@@ -1,0 +1,20 @@
+HloModule jit__unnamed_wrapped_function_, entry_computation_layout={(s32[8,8]{1,0}, s32[8,8]{1,0}, s32[8,8]{1,0})->s32[8,8]{1,0}}, allow_spmd_sharding_propagation_to_parameters={true,true,true}, allow_spmd_sharding_propagation_to_output={true}, num_partitions=8
+
+model.impl.15 {
+  Arg_2.18 = s32[8,8]{1,0} parameter(2)
+  custom-call.19 = s32[8,8]{1,0} custom-call(Arg_2.18), custom_call_target="AutoSharding", backend_config={"axes": [["batch"], []]}
+  Arg_0.16 = s32[8,8]{1,0} parameter(0)
+  custom-call.20 = s32[8,8]{1,0} custom-call(Arg_0.16), custom_call_target="AutoSharding", backend_config={"axes": [["model"], []]}
+  dot.22 = s32[8,8]{1,0} dot(custom-call.19, custom-call.20), lhs_contracting_dims={1}, rhs_contracting_dims={0}
+  Arg_1.17 = s32[8,8]{1,0} parameter(1)
+  custom-call.21 = s32[8,8]{1,0} custom-call(Arg_1.17), custom_call_target="AutoSharding", backend_config={"axes": [[], ["model"]]}
+  dot.23 = s32[8,8]{1,0} dot(dot.22, custom-call.21), lhs_contracting_dims={1}, rhs_contracting_dims={0}
+  ROOT custom-call.24 = s32[8,8]{1,0} custom-call(dot.23), custom_call_target="AutoSharding", backend_config={"axes": [["batch"], []]}
+} // model.impl.15
+
+ENTRY main.26 {
+  Arg_0.1 = s32[8,8]{1,0} parameter(0), metadata={op_name=""}
+  Arg_1.2 = s32[8,8]{1,0} parameter(1), metadata={op_name=""}
+  Arg_2.3 = s32[8,8]{1,0} parameter(2), metadata={op_name=""}
+  ROOT custom-call.25 = s32[8,8]{1,0} custom-call(Arg_0.1, Arg_1.2, Arg_2.3), custom_call_target="MultiMeshTask", called_computations={model.impl.15}, backend_config={"name": "model", "devices": [0, 1, 2, 3, 4, 5, 6, 7], "autosharding": {"dims": [8], "device_axes": ["x"], "logical_axes": [["batch", "x"], ["model", "x"]]}}
+}

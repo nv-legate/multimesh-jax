@@ -1,0 +1,327 @@
+HloModule compute_loss.id_79, input_output_alias={ {0}: (9, {}, must-alias), {1}: (10, {}, must-alias), {2}: (11, {}, must-alias), {3}: (12, {}, must-alias), {4}: (13, {}, must-alias), {5}: (14, {}, must-alias), {6}: (15, {}, must-alias), {7}: (16, {}, must-alias), {8}: (17, {}, must-alias), {9}: (18, {}, must-alias), {10}: (19, {}, must-alias), {11}: (20, {}, must-alias), {14}: (22, {}, must-alias), {15}: (23, {}, must-alias), {16}: (24, {}, must-alias) }, entry_computation_layout={(bf16[4,256,12288]{2,1,0}, f32[12288]{0}, f32[12288]{0}, f32[12288,6400]{1,0}, f32[6400]{0}, /*index=5*/s32[256,2048]{1,0}, s32[], f32[256,2048]{1,0}, f32[], f32[], /*index=10*/f32[], f32[], bf16[], f32[], f32[], /*index=15*/f32[], f32[], f32[], f32[], s32[8,2048]{1,0}, /*index=20*/f32[4]{0}, f32[], f32[12288]{0}, f32[12288]{0}, f32[6400]{0})->(f32[], f32[], f32[], bf16[], f32[], /*index=5*/f32[], f32[], f32[], f32[], f32[], /*index=10*/s32[8,2048]{1,0}, f32[4]{0}, bf16[4,256,12288]{2,1,0}, bf16[6400,12288]{1,0}, f32[12288]{0}, /*index=15*/f32[12288]{0}, f32[6400]{0})}, num_partitions=16
+
+region_81.2283.clone.1 {
+  Arg_0.1 = f32[] parameter(0)
+  Arg_1.1 = f32[] parameter(1)
+  ROOT add.3 = f32[] add(Arg_0.1, Arg_1.1)
+}
+
+region_84.2295.clone {
+  Arg_0.2 = f32[] parameter(0)
+  Arg_1.3 = f32[] parameter(1)
+  ROOT add.4 = f32[] add(Arg_0.2, Arg_1.3)
+}
+
+region_84.2295.clone.1 {
+  Arg_0.3 = f32[] parameter(0)
+  Arg_1.4 = f32[] parameter(1)
+  ROOT add.5 = f32[] add(Arg_0.3, Arg_1.4)
+}
+
+region_83.2291.clone {
+  Arg_0.4 = f32[] parameter(0)
+  Arg_1.5 = f32[] parameter(1)
+  ROOT add.6 = f32[] add(Arg_0.4, Arg_1.5)
+}
+
+region_90.2332.clone {
+  Arg_0.5 = bf16[] parameter(0)
+  Arg_1.6 = bf16[] parameter(1)
+  ROOT add.11 = bf16[] add(Arg_0.5, Arg_1.6)
+}
+
+region_90.2332.clone.1 {
+  Arg_0.6 = bf16[] parameter(0)
+  Arg_1.7 = bf16[] parameter(1)
+  ROOT add.12 = bf16[] add(Arg_0.6, Arg_1.7)
+}
+
+region_92.2340.clone {
+  Arg_0.7 = bf16[] parameter(0)
+  Arg_1.8 = bf16[] parameter(1)
+  ROOT add.13 = bf16[] add(Arg_0.7, Arg_1.8)
+}
+
+region_92.2340.clone.1 {
+  Arg_0.8 = bf16[] parameter(0)
+  Arg_1.9 = bf16[] parameter(1)
+  ROOT add.14 = bf16[] add(Arg_0.8, Arg_1.9)
+}
+
+region_88.2324.clone.1 {
+  Arg_0.10 = bf16[] parameter(0)
+  Arg_1.11 = bf16[] parameter(1)
+  ROOT add.16 = bf16[] add(Arg_0.10, Arg_1.11)
+}
+
+region_73.2194 {
+  Arg_0.2195 = f32[] parameter(0)
+  Arg_1.2196 = f32[] parameter(1)
+  ROOT add.2197 = f32[] add(Arg_0.2195, Arg_1.2196)
+}
+
+region_78.2251 {
+  Arg_0.2252 = f32[] parameter(0)
+  Arg_2.2254 = f32[] parameter(2)
+  compare.2256 = pred[] compare(Arg_0.2252, Arg_2.2254), direction=GT
+  compare.2257 = pred[] compare(Arg_0.2252, Arg_0.2252), direction=NE
+  or.2258 = pred[] or(compare.2256, compare.2257)
+  select.2263 = f32[] select(or.2258, Arg_0.2252, Arg_2.2254)
+  compare.2259 = pred[] compare(Arg_0.2252, Arg_2.2254), direction=EQ
+  Arg_1.2253 = s32[] parameter(1)
+  Arg_3.2255 = s32[] parameter(3)
+  compare.2260 = pred[] compare(Arg_1.2253, Arg_3.2255), direction=LT
+  and.2261 = pred[] and(compare.2259, compare.2260)
+  or.2262 = pred[] or(or.2258, and.2261)
+  select.2264 = s32[] select(or.2262, Arg_1.2253, Arg_3.2255)
+  ROOT tuple.2265 = (f32[], s32[]) tuple(select.2263, select.2264)
+} // region_78.2251
+
+region_94.2348 {
+  Arg_0.2349 = bf16[] parameter(0)
+  Arg_1.2350 = bf16[] parameter(1)
+  ROOT add.2351 = bf16[] add(Arg_0.2349, Arg_1.2350)
+}
+
+add.clone {
+  x.1 = bf16[] parameter(0)
+  y.1 = bf16[] parameter(1)
+  ROOT add.8 = bf16[] add(x.1, y.1)
+}
+
+add.1.clone {
+  x.3 = bf16[] parameter(0)
+  y.3 = bf16[] parameter(1)
+  ROOT add.10 = bf16[] add(x.3, y.3)
+}
+
+region_81.2283.clone {
+  Arg_0.0 = f32[] parameter(0)
+  Arg_1.0 = f32[] parameter(1)
+  ROOT add.2 = f32[] add(Arg_0.0, Arg_1.0)
+}
+
+region_88.2324.clone {
+  Arg_0.9 = bf16[] parameter(0)
+  Arg_1.10 = bf16[] parameter(1)
+  ROOT add.15 = bf16[] add(Arg_0.9, Arg_1.10)
+}
+
+ENTRY main.36562_spmd {
+  param = f32[] parameter(8), sharding={replicated}
+  param.1 = f32[] parameter(21), sharding={replicated}
+  param.2 = f32[] parameter(9), sharding={replicated}
+  param.3 = s32[256,2048]{1,0} parameter(5), sharding={replicated}
+  constant.44 = s32[16]{0} constant({...})
+  partition-id = u32[] partition-id()
+  dynamic-slice.1 = s32[1]{0} dynamic-slice(constant.44, partition-id), dynamic_slice_sizes={1}
+  reshape.165 = s32[] reshape(dynamic-slice.1)
+  constant.43 = s32[] constant(0)
+  param.4 = s32[] parameter(6), sharding={replicated}
+  constant.103 = s32[] constant(252), sharding={replicated}
+  clamp = s32[] clamp(constant.43, param.4, constant.103), sharding={replicated}
+  add.41 = s32[] add(reshape.165, clamp)
+  constant.45 = s32[16]{0} constant({...})
+  dynamic-slice.4 = s32[1]{0} dynamic-slice(constant.45, partition-id), dynamic_slice_sizes={1}
+  reshape.166 = s32[] reshape(dynamic-slice.4)
+  dynamic-slice.5 = s32[4,256]{1,0} dynamic-slice(param.3, add.41, reshape.166), dynamic_slice_sizes={4,256}
+  broadcast.35 = s32[4,256,51200]{2,1,0} broadcast(dynamic-slice.5), dimensions={0,1}
+  iota.4 = s32[4,256,51200]{2,1,0} iota(), iota_dimension=2
+  compare.0 = pred[4,256,51200]{2,1,0} compare(broadcast.35, iota.4), direction=EQ
+  param.5 = bf16[4,256,12288]{2,1,0} parameter(0), sharding={devices=[2,8,1]<=[16]}
+  convert.17 = f32[4,256,12288]{2,1,0} convert(param.5)
+  constant.46 = f32[] constant(0)
+  reduce.4 = f32[4,256]{1,0} reduce(convert.17, constant.46), dimensions={2}, to_apply=region_73.2194
+  constant.47 = f32[] constant(8.13802108e-05)
+  broadcast.36 = f32[4,256]{1,0} broadcast(constant.47), dimensions={}
+  multiply.34 = f32[4,256]{1,0} multiply(reduce.4, broadcast.36)
+  convert.18 = bf16[4,256]{1,0} convert(multiply.34)
+  broadcast.37 = bf16[4,256,12288]{2,1,0} broadcast(convert.18), dimensions={0,1}
+  subtract.0 = bf16[4,256,12288]{2,1,0} subtract(param.5, broadcast.37)
+  multiply.35 = bf16[4,256,12288]{2,1,0} multiply(subtract.0, subtract.0)
+  convert.19 = f32[4,256,12288]{2,1,0} convert(multiply.35)
+  reduce.5 = f32[4,256]{1,0} reduce(convert.19, constant.46), dimensions={2}, to_apply=region_73.2194
+  multiply.36 = f32[4,256]{1,0} multiply(reduce.5, broadcast.36)
+  convert.20 = bf16[4,256]{1,0} convert(multiply.36)
+  constant.50 = bf16[] constant(9.984e-07)
+  broadcast.40 = bf16[4,256]{1,0} broadcast(constant.50), dimensions={}
+  add.17 = bf16[4,256]{1,0} add(convert.20, broadcast.40)
+  reshape.167 = bf16[4,256,1]{2,1,0} reshape(add.17)
+  rsqrt.1 = bf16[4,256,1]{2,1,0} rsqrt(reshape.167)
+  reshape.168 = bf16[4,256]{1,0} reshape(rsqrt.1)
+  broadcast.41 = bf16[4,256,12288]{2,1,0} broadcast(reshape.168), dimensions={0,1}
+  multiply.37 = bf16[4,256,12288]{2,1,0} multiply(subtract.0, broadcast.41)
+  param.6 = f32[12288]{0} parameter(1), sharding={replicated}
+  convert.21 = bf16[12288]{0} convert(param.6)
+  constant.51 = bf16[] constant(1)
+  broadcast.42 = bf16[12288]{0} broadcast(constant.51), dimensions={}
+  add.18 = bf16[12288]{0} add(convert.21, broadcast.42)
+  broadcast.43 = bf16[4,256,12288]{2,1,0} broadcast(add.18), dimensions={2}
+  multiply.38 = bf16[4,256,12288]{2,1,0} multiply(multiply.37, broadcast.43)
+  param.7 = f32[12288]{0} parameter(2), sharding={replicated}
+  convert.22 = bf16[12288]{0} convert(param.7)
+  broadcast.44 = bf16[4,256,12288]{2,1,0} broadcast(convert.22), dimensions={2}
+  add.19 = bf16[4,256,12288]{2,1,0} add(multiply.38, broadcast.44)
+  reshape.188 = bf16[1024,12288]{1,0} reshape(add.19)
+  param.8 = f32[12288,6400]{1,0} parameter(3), sharding={devices=[1,8,2]<=[2,8]T(1,0) last_tile_dim_replicate}
+  convert.23 = bf16[12288,6400]{1,0} convert(param.8)
+  all-gather = bf16[12288,51200]{1,0} all-gather(convert.23), channel_id=1, replica_groups=[2,8]<=[16], dimensions={1}, use_global_device_ids=true
+  dot.3 = bf16[1024,51200]{1,0} dot(reshape.188, all-gather), lhs_contracting_dims={1}, rhs_contracting_dims={0}
+  param.9 = f32[6400]{0} parameter(4), sharding={devices=[8,2]<=[2,8]T(1,0) last_tile_dim_replicate}
+  convert.24 = bf16[6400]{0} convert(param.9)
+  all-gather.1 = bf16[51200]{0} all-gather(convert.24), channel_id=2, replica_groups=[2,8]<=[16], dimensions={0}, use_global_device_ids=true
+  broadcast.107 = bf16[1024,51200]{1,0} broadcast(all-gather.1), dimensions={1}
+  add.43 = bf16[1024,51200]{1,0} add(dot.3, broadcast.107)
+  constant.53 = bf16[] constant(0.03345)
+  broadcast.108 = bf16[1024,51200]{1,0} broadcast(constant.53), dimensions={}
+  multiply.60 = bf16[1024,51200]{1,0} multiply(add.43, broadcast.108)
+  tanh.2 = bf16[1024,51200]{1,0} tanh(multiply.60)
+  reshape.216 = bf16[4,256,51200]{2,1,0} reshape(tanh.2)
+  constant.54 = bf16[] constant(30)
+  broadcast.47 = bf16[4,256,51200]{2,1,0} broadcast(constant.54), dimensions={}
+  multiply.40 = bf16[4,256,51200]{2,1,0} multiply(reshape.216, broadcast.47)
+  convert.25 = f32[4,256,51200]{2,1,0} convert(multiply.40)
+  iota.5 = s32[4,256,51200]{2,1,0} iota(), iota_dimension=2
+  constant.55 = f32[] constant(-inf)
+  reduce.6 = (f32[4,256]{1,0}, s32[4,256]{1,0}) reduce(convert.25, iota.5, constant.55, constant.43), dimensions={2}, to_apply=region_78.2251
+  get-tuple-element.1 = f32[4,256]{1,0} get-tuple-element(reduce.6), index=0
+  broadcast.48 = f32[4,256,51200]{2,1,0} broadcast(get-tuple-element.1), dimensions={0,1}
+  subtract.2 = f32[4,256,51200]{2,1,0} subtract(convert.25, broadcast.48)
+  exponential.0 = f32[4,256,51200]{2,1,0} exponential(subtract.2)
+  reduce.7 = f32[4,256]{1,0} reduce(exponential.0, constant.46), dimensions={2}, to_apply=region_73.2194
+  log.2 = f32[4,256]{1,0} log(reduce.7)
+  broadcast.49 = f32[4,256,51200]{2,1,0} broadcast(log.2), dimensions={0,1}
+  subtract.8 = f32[4,256,51200]{2,1,0} subtract(subtract.2, broadcast.49)
+  broadcast.50 = f32[4,256,51200]{2,1,0} broadcast(constant.46), dimensions={}
+  select.4 = f32[4,256,51200]{2,1,0} select(compare.0, subtract.8, broadcast.50)
+  reduce.8 = f32[4,256]{1,0} reduce(select.4, constant.46), dimensions={2}, to_apply=region_73.2194
+  negate.10 = f32[4,256]{1,0} negate(reduce.8)
+  param.10 = f32[256,2048]{1,0} parameter(7), sharding={replicated}
+  dynamic-slice.7 = f32[8,2048]{1,0} dynamic-slice(param.10, param.4, constant.43), dynamic_slice_sizes={8,2048}
+  convert.26 = bf16[8,2048]{1,0} convert(dynamic-slice.7)
+  dynamic-slice.10 = bf16[4,256]{1,0} dynamic-slice(convert.26, reshape.165, reshape.166), dynamic_slice_sizes={4,256}
+  convert.27 = f32[4,256]{1,0} convert(dynamic-slice.10)
+  multiply.41 = f32[4,256]{1,0} multiply(negate.10, convert.27)
+  reduce.9 = f32[] reduce(multiply.41, constant.46), dimensions={0,1}, to_apply=region_73.2194
+  all-reduce.13 = f32[] all-reduce(reduce.9), channel_id=16, replica_groups={{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}}, use_global_device_ids=true, to_apply=region_81.2283.clone
+  add.21 = f32[] add(param.2, all-reduce.13)
+  param.11 = f32[] parameter(10), sharding={replicated}
+  add.22 = f32[] add(param.11, all-reduce.13)
+  param.12 = f32[] parameter(11), sharding={replicated}
+  convert.28 = f32[8,2048]{1,0} convert(convert.26)
+  reduce.10 = f32[] reduce(convert.28, constant.46), dimensions={0,1}, to_apply=region_73.2194
+  add.23 = f32[] add(param.12, reduce.10)
+  param.13 = bf16[] parameter(12), sharding={replicated}
+  get-tuple-element.2 = s32[4,256]{1,0} get-tuple-element(reduce.6), index=1
+  compare.1 = pred[4,256]{1,0} compare(dynamic-slice.5, get-tuple-element.2), direction=EQ
+  constant.65 = bf16[] constant(0)
+  broadcast.88 = bf16[4,256]{1,0} broadcast(constant.65), dimensions={}
+  select.5 = bf16[4,256]{1,0} select(compare.1, dynamic-slice.10, broadcast.88)
+  convert.29 = f32[4,256]{1,0} convert(select.5)
+  reduce.11 = f32[] reduce(convert.29, constant.46), dimensions={0,1}, to_apply=region_73.2194
+  convert.30 = bf16[] convert(reduce.11)
+  add.24 = bf16[] add(param.13, convert.30)
+  param.14 = f32[] parameter(13), sharding={replicated}
+  add.25 = f32[] add(param.14, reduce.10)
+  param.15 = f32[] parameter(14), sharding={replicated}
+  add.26 = f32[] add(param.15, all-reduce.13)
+  param.16 = f32[] parameter(15), sharding={replicated}
+  add.27 = f32[] add(param.16, reduce.10)
+  param.17 = f32[] parameter(16), sharding={replicated}
+  add.28 = f32[] add(param.17, reduce.10)
+  param.18 = f32[] parameter(17), sharding={replicated}
+  add.29 = f32[] add(param.18, all-reduce.13)
+  param.19 = f32[] parameter(18), sharding={replicated}
+  add.30 = f32[] add(param.19, reduce.10)
+  param.20 = s32[8,2048]{1,0} parameter(19), sharding={devices=[1,1,16]<=[16] last_tile_dim_replicate}
+  dynamic-slice.12 = s32[8,2048]{1,0} dynamic-slice(param.3, param.4, constant.43), dynamic_slice_sizes={8,2048}
+  add.31 = s32[8,2048]{1,0} add(param.20, dynamic-slice.12)
+  param.21 = f32[4]{0} parameter(20), sharding={devices=[2,8]<=[16] last_tile_dim_replicate}
+  dynamic-slice.15 = f32[4,256]{1,0} dynamic-slice(convert.28, reshape.165, reshape.166), dynamic_slice_sizes={4,256}
+  multiply.42 = f32[4,256]{1,0} multiply(negate.10, dynamic-slice.15)
+  reduce.12 = f32[4]{0} reduce(multiply.42, constant.46), dimensions={1}, to_apply=region_73.2194
+  add.32 = f32[4]{0} add(param.21, reduce.12)
+  negate.11 = f32[4,256]{1,0} negate(convert.27)
+  broadcast.89 = f32[4,256,51200]{2,1,0} broadcast(negate.11), dimensions={0,1}
+  select.6 = f32[4,256,51200]{2,1,0} select(compare.0, broadcast.89, broadcast.50)
+  reduce.13 = f32[4,256]{1,0} reduce(select.6, constant.46), dimensions={2}, to_apply=region_73.2194
+  negate.12 = f32[4,256]{1,0} negate(reduce.13)
+  divide.9 = f32[4,256]{1,0} divide(negate.12, reduce.7)
+  broadcast.91 = f32[4,256,51200]{2,1,0} broadcast(divide.9), dimensions={0,1}
+  multiply.43 = f32[4,256,51200]{2,1,0} multiply(broadcast.91, exponential.0)
+  add.33 = f32[4,256,51200]{2,1,0} add(select.6, multiply.43)
+  convert.32 = bf16[4,256,51200]{2,1,0} convert(add.33)
+  multiply.44 = bf16[4,256,51200]{2,1,0} multiply(convert.32, broadcast.47)
+  broadcast.92 = bf16[4,256,51200]{2,1,0} broadcast(constant.51), dimensions={}
+  subtract.9 = bf16[4,256,51200]{2,1,0} subtract(broadcast.92, reshape.216)
+  multiply.45 = bf16[4,256,51200]{2,1,0} multiply(multiply.44, subtract.9)
+  multiply.46 = bf16[4,256,51200]{2,1,0} multiply(multiply.45, reshape.216)
+  add.34 = bf16[4,256,51200]{2,1,0} add(multiply.45, multiply.46)
+  broadcast.46 = bf16[4,256,51200]{2,1,0} broadcast(constant.53), dimensions={}
+  multiply.47 = bf16[4,256,51200]{2,1,0} multiply(add.34, broadcast.46)
+  reshape.191 = bf16[1024,51200]{1,0} reshape(multiply.47)
+  dot.4 = bf16[1024,12288]{1,0} dot(reshape.191, all-gather), lhs_contracting_dims={1}, rhs_contracting_dims={1}
+  reshape.193 = bf16[4,256,12288]{2,1,0} reshape(dot.4)
+  multiply.48 = bf16[4,256,12288]{2,1,0} multiply(reshape.193, broadcast.43)
+  multiply.49 = bf16[4,256,12288]{2,1,0} multiply(subtract.0, multiply.48)
+  reduce.14 = bf16[4,256]{1,0} reduce(multiply.49, constant.65), dimensions={2}, to_apply=region_94.2348
+  reshape.176 = bf16[4,256,1]{2,1,0} reshape(reduce.14)
+  divide.10 = bf16[4,256,1]{2,1,0} divide(rsqrt.1, reshape.167)
+  constant.79 = bf16[] constant(-0.5)
+  broadcast.102 = bf16[4,256,1]{2,1,0} broadcast(constant.79), dimensions={}
+  multiply.50 = bf16[4,256,1]{2,1,0} multiply(divide.10, broadcast.102)
+  multiply.51 = bf16[4,256,1]{2,1,0} multiply(reshape.176, multiply.50)
+  convert.33 = f32[4,256,1]{2,1,0} convert(multiply.51)
+  broadcast.104 = f32[4,256,1]{2,1,0} broadcast(constant.47), dimensions={}
+  multiply.52 = f32[4,256,1]{2,1,0} multiply(convert.33, broadcast.104)
+  convert.34 = bf16[4,256,1]{2,1,0} convert(multiply.52)
+  constant.87 = bf16[] constant(2)
+  broadcast.97 = bf16[4,256,1]{2,1,0} broadcast(constant.87), dimensions={}
+  multiply.53 = bf16[4,256,1]{2,1,0} multiply(convert.34, broadcast.97)
+  reshape.181 = bf16[4,256]{1,0} reshape(multiply.53)
+  broadcast.98 = bf16[4,256,12288]{2,1,0} broadcast(reshape.181), dimensions={0,1}
+  multiply.54 = bf16[4,256,12288]{2,1,0} multiply(subtract.0, broadcast.98)
+  multiply.55 = bf16[4,256,12288]{2,1,0} multiply(multiply.48, broadcast.41)
+  add.35 = bf16[4,256,12288]{2,1,0} add(multiply.54, multiply.55)
+  reduce.15 = bf16[4,256]{1,0} reduce(multiply.54, constant.65), dimensions={2}, to_apply=region_94.2348
+  negate.13 = bf16[4,256]{1,0} negate(reduce.15)
+  reduce.16 = bf16[4,256]{1,0} reduce(multiply.55, constant.65), dimensions={2}, to_apply=region_94.2348
+  negate.14 = bf16[4,256]{1,0} negate(reduce.16)
+  add.36 = bf16[4,256]{1,0} add(negate.13, negate.14)
+  convert.35 = f32[4,256]{1,0} convert(add.36)
+  multiply.56 = f32[4,256]{1,0} multiply(convert.35, broadcast.36)
+  convert.36 = bf16[4,256]{1,0} convert(multiply.56)
+  broadcast.101 = bf16[4,256,12288]{2,1,0} broadcast(convert.36), dimensions={0,1}
+  add.37 = bf16[4,256,12288]{2,1,0} add(add.35, broadcast.101)
+  transpose.4 = bf16[51200,4,256]{0,2,1} transpose(multiply.47), dimensions={2,0,1}
+  reshape.194 = bf16[51200,1024]{1,0} reshape(transpose.4)
+  dot.5 = bf16[51200,12288]{1,0} dot(reshape.194, reshape.188), lhs_contracting_dims={1}, rhs_contracting_dims={0}
+  all-reduce.5 = bf16[51200,12288]{1,0} all-reduce(dot.5), channel_id=8, replica_groups=[2,8]<=[16], use_global_device_ids=true, to_apply=add.clone
+  constant.110 = u32[1]{0} constant({0})
+  constant.94 = u32[16]{0} constant({...})
+  dynamic-slice.24 = u32[1]{0} dynamic-slice(constant.94, partition-id), dynamic_slice_sizes={1}
+  constant.111 = u32[1]{0} constant({7})
+  clamp.3 = u32[1]{0} clamp(constant.110, dynamic-slice.24, constant.111)
+  convert.41 = s32[1]{0} convert(clamp.3)
+  constant.112 = s32[1]{0} constant({6400})
+  multiply.61 = s32[1]{0} multiply(convert.41, constant.112)
+  reshape.219 = s32[] reshape(multiply.61)
+  dynamic-slice.26 = bf16[6400,12288]{1,0} dynamic-slice(all-reduce.5, reshape.219, constant.43), dynamic_slice_sizes={6400,12288}
+  all-reduce.6 = bf16[6400,12288]{1,0} all-reduce(dynamic-slice.26), channel_id=9, replica_groups=[8,2]<=[2,8]T(1,0), use_global_device_ids=true, to_apply=add.1.clone
+  param.22 = f32[12288]{0} parameter(22), sharding={replicated}
+  reduce.17 = bf16[12288]{0} reduce(dot.4, constant.65), dimensions={0}, to_apply=region_94.2348
+  convert.37 = f32[12288]{0} convert(reduce.17)
+  add.38 = f32[12288]{0} add(param.22, convert.37)
+  param.23 = f32[12288]{0} parameter(23), sharding={replicated}
+  multiply.57 = bf16[4,256,12288]{2,1,0} multiply(multiply.37, reshape.193)
+  reduce.18 = bf16[12288]{0} reduce(multiply.57, constant.65), dimensions={0,1}, to_apply=region_94.2348
+  convert.38 = f32[12288]{0} convert(reduce.18)
+  add.39 = f32[12288]{0} add(param.23, convert.38)
+  param.24 = f32[6400]{0} parameter(24), sharding={devices=[8,2]<=[2,8]T(1,0) last_tile_dim_replicate}
+  reduce.19 = bf16[51200]{0} reduce(multiply.47, constant.65), dimensions={0,1}, to_apply=region_94.2348
+  all-reduce.17 = bf16[51200]{0} all-reduce(reduce.19), channel_id=20, replica_groups={{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}}, use_global_device_ids=true, to_apply=region_88.2324.clone
+  dynamic-slice.29 = bf16[6400]{0} dynamic-slice(all-reduce.17, reshape.219), dynamic_slice_sizes={6400}
+  convert.39 = f32[6400]{0} convert(dynamic-slice.29)
+  add.40 = f32[6400]{0} add(param.24, convert.39)
+  ROOT tuple = (f32[], f32[], f32[], bf16[], f32[], /*index=5*/f32[], f32[], f32[], f32[], f32[], /*index=10*/s32[8,2048]{1,0}, f32[4]{0}, bf16[4,256,12288]{2,1,0}, bf16[6400,12288]{1,0}, f32[12288]{0}, /*index=15*/f32[12288]{0}, f32[6400]{0}) tuple(add.21, add.22, add.23, add.24, add.25, /*index=5*/add.26, add.27, add.28, add.29, add.30, /*index=10*/add.31, add.32, add.37, all-reduce.6, add.38, /*index=15*/add.39, add.40)
+} // main.36562_spmd

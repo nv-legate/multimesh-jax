@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
+#                         All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+from .install_info import libpath
+from pathlib import Path
+import atexit
+import functools
+
+from .init import init, init_test
+
+
+def initialize():
+    import jax._src.xla_bridge as xb
+    from multimesh.jax import register_custom_call_target
+
+    lib = Path(libpath) / "libmultimesh_plugin.so"
+    c_api = xb.register_plugin(
+        "multimesh", priority=500, library_path=str(lib), options=None
+    )
+
+    from jax._src.lib import xla_client
+    from jaxlib import xla_extension as xe
+
+    xla_client.register_custom_call_handler(
+        "CUDA", functools.partial(register_custom_call_target, c_api)
+    )
+
+    import multimesh.jax
+
+    atexit.register(multimesh.jax.shutdown)

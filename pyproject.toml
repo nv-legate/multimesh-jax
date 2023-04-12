@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+[build-system]
+requires = [
+    "wheel",
+    "setuptools",
+    "numpy",
+    "scikit-build>=0.13.1",
+    "cmake>=3.22.1,!=3.23.0,!=3.25.0",
+    "versioneer[toml]",
+]
+
+[tool.black]
+line-length = 79
+target-version = ["py36"]
+include = '\.py?$'
+exclude = '''
+/(
+    \.eggs |
+    \.git |
+    \.mypy_cache |
+    \.tox |
+    \.venv |
+    _build |
+    buck-out |
+    build |
+    dist
+)/
+'''
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "@abstract"
+]
+

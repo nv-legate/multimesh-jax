@@ -1,0 +1,19 @@
+{
+  "packages" : {
+    "realm": {
+      "version" : "24.9.0",
+      "git_url" : "https://gitlab.com/StanfordLegion/legion.git",
+      "git_tag" : "228238b0d3154fa18faa38e7d75a74914b893738"
+    },
+    "zuku": {
+      "version" : "24.9.0",
+      "git_url" : "https://github.com/nv-legate/zuku.git",
+      "git_tag" : "dd24496ecf84bebd2dc6740bcb9ef35985f34c0f"
+    },
+    "OpenXLA" : {
+      "version" : "24.9.0",
+      "git_url" : "https://github.com/openxla/xla/tree/main/xla",
+      "git_tag" : "41c2b0eda0a14662506528647384798e81fe39f4"
+    }
+  }
+}
