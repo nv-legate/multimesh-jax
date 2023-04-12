@@ -1,0 +1,78 @@
+#=============================================================================
+# Copyright 2022 NVIDIA Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#=============================================================================
+
+cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
+project(LegataXLA LANGUAGES C CXX CUDA)
+
+set(CMAKE_CXX_STANDARD 17)
+
+if(POLICY CMP0077)
+  cmake_policy(SET CMP0077 NEW)
+  set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+endif()
+
+if(POLICY CMP0096)
+  cmake_policy(SET CMP0096 NEW)
+  set(CMAKE_POLICY_DEFAULT_CMP0096 NEW)
+endif()
+
+if(POLICY CMP0135)
+  # make the timestamps of ExternalProject_ADD match the download time
+  # https://cmake.org/cmake/help/latest/policy/CMP0135.html
+  cmake_policy(SET CMP0135 NEW)
+  set(CMAKE_POLICY_DEFAULT_CMP0135 NEW)
+endif()
+
+##############################################################################
+# - Download and initialize RAPIDS CMake helpers -----------------------------
+
+
+if(NOT EXISTS ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-22.08/RAPIDS.cmake
+       ${CMAKE_BINARY_DIR}/legate-xla-RAPIDS.cmake)
+endif()
+include(${CMAKE_BINARY_DIR}/legate-xla-RAPIDS.cmake)
+include(rapids-cmake)
+include(rapids-cpm)
+include(rapids-cuda)
+include(rapids-export)
+include(rapids-find)
+
+set(legate_xla_version 23.03.00)
+
+
+include(cmake/third_party/get_legate_core.cmake)
+
+#set(BUILD_SHARED_LIBS ON)
+add_subdirectory(src)
+
+
+rapids_export(
+  INSTALL legate-xla
+  EXPORT_SET legate-xla-exports
+  GLOBAL_TARGETS xla-bridge
+  NAMESPACE legate::
+  LANGUAGES ${ENABLED_LANGUAGES}
+)
+
+# build export targets
+rapids_export(
+  BUILD legate-xla
+  EXPORT_SET legate-xla-exports
+  GLOBAL_TARGETS xla-birdge
+  NAMESPACE legate::
+  LANGUAGES ${ENABLED_LANGUAES}
+)
