@@ -4,8 +4,9 @@
 #include <stdint.h>
 #include <utility>
 #include <vector>
+#include <functional>
 
-namespace legate {
+namespace legate_xla {
 
 class TaskMemoryAllocator {
  public:
@@ -66,17 +67,6 @@ class DeviceAssignment {
   std::vector<int> global_device_ids_;
 };
 
-class Stream {
- public:
-  virtual bool BlockUntilDone() = 0;
-
-  virtual int64_t ComputeTimeNs() const = 0;
-};
-
-class LegateCompiler {
- public:
-  virtual void Compile(uint64_t run_id, const CompileConfig& config) = 0;
-};
 
 class LegateExecutable {
  public:
@@ -91,18 +81,62 @@ class LegateExecutable {
   * @param device_assignment The local device and global device ID array
   * @return Whether the execution ran successfully on the device
   */
-  virtual std::unique_ptr<Stream> Execute(uint64_t run_id,
-                                          const std::vector<BufferAllocation>& inputs,
-                                          const std::vector<BufferAllocation>& outputs,
-                                          TaskMemoryAllocator* allocator,
-                                          const DeviceAssignment& device_assignment,
-                                          bool block_host_until_done = true) const = 0;
+  virtual bool Execute(uint64_t run_id,
+                      const std::vector<BufferAllocation>& inputs,
+                      const std::vector<BufferAllocation>& outputs,
+                      TaskMemoryAllocator* allocator,
+                      const DeviceAssignment& device_assignment) const = 0;
 
-  virtual bool TupledArgs() const = 0;
-
-  virtual void PrintBuffers() const = 0;
-
-  virtual std::string ToString() const = 0;
 };
 
+class LegateCompiler {
+ public:
+  virtual void Compile(uint64_t run_id, const CompileConfig& config) = 0;
+
+  virtual std::unique_ptr<LegateExecutable> MakeExecutable() = 0;
+};
+
+
+class StoreHandle {};
+
+enum class SupportedType {
+    F16,
+    BF16,
+    F32,
+    F64,
+    S8,
+    S16,
+    S32,
+    S64,
+    U8,
+    U16,
+    U32,
+    U64,
+    C64,
+    C128,
+};
+
+struct Shape {
+  SupportedType type;
+  std::vector<int> dims;
+};
+
+void CreateCompileTask(LegateCompiler* compiler);
+
+void CreateExecuteTask(LegateExecutable* executable,
+  const std::vector<StoreHandle*>& inputs,
+  const std::vector<StoreHandle*>& outputs);
+
+StoreHandle* CreateStore(const legate_xla::Shape& shape);
+
+StoreHandle* CreateStoreFromHostBuffer(
+  const legate_xla::Shape& shape, const void* data, std::function<void()> on_done);
+
+void InitLegate();
+
 }
+
+extern "C" std::unique_ptr<legate_xla::LegateCompiler> GetLegateCompilerFromHloProtoText(
+  const std::string& hlo_string,
+  const std::string& platform_name,
+  int replica_count, int num_partitions);

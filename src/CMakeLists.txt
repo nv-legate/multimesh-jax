@@ -1,12 +1,15 @@
 
 add_library(
   legate_xla
-  STATIC
   allocator.cc
   hlo_executor.cc
   hlo_executor.cu
   hlo_loader.cc
   hlo_loader.cu
+  hlo_prototype_load.cc
+  hlo_prototype_load.cu
+  hlo_prototype_execute.cc
+  hlo_prototype_execute.cu
   task_utils.cc
   xla_task.cc
 )

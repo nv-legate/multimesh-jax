@@ -23,6 +23,8 @@ namespace legate_xla {
 enum XlaOpCode{
   XLA_COMPILE_TASK,
   XLA_EXECUTE_TASK,
+  HLO_PROTOTYPE_LOAD,
+  HLO_PROTOTYPE_EXECUTE
 };
 
 extern Legion::Logger log_xla;

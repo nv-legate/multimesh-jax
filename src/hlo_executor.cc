@@ -33,20 +33,20 @@ namespace {
 
 struct get_read_only_buffer_fn {
   template <legate::LegateTypeCode TYPE_CODE, int32_t DIM>
-  legate::BufferAllocation operator()(legate::Store& store)
+  BufferAllocation operator()(legate::Store& store)
   {
     using VAL    = legate::legate_type_of<TYPE_CODE>;
     auto shape   = store.shape<DIM>();
     auto acc     = store.read_accessor<VAL, DIM>();
     size_t size  = sizeof(legate::legate_type_of<TYPE_CODE>) * store.domain().get_volume();
     void* buffer = const_cast<void*>(static_cast<const void*>(acc.ptr(shape)));
-    return legate::BufferAllocation{.buffer = buffer, .size = size};
+    return BufferAllocation{.buffer = buffer, .size = size};
   }
 };
 
 struct get_write_only_buffer_fn {
   template <legate::LegateTypeCode TYPE_CODE, int32_t DIM>
-  legate::BufferAllocation operator()(legate::Store& store, bool is_red)
+  BufferAllocation operator()(legate::Store& store, bool is_red)
   {
     using VAL    = legate::legate_type_of<TYPE_CODE>;
     auto shape   = store.shape<DIM>();
@@ -59,7 +59,7 @@ struct get_write_only_buffer_fn {
       buffer   = static_cast<void*>(acc.ptr(shape));
     }
     size_t size = sizeof(legate::legate_type_of<TYPE_CODE>) * store.domain().get_volume();
-    return legate::BufferAllocation{.buffer = buffer, .size = size};
+    return BufferAllocation{.buffer = buffer, .size = size};
   }
 };
 
@@ -68,9 +68,13 @@ struct get_write_only_buffer_fn {
 /*static*/ void HLOExecutorTask::run_executable(legate::TaskContext& context)
 {
   LegateExecutable* exe = reinterpret_cast<LegateExecutable*>(context.scalars()[0].value<void*>());
-  uint64_t run_id = context.scalars()[1].value<uint64_t>();
+  uint64_t run_id = context.scalars()[1].value<int64_t>();
+  run_executable(context, exe, run_id, /*scalar_offset=*/2);
+}
 
-  std::vector<legate::BufferAllocation> inputs, outputs;
+/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext& context, LegateExecutable* exe, int64_t run_id, int scalar_offset)
+{
+  std::vector<legate_xla::BufferAllocation> inputs, outputs;
 
   for (auto& store : context.inputs()) {
     inputs.push_back(
@@ -81,7 +85,6 @@ struct get_write_only_buffer_fn {
   int output_idx       = 0;
   int red_idx          = 0;
   // first 2 scalars are exe and ID values
-  int scalar_offset = 2;
   for (size_t idx = scalar_offset; idx < total_outputs + scalar_offset; ++idx) {
     bool is_red  = context.scalars()[idx].value<char>();
     Store& store = is_red ? context.reductions()[red_idx++] : context.outputs()[output_idx++];
@@ -93,7 +96,7 @@ struct get_write_only_buffer_fn {
   auto cfg = get_task_config(context);
 
   DeferredBufferAllocator allocator;
-  legate::DeviceAssignment device_assignment(
+  DeviceAssignment device_assignment(
     {.local_device_id = cfg.local_proc_id, .replica_count = 1, .num_partitions = cfg.num_tasks});
 
   // TODO: need resource scoping to set the device assignment
@@ -109,14 +112,12 @@ struct get_write_only_buffer_fn {
   bool block_host_until_done = true;
 
   auto ts_start = std::chrono::high_resolution_clock::now();
-  auto stream   = exe->Execute(
-    run_id, inputs, outputs, &allocator, device_assignment, block_host_until_done);
+  bool success = exe->Execute(run_id, inputs, outputs, &allocator, device_assignment);
   // Check that the stream ran and finished correctly
-  if (!stream->BlockUntilDone()) {
+  if (!success) {
     log_xla.error() << "[HLOExecutor] HLO failed!";
     LEGATE_ABORT;
   }
-
 }
 
 /*static*/ void HLOExecutorTask::cpu_variant(TaskContext& context) { run_executable(context); }

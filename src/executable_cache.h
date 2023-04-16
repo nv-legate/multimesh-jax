@@ -16,25 +16,32 @@
 
 #pragma once
 
-#include "xla_task.h"
+#include <memory>
+#include <unordered_map>
+#include <vector>
 #include "legate_xla.h"
 
 namespace legate_xla {
 
-class HLOExecutorTask : public XlaTask<HLOExecutorTask> {
+
+class ExecutableCache {
  public:
-  static const int TASK_ID = XLA_EXECUTE_TASK;
+  void register_executable(uint64_t hlo_id,
+                           std::unique_ptr<LegateExecutable> executable);
 
- public:
-  static void run_executable(legate::TaskContext& context);
+  bool claim_executable_compile_token(uint64_t hlo_id);
+  LegateExecutable* find_executable(uint64_t hlo_id);
+  //ExecutableInfo& get_executable_info(uint64_t hlo_id);
 
-  static void run_executable(legate::TaskContext& context, LegateExecutable* exe, int64_t run_id, int scalar_offset);
-
- public:
-  static void cpu_variant(legate::TaskContext& context);
-
-  static void gpu_variant(legate::TaskContext& context);
-
+ private:
+  std::unordered_map<uint64_t, std::unique_ptr<LegateExecutable>> executables_;
 };
+
+bool claim_executable_compile_token(uint64_t hlo_id);
+
+void register_executable(uint64_t hlo_id,
+                         std::unique_ptr<LegateExecutable> executable);
+
+LegateExecutable* find_executable(uint64_t hlo_id);
 
 }  // namespace llm

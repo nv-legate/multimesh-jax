@@ -16,19 +16,27 @@
 
 #pragma once
 
+#include "xla_task.h"
 #include "legate_xla.h"
-#include "legate.h"
-#include <unordered_map>
+#include <core/data/scalar.h>
+#include <cstdint>
+#include <memory>
+#include <optional>
 
 namespace legate_xla {
 
-struct DeferredBufferAllocator : TaskMemoryAllocator {
-  using Buffer = Legion::DeferredBuffer<uint8_t, 1>;
-  DeferredBufferAllocator();
-  virtual void* Allocate(size_t size) override;
-  virtual void Free(void* buf, size_t size) override;
-  Legion::Memory::Kind mem_kind;
-  std::unordered_map<void*, Buffer> buffers;
+class HLOPrototypeLoaderTask : public XlaTask<HLOPrototypeLoaderTask> {
+ public:
+  static constexpr int32_t TASK_ID = HLO_PROTOTYPE_LOAD;
+
+ public:
+  static void cpu_variant(legate::TaskContext& context);
+
+  static void gpu_variant(legate::TaskContext& context);
+
+ public:
+  static void load_and_compile(legate::TaskContext& context, const std::string& platform_name);
+
 };
 
 }  // namespace llm

@@ -16,39 +16,36 @@
 
 #include "hlo_loader.h"
 #include "allocator.h"
+#include "hlo_prototype_load.h"
 #include "task_utils.h"
 #include "legate_xla.h"
+#include "executable_cache.h"
 
 using namespace legate;
 
 namespace legate_xla {
 
-/*static*/ void
-HLOLoaderTask::load_and_compile(TaskContext& context, LegateCompiler *compiler, uint64_t run_id,
-                                const std::string &platform_name,
-                                std::optional<uint32_t> num_partitions) {
-  auto cfg = get_task_config(context);
-  uint32_t partitions = num_partitions.has_value() ? *num_partitions : cfg.num_tasks;
-  DeferredBufferAllocator allocator;
-  compiler->Compile(
-    run_id,
-    {.replica_count         = 1,  // TODO: we do not handle psum calls or replica all-reduces
-     .num_partitions        = (int)partitions,
-     .run_hlo_passes        = true,
-     .stream_executor_index = cfg.local_proc_id,
-     .allocator             = &allocator});
-}
 
-/*static*/ void HLOLoaderTask::load_and_compile(TaskContext& context,
+/*static*/ void HLOPrototypeLoaderTask::load_and_compile(TaskContext& context,
                                                 const std::string& platform_name)
 {
   auto& scalars           = context.scalars();
-  LegateCompiler* compiler = reinterpret_cast<LegateCompiler*>(scalars[0].value<void*>());
-  uint64_t run_id = scalars[1].value<uint64_t>();
-  load_and_compile(context, compiler, run_id, platform_name);
+  uint64_t run_id         = scalars[0].value<uint64_t>();
+  auto hlo_string         = scalars[1].value<std::string>();
+  auto hlo_name           = scalars[2].value<std::string>();
+  auto hlo_id             = scalars[3].value<uint64_t>();
+  auto loader_npartitions = scalars[4].value<uint32_t>();
+
+  auto compiler = GetLegateCompilerFromHloProtoText(
+      hlo_string, platform_name, /*replica_count=*/1, loader_npartitions);
+
+  HLOLoaderTask::load_and_compile(context, compiler.get(), run_id,
+                                  platform_name, loader_npartitions);
+
+  register_executable(hlo_id, compiler->MakeExecutable());
 }
 
-/*static*/ void HLOLoaderTask::cpu_variant(TaskContext& context)
+/*static*/ void HLOPrototypeLoaderTask::cpu_variant(TaskContext& context)
 {
   load_and_compile(context, "cpu");
 }

@@ -14,21 +14,14 @@
  *
  */
 
-#pragma once
-
-#include "legate_xla.h"
-#include "legate.h"
-#include <unordered_map>
+#include "hlo_loader.h"
+#include "hlo_prototype_load.h"
 
 namespace legate_xla {
 
-struct DeferredBufferAllocator : TaskMemoryAllocator {
-  using Buffer = Legion::DeferredBuffer<uint8_t, 1>;
-  DeferredBufferAllocator();
-  virtual void* Allocate(size_t size) override;
-  virtual void Free(void* buf, size_t size) override;
-  Legion::Memory::Kind mem_kind;
-  std::unordered_map<void*, Buffer> buffers;
-};
+/*static*/ void HLOPrototypeLoaderTask::gpu_variant(legate::TaskContext& context)
+{
+  load_and_compile(context, "gpu");
+}
 
 }  // namespace llm
