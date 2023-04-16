@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "legate_runtime.h"
 #include "legate.h"
+#include "legate_mapper.h"
 
 using namespace Legion;
 using namespace legate;
@@ -59,35 +60,12 @@ void Runtime::issue_execution_fence(bool block) {
     runtime_ = new Runtime(core_runtime, context);
 }
 
-Mapper::Mapper(){};
-
-void Mapper::set_machine(
-    const legate::mapping::MachineQueryInterface* machine){
-    // FIXME
-};
-
-mapping::TaskTarget Mapper::task_target(
-    const mapping::Task& task,
-    const std::vector<mapping::TaskTarget>& options) {
-  return *options.begin();
-}
-
-std::vector<mapping::StoreMapping> Mapper::store_mappings(
-    const mapping::Task& task,
-    const std::vector<mapping::StoreTarget>& options) {
-  return {};
-}
-
-Scalar Mapper::tunable_value(TunableID tunable_id) {
-  LEGATE_ABORT;
-  return Scalar();
-}
 
 /*static*/ void registration_callback(
     Legion::Machine machine, Legion::Runtime* legion_runtime,
     const std::set<Legion::Processor>& local_procs) {
   ResourceConfig config;
-  config.max_tasks = 1;
+  config.max_tasks = 64;
   config.max_projections = 0;
   // We register one sharding functor for each new projection functor
   config.max_shardings = 0;

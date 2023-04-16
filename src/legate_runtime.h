@@ -15,10 +15,10 @@ limitations under the License.
 
 #pragma once
 
-#include "core/mapping/base_mapper.h"
 #include "legate.h"
 #include "xla_task.h"
 #include "legate_xla.h"
+#include "legate_xla_c.h"
 
 namespace legate_xla {
 
@@ -54,30 +54,6 @@ struct Runtime {
   std::vector<legate::LogicalStore> temporary_stores;
 };
 
-// Legate JAX mapper
-class Mapper : public legate::mapping::LegateMapper {
- public:
-  // LegateJAXMapper(Legion::Runtime* rt, Legion::Machine machine,
-  //                 const legate::LibraryContext& context);
-  Mapper();
-  virtual ~Mapper(void) {}
-
- private:
-  Mapper(const Mapper& rhs) = delete;
-  Mapper& operator=(const Mapper& rhs) = delete;
-
-  // Legate mapping functions
- public:
-  void set_machine(
-      const legate::mapping::MachineQueryInterface* machine) override;
-  legate::mapping::TaskTarget task_target(
-      const legate::mapping::Task& task,
-      const std::vector<legate::mapping::TaskTarget>& options) override;
-  std::vector<legate::mapping::StoreMapping> store_mappings(
-      const legate::mapping::Task& task,
-      const std::vector<legate::mapping::StoreTarget>& options) override;
-  legate::Scalar tunable_value(legate::TunableID tunable_id) override;
-};
 
 // Registration callback for Legate JAX
 /*static*/ void registration_callback(
@@ -85,8 +61,4 @@ class Mapper : public legate::mapping::LegateMapper {
     const std::set<Legion::Processor>& local_procs);
 
 }  // namespace legate
-
-extern "C" {
-void legate_xla_perform_registration();
-}
 

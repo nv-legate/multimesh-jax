@@ -1,5 +1,8 @@
 #include "legate_xla.h"
 #include "xla_task.h"
+
+#ifndef LEGATE_XLA_PYTHON_PROTOTYPE
+
 #include "legate_runtime.h"
 #include <core/data/logical_store.h>
 
@@ -13,7 +16,6 @@ int64_t GetRunId() {
 }
 
 }
-
 
 struct StoreHandleImpl : public StoreHandle {
   legate::LogicalStore store;
@@ -59,5 +61,7 @@ void CreateExecuteTask(
   runtime->submit(std::move(task));
 }
 
-
 }
+
+#endif
+

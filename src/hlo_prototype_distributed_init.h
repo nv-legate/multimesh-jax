@@ -16,41 +16,23 @@
 
 #pragma once
 
-#include "legate.h"
+#include "xla_task.h"
 #include "legate_xla_c.h"
 
 namespace legate_xla {
 
-extern Legion::Logger log_xla;
-
-#ifdef LEGATE_XLA_PYTHON_PROTOTYPE
-
-struct Registry {
-  static legate::TaskRegistrar& get_registrar();
-};
-
-template <typename T>
-struct XlaTask : public legate::LegateTask<T> {
-  using Registrar = Registry;
-};
-
-#else
-
-struct Registry {
+class HloPrototypeDistributedInitTask : public XlaTask<HloPrototypeDistributedInitTask> {
  public:
-  template <typename... Args>
-  static void record_variant(Args&&... args)
-  {
-    get_registrar().record_variant(std::forward<Args>(args)...);
-  }
-  static legate::TaskRegistrar& get_registrar();
-};
+  static const int TASK_ID = HLO_PROTOTYPE_DISTRIBUTED_INIT;
 
-template <typename T>
-struct XlaTask : public legate::LegateTask<T> {
-  using Registrar = LegateXla;
-};
+ public:
+  static void init_distributed(legate::TaskContext& context);
 
+ public:
+  static void cpu_variant(legate::TaskContext& context);
+#ifdef LEGATE_USE_CUDA
+  static void gpu_variant(legate::TaskContext& context);
 #endif
+};
 
 }  // namespace llm

@@ -20,7 +20,7 @@ project(LegataXLA LANGUAGES C CXX CUDA)
 set(CMAKE_CXX_STANDARD 17)
 
 # This must be built as a shared library for
-# the XLA extension. The XLA extension will privatize all 
+# the XLA extension. The XLA extension will privatize all
 # symbols, which means the linked Legate runtime will
 # be completely independent of all other Legate runtimes.
 set(BUILD_SHARED_LIBS ON)
@@ -61,6 +61,8 @@ set(legate_xla_version 23.03.00)
 
 
 include(cmake/third_party/get_legate_core.cmake)
+
+option(LegateXLA_ENABLE_PYTHON OFF "Whether to build a Python library")
 
 add_subdirectory(src)
 
