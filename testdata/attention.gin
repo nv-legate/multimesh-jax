@@ -1,0 +1,40 @@
+from lllm import mesh
+
+
+AXES = [
+  ("batch", "ax"),
+  ("heads", "ax"),
+]
+
+TASK_MESH = (2,)
+
+NUM_LAYERS = 4
+
+COMMON_ARGS = {
+  "device_axes" : ('ax',),
+  "logical_axes" : %AXES,
+  "device_shape" : %TASK_MESH,
+}
+
+LAYER_MESH_ARGS = (%COMMON_ARGS, {
+  "num_layers" : %NUM_LAYERS,
+})
+
+TASK_ARGS = (%COMMON_ARGS,)
+
+legate_global_mesh:
+  mesh_args = [
+    (@mesh.LayerMesh, "layer_{}.*", %LAYER_MESH_ARGS),
+    (@mesh.TaskMesh, "loss.*", %TASK_ARGS),
+    (@mesh.TaskMesh, "microbatch.*", %TASK_ARGS),
+    (@mesh.TaskMesh, "jit_step.*", %TASK_ARGS),
+  ]
+  debug_mode = True
+
+RunConfig:
+  rematerialization = True
+
+
+
+
+

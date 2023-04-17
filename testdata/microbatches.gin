@@ -1,0 +1,36 @@
+from lllm import mesh
+
+
+AXES = [
+  ("x", "ax0"),
+  ("y", "ax1"),
+]
+
+TASK_MESH = (1,1)
+
+COMMON_ARGS = {
+  "device_axes" : ("ax0", "ax1"),
+  "logical_axes" : %AXES,
+  "device_shape" : (1,1),
+}
+
+EVEN_ARGS = (%COMMON_ARGS,)
+ODD_ARGS = (%COMMON_ARGS, {
+  "device_offset" : 1,
+})
+
+legate_global_mesh:
+  mesh_args = [
+    (@mesh.TaskMesh, "layer_0.*", %EVEN_ARGS),
+    (@mesh.TaskMesh, "layer_1.*", %ODD_ARGS),
+    (@mesh.TaskMesh, "layer_2.*", %EVEN_ARGS),
+    (@mesh.TaskMesh, "layer_3.*", %ODD_ARGS),
+    (@mesh.TaskMesh, "microbatch", %EVEN_ARGS),
+    (@mesh.TaskMesh, "update", %EVEN_ARGS),
+    (@mesh.TaskMesh, "jit.*", %EVEN_ARGS),
+  ]
+
+
+
+
+

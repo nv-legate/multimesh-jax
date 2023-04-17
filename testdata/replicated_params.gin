@@ -1,0 +1,25 @@
+from lllm import mesh
+
+
+NUM_LAYERS = 1
+
+FORWARD_AXES = [
+  ("batch", "x"),
+]
+
+MESH_ARGS = {
+  "num_layers" : %NUM_LAYERS,
+  "device_axes" : ('x',),
+  "logical_axes" : %FORWARD_AXES,
+  "device_shape" : (2,1),
+}
+
+legate_global_mesh:
+  mesh_args = [
+    (@mesh.LayerMesh, ".*step_fn.*", (%MESH_ARGS,)),
+  ]
+
+
+
+
+

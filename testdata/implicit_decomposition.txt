@@ -1,0 +1,6 @@
+HloModule jit_prim_fun, entry_computation_layout={()->s32[8]{0}}
+
+ENTRY main.2 {
+  ROOT iota.1 = s32[8]{0} iota(), iota_dimension=0, metadata={op_name="jit(iota)/jit(main)/iota[dtype=int32 shape=(8,) dimension=0]" source_file="examples/jax/implicit_decomposition.py" source_line=9}
+}
+

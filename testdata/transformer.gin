@@ -1,0 +1,48 @@
+MAPPING = (
+ ('batch', 'x'),
+ ('embed', 'y'),
+ ('embed', 'x'),
+ ('length', 'y'),
+ ('length', 'x'),
+)
+TASK_MESH = (2,2)
+DEVICE_AXES = ('x', 'y')
+
+NUM_ENCODER_LAYERS = 8
+NUM_DECODER_LAYERS = 8
+DECODER_OFFSET = 32 # 8x4
+
+legate_global_mesh:
+  mesh_args = [
+    (@mesh.TaskMesh, ("encoder_embeddings", %DEVICE_AXES, %MAPPING, %TASK_MESH)),
+    (@mesh.TaskMesh, ("decoder_embeddings", %DEVICE_AXES, %MAPPING, %TASK_MESH, %DECODER_OFFSET)),
+    (@mesh.PipelineMesh, (
+     (@mesh.LayerMesh, ("encoder_{}", %NUM_ENCODER_LAYERS, %DEVICE_AXES, %MAPPING, %TASK_MESH)),
+     (@mesh.LayerMesh, ("decoder_{}", %NUM_DECODER_LAYERS, %DEVICE_AXES, %MAPPING, %TASK_MESH)),
+    )),
+    (@mesh.TaskMesh, ("encoder_embeddings.backward", %DEVICE_AXES, %MAPPING, %TASK_MESH)),
+    (@mesh.TaskMesh, ("decoder_embeddings.backward", %DEVICE_AXES, %MAPPING, %TASK_MESH, %DECODER_OFFSET)),
+    (@mesh.PipelineMesh, (
+     (@mesh.LayerMesh, ("encoder_{}.backward", %NUM_ENCODER_LAYERS, %DEVICE_AXES, %MAPPING, %TASK_MESH)),
+     (@mesh.LayerMesh, ("decoder_{}.backward", %NUM_DECODER_LAYERS, %DEVICE_AXES, %MAPPING, %TASK_MESH)),
+    )),
+    (@mesh.TaskMesh, ("encoder_embeddings.update_params", %DEVICE_AXES, %MAPPING, %TASK_MESH)),
+    (@mesh.TaskMesh, ("decoder_embeddings.update_params", %DEVICE_AXES, %MAPPING, %TASK_MESH, %DECODER_OFFSET)),
+    (@mesh.PipelineMesh, (
+     (@mesh.LayerMesh, ("encoder_{}.update_params", %NUM_ENCODER_LAYERS, %DEVICE_AXES, %MAPPING, %TASK_MESH)),
+     (@mesh.LayerMesh, ("decoder_{}.update_params", %NUM_DECODER_LAYERS, %DEVICE_AXES, %MAPPING, %TASK_MESH)),
+    )),
+    # This is just a learning rate update with a few scalar operations
+    (@mesh.TaskMesh, ("update_params", (), {}, (1,))),
+    (@mesh.TaskMesh, ("constant_orphans", (), {}, (1,)))
+  ]
+  # Set to True to serialize tasks to run on a small set of procs 0...N
+  debug_mode = False
+
+
+check_replicated_instruction_exception:
+  exempt_axes =  [
+    ("vocab",),     # 1-D array of size vocab is okay to replicate as output
+    ("joined_kv",), # 1-D array of size joined_kv is okay to replicate as output
+    ("mlp",)        # 1-D array of size mlp is okay to replcate as output
+  ]
