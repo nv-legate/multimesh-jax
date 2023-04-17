@@ -17,7 +17,7 @@
 #pragma once
 
 #include "xla_task.h"
-#include "legate_xla.h"
+#include "legate_xla_common.h"
 #include <core/data/scalar.h>
 #include <cstdint>
 #include <memory>
@@ -41,4 +41,4 @@ class HLOLoaderTask : public XlaTask<HLOLoaderTask> {
   static void load_and_compile(legate::TaskContext& context, const std::string& platform_name);
 };
 
-}  // namespace llm
+}  // namespace legate_xla

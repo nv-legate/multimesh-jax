@@ -19,4 +19,12 @@ namespace legate_xla {
   run_executable(context, "cpu");
 }
 
+namespace  // unnamed
+{
+static void __attribute__((constructor)) register_tasks(void)
+{
+  HLOPrototypeExecuteTask::register_variants();
+}
+}  // namespace
+
 }

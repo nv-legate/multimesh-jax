@@ -17,7 +17,7 @@ limitations under the License.
 
 #include "legate.h"
 #include "xla_task.h"
-#include "legate_xla.h"
+#include "legate_xla_common.h"
 #include "legate_xla_c.h"
 
 namespace legate_xla {

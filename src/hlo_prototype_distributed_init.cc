@@ -15,7 +15,7 @@
  */
 
 #include "hlo_prototype_distributed_init.h"
-#include "legate_xla.h"
+#include "legate_to_xla.h"
 #include <legate_defines.h>
 #include <unistd.h>
 #include <chrono>

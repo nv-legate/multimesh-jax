@@ -23,6 +23,7 @@ set(CMAKE_CXX_STANDARD 17)
 # the XLA extension. The XLA extension will privatize all
 # symbols, which means the linked Legate runtime will
 # be completely independent of all other Legate runtimes.
+set(CMAKE_LINK_WHAT_YOU_USE ON)
 set(BUILD_SHARED_LIBS ON)
 
 if(POLICY CMP0077)
@@ -60,26 +61,23 @@ include(rapids-find)
 set(legate_xla_version 23.03.00)
 
 
-include(cmake/third_party/get_legate_core.cmake)
 
 option(LegateXLA_ENABLE_PYTHON OFF "Whether to build a Python library")
 
-add_subdirectory(src)
+
+if (SKBUILD)
+  set(_required REQUIRED)
+  find_package(LegateXLA ${_required})
+else()
+  set(LegateXLA_FOUND FALSE)
+endif()
 
 
-rapids_export(
-  INSTALL legate-xla
-  EXPORT_SET legate-xla-exports
-  GLOBAL_TARGETS xla-bridge
-  NAMESPACE legate::
-  LANGUAGES ${ENABLED_LANGUAGES}
-)
+if (NOT LegateXLA_FOUND)
+  include(cmake/third_party/get_legate_core.cmake)
+  add_subdirectory(src)
+endif()
 
-# build export targets
-rapids_export(
-  BUILD legate-xla
-  EXPORT_SET legate-xla-exports
-  GLOBAL_TARGETS xla-birdge
-  NAMESPACE legate::
-  LANGUAGES ${ENABLED_LANGUAES}
-)
+if (SKBUILD)
+  include(legate_xla_python.cmake)
+endif()

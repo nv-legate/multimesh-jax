@@ -18,7 +18,7 @@
 #include "allocator.h"
 #include "hlo_prototype_load.h"
 #include "task_utils.h"
-#include "legate_xla.h"
+#include "legate_to_xla.h"
 #include "executable_cache.h"
 
 using namespace legate;
@@ -54,7 +54,7 @@ namespace  // unnamed
 {
 static void __attribute__((constructor)) register_tasks(void)
 {
-  HLOLoaderTask::register_variants();
+  HLOPrototypeLoaderTask::register_variants();
 }
 }  // namespace
 

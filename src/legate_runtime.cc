@@ -60,36 +60,4 @@ void Runtime::issue_execution_fence(bool block) {
     runtime_ = new Runtime(core_runtime, context);
 }
 
-
-/*static*/ void registration_callback(
-    Legion::Machine machine, Legion::Runtime* legion_runtime,
-    const std::set<Legion::Processor>& local_procs) {
-  ResourceConfig config;
-  config.max_tasks = 64;
-  config.max_projections = 0;
-  // We register one sharding functor for each new projection functor
-  config.max_shardings = 0;
-  config.max_reduction_ops = 0;
-
-  auto runtime = legate::Runtime::get_runtime();
-
-  auto context = runtime->create_library(library_name, config);
-
-  LegateXla::get_registrar().register_all_tasks(*context);
-
-  // Now we can register our mapper with the runtime
-  context->register_mapper(std::make_unique<Mapper>(), 0);
-
-  Runtime::initialize(runtime, context);
-}
-
 }  // namespace legate_xla
-
-extern "C" {
-
-void legate_jax_perform_registration() {
-  Legion::Runtime::perform_registration_callback(
-      legate_xla::registration_callback, true /*global*/);
-}
-
-}

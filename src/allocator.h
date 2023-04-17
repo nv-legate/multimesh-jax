@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "legate_xla.h"
+#include "legate_xla_common.h"
 #include "legate.h"
 #include <unordered_map>
 

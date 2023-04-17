@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "legate_xla.h"
+#include "legate_xla_common.h"
 #include "xla_task.h"
 
 namespace legate_xla {

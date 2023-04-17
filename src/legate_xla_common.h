@@ -67,7 +67,6 @@ class DeviceAssignment {
   std::vector<int> global_device_ids_;
 };
 
-
 class LegateExecutable {
  public:
   /**
@@ -96,7 +95,6 @@ class LegateCompiler {
   virtual std::unique_ptr<LegateExecutable> MakeExecutable() = 0;
 };
 
-
 class StoreHandle {};
 
 enum class SupportedType {
@@ -121,31 +119,4 @@ struct Shape {
   std::vector<int> dims;
 };
 
-void CreateCompileTask(LegateCompiler* compiler);
-
-void CreateExecuteTask(LegateExecutable* executable,
-  const std::vector<StoreHandle*>& inputs,
-  const std::vector<StoreHandle*>& outputs);
-
-StoreHandle* CreateStore(const legate_xla::Shape& shape);
-
-StoreHandle* CreateStoreFromHostBuffer(
-  const legate_xla::Shape& shape, const void* data, std::function<void()> on_done);
-
-void InitLegate();
-
 }
-
-extern "C" std::unique_ptr<legate_xla::LegateCompiler> GetLegateCompilerFromHloProtoText(
-  const std::string& hlo_string,
-  const std::string& platform_name,
-  int replica_count, int num_partitions);
-
-
-extern "C" bool InitDistributedRuntime(const std::string& coordinator_addr,
-                                       int coordinator_port,
-                                       int num_procs,
-                                       int proc_id,
-                                       int gpus_per_proc);
-
-extern "C" bool ShutdownDistributedRuntime();

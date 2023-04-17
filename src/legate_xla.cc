@@ -1,13 +1,13 @@
-#include "legate_xla.h"
+#include "legate_xla_common.h"
+#include "xla_to_legate.h"
 #include "xla_task.h"
+#include "legate_mapper.h"
 
 #ifndef LEGATE_XLA_PYTHON_PROTOTYPE
-
 #include "legate_runtime.h"
 #include <core/data/logical_store.h>
 
 namespace legate_xla {
-
 namespace {
 
 int64_t GetRunId() {
@@ -25,7 +25,7 @@ void CreateCompileTask(LegateCompiler* compiler){
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
 
-  auto task = runtime->create_task(XlaOpCode::XLA_EXECUTE_TASK);
+  auto task = runtime->create_task(XlaOpCode::XLA_COMPILE_TASK);
   auto part = task->declare_partition();
 
   task->add_scalar_arg(legate::Scalar(compiler));
@@ -62,6 +62,37 @@ void CreateExecuteTask(
 }
 
 }
-
 #endif
 
+namespace legate_xla {
+namespace {
+  static constexpr char library_name[] = "legate.xla";
+}
+
+/*static*/ void registration_callback() {
+  legate::ResourceConfig config;
+  config.max_tasks = 64;
+  config.max_projections = 0;
+  // We register one sharding functor for each new projection functor
+  config.max_shardings = 0;
+  config.max_reduction_ops = 0;
+
+  auto runtime = legate::Runtime::get_runtime();
+
+  auto context = runtime->create_library(library_name, config);
+
+  Registry::get_registrar().register_all_tasks(*context);
+
+  // Now we can register our mapper with the runtime
+  context->register_mapper(std::make_unique<Mapper>(), 0);
+}
+
+}
+
+extern "C" {
+
+void legate_xla_perform_registration() {
+  legate::Core::perform_registration<&legate_xla::registration_callback>();
+}
+
+}

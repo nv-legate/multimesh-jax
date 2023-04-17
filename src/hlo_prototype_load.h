@@ -17,7 +17,7 @@
 #pragma once
 
 #include "xla_task.h"
-#include "legate_xla.h"
+#include "legate_xla_common.h"
 #include <core/data/scalar.h>
 #include <cstdint>
 #include <memory>

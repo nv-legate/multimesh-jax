@@ -18,7 +18,7 @@
 
 #include <chrono>
 
-#include "legate_xla.h"
+#include "legate_to_xla.h"
 #include "xla_task.h"
 #include "allocator.h"
 #include "task_utils.h"

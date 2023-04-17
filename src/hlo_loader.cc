@@ -17,7 +17,7 @@
 #include "hlo_loader.h"
 #include "allocator.h"
 #include "task_utils.h"
-#include "legate_xla.h"
+#include "legate_to_xla.h"
 
 using namespace legate;
 

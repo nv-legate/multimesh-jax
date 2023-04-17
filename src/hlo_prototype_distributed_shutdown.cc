@@ -15,7 +15,7 @@
  */
 
 #include "hlo_prototype_distributed_shutdown.h"
-#include "legate_xla.h"
+#include "legate_to_xla.h"
 
 #include <chrono>
 

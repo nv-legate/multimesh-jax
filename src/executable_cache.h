@@ -19,7 +19,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
-#include "legate_xla.h"
+#include "legate_xla_common.h"
 
 namespace legate_xla {
 

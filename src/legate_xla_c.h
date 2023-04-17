@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __LEGATE_XLA_C_H__
+#define __LEGATE_XLA_C_H__
 
 enum XlaOpCode{
   XLA_COMPILE_TASK,
@@ -18,4 +19,6 @@ void legate_xla_perform_registration();
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif

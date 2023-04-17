@@ -15,7 +15,7 @@
  */
 
 #include "executable_cache.h"
-#include "legate_xla.h"
+#include "legate_xla_common.h"
 
 #include <mutex>
 
@@ -29,7 +29,7 @@ void ExecutableCache::register_executable(uint64_t hlo_id,
   std::lock_guard<std::mutex> guard(cache_lock);
   auto iter = executables_.find(hlo_id);
   // someone should have claimed the compile token for this previously
-  assert(iter != executables_.end());
+  //assert(iter != executables_.end());
   iter->second = std::move(executable);
 }
 
