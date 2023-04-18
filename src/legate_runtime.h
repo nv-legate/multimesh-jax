@@ -22,8 +22,6 @@ limitations under the License.
 
 namespace legate_xla {
 
-static const char* library_name = "legate.jax";
-
 // Simple runtime holding a pointer to the library context
 
 struct Runtime {

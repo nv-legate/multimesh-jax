@@ -1,29 +1,38 @@
 
-add_library(
-  legate_xla
+set(_srcs
   allocator.cc
   executable_cache.cc
   hlo_executor.cc
   hlo_executor.cu
   hlo_loader.cc
   hlo_loader.cu
-  hlo_prototype_distributed_init.cc
-  hlo_prototype_distributed_init.cu
-  hlo_prototype_distributed_shutdown.cc
-  hlo_prototype_distributed_shutdown.cu
-  hlo_prototype_fill.cc
-  hlo_prototype_fill.cu
-  hlo_prototype_load.cc
-  hlo_prototype_load.cu
-  hlo_prototype_execute.cc
-  hlo_prototype_execute.cu
   legate_mapper.cc
   legate_xla.cc
   task_utils.cc
   xla_task.cc
 )
 
-#  legate_runtime.cc
+if (LegateXLA_ENABLE_PYTHON)
+  list(APPEND _srcs
+    hlo_prototype_distributed_init.cc
+    hlo_prototype_distributed_init.cu
+    hlo_prototype_distributed_shutdown.cc
+    hlo_prototype_distributed_shutdown.cu
+    hlo_prototype_fill.cc
+    hlo_prototype_fill.cu
+    hlo_prototype_load.cc
+    hlo_prototype_load.cu
+    hlo_prototype_execute.cc
+    hlo_prototype_execute.cu)
+else()
+  list(APPEND _srcs
+    legate_runtime.cc)
+endif()
+
+add_library(
+  legate_xla
+  ${_srcs}
+)
 
 set_target_properties(legate_xla PROPERTIES
          LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib

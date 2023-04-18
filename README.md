@@ -44,6 +44,7 @@ After downloading Jax, the custom jaxlib should be built by 1) pointing to the c
 > XLA_LEGATE_ROOT=<...> \
 python build/build.py \
   --enable_cuda \
+  --enable_plugin_device \
   --bazel_options=--override_repository=xla=<...>
 ```
 

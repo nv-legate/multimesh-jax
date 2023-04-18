@@ -48,7 +48,7 @@ struct Registry {
 
 template <typename T>
 struct XlaTask : public legate::LegateTask<T> {
-  using Registrar = LegateXla;
+  using Registrar = Registry;
 };
 
 #endif
