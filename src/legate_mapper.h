@@ -1,5 +1,4 @@
 #include "core/mapping/base_mapper.h"
-#include "core/mapping/base_mapper.h"
 #include "legate.h"
 
 #if 1 //ndef LEGATE_XLA_PYTHON_PROTOTYPE
