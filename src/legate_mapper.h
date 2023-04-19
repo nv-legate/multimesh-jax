@@ -1,4 +1,5 @@
 #include "core/mapping/base_mapper.h"
+#include "core/mapping/base_mapper.h"
 #include "legate.h"
 
 #if 1 //ndef LEGATE_XLA_PYTHON_PROTOTYPE
@@ -6,7 +7,7 @@
 namespace legate_xla {
 
 // Legate JAX mapper
-class Mapper : public legate::mapping::LegateMapper {
+class Mapper : public legate::mapping::Mapper {
  public:
   // LegateJAXMapper(Legion::Runtime* rt, Legion::Machine machine,
   //                 const legate::LibraryContext& context);

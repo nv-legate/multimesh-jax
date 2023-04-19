@@ -79,12 +79,9 @@ namespace {
 
   auto runtime = legate::Runtime::get_runtime();
 
-  auto context = runtime->create_library(library_name, config);
+  auto context = runtime->create_library(library_name, config, std::make_unique<Mapper>());
 
   Registry::get_registrar().register_all_tasks(*context);
-
-  // Now we can register our mapper with the runtime
-  context->register_mapper(std::make_unique<Mapper>(), 0);
 }
 
 }
