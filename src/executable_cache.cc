@@ -18,6 +18,7 @@
 #include "legate_xla_common.h"
 
 #include <mutex>
+#include <iostream>
 
 namespace legate_xla {
 
@@ -28,8 +29,11 @@ void ExecutableCache::register_executable(uint64_t hlo_id,
 {
   std::lock_guard<std::mutex> guard(cache_lock);
   auto iter = executables_.find(hlo_id);
+  if (iter == executables_.end()){
+    std::cerr << "No registration spot open for HLO " << hlo_id << std::endl;
+    abort();
+  }
   // someone should have claimed the compile token for this previously
-  //assert(iter != executables_.end());
   iter->second = std::move(executable);
 }
 

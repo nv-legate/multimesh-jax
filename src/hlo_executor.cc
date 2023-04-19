@@ -99,13 +99,15 @@ struct get_write_only_buffer_fn {
   DeviceAssignment device_assignment(
     {.local_device_id = cfg.local_proc_id, .replica_count = 1, .num_partitions = cfg.num_tasks});
 
+#ifndef LEGATE_XLA_PYTHON_PROTOTYPE
   // TODO: need resource scoping to set the device assignment
   device_assignment(0,0) = 0;
-
-  //for (uint32_t device_id = cfg.device_id_range.lo, idx = 0; device_id <= cfg.device_id_range.hi;
-  //     ++device_id, ++idx){
-  //  device_assignment(0, idx) = device_id;
-  //}
+#else
+  for (uint32_t device_id = cfg.device_id_range.lo, idx = 0; device_id <= cfg.device_id_range.hi;
+       ++device_id, ++idx){
+    device_assignment(0, idx) = device_id;
+  }
+#endif
 
   // If this is set to false, the execution profile and ComputeTimeNs for the stream
   // will be incorrect since it will not include the blocking time.
