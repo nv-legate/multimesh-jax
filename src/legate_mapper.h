@@ -1,10 +1,17 @@
 #include "core/mapping/base_mapper.h"
 #include "legate.h"
+#include <core/mapping/mapping.h>
 
 namespace legate_xla {
 
+#ifndef LEGATE_XLA_PYTHON_PROTOTYPE
+using LegateMapper = legate::mapping::Mapper;
+#else
+using LegateMapper = legate::mapping::LegateMapper;
+#endif
+
 // Legate XLA mapper
-class Mapper : public legate::mapping::LegateMapper {
+class Mapper : public LegateMapper {
  public:
   Mapper();
   virtual ~Mapper(void) {}
