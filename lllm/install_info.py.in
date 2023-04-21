@@ -26,15 +26,15 @@ def get_libpath():
         "Windows": ".dll"
     }[platform.system()]
 
-    def find_liblgllm(libdir):
-        if exists(join(libdir, f"liblgllm{so_ext}")):
+    def find_lib(libdir):
+        if exists(join(libdir, f"liblegate_xla{so_ext}")):
             return libdir
         return None
 
     return (
-        find_liblgllm(join(lllm_path, "build", "lib")) or
-        find_liblgllm(join(dirname(dirname(dirname(lllm_path))), "lib")) or
-        find_liblgllm(join(dirname(dirname(sys.executable)), "lib")) or
+        find_lib(join(lllm_path, "build", "lib")) or
+        find_lib(join(dirname(dirname(dirname(lllm_path))), "lib")) or
+        find_lib(join(dirname(dirname(sys.executable)), "lib")) or
         ""
     )
 

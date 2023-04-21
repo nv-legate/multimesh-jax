@@ -11,6 +11,12 @@ enum XlaOpCode{
   HLO_PROTOTYPE_FILL,
 };
 
+enum XlaTunable {
+  XLA_NUM_GPUS  = 1,
+  XLA_NUM_PROCS = 2,
+};
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif

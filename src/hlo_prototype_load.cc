@@ -39,10 +39,16 @@ namespace legate_xla {
   auto compiler = GetLegateCompilerFromHloProtoText(
       hlo_string, platform_name, /*replica_count=*/1, loader_npartitions);
 
-  HLOLoaderTask::load_and_compile(context, compiler.get(), run_id,
-                                  platform_name, loader_npartitions);
+  if (!compiler){
+    std::cerr << "Failed to get compiler" << std::endl;
+    LEGATE_ABORT;
+  }
 
-  register_executable(hlo_id, compiler->MakeExecutable());
+  if (claim_executable_compile_token(hlo_id)){
+    HLOLoaderTask::load_and_compile(context, compiler.get(), run_id,
+                                    platform_name, loader_npartitions);
+    register_executable(hlo_id, compiler->MakeExecutable());
+  }
 }
 
 /*static*/ void HLOPrototypeLoaderTask::cpu_variant(TaskContext& context)

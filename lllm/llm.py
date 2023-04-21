@@ -354,8 +354,6 @@ class LLMRuntime:
 
             if machine.num_procs > 1:
                 task.set_concurrent(True)
-                if self._args.exit_barrier:
-                    task.set_exit_barrier(True)
 
             task.execute()
 
