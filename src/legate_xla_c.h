@@ -1,9 +1,10 @@
 #ifndef __LEGATE_XLA_C_H__
 #define __LEGATE_XLA_C_H__
 
-enum XlaOpCode{
+enum XlaOpCode {
   XLA_COMPILE_TASK,
   XLA_EXECUTE_TASK,
+  XLA_INIT_FROM_HOST_TASK,
   HLO_PROTOTYPE_LOAD,
   HLO_PROTOTYPE_EXECUTE,
   HLO_PROTOTYPE_DISTRIBUTED_INIT,
@@ -12,10 +13,9 @@ enum XlaOpCode{
 };
 
 enum XlaTunable {
-  XLA_NUM_GPUS  = 1,
+  XLA_NUM_GPUS = 1,
   XLA_NUM_PROCS = 2,
 };
-
 
 #ifdef __cplusplus
 extern "C" {

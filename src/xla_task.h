@@ -46,6 +46,15 @@ struct XlaTask : public legate::LegateTask<T> {
   using Registrar = Registry;
 };
 
+// Generic initialization of LegateBuffer from host data ptr
+class XLAInitFromHostTask : public XlaTask<XLAInitFromHostTask> {
+ public:
+  static const int32_t TASK_ID = XlaOpCode::XLA_INIT_FROM_HOST_TASK;
+
+ public:
+  static void gpu_variant(legate::TaskContext& context);
+};
+
 #endif
 
-}  // namespace llm
+}  // namespace legate_xla
