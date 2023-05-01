@@ -4,33 +4,27 @@
 
 namespace legate_xla {
 
-#ifndef LEGATE_XLA_PYTHON_PROTOTYPE
-using LegateMapper = legate::mapping::Mapper;
-#else
-using LegateMapper = legate::mapping::LegateMapper;
-#endif
-
 // Legate XLA mapper
-class Mapper : public LegateMapper {
- public:
+class Mapper : public legate::mapping::Mapper {
+public:
   Mapper();
   virtual ~Mapper(void) {}
 
- private:
-  Mapper(const Mapper& rhs) = delete;
-  Mapper& operator=(const Mapper& rhs) = delete;
+private:
+  Mapper(const Mapper &rhs) = delete;
+  Mapper &operator=(const Mapper &rhs) = delete;
 
   // Legate mapping functions
- public:
-  void set_machine(
-      const legate::mapping::MachineQueryInterface* machine) override;
-  legate::mapping::TaskTarget task_target(
-      const legate::mapping::Task& task,
-      const std::vector<legate::mapping::TaskTarget>& options) override;
+public:
+  void
+  set_machine(const legate::mapping::MachineQueryInterface *machine) override;
+  legate::mapping::TaskTarget
+  task_target(const legate::mapping::Task &task,
+              const std::vector<legate::mapping::TaskTarget> &options) override;
   std::vector<legate::mapping::StoreMapping> store_mappings(
-      const legate::mapping::Task& task,
-      const std::vector<legate::mapping::StoreTarget>& options) override;
+      const legate::mapping::Task &task,
+      const std::vector<legate::mapping::StoreTarget> &options) override;
   legate::Scalar tunable_value(legate::TunableID tunable_id) override;
 };
 
-}
+} // namespace legate_xla

@@ -1,22 +1,22 @@
 #pragma once
 
-#include <stdint.h>
 #include <functional>
 #include <memory>
+#include <stdint.h>
 #include <utility>
 #include <vector>
 
 namespace legate_xla {
 
 class TaskMemoryAllocator {
- public:
-  virtual void* Allocate(size_t size) = 0;
+public:
+  virtual void *Allocate(size_t size) = 0;
 
-  virtual void Free(void* buf, size_t size) = 0;
+  virtual void Free(void *buf, size_t size) = 0;
 };
 
 struct BufferAllocation {
-  void* buffer;
+  void *buffer;
   size_t size;
 };
 
@@ -25,7 +25,8 @@ struct CompileConfig {
   int num_partitions = 1;
   bool run_hlo_passes = true;
   int stream_executor_index = 0;
-  TaskMemoryAllocator* allocator = nullptr;
+  TaskMemoryAllocator *allocator = nullptr;
+  bool print_stats = false;
 };
 
 struct DeviceConfig {
@@ -35,15 +36,15 @@ struct DeviceConfig {
 };
 
 class DeviceAssignment {
- public:
-  DeviceAssignment(const DeviceConfig& config)
+public:
+  DeviceAssignment(const DeviceConfig &config)
       : local_device_id_(config.local_device_id),
         replica_count_(config.replica_count),
         num_partitions_(config.num_partitions),
         global_device_ids_(config.replica_count * config.num_partitions,
                            /*fill_value=*/-1) {}
 
-  int& operator()(int replica, int partition) {
+  int &operator()(int replica, int partition) {
     return global_device_ids_[partition * replica_count_ + replica];
   }
 
@@ -57,7 +58,7 @@ class DeviceAssignment {
     return global_device_ids_[partition * replica_count_ + replica];
   }
 
- private:
+private:
   int local_device_id_;
   int replica_count_;
   int num_partitions_;
@@ -65,7 +66,7 @@ class DeviceAssignment {
 };
 
 class LegateExecutable {
- public:
+public:
   /**
   * @brief
   *
@@ -80,21 +81,21 @@ class LegateExecutable {
   * @return Whether the execution ran successfully on the device
   */
   virtual bool Execute(uint64_t run_id,
-                       const std::vector<BufferAllocation>& inputs,
-                       const std::vector<BufferAllocation>& outputs,
-                       TaskMemoryAllocator* allocator,
-                       const DeviceAssignment& device_assignment) const = 0;
+                       const std::vector<BufferAllocation> &inputs,
+                       const std::vector<BufferAllocation> &outputs,
+                       TaskMemoryAllocator *allocator,
+                       const DeviceAssignment &device_assignment) const = 0;
 };
 
 struct StoreHandleImpl;
 
 struct StoreHandle {
-  StoreHandleImpl* impl;
+  StoreHandleImpl *impl;
 };
 
 class LegateCompiler {
- public:
-  virtual void Compile(uint64_t run_id, const CompileConfig& config) = 0;
+public:
+  virtual void Compile(uint64_t run_id, const CompileConfig &config) = 0;
 
   virtual StoreHandle SyncStoreHandle() const = 0;
 
@@ -124,6 +125,6 @@ struct Shape {
   std::vector<size_t> dims;
 };
 
-std::ostream& operator<<(std::ostream& os, const Shape& shape);
+std::ostream &operator<<(std::ostream &os, const Shape &shape);
 
-}  // namespace legate_xla
+} // namespace legate_xla

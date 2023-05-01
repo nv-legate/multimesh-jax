@@ -16,80 +16,80 @@ int64_t GetRunId() {
   return counter.fetch_add(1);
 }
 
-legate::LegateTypeCode SupportedTypeToLegateType(SupportedType type) {
-  legate::LegateTypeCode code;
+legate::Type::Code SupportedTypeToLegateType(SupportedType type) {
+  legate::Type::Code code;
   switch (type) {
-    case SupportedType::PRED:
-      code = legate::LegateTypeCode::BOOL_LT;
-      break;
-    case SupportedType::S8:
-      code = legate::LegateTypeCode::INT8_LT;
-      break;
-    case SupportedType::U8:
-      code = legate::LegateTypeCode::UINT8_LT;
-      break;
-    case SupportedType::F16:
-      /* fall-through */
-    case SupportedType::BF16:
-      code = legate::LegateTypeCode::HALF_LT;
-      break;
-    case SupportedType::S16:
-      code = legate::LegateTypeCode::INT16_LT;
-      break;
-    case SupportedType::U16:
-      code = legate::LegateTypeCode::UINT16_LT;
-      break;
-    case SupportedType::F32:
-      code = legate::LegateTypeCode::FLOAT_LT;
-      break;
-    case SupportedType::S32:
-      code = legate::LegateTypeCode::INT32_LT;
-      break;
-    case SupportedType::U32:
-      code = legate::LegateTypeCode::UINT32_LT;
-      break;
-    case SupportedType::F64:
-      code = legate::LegateTypeCode::DOUBLE_LT;
-      break;
-    case SupportedType::S64:
-      code = legate::LegateTypeCode::INT64_LT;
-      break;
-    case SupportedType::U64:
-      code = legate::LegateTypeCode::UINT64_LT;
-      break;
-    case SupportedType::C64:
-      code = legate::LegateTypeCode::COMPLEX64_LT;
-      break;
-    case SupportedType::C128:
-      code = legate::LegateTypeCode::COMPLEX128_LT;
-      break;
-    default:
-      std::cerr << "Unsupported SupportedType type "
-                << static_cast<std::underlying_type<SupportedType>::type>(type)
-                << std::endl;
-      break;
+  case SupportedType::PRED:
+    code = legate::Type::Code::BOOL;
+    break;
+  case SupportedType::S8:
+    code = legate::Type::Code::INT8;
+    break;
+  case SupportedType::U8:
+    code = legate::Type::Code::UINT8;
+    break;
+  case SupportedType::F16:
+    /* fall-through */
+  case SupportedType::BF16:
+    code = legate::Type::Code::FLOAT16;
+    break;
+  case SupportedType::S16:
+    code = legate::Type::Code::INT16;
+    break;
+  case SupportedType::U16:
+    code = legate::Type::Code::UINT16;
+    break;
+  case SupportedType::F32:
+    code = legate::Type::Code::FLOAT32;
+    break;
+  case SupportedType::S32:
+    code = legate::Type::Code::INT32;
+    break;
+  case SupportedType::U32:
+    code = legate::Type::Code::UINT32;
+    break;
+  case SupportedType::F64:
+    code = legate::Type::Code::FLOAT64;
+    break;
+  case SupportedType::S64:
+    code = legate::Type::Code::INT64;
+    break;
+  case SupportedType::U64:
+    code = legate::Type::Code::UINT64;
+    break;
+  case SupportedType::C64:
+    code = legate::Type::Code::COMPLEX64;
+    break;
+  case SupportedType::C128:
+    code = legate::Type::Code::COMPLEX128;
+    break;
+  default:
+    std::cerr << "Unsupported SupportedType type "
+              << static_cast<std::underlying_type<SupportedType>::type>(type)
+              << std::endl;
+    break;
   }
   return code;
 }
 
 struct get_read_only_ptr {
-  template <legate::LegateTypeCode TYPE_CODE, int32_t DIM>
-  const void* operator()(legate::Store& store) {
+  template <legate::Type::Code TYPE_CODE, int32_t DIM>
+  const void *operator()(legate::Store &store) {
     using VAL = legate::legate_type_of<TYPE_CODE>;
     auto shape = store.shape<DIM>();
     auto acc = store.read_accessor<VAL, DIM>();
-    const void* buffer = static_cast<const void*>(acc.ptr(shape));
+    const void *buffer = static_cast<const void *>(acc.ptr(shape));
     return buffer;
   }
 };
 
-}  // namespace
+} // namespace
 
 struct StoreHandleImpl {
   legate::LogicalStore store;
 };
 
-void CreateCompileTask(LegateCompiler* compiler) {
+void CreateCompileTask(LegateCompiler *compiler) {
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
 
@@ -108,10 +108,10 @@ void CreateCompileTask(LegateCompiler* compiler) {
   runtime->submit(std::move(task));
 }
 
-void CreateExecuteTask(LegateExecutable* executable,
-                       const std::vector<StoreHandle>& inputs,
-                       const std::vector<StoreHandle>& outputs,
-                       std::vector<std::function<void()>>* on_done) {
+void CreateExecuteTask(LegateExecutable *executable,
+                       const std::vector<StoreHandle> &inputs,
+                       const std::vector<StoreHandle> &outputs,
+                       std::vector<std::function<void()>> *on_done) {
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
 
@@ -136,7 +136,7 @@ void CreateExecuteTask(LegateExecutable* executable,
   runtime->submit(std::move(task));
 }
 
-void CreateStoreFromHostBufferTask(const void* data, uint64_t num_bytes,
+void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
                                    StoreHandle output,
                                    std::function<void()> on_done) {
   auto runtime = legate_xla::Runtime::get_runtime();
@@ -172,7 +172,7 @@ void Synchronize(StoreHandle store) {
 }
 
 void CopyStoreToHostSync(StoreHandle input,
-                         std::function<void(const void*)> copy_func) {
+                         std::function<void(const void *)> copy_func) {
   log_xla.debug() << "CopyStoreToHostSync called.";
   auto runtime = legate_xla::Runtime::get_runtime();
   auto logical_store = input.impl->store;
@@ -182,8 +182,8 @@ void CopyStoreToHostSync(StoreHandle input,
   copy_func(buffer_alloc);
 }
 
-StoreHandle CreateStore(const legate_xla::Shape& shape) {
-  legate::LegateTypeCode code = SupportedTypeToLegateType(shape.type);
+StoreHandle CreateStore(const legate_xla::Shape &shape) {
+  legate::Type::Code code = SupportedTypeToLegateType(shape.type);
 
   log_xla.debug() << "CreateStore called with " << shape;
   // legate modification of dimensions:
@@ -206,8 +206,8 @@ StoreHandle CreateStore(const legate_xla::Shape& shape) {
 
   auto core_runtime = legate::Runtime::get_runtime();
 
-  return {.impl = new StoreHandleImpl{
-              .store = core_runtime->create_store(dims, code)}};
+  return {.impl = new StoreHandleImpl{.store = core_runtime->create_store(
+                                          dims, legate::primitive_type(code))}};
 }
 
 void InitLegate() {
@@ -218,18 +218,33 @@ void InitLegate() {
   legate_xla_perform_registration();
 }
 
-std::ostream& operator<<(std::ostream& os, const Shape& shape) {
+std::ostream &operator<<(std::ostream &os, const Shape &shape) {
   std::ostringstream ss;
   ss << "Shape(type="
      << static_cast<std::underlying_type<SupportedType>::type>(shape.type)
      << ",dim=[";
-  for (auto i : shape.dims) ss << i << ",";
+  for (auto i : shape.dims)
+    ss << i << ",";
   ss << "])";
   os << ss.str();
   return os;
 }
 
-}  // namespace legate_xla
+} // namespace legate_xla
+#else
+
+namespace legate_xla {
+
+void Synchronize(StoreHandle store) {
+  /** never called, but needed to provide symbol */
+}
+
+StoreHandle CreateStore(const legate_xla::Shape &shape) {
+  /** never called, but needed to provide symbol */
+  return StoreHandle{};
+}
+
+} // namespace legate_xla
 #endif
 
 namespace legate_xla {
@@ -247,20 +262,16 @@ static constexpr char library_name[] = "legate.xla";
 
   auto runtime = legate::Runtime::get_runtime();
 
-#ifndef LEGATE_XLA_PYTHON_PROTOTYPE
   auto context =
       runtime->create_library(library_name, config, std::make_unique<Mapper>());
-#else
-  auto context = runtime->create_library(library_name, config);
-  context->register_mapper(std::make_unique<Mapper>());
+#ifndef LEGATE_XLA_PYTHON_PROTOTYPE
+  legate_xla::Runtime::initialize(runtime, context);
 #endif
 
-  legate_xla::Runtime::initialize(runtime, context);
-
-  Registry::get_registrar().register_all_tasks(*context);
+  Registry::get_registrar().register_all_tasks(context);
 }
 
-}  // namespace legate_xla
+} // namespace legate_xla
 
 extern "C" {
 

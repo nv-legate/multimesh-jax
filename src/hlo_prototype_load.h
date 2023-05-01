@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "xla_task.h"
 #include "legate_xla_common.h"
+#include "xla_task.h"
 #include <core/data/scalar.h>
 #include <cstdint>
 #include <memory>
@@ -26,17 +26,17 @@
 namespace legate_xla {
 
 class HLOPrototypeLoaderTask : public XlaTask<HLOPrototypeLoaderTask> {
- public:
+public:
   static constexpr int32_t TASK_ID = HLO_PROTOTYPE_LOAD;
 
- public:
-  static void cpu_variant(legate::TaskContext& context);
+public:
+  static void cpu_variant(legate::TaskContext &context);
 
-  static void gpu_variant(legate::TaskContext& context);
+  static void gpu_variant(legate::TaskContext &context);
 
- public:
-  static void load_and_compile(legate::TaskContext& context, const std::string& platform_name);
-
+public:
+  static void load_and_compile(legate::TaskContext &context,
+                               const std::string &platform_name);
 };
 
-}  // namespace llm
+} // namespace legate_xla

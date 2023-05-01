@@ -14,18 +14,17 @@
  *
  */
 
-#include "hlo_executor.h"
 #include "core/cuda/cuda_help.h"
+#include "hlo_executor.h"
 
 namespace legate_xla {
 
 using namespace Legion;
 using namespace legate;
 
-/*static*/ void HLOExecutorTask::gpu_variant(TaskContext& context)
-{
+/*static*/ void HLOExecutorTask::gpu_variant(TaskContext &context) {
   run_executable(context);
   CHECK_CUDA(cudaPeekAtLastError());
 }
 
-}  // namespace llm
+} // namespace legate_xla

@@ -16,24 +16,23 @@
 
 #pragma once
 
+#include "legate_xla_common.h"
 #include <memory>
 #include <unordered_map>
 #include <vector>
-#include "legate_xla_common.h"
 
 namespace legate_xla {
 
-
 class ExecutableCache {
- public:
+public:
   void register_executable(uint64_t hlo_id,
                            std::unique_ptr<LegateExecutable> executable);
 
   bool claim_executable_compile_token(uint64_t hlo_id);
-  LegateExecutable* find_executable(uint64_t hlo_id);
-  //ExecutableInfo& get_executable_info(uint64_t hlo_id);
+  LegateExecutable *find_executable(uint64_t hlo_id);
+  // ExecutableInfo& get_executable_info(uint64_t hlo_id);
 
- private:
+private:
   std::unordered_map<uint64_t, std::unique_ptr<LegateExecutable>> executables_;
 };
 
@@ -42,6 +41,6 @@ bool claim_executable_compile_token(uint64_t hlo_id);
 void register_executable(uint64_t hlo_id,
                          std::unique_ptr<LegateExecutable> executable);
 
-LegateExecutable* find_executable(uint64_t hlo_id);
+LegateExecutable *find_executable(uint64_t hlo_id);
 
-}  // namespace llm
+} // namespace legate_xla

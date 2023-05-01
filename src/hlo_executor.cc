@@ -16,13 +16,12 @@
 
 #include "hlo_executor.h"
 
-#include <chrono>
-
 #include "allocator.h"
 #include "core/utilities/dispatch.h"
 #include "legate_to_xla.h"
 #include "task_utils.h"
 #include "xla_task.h"
+#include <chrono>
 
 namespace legate_xla {
 
@@ -32,30 +31,32 @@ using namespace legate;
 namespace {
 
 struct get_read_only_buffer_fn {
-  template <legate::LegateTypeCode TYPE_CODE, int32_t DIM>
-  BufferAllocation operator()(legate::Store& store) {
+  template <legate::Type::Code TYPE_CODE, int32_t DIM>
+
+  BufferAllocation operator()(legate::Store &store) {
     using VAL = legate::legate_type_of<TYPE_CODE>;
     auto shape = store.shape<DIM>();
     auto acc = store.read_accessor<VAL, DIM>();
     size_t size =
         sizeof(legate::legate_type_of<TYPE_CODE>) * store.domain().get_volume();
-    void* buffer = const_cast<void*>(static_cast<const void*>(acc.ptr(shape)));
+    void *buffer =
+        const_cast<void *>(static_cast<const void *>(acc.ptr(shape)));
     return BufferAllocation{.buffer = buffer, .size = size};
   }
 };
 
 struct get_write_only_buffer_fn {
-  template <legate::LegateTypeCode TYPE_CODE, int32_t DIM>
-  BufferAllocation operator()(legate::Store& store, bool is_red) {
+  template <legate::Type::Code TYPE_CODE, int32_t DIM>
+  BufferAllocation operator()(legate::Store &store, bool is_red) {
     using VAL = legate::legate_type_of<TYPE_CODE>;
     auto shape = store.shape<DIM>();
-    void* buffer = nullptr;
+    void *buffer = nullptr;
     if (is_red) {
       auto acc = store.reduce_accessor<Legion::SumReduction<VAL>, true, DIM>();
-      buffer = static_cast<void*>(acc.ptr(shape));
+      buffer = static_cast<void *>(acc.ptr(shape));
     } else {
       auto acc = store.write_accessor<VAL, DIM>();
-      buffer = static_cast<void*>(acc.ptr(shape));
+      buffer = static_cast<void *>(acc.ptr(shape));
     }
     size_t size =
         sizeof(legate::legate_type_of<TYPE_CODE>) * store.domain().get_volume();
@@ -63,17 +64,17 @@ struct get_write_only_buffer_fn {
   }
 };
 
-}  // namespace
+} // namespace
 
-/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext& context) {
+/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext &context) {
   int scalar_offset = 0;
-  LegateExecutable* exe = reinterpret_cast<LegateExecutable*>(
-      context.scalars()[scalar_offset++].value<void*>());
+  LegateExecutable *exe = reinterpret_cast<LegateExecutable *>(
+      context.scalars()[scalar_offset++].value<void *>());
   uint64_t run_id = context.scalars()[scalar_offset++].value<int64_t>();
 
 #ifndef LEGATE_XLA_PYTHON_PROTOTYPE
-  auto* callbacks = context.scalars()[scalar_offset++]
-                        .value<std::vector<std::function<void()>>*>();
+  auto *callbacks = context.scalars()[scalar_offset++]
+                        .value<std::vector<std::function<void()>> *>();
 #endif
 
   run_executable(context, exe, run_id, scalar_offset);
@@ -81,7 +82,7 @@ struct get_write_only_buffer_fn {
 #ifndef LEGATE_XLA_PYTHON_PROTOTYPE
   if (callbacks->size() > 0) {
     log_xla.debug() << "Running total of " << callbacks->size() << " callbacks";
-    for (auto& fn : *callbacks) {
+    for (auto &fn : *callbacks) {
       fn();
     }
   }
@@ -89,13 +90,13 @@ struct get_write_only_buffer_fn {
 #endif
 }
 
-/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext& context,
-                                                LegateExecutable* exe,
+/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext &context,
+                                                LegateExecutable *exe,
                                                 int64_t run_id,
                                                 int scalar_offset) {
   std::vector<legate_xla::BufferAllocation> inputs, outputs;
 
-  for (auto& store : context.inputs()) {
+  for (auto &store : context.inputs()) {
     inputs.push_back(legate::double_dispatch(store.dim(), store.code(),
                                              get_read_only_buffer_fn{}, store));
   }
@@ -103,10 +104,11 @@ struct get_write_only_buffer_fn {
   size_t total_outputs = context.outputs().size() + context.reductions().size();
   int output_idx = 0;
   int red_idx = 0;
-  // first <scalar_offset> scalars are exe and ID values
+
+  // first 2 scalars are exe and ID values
   for (size_t idx = scalar_offset; idx < total_outputs + scalar_offset; ++idx) {
     bool is_red = context.scalars()[idx].value<char>();
-    Store& store = is_red ? context.reductions()[red_idx++]
+    Store &store = is_red ? context.reductions()[red_idx++]
                           : context.outputs()[output_idx++];
 
     outputs.push_back(legate::double_dispatch(
@@ -120,15 +122,10 @@ struct get_write_only_buffer_fn {
                                       .replica_count = 1,
                                       .num_partitions = cfg.num_tasks});
 
-#ifndef LEGATE_XLA_PYTHON_PROTOTYPE
-  // TODO: need resource scoping to set the device assignment
-  device_assignment(0, 0) = 0;
-#else
-  for (uint32_t device_id = cfg.device_id_range.lo, idx = 0;
-       device_id <= cfg.device_id_range.hi; ++device_id, ++idx) {
+  for (uint32_t device_id = cfg.device_id_range.low, idx = 0;
+       device_id < cfg.device_id_range.high; ++device_id, ++idx) {
     device_assignment(0, idx) = device_id;
   }
-#endif
 
   // If this is set to false, the execution profile and ComputeTimeNs for the
   // stream will be incorrect since it will not include the blocking time.
@@ -144,11 +141,11 @@ struct get_write_only_buffer_fn {
   }
 }
 
-/*static*/ void HLOExecutorTask::cpu_variant(TaskContext& context) {
+/*static*/ void HLOExecutorTask::cpu_variant(TaskContext &context) {
   run_executable(context);
 }
 
-namespace  // unnamed
+namespace // unnamed
 {
 static void __attribute__((constructor)) register_tasks(void) {
   legate::VariantOptions options;
@@ -156,6 +153,6 @@ static void __attribute__((constructor)) register_tasks(void) {
   HLOExecutorTask::register_variants(
       {{LEGATE_CPU_VARIANT, options}, {LEGATE_GPU_VARIANT, options}});
 }
-}  // namespace
+} // namespace
 
-}  // namespace legate_xla
+} // namespace legate_xla

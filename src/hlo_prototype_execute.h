@@ -22,17 +22,18 @@
 namespace legate_xla {
 
 class HLOPrototypeExecuteTask : public XlaTask<HLOPrototypeExecuteTask> {
- public:
+public:
   static const int TASK_ID = HLO_PROTOTYPE_EXECUTE;
 
- public:
-  static void run_executable(legate::TaskContext& context, const std::string& platform);
+public:
+  static void run_executable(legate::TaskContext &context,
+                             const std::string &platform);
 
- public:
-  static void cpu_variant(legate::TaskContext& context);
+public:
+  static void cpu_variant(legate::TaskContext &context);
 #ifdef LEGATE_USE_CUDA
-  static void gpu_variant(legate::TaskContext& context);
+  static void gpu_variant(legate::TaskContext &context);
 #endif
 };
 
-}  // namespace llm
+} // namespace legate_xla

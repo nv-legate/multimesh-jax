@@ -1,4 +1,4 @@
-# Copyright 2022 NVIDIA Corporation
+# Copyright (c) 2021-2022, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,17 +11,39 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
-from .pjit import (
-    fori_reduce,
-    reduce_body,
-    pytree_zeros,
-    pjit,
-    partition,
-    with_sharding_constraint,
-    task,
-    LayerMesh,
-    mark_gradient_scalar,
-    checkpoint_activation,
-)
+[build-system]
+requires = [
+    "wheel",
+    "ninja",
+    "setuptools",
+    "scikit-build>=0.13.1",
+    "cmake>=3.22.1,!=3.23.0,!=3.25.0",
+    "cython",
+]
+
+[tool.black]
+line-length = 79
+target-version = ["py36"]
+include = '\.py?$'
+exclude = '''
+/(
+    \.eggs |
+    \.git |
+    \.mypy_cache |
+    \.tox |
+    \.venv |
+    _build |
+    buck-out |
+    build |
+    dist
+)/
+'''
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "@abstract"
+]
+

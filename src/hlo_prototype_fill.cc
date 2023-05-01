@@ -24,30 +24,32 @@ namespace legate_xla {
 namespace {
 
 struct fill_buffer_fn {
-  template <legate::LegateTypeCode TYPE_CODE, int32_t DIM>
-  void operator()(legate::Store& store)
-  {
-    using VAL   = legate::legate_type_of<TYPE_CODE>;
-    auto shape  = store.shape<DIM>();
-    auto acc    = store.write_accessor<VAL, DIM>();
-    VAL* buffer = acc.ptr(shape);
+  template <legate::Type::Code TYPE_CODE, int32_t DIM>
+  void operator()(legate::Store &store) {
+    using VAL = legate::legate_type_of<TYPE_CODE>;
+    auto shape = store.shape<DIM>();
+    auto acc = store.write_accessor<VAL, DIM>();
+    VAL *buffer = acc.ptr(shape);
     size_t size = store.domain().get_volume();
-    for (size_t i = 0; i < size; i++) { buffer[i] = 0.06 * (i % 16); }
+    for (size_t i = 0; i < size; i++) {
+      buffer[i] = 0.06 * (i % 16);
+    }
   }
 };
 
-}
+} // namespace
 
-/*static*/ void HLOFillTask::cpu_variant(TaskContext& context)
-{
-  for (auto& store : context.outputs()) {
+/*static*/ void HLOFillTask::cpu_variant(TaskContext &context) {
+  for (auto &store : context.outputs()) {
     legate::double_dispatch(store.dim(), store.code(), fill_buffer_fn{}, store);
   }
 }
 
-namespace  // unnamed
+namespace // unnamed
 {
-static void __attribute__((constructor)) register_tasks(void) { HLOFillTask::register_variants(); }
-}  // namespace
+static void __attribute__((constructor)) register_tasks(void) {
+  HLOFillTask::register_variants();
+}
+} // namespace
 
-}  // namespace llm
+} // namespace legate_xla

@@ -17,19 +17,18 @@
 #include "executable_cache.h"
 #include "legate_xla_common.h"
 
-#include <mutex>
 #include <iostream>
+#include <mutex>
 
 namespace legate_xla {
 
 static std::mutex cache_lock;
 
-void ExecutableCache::register_executable(uint64_t hlo_id,
-                                          std::unique_ptr<LegateExecutable> executable)
-{
+void ExecutableCache::register_executable(
+    uint64_t hlo_id, std::unique_ptr<LegateExecutable> executable) {
   std::lock_guard<std::mutex> guard(cache_lock);
   auto iter = executables_.find(hlo_id);
-  if (iter == executables_.end()){
+  if (iter == executables_.end()) {
     std::cerr << "No registration spot open for HLO " << hlo_id << std::endl;
     abort();
   }
@@ -37,17 +36,17 @@ void ExecutableCache::register_executable(uint64_t hlo_id,
   iter->second = std::move(executable);
 }
 
-bool ExecutableCache::claim_executable_compile_token(uint64_t hlo_id)
-{
+bool ExecutableCache::claim_executable_compile_token(uint64_t hlo_id) {
   std::lock_guard<std::mutex> guard(cache_lock);
-  if (executables_.find(hlo_id) != executables_.end()) { return false; }
+  if (executables_.find(hlo_id) != executables_.end()) {
+    return false;
+  }
   // drop an empty entry to keep others from building this
   executables_[hlo_id];
   return true;
 }
 
-LegateExecutable* ExecutableCache::find_executable(uint64_t hlo_id)
-{
+LegateExecutable *ExecutableCache::find_executable(uint64_t hlo_id) {
   std::lock_guard<std::mutex> guard(cache_lock);
   auto finder = executables_.find(hlo_id);
   if (executables_.end() == finder) {
@@ -56,28 +55,22 @@ LegateExecutable* ExecutableCache::find_executable(uint64_t hlo_id)
   return finder->second.get();
 }
 
-static ExecutableCache& get_executable_cache()
-{
+static ExecutableCache &get_executable_cache() {
   static ExecutableCache executable_cache;
   return executable_cache;
 }
 
 void register_executable(uint64_t hlo_id,
-                         std::unique_ptr<LegateExecutable> executable)
-{
-  get_executable_cache().register_executable(hlo_id,
-                                             std::move(executable));
+                         std::unique_ptr<LegateExecutable> executable) {
+  get_executable_cache().register_executable(hlo_id, std::move(executable));
 }
 
-bool claim_executable_compile_token(uint64_t hlo_id)
-{
+bool claim_executable_compile_token(uint64_t hlo_id) {
   return get_executable_cache().claim_executable_compile_token(hlo_id);
 }
 
-LegateExecutable* find_executable(uint64_t hlo_id)
-{
+LegateExecutable *find_executable(uint64_t hlo_id) {
   return get_executable_cache().find_executable(hlo_id);
 }
 
-
-}  // namespace legate_xla
+} // namespace legate_xla

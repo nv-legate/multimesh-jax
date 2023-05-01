@@ -1,10 +1,10 @@
 import os
 import sys
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import jit, value_and_grad
-import jax
 from jax.tree_util import tree_flatten, tree_unflatten
 
 from lllm.api import (
@@ -65,7 +65,7 @@ def step_fn(params, batch, microbatch_size, num_microbatches):
         batch, params = args
         offset = i * microbatch_size
         length = microbatch_size
-        starts = [offset] + [0] * (batch.ndim-1)
+        starts = [offset] + [0] * (batch.ndim - 1)
         limits = [length] + list(batch.shape[1:])
 
         microbatch = jax.lax.dynamic_slice(batch, starts, limits)
@@ -82,7 +82,7 @@ def step_fn(params, batch, microbatch_size, num_microbatches):
         reduce_init=reduce_init,
         reduce=reduce,
         implicit_decomposition=True,
-        unroll=False
+        unroll=False,
     )
 
     flat_params, tree = tree_flatten(params)
@@ -108,7 +108,7 @@ def run_step(num_layers: int = 4, num_microbatches: int = 4, size=1024):
         params.append((mult_params, cos_params))
 
     batch = generate_input(microbatch_size * num_microbatches)
-    step = jit(step_fn, static_argnums=(2,3))
+    step = jit(step_fn, static_argnums=(2, 3))
     loss, params = step(params, batch, microbatch_size, num_microbatches)
     print("Loss=", loss)
 

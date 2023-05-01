@@ -19,9 +19,9 @@
 
 namespace legate_xla {
 
-/*static*/ void HLOPrototypeLoaderTask::gpu_variant(legate::TaskContext& context)
-{
+/*static*/ void
+HLOPrototypeLoaderTask::gpu_variant(legate::TaskContext &context) {
   load_and_compile(context, "gpu");
 }
 
-}  // namespace llm
+} // namespace legate_xla

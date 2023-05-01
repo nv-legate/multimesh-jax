@@ -16,23 +16,24 @@
 
 #pragma once
 
-#include "xla_task.h"
 #include "legate_xla_c.h"
+#include "xla_task.h"
 
 namespace legate_xla {
 
-class HloPrototypeDistributedInitTask : public XlaTask<HloPrototypeDistributedInitTask> {
- public:
+class HloPrototypeDistributedInitTask
+    : public XlaTask<HloPrototypeDistributedInitTask> {
+public:
   static const int TASK_ID = HLO_PROTOTYPE_DISTRIBUTED_INIT;
 
- public:
-  static void init_distributed(legate::TaskContext& context);
+public:
+  static void init_distributed(legate::TaskContext &context);
 
- public:
-  static void cpu_variant(legate::TaskContext& context);
+public:
+  static void cpu_variant(legate::TaskContext &context);
 #ifdef LEGATE_USE_CUDA
-  static void gpu_variant(legate::TaskContext& context);
+  static void gpu_variant(legate::TaskContext &context);
 #endif
 };
 
-}  // namespace llm
+} // namespace legate_xla

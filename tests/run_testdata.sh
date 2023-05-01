@@ -1,7 +1,18 @@
 #! /usr/bin/env bash
 
 for example in \
- "attention 2 async" 
+ "attention 2 async" \
+ "attention-ckpt 2 async" \
+ "attention-mp 2 async" \
+ "attention-while-loop 2 async" \
+ "constant_output 1 async" \
+ "dot_layers 2 async" \
+ "many_layers 2 async" \
+ "microbatches 2 async" \
+ "implicit_decomposition 1 noasync" \
+ "pruned 1 noasync" \
+ "replicated_params 2 noasync" \
+ "simple_layers 2 async"
 do
   set -- $example
   echo "Running $1"

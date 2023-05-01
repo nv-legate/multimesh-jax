@@ -13,16 +13,11 @@ rapids_cpm_find(xla 2.10
 set(xla_library_name liblegate_hlo_prototype.so)
 set(xla_library "${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${xla_library_name}")
 set(xla_target "//xla/pjrt/legate:${xla_library_name}")
-#set(xla_library_name xla_extension.so)
-#set(xla_library "${xla_SOURCE_DIR}/bazel-bin/xla/python/xla_extension.so")
-#set(xla_target "//xla/python:${xla_library_name}")
 
 file(GLOB xla_source_files
      "${xla_SOURCE_DIR}/xla/pjrt/legate/*.cc"
      "${xla_SOURCE_DIR}/xla/pjrt/legate/*.h"
      "${xla_SOURCE_DIR}/xla/pjrt/legate/BUILD")
-
-message("files=${xla_source_files}")
 
 set(_bazel_options
   --define open_source_build=true

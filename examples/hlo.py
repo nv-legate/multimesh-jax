@@ -83,7 +83,7 @@ def run_hlo(
 
     if exec_async:
         with timer("async decompose"):
-            model.decompose_into_layers()
+            model.decompose_into_layers(all_tensors)
             model.print_decomposition_tree()
             if print_layers:
                 print(model.summary(mesh=device_mesh))

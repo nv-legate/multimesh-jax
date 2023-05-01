@@ -17,23 +17,10 @@ do
 
   rm -rf dump_gen
 done
-#
-#legate examples/jax/attention.py \
-#    --nbatch 1 \
-#    --batch 32 \
-#    --seq 256 \
-#    --hidden 512 \
-#    --nlayers 4 \
-#    --nreps 8 \
-#    --dump-to=dump_attention \
-#    --dump-hlo-txt \
-#    --abstract
-#
-#cp dump_attention/module_0000.*.before_optimizations.hlo.pb testdata/attention.pb
-#cp dump_attention/module_0000.*.before_optimizations.txt testdata/attention.txt
-#rm -rf dump_attention
 
-legate examples/jax/attention-while-loop.py \
+gen_attention_data() {
+
+legate examples/jax/$1.py \
     --nbatch 4 \
     --batch 32 \
     --seq 256 \
@@ -44,6 +31,14 @@ legate examples/jax/attention-while-loop.py \
     --dump-hlo-txt \
     --abstract
 
-cp dump_attention/module_0000.*.before_optimizations.hlo.pb testdata/attention-while.pb
-cp dump_attention/module_0000.*.before_optimizations.txt testdata/attention-while.txt
+cp dump_attention/module_0000.*.before_optimizations.hlo.pb testdata/$1.pb
+cp dump_attention/module_0000.*.before_optimizations.txt testdata/$1.txt
 rm -rf dump_attention
+
+}
+
+#gen_attention_data attention
+#gen_attention_data attention-mp
+#gen_attention_data attention-while-loop
+gen_attention_data attention-ckpt
+
