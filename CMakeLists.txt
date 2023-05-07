@@ -78,6 +78,15 @@ if (NOT LegateXLA_FOUND)
   add_subdirectory(src)
 endif()
 
+include(GNUInstallDirs)
+rapids_cmake_install_lib_dir(lib_dir)
+
+install(
+  FILES src/legate_xla_common.h
+        src/legate_to_xla.h
+        src/xla_to_legate.h
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
 if (SKBUILD)
   include(legate_xla_python.cmake)
 endif()
