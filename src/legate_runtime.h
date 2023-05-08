@@ -16,47 +16,46 @@ limitations under the License.
 #pragma once
 
 #include "legate.h"
-#include "xla_task.h"
-#include "legate_xla_common.h"
 #include "legate_xla_c.h"
+#include "legate_xla_common.h"
+#include "xla_task.h"
 
 namespace legate_xla {
 
 // Simple runtime holding a pointer to the library context
 
 struct Runtime {
- public:
-  Runtime(legate::Runtime* core_runtime, legate::LibraryContext* context);
+public:
+  Runtime(legate::Runtime *core_runtime, legate::LibraryContext *context);
 
- public:
-  legate::LibraryContext* get_context() const { return context_; }
+public:
+  legate::LibraryContext *get_context() const { return context_; }
 
- public:
+public:
   std::unique_ptr<legate::AutoTask> create_task(XlaOpCode task_id);
-  std::unique_ptr<legate::ManualTask> create_task(XlaOpCode task_id,
-                                          const legate::Shape& launch_shape);
+  std::unique_ptr<legate::ManualTask>
+  create_task(XlaOpCode task_id, const legate::Shape &launch_shape);
   void submit(std::unique_ptr<legate::Task> task);
   void issue_execution_fence(bool block = false);
-  std::vector<legate::LogicalStore>& get_tmp_stores();
+  std::vector<legate::LogicalStore> &get_tmp_stores();
 
- public:
-  static Runtime* get_runtime();
-  static void initialize(legate::Runtime* core_runtime, legate::LibraryContext* context);
+public:
+  static Runtime *get_runtime();
+  static void initialize(legate::Runtime *core_runtime,
+                         legate::LibraryContext *context);
 
- private:
-  static Runtime* runtime_;
+private:
+  static Runtime *runtime_;
 
- private:
-  legate::Runtime* core_runtime_;
-  legate::LibraryContext* context_;
+private:
+  legate::Runtime *core_runtime_;
+  legate::LibraryContext *context_;
   std::vector<legate::LogicalStore> temporary_stores;
 };
 
-
 // Registration callback for Legate JAX
-/*static*/ void registration_callback(
-    Legion::Machine machine, Legion::Runtime* legion_runtime,
-    const std::set<Legion::Processor>& local_procs);
+/*static*/ void
+registration_callback(Legion::Machine machine, Legion::Runtime *legion_runtime,
+                      const std::set<Legion::Processor> &local_procs);
 
-}  // namespace legate
-
+} // namespace legate_xla

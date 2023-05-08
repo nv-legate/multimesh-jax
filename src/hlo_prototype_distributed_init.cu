@@ -14,15 +14,15 @@
  *
  */
 
-#include "hlo_prototype_distributed_init.h"
 #include "core/cuda/cuda_help.h"
+#include "hlo_prototype_distributed_init.h"
 
 namespace legate_xla {
 
-/*static*/ void HloPrototypeDistributedInitTask::gpu_variant(legate::TaskContext& context)
-{
+/*static*/ void
+HloPrototypeDistributedInitTask::gpu_variant(legate::TaskContext &context) {
   init_distributed(context);
   CHECK_CUDA(cudaPeekAtLastError());
 }
 
-}  // namespace llm
+} // namespace legate_xla

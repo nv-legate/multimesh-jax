@@ -1,6 +1,7 @@
 import argparse
 import os
 
+import jax
 import jax.lax
 import jax.nn
 import jax.numpy as jnp
@@ -52,6 +53,11 @@ def layer(params, x, num_heads: int):
 
     x = jnp.cos(x)
     return partition(x, "batch", "seq", "embed")
+
+
+layer = jax.checkpoint(
+    layer, policy=jax.checkpoint_policies.nothing_saveable, static_argnums=(2,)
+)
 
 
 def loss_fn(params, x, num_heads: int):

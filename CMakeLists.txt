@@ -58,6 +58,8 @@ include(rapids-cuda)
 include(rapids-export)
 include(rapids-find)
 
+rapids_cpm_init()
+
 set(legate_xla_version 23.03.00)
 
 

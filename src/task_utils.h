@@ -3,9 +3,7 @@
 namespace legate_xla {
 
 struct TaskConfig {
-#ifdef LEGATE_XLA_PYTHON_PROTOTYPE
   legate::mapping::ProcessorRange device_id_range;
-#endif
   int32_t task_id;
   int32_t num_tasks;
   int32_t local_proc_id;
@@ -13,6 +11,6 @@ struct TaskConfig {
   uint32_t my_node;
 };
 
-TaskConfig get_task_config(legate::TaskContext& context);
+TaskConfig get_task_config(legate::TaskContext &context);
 
-}
+} // namespace legate_xla

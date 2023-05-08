@@ -21,16 +21,15 @@ namespace legate_xla {
 using namespace Legion;
 using namespace legate;
 
-DeferredBufferAllocator::DeferredBufferAllocator()
-{
+DeferredBufferAllocator::DeferredBufferAllocator() {
   auto proc = Processor::get_executing_processor();
-  mem_kind  = proc.kind() == Processor::TOC_PROC ? Memory::GPU_FB_MEM : Memory::SYSTEM_MEM;
+  mem_kind = proc.kind() == Processor::TOC_PROC ? Memory::GPU_FB_MEM
+                                                : Memory::SYSTEM_MEM;
 }
 
-void* DeferredBufferAllocator::Allocate(size_t size)
-{
+void *DeferredBufferAllocator::Allocate(size_t size) {
   Buffer buffer(mem_kind, legate::Rect<1>(0, size - 1));
-  void* p = buffer.ptr(0);
+  void *p = buffer.ptr(0);
 #ifdef DEBUG_LEGATE_LLM
   assert(buffers.find(p) == buffers.end());
 #endif
@@ -38,8 +37,7 @@ void* DeferredBufferAllocator::Allocate(size_t size)
   return p;
 }
 
-void DeferredBufferAllocator::Free(void* buf, size_t size)
-{
+void DeferredBufferAllocator::Free(void *buf, size_t size) {
   auto finder = buffers.find(buf);
 #ifdef DEBUG_LEGATE_LLM
   assert(finder != buffers.end());
@@ -48,4 +46,4 @@ void DeferredBufferAllocator::Free(void* buf, size_t size)
   buffers.erase(finder);
 }
 
-}  // namespace llm
+} // namespace legate_xla

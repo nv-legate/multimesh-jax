@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "xla_task.h"
 #include "legate_xla_common.h"
+#include "xla_task.h"
 #include <core/data/scalar.h>
 #include <cstdint>
 #include <memory>
@@ -26,19 +26,23 @@
 namespace legate_xla {
 
 class HLOLoaderTask : public XlaTask<HLOLoaderTask> {
- public:
+public:
   static constexpr int32_t TASK_ID = XLA_COMPILE_TASK;
 
- public:
-  static void cpu_variant(legate::TaskContext& context);
+public:
+  static void cpu_variant(legate::TaskContext &context);
 
-  static void gpu_variant(legate::TaskContext& context);
+  static void gpu_variant(legate::TaskContext &context);
 
- public:
-  static void load_and_compile(legate::TaskContext& context, LegateCompiler* compiler, uint64_t run_id,
-                                const std::string &platform_name, std::optional<uint32_t> num_partitions = std::nullopt);
+public:
+  static void
+  load_and_compile(legate::TaskContext &context, LegateCompiler *compiler,
+                   uint64_t run_id, const std::string &platform_name,
+                   std::optional<uint32_t> num_partitions = std::nullopt,
+                   bool has_sync_store = true, bool print_stats = false);
 
-  static void load_and_compile(legate::TaskContext& context, const std::string& platform_name);
+  static void load_and_compile(legate::TaskContext &context,
+                               const std::string &platform_name);
 };
 
-}  // namespace legate_xla
+} // namespace legate_xla

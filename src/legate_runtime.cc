@@ -22,23 +22,21 @@ using namespace legate;
 
 namespace legate_xla {
 
-/*static*/ Runtime* Runtime::runtime_ = nullptr;
+/*static*/ Runtime *Runtime::runtime_ = nullptr;
 
-Runtime::Runtime(legate::Runtime* core_runtime,
-                 legate::LibraryContext* context)
+Runtime::Runtime(legate::Runtime *core_runtime, legate::LibraryContext *context)
     : core_runtime_(core_runtime), context_(context) {}
 
-std::vector<LogicalStore>& Runtime::get_tmp_stores() {
+std::vector<LogicalStore> &Runtime::get_tmp_stores() {
   return temporary_stores;
 }
 
-std::unique_ptr<AutoTask> Runtime::create_task(
-    XlaOpCode task_id) {
+std::unique_ptr<AutoTask> Runtime::create_task(XlaOpCode task_id) {
   return core_runtime_->create_task(context_, task_id);
 }
 
-std::unique_ptr<ManualTask> Runtime::create_task(
-    XlaOpCode task_id, const legate::Shape& launch_shape) {
+std::unique_ptr<ManualTask>
+Runtime::create_task(XlaOpCode task_id, const legate::Shape &launch_shape) {
   return core_runtime_->create_task(context_, task_id, launch_shape);
 }
 
@@ -50,14 +48,12 @@ void Runtime::issue_execution_fence(bool block) {
   core_runtime_->issue_execution_fence(block);
 }
 
-/*static*/ Runtime* Runtime::get_runtime() {
-  return runtime_;
-}
+/*static*/ Runtime *Runtime::get_runtime() { return runtime_; }
 
-/*static*/ void Runtime::initialize(legate::Runtime* core_runtime,
-                                             legate::LibraryContext* context) {
+/*static*/ void Runtime::initialize(legate::Runtime *core_runtime,
+                                    legate::LibraryContext *context) {
   if (nullptr == runtime_)
     runtime_ = new Runtime(core_runtime, context);
 }
 
-}  // namespace legate_xla
+} // namespace legate_xla

@@ -26,33 +26,34 @@ namespace legate_xla {
 using namespace Legion;
 using namespace legate;
 
-/*static*/ void HloPrototypeDistributedShutdownTask::shutdown_distributed(legate::TaskContext& context)
-{
+/*static*/ void HloPrototypeDistributedShutdownTask::shutdown_distributed(
+    legate::TaskContext &context) {
   auto device_id_range = context.machine_desc().processor_range();
-  auto task_id         = static_cast<int32_t>(context.get_task_index()[0]);
-  auto num_tasks       = device_id_range.count();
-  auto local_proc_id =
-    static_cast<int32_t>((device_id_range.lo + task_id) % device_id_range.per_node_count);
+  auto task_id = static_cast<int32_t>(context.get_task_index()[0]);
+  auto num_tasks = device_id_range.count();
+  auto local_proc_id = static_cast<int32_t>((device_id_range.low + task_id) %
+                                            device_id_range.per_node_count);
 
   // only initialize one task per process/node
   if (local_proc_id == 0) {
-    log_xla.debug() << "[DistributedShutdownTask] start shutdown on " << task_id;
+    log_xla.debug() << "[DistributedShutdownTask] start shutdown on "
+                    << task_id;
     ShutdownDistributedRuntime();
-    log_xla.debug() << "[DistributedShutdownTask] finish shutdown on " << task_id;
+    log_xla.debug() << "[DistributedShutdownTask] finish shutdown on "
+                    << task_id;
   }
 }
 
-/*static*/ void HloPrototypeDistributedShutdownTask::cpu_variant(TaskContext& context)
-{
+/*static*/ void
+HloPrototypeDistributedShutdownTask::cpu_variant(TaskContext &context) {
   shutdown_distributed(context);
 }
 
-namespace  // unnamed
+namespace // unnamed
 {
-static void __attribute__((constructor)) register_tasks(void)
-{
+static void __attribute__((constructor)) register_tasks(void) {
   HloPrototypeDistributedShutdownTask::register_variants();
 }
-}  // namespace
+} // namespace
 
-}  // namespace llm
+} // namespace legate_xla

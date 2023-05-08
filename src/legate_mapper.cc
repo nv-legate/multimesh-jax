@@ -8,20 +8,19 @@ namespace legate_xla {
 
 Mapper::Mapper(){};
 
-void Mapper::set_machine(
-    const legate::mapping::MachineQueryInterface* machine){
+void Mapper::set_machine(const legate::mapping::MachineQueryInterface *machine){
     // FIXME
 };
 
-mapping::TaskTarget Mapper::task_target(
-    const mapping::Task& task,
-    const std::vector<mapping::TaskTarget>& options) {
+mapping::TaskTarget
+Mapper::task_target(const mapping::Task &task,
+                    const std::vector<mapping::TaskTarget> &options) {
   return *options.begin();
 }
 
-std::vector<mapping::StoreMapping> Mapper::store_mappings(
-    const mapping::Task& task,
-    const std::vector<mapping::StoreTarget>& options) {
+std::vector<mapping::StoreMapping>
+Mapper::store_mappings(const mapping::Task &task,
+                       const std::vector<mapping::StoreTarget> &options) {
   return {};
 }
 
@@ -30,4 +29,4 @@ Scalar Mapper::tunable_value(TunableID tunable_id) {
   return Scalar();
 }
 
-}
+} // namespace legate_xla

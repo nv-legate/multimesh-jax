@@ -1,0 +1,61 @@
+from lllm import mesh
+
+
+AXES = [
+  ("batch", "ax"),
+#  ("heads", "ax"),
+]
+
+TASK_MESH = (1,)
+
+COMMON_ARGS = {
+  "device_axes" : ('ax',),
+  "logical_axes" : %AXES,
+  "device_shape" : %TASK_MESH,
+}
+
+LAYER_MESH_ARGS = (%COMMON_ARGS, {
+  "num_layers" : 2,
+})
+
+LAST_LAYER_ARGS = (%COMMON_ARGS, {
+  "device_offset" : 1,
+})
+
+TASK_ARGS = (%COMMON_ARGS,)
+
+to_combine = {
+  "last_layer" : ["layer_1", "logits", "loss"],
+}
+key_utils.CombineNamesTransform:
+  to_combine = %to_combine
+
+
+key_utils.CompressLayersTransform:
+  num_layers = 4
+  num_layers_per_key = 2
+
+to_combine = {
+  "last_layer" : ["layer_1", "logits", "loss"],
+}
+key_utils.CombineNamesTransform:
+  to_combine = %to_combine
+
+map_legate_key:
+  transforms = [
+   (@key_utils.CompressLayersTransform,()),
+   (@key_utils.CombineNamesTransform,()),
+  ]
+
+legate_global_mesh:
+  mesh_args = [
+    (@mesh.LayerMesh, "layer_{}.*", %LAYER_MESH_ARGS),
+    (@mesh.TaskMesh, "last_layer.*", %LAST_LAYER_ARGS),
+    (@mesh.TaskMesh, "jit_step.*", %TASK_ARGS),
+  ]
+  debug_mode = False
+
+
+
+
+

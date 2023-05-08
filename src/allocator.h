@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "legate_xla_common.h"
 #include "legate.h"
+#include "legate_xla_common.h"
 #include <unordered_map>
 
 namespace legate_xla {
@@ -25,10 +25,10 @@ namespace legate_xla {
 struct DeferredBufferAllocator : TaskMemoryAllocator {
   using Buffer = Legion::DeferredBuffer<uint8_t, 1>;
   DeferredBufferAllocator();
-  virtual void* Allocate(size_t size) override;
-  virtual void Free(void* buf, size_t size) override;
+  virtual void *Allocate(size_t size) override;
+  virtual void Free(void *buf, size_t size) override;
   Legion::Memory::Kind mem_kind;
-  std::unordered_map<void*, Buffer> buffers;
+  std::unordered_map<void *, Buffer> buffers;
 };
 
-}  // namespace llm
+} // namespace legate_xla

@@ -1,0 +1,508 @@
+HloModule jit_step_fn, entry_computation_layout={(f32[32,256,2048]{2,1,0},f32[256,4,512]{2,1,0},f32[256,4,512]{2,1,0},f32[256,4,512]{2,1,0},f32[256,4,512]{2,1,0})->(f32[], f32[256,4,512]{2,1,0}, f32[256,4,512]{2,1,0}, f32[256,4,512]{2,1,0}, f32[256,4,512]{2,1,0})}, allow_spmd_sharding_propagation_to_output={true,true,true,true,true}
+
+_einsum.18 {
+  Arg_1.20 = f32[256,4,512]{2,1,0} parameter(1)
+  Arg_0.19 = f32[32,256,4,512]{3,2,1,0} parameter(0)
+  dot.21 = f32[4,256,32,256]{3,2,1,0} dot(Arg_1.20, Arg_0.19), lhs_batch_dims={1}, lhs_contracting_dims={2}, rhs_batch_dims={2}, rhs_contracting_dims={3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/bqhd,khd->bhqk/jit(_einsum)/dot_general[dimension_numbers=(((2,), (3,)), ((1,), (2,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=24}
+  ROOT transpose.22 = f32[32,4,256,256]{2,0,3,1} transpose(dot.21), dimensions={2,0,3,1}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(2, 0, 3, 1)]" source_file="examples/jax/attention-mp.py" source_line=24}
+}
+
+region_0.24 {
+  Arg_0.25 = f32[] parameter(0)
+  Arg_1.26 = f32[] parameter(1)
+  ROOT maximum.27 = f32[] maximum(Arg_0.25, Arg_1.26), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/reduce_max[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+region_1.35 {
+  Arg_0.36 = f32[] parameter(0)
+  Arg_1.37 = f32[] parameter(1)
+  ROOT add.38 = f32[] add(Arg_0.36, Arg_1.37), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+_einsum_0.47 {
+  Arg_1.49 = f32[256,4,512]{2,1,0} parameter(1)
+  Arg_0.48 = f32[32,4,256,256]{3,2,1,0} parameter(0)
+  dot.50 = f32[4,512,32,256]{3,2,1,0} dot(Arg_1.49, Arg_0.48), lhs_batch_dims={1}, lhs_contracting_dims={0}, rhs_batch_dims={1}, rhs_contracting_dims={3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((0,), (3,)), ((1,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  ROOT transpose.51 = f32[32,256,4,512]{1,0,3,2} transpose(dot.50), dimensions={2,3,0,1}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 3, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+}
+
+_einsum_1.62 {
+  Arg_1.64 = f32[256,4,512]{2,1,0} parameter(1)
+  Arg_0.63 = f32[32,256,4,512]{3,2,1,0} parameter(0)
+  dot.65 = f32[4,256,32,256]{3,2,1,0} dot(Arg_1.64, Arg_0.63), lhs_batch_dims={1}, lhs_contracting_dims={2}, rhs_batch_dims={2}, rhs_contracting_dims={3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/bqhd,khd->bhqk/jit(_einsum)/dot_general[dimension_numbers=(((2,), (3,)), ((1,), (2,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=24}
+  ROOT transpose.66 = f32[32,4,256,256]{2,0,3,1} transpose(dot.65), dimensions={2,0,3,1}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(2, 0, 3, 1)]" source_file="examples/jax/attention-mp.py" source_line=24}
+}
+
+region_2.68 {
+  Arg_0.69 = f32[] parameter(0)
+  Arg_1.70 = f32[] parameter(1)
+  ROOT maximum.71 = f32[] maximum(Arg_0.69, Arg_1.70), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/reduce_max[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+region_3.79 {
+  Arg_0.80 = f32[] parameter(0)
+  Arg_1.81 = f32[] parameter(1)
+  ROOT add.82 = f32[] add(Arg_0.80, Arg_1.81), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+_einsum_2.91 {
+  Arg_1.93 = f32[256,4,512]{2,1,0} parameter(1)
+  Arg_0.92 = f32[32,4,256,256]{3,2,1,0} parameter(0)
+  dot.94 = f32[4,512,32,256]{3,2,1,0} dot(Arg_1.93, Arg_0.92), lhs_batch_dims={1}, lhs_contracting_dims={0}, rhs_batch_dims={1}, rhs_contracting_dims={3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((0,), (3,)), ((1,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  ROOT transpose.95 = f32[32,256,4,512]{1,0,3,2} transpose(dot.94), dimensions={2,3,0,1}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 3, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+}
+
+_einsum_3.106 {
+  Arg_1.108 = f32[256,4,512]{2,1,0} parameter(1)
+  Arg_0.107 = f32[32,256,4,512]{3,2,1,0} parameter(0)
+  dot.109 = f32[4,256,32,256]{3,2,1,0} dot(Arg_1.108, Arg_0.107), lhs_batch_dims={1}, lhs_contracting_dims={2}, rhs_batch_dims={2}, rhs_contracting_dims={3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/bqhd,khd->bhqk/jit(_einsum)/dot_general[dimension_numbers=(((2,), (3,)), ((1,), (2,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=24}
+  ROOT transpose.110 = f32[32,4,256,256]{2,0,3,1} transpose(dot.109), dimensions={2,0,3,1}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(2, 0, 3, 1)]" source_file="examples/jax/attention-mp.py" source_line=24}
+}
+
+region_4.112 {
+  Arg_0.113 = f32[] parameter(0)
+  Arg_1.114 = f32[] parameter(1)
+  ROOT maximum.115 = f32[] maximum(Arg_0.113, Arg_1.114), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/reduce_max[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+region_5.123 {
+  Arg_0.124 = f32[] parameter(0)
+  Arg_1.125 = f32[] parameter(1)
+  ROOT add.126 = f32[] add(Arg_0.124, Arg_1.125), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+_einsum_4.135 {
+  Arg_1.137 = f32[256,4,512]{2,1,0} parameter(1)
+  Arg_0.136 = f32[32,4,256,256]{3,2,1,0} parameter(0)
+  dot.138 = f32[4,512,32,256]{3,2,1,0} dot(Arg_1.137, Arg_0.136), lhs_batch_dims={1}, lhs_contracting_dims={0}, rhs_batch_dims={1}, rhs_contracting_dims={3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((0,), (3,)), ((1,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  ROOT transpose.139 = f32[32,256,4,512]{1,0,3,2} transpose(dot.138), dimensions={2,3,0,1}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 3, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+}
+
+_einsum_5.150 {
+  Arg_1.152 = f32[256,4,512]{2,1,0} parameter(1)
+  Arg_0.151 = f32[32,256,4,512]{3,2,1,0} parameter(0)
+  dot.153 = f32[4,256,32,256]{3,2,1,0} dot(Arg_1.152, Arg_0.151), lhs_batch_dims={1}, lhs_contracting_dims={2}, rhs_batch_dims={2}, rhs_contracting_dims={3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/bqhd,khd->bhqk/jit(_einsum)/dot_general[dimension_numbers=(((2,), (3,)), ((1,), (2,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=24}
+  ROOT transpose.154 = f32[32,4,256,256]{2,0,3,1} transpose(dot.153), dimensions={2,0,3,1}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(2, 0, 3, 1)]" source_file="examples/jax/attention-mp.py" source_line=24}
+}
+
+region_6.156 {
+  Arg_0.157 = f32[] parameter(0)
+  Arg_1.158 = f32[] parameter(1)
+  ROOT maximum.159 = f32[] maximum(Arg_0.157, Arg_1.158), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/reduce_max[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+region_7.167 {
+  Arg_0.168 = f32[] parameter(0)
+  Arg_1.169 = f32[] parameter(1)
+  ROOT add.170 = f32[] add(Arg_0.168, Arg_1.169), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+_einsum_6.179 {
+  Arg_1.181 = f32[256,4,512]{2,1,0} parameter(1)
+  Arg_0.180 = f32[32,4,256,256]{3,2,1,0} parameter(0)
+  dot.182 = f32[4,512,32,256]{3,2,1,0} dot(Arg_1.181, Arg_0.180), lhs_batch_dims={1}, lhs_contracting_dims={0}, rhs_batch_dims={1}, rhs_contracting_dims={3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((0,), (3,)), ((1,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  ROOT transpose.183 = f32[32,256,4,512]{1,0,3,2} transpose(dot.182), dimensions={2,3,0,1}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 3, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+}
+
+region_8.191 {
+  Arg_0.192 = f32[] parameter(0)
+  Arg_1.193 = f32[] parameter(1)
+  ROOT add.194 = f32[] add(Arg_0.192, Arg_1.193), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=loss;task_id=0/legate_backprop/)/reduce_sum[axes=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=63}
+}
+
+_einsum_7.202 {
+  Arg_2.205 = f32[32,256,4,512]{3,2,1,0} parameter(2)
+  transpose.206 = f32[4,512,32,256]{1,0,3,2} transpose(Arg_2.205), dimensions={2,3,0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 3, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  Arg_1.204 = f32[256,4,512]{2,1,0} parameter(1)
+  dot.207 = f32[4,32,256,256]{3,2,1,0} dot(transpose.206, Arg_1.204), lhs_batch_dims={0}, lhs_contracting_dims={1}, rhs_batch_dims={1}, rhs_contracting_dims={2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((1,), (2,)), ((0,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  transpose.208 = f32[32,4,256,256]{3,2,0,1} transpose(dot.207), dimensions={1,0,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(1, 0, 2, 3)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  Arg_0.203 = f32[32,4,256,256]{3,2,1,0} parameter(0)
+  dot.209 = f32[4,512,256]{2,1,0} dot(transpose.206, Arg_0.203), lhs_batch_dims={0}, lhs_contracting_dims={2,3}, rhs_batch_dims={1}, rhs_contracting_dims={0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((2, 3), (0, 2)), ((0,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  transpose.210 = f32[256,4,512]{0,2,1} transpose(dot.209), dimensions={2,0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  ROOT tuple.211 = (f32[32,4,256,256]{3,2,0,1}, f32[256,4,512]{0,2,1}) tuple(transpose.208, transpose.210)
+}
+
+region_9.220 {
+  Arg_0.221 = f32[] parameter(0)
+  Arg_1.222 = f32[] parameter(1)
+  ROOT add.223 = f32[] add(Arg_0.221, Arg_1.222), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+region_10.231 {
+  Arg_0.232 = f32[] parameter(0)
+  Arg_1.233 = f32[] parameter(1)
+  ROOT add.234 = f32[] add(Arg_0.232, Arg_1.233), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+_einsum_8.239 {
+  Arg_2.242 = f32[32,4,256,256]{3,2,1,0} parameter(2)
+  transpose.243 = f32[4,256,32,256]{1,3,0,2} transpose(Arg_2.242), dimensions={1,3,0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(1, 3, 0, 2)]" source_file="examples/jax/attention-mp.py" source_line=24}
+  Arg_1.241 = f32[256,4,512]{2,1,0} parameter(1)
+  dot.244 = f32[4,32,256,512]{3,2,1,0} dot(transpose.243, Arg_1.241), lhs_batch_dims={0}, lhs_contracting_dims={1}, rhs_batch_dims={1}, rhs_contracting_dims={0}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/dot_general[dimension_numbers=(((1,), (0,)), ((0,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=24}
+  transpose.245 = f32[32,256,4,512]{3,1,0,2} transpose(dot.244), dimensions={1,2,0,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(1, 2, 0, 3)]" source_file="examples/jax/attention-mp.py" source_line=24}
+  Arg_0.240 = f32[32,256,4,512]{3,2,1,0} parameter(0)
+  dot.246 = f32[4,256,512]{2,1,0} dot(transpose.243, Arg_0.240), lhs_batch_dims={0}, lhs_contracting_dims={2,3}, rhs_batch_dims={2}, rhs_contracting_dims={0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/dot_general[dimension_numbers=(((2, 3), (0, 1)), ((0,), (2,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=24}
+  transpose.247 = f32[256,4,512]{2,0,1} transpose(dot.246), dimensions={1,0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(1, 0, 2)]" source_file="examples/jax/attention-mp.py" source_line=24}
+  ROOT tuple.248 = (f32[32,256,4,512]{3,1,0,2}, f32[256,4,512]{2,0,1}) tuple(transpose.245, transpose.247)
+}
+
+_einsum_9.262 {
+  Arg_2.265 = f32[32,256,4,512]{3,2,1,0} parameter(2)
+  transpose.266 = f32[4,512,32,256]{1,0,3,2} transpose(Arg_2.265), dimensions={2,3,0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 3, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  Arg_1.264 = f32[256,4,512]{2,1,0} parameter(1)
+  dot.267 = f32[4,32,256,256]{3,2,1,0} dot(transpose.266, Arg_1.264), lhs_batch_dims={0}, lhs_contracting_dims={1}, rhs_batch_dims={1}, rhs_contracting_dims={2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((1,), (2,)), ((0,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  transpose.268 = f32[32,4,256,256]{3,2,0,1} transpose(dot.267), dimensions={1,0,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(1, 0, 2, 3)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  Arg_0.263 = f32[32,4,256,256]{3,2,1,0} parameter(0)
+  dot.269 = f32[4,512,256]{2,1,0} dot(transpose.266, Arg_0.263), lhs_batch_dims={0}, lhs_contracting_dims={2,3}, rhs_batch_dims={1}, rhs_contracting_dims={0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((2, 3), (0, 2)), ((0,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  transpose.270 = f32[256,4,512]{0,2,1} transpose(dot.269), dimensions={2,0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  ROOT tuple.271 = (f32[32,4,256,256]{3,2,0,1}, f32[256,4,512]{0,2,1}) tuple(transpose.268, transpose.270)
+}
+
+region_11.280 {
+  Arg_0.281 = f32[] parameter(0)
+  Arg_1.282 = f32[] parameter(1)
+  ROOT add.283 = f32[] add(Arg_0.281, Arg_1.282), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+region_12.291 {
+  Arg_0.292 = f32[] parameter(0)
+  Arg_1.293 = f32[] parameter(1)
+  ROOT add.294 = f32[] add(Arg_0.292, Arg_1.293), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+_einsum_10.299 {
+  Arg_2.302 = f32[32,4,256,256]{3,2,1,0} parameter(2)
+  transpose.303 = f32[4,256,32,256]{1,3,0,2} transpose(Arg_2.302), dimensions={1,3,0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(1, 3, 0, 2)]" source_file="examples/jax/attention-mp.py" source_line=24}
+  Arg_1.301 = f32[256,4,512]{2,1,0} parameter(1)
+  dot.304 = f32[4,32,256,512]{3,2,1,0} dot(transpose.303, Arg_1.301), lhs_batch_dims={0}, lhs_contracting_dims={1}, rhs_batch_dims={1}, rhs_contracting_dims={0}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/dot_general[dimension_numbers=(((1,), (0,)), ((0,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=24}
+  transpose.305 = f32[32,256,4,512]{3,1,0,2} transpose(dot.304), dimensions={1,2,0,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(1, 2, 0, 3)]" source_file="examples/jax/attention-mp.py" source_line=24}
+  Arg_0.300 = f32[32,256,4,512]{3,2,1,0} parameter(0)
+  dot.306 = f32[4,256,512]{2,1,0} dot(transpose.303, Arg_0.300), lhs_batch_dims={0}, lhs_contracting_dims={2,3}, rhs_batch_dims={2}, rhs_contracting_dims={0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/dot_general[dimension_numbers=(((2, 3), (0, 1)), ((0,), (2,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=24}
+  transpose.307 = f32[256,4,512]{2,0,1} transpose(dot.306), dimensions={1,0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(1, 0, 2)]" source_file="examples/jax/attention-mp.py" source_line=24}
+  ROOT tuple.308 = (f32[32,256,4,512]{3,1,0,2}, f32[256,4,512]{2,0,1}) tuple(transpose.305, transpose.307)
+}
+
+_einsum_11.322 {
+  Arg_2.325 = f32[32,256,4,512]{3,2,1,0} parameter(2)
+  transpose.326 = f32[4,512,32,256]{1,0,3,2} transpose(Arg_2.325), dimensions={2,3,0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 3, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  Arg_1.324 = f32[256,4,512]{2,1,0} parameter(1)
+  dot.327 = f32[4,32,256,256]{3,2,1,0} dot(transpose.326, Arg_1.324), lhs_batch_dims={0}, lhs_contracting_dims={1}, rhs_batch_dims={1}, rhs_contracting_dims={2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((1,), (2,)), ((0,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  transpose.328 = f32[32,4,256,256]{3,2,0,1} transpose(dot.327), dimensions={1,0,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(1, 0, 2, 3)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  Arg_0.323 = f32[32,4,256,256]{3,2,1,0} parameter(0)
+  dot.329 = f32[4,512,256]{2,1,0} dot(transpose.326, Arg_0.323), lhs_batch_dims={0}, lhs_contracting_dims={2,3}, rhs_batch_dims={1}, rhs_contracting_dims={0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((2, 3), (0, 2)), ((0,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  transpose.330 = f32[256,4,512]{0,2,1} transpose(dot.329), dimensions={2,0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  ROOT tuple.331 = (f32[32,4,256,256]{3,2,0,1}, f32[256,4,512]{0,2,1}) tuple(transpose.328, transpose.330)
+}
+
+region_13.340 {
+  Arg_0.341 = f32[] parameter(0)
+  Arg_1.342 = f32[] parameter(1)
+  ROOT add.343 = f32[] add(Arg_0.341, Arg_1.342), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+region_14.351 {
+  Arg_0.352 = f32[] parameter(0)
+  Arg_1.353 = f32[] parameter(1)
+  ROOT add.354 = f32[] add(Arg_0.352, Arg_1.353), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+_einsum_12.359 {
+  Arg_2.362 = f32[32,4,256,256]{3,2,1,0} parameter(2)
+  transpose.363 = f32[4,256,32,256]{1,3,0,2} transpose(Arg_2.362), dimensions={1,3,0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(1, 3, 0, 2)]" source_file="examples/jax/attention-mp.py" source_line=24}
+  Arg_1.361 = f32[256,4,512]{2,1,0} parameter(1)
+  dot.364 = f32[4,32,256,512]{3,2,1,0} dot(transpose.363, Arg_1.361), lhs_batch_dims={0}, lhs_contracting_dims={1}, rhs_batch_dims={1}, rhs_contracting_dims={0}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/dot_general[dimension_numbers=(((1,), (0,)), ((0,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=24}
+  transpose.365 = f32[32,256,4,512]{3,1,0,2} transpose(dot.364), dimensions={1,2,0,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(1, 2, 0, 3)]" source_file="examples/jax/attention-mp.py" source_line=24}
+  Arg_0.360 = f32[32,256,4,512]{3,2,1,0} parameter(0)
+  dot.366 = f32[4,256,512]{2,1,0} dot(transpose.363, Arg_0.360), lhs_batch_dims={0}, lhs_contracting_dims={2,3}, rhs_batch_dims={2}, rhs_contracting_dims={0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/dot_general[dimension_numbers=(((2, 3), (0, 1)), ((0,), (2,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=24}
+  transpose.367 = f32[256,4,512]{2,0,1} transpose(dot.366), dimensions={1,0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(1, 0, 2)]" source_file="examples/jax/attention-mp.py" source_line=24}
+  ROOT tuple.368 = (f32[32,256,4,512]{3,1,0,2}, f32[256,4,512]{2,0,1}) tuple(transpose.365, transpose.367)
+}
+
+_einsum_13.382 {
+  Arg_2.385 = f32[32,256,4,512]{3,2,1,0} parameter(2)
+  transpose.386 = f32[4,512,32,256]{1,0,3,2} transpose(Arg_2.385), dimensions={2,3,0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 3, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  Arg_1.384 = f32[256,4,512]{2,1,0} parameter(1)
+  dot.387 = f32[4,32,256,256]{3,2,1,0} dot(transpose.386, Arg_1.384), lhs_batch_dims={0}, lhs_contracting_dims={1}, rhs_batch_dims={1}, rhs_contracting_dims={2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((1,), (2,)), ((0,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  transpose.388 = f32[32,4,256,256]{3,2,0,1} transpose(dot.387), dimensions={1,0,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(1, 0, 2, 3)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  Arg_0.383 = f32[32,4,256,256]{3,2,1,0} parameter(0)
+  dot.389 = f32[4,512,256]{2,1,0} dot(transpose.386, Arg_0.383), lhs_batch_dims={0}, lhs_contracting_dims={2,3}, rhs_batch_dims={1}, rhs_contracting_dims={0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/dot_general[dimension_numbers=(((2, 3), (0, 2)), ((0,), (1,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=26}
+  transpose.390 = f32[256,4,512]{0,2,1} transpose(dot.389), dimensions={2,0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/bhqk,khd->bqhd/jit(_einsum)/transpose[permutation=(2, 0, 1)]" source_file="examples/jax/attention-mp.py" source_line=26}
+  ROOT tuple.391 = (f32[32,4,256,256]{3,2,0,1}, f32[256,4,512]{0,2,1}) tuple(transpose.388, transpose.390)
+}
+
+region_15.400 {
+  Arg_0.401 = f32[] parameter(0)
+  Arg_1.402 = f32[] parameter(1)
+  ROOT add.403 = f32[] add(Arg_0.401, Arg_1.402), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+region_16.411 {
+  Arg_0.412 = f32[] parameter(0)
+  Arg_1.413 = f32[] parameter(1)
+  ROOT add.414 = f32[] add(Arg_0.412, Arg_1.413), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+}
+
+_einsum_14.419 {
+  Arg_1.421 = f32[32,4,256,256]{3,2,1,0} parameter(1)
+  transpose.422 = f32[4,256,32,256]{1,3,0,2} transpose(Arg_1.421), dimensions={1,3,0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(1, 3, 0, 2)]" source_file="examples/jax/attention-mp.py" source_line=24}
+  Arg_0.420 = f32[32,256,4,512]{3,2,1,0} parameter(0)
+  dot.423 = f32[4,256,512]{2,1,0} dot(transpose.422, Arg_0.420), lhs_batch_dims={0}, lhs_contracting_dims={2,3}, rhs_batch_dims={2}, rhs_contracting_dims={0,1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/dot_general[dimension_numbers=(((2, 3), (0, 1)), ((0,), (2,))) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=24}
+  ROOT transpose.424 = f32[256,4,512]{2,0,1} transpose(dot.423), dimensions={1,0,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/bqhd,khd->bhqk/jit(_einsum)/transpose[permutation=(1, 0, 2)]" source_file="examples/jax/attention-mp.py" source_line=24}
+}
+
+ENTRY main.438 {
+  Arg_0.1 = f32[32,256,2048]{2,1,0} parameter(0), sharding={replicated}
+  custom-call.14 = f32[32,256,2048]{2,1,0} custom-call(Arg_0.1), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/legate_axes=(\'batch\', \'seq\', \'embed\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  constant.8 = f32[] constant(1)
+  broadcast.9 = f32[2048,2048]{1,0} broadcast(constant.8), dimensions={}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/broadcast_in_dim[shape=(2048, 2048) broadcast_dimensions=()]" source_file="examples/jax/attention-mp.py" source_line=31}
+  dot.16 = f32[32,256,2048]{2,1,0} dot(custom-call.14, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={0}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/dot_general[dimension_numbers=(((2,), (0,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  reshape.17 = f32[32,256,4,512]{3,2,1,0} reshape(dot.16), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/reshape[new_sizes=(32, 256, 4, 512) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=39}
+  Arg_1.2 = f32[256,4,512]{2,1,0} parameter(1), sharding={replicated}
+  custom-call.15 = f32[256,4,512]{2,1,0} custom-call(Arg_1.2), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/legate_axes=(\'key\', \'heads\', \'hidden\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  call.23 = f32[32,4,256,256]{2,0,3,1} call(reshape.17, custom-call.15), to_apply=_einsum.18
+  constant.12 = f32[] constant(-inf)
+  reduce.28 = f32[32,4,256]{2,1,0} reduce(call.23, constant.12), dimensions={3}, to_apply=region_0.24, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/reduce_max[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.29 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.28), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/broadcast_in_dim[shape=(32, 4, 256, 1) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.30 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.29), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.31 = f32[32,4,256]{2,1,0} reshape(broadcast.30), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.32 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.31), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  subtract.33 = f32[32,4,256,256]{2,0,3,1} subtract(call.23, broadcast.32), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  exponential.34 = f32[32,4,256,256]{2,0,3,1} exponential(subtract.33), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/exp" source_file="examples/jax/attention-mp.py" source_line=25}
+  constant.13 = f32[] constant(0)
+  reduce.39 = f32[32,4,256]{2,1,0} reduce(exponential.34, constant.13), dimensions={3}, to_apply=region_1.35, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.40 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.39), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/broadcast_in_dim[shape=(32, 4, 256, 1) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.41 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.40), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.42 = f32[32,4,256]{2,1,0} reshape(broadcast.41), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.43 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.42), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.44 = f32[32,4,256,256]{2,0,3,1} divide(exponential.34, broadcast.43), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  call.52 = f32[32,256,4,512]{1,0,3,2} call(divide.44, custom-call.15), to_apply=_einsum_0.47
+  reshape.53 = f32[32,256,2048]{2,1,0} reshape(call.52), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/reshape[new_sizes=(32, 256, 2048) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=51}
+  dot.54 = f32[32,256,2048]{2,1,0} dot(reshape.53, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={0}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/dot_general[dimension_numbers=(((2,), (0,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  cosine.55 = f32[32,256,2048]{2,1,0} cosine(dot.54), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/cos" source_file="examples/jax/attention-mp.py" source_line=54}
+  custom-call.57 = f32[32,256,2048]{2,1,0} custom-call(cosine.55), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/legate_axes=(\'batch\', \'seq\', \'embed\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  custom-call.58 = f32[32,256,2048]{2,1,0} custom-call(custom-call.57), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/legate_axes=(\'batch\', \'seq\', \'embed\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  dot.60 = f32[32,256,2048]{2,1,0} dot(custom-call.58, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={0}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/dot_general[dimension_numbers=(((2,), (0,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  reshape.61 = f32[32,256,4,512]{3,2,1,0} reshape(dot.60), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/reshape[new_sizes=(32, 256, 4, 512) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=39}
+  Arg_2.3 = f32[256,4,512]{2,1,0} parameter(2), sharding={replicated}
+  custom-call.59 = f32[256,4,512]{2,1,0} custom-call(Arg_2.3), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/legate_axes=(\'key\', \'heads\', \'hidden\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  call.67 = f32[32,4,256,256]{2,0,3,1} call(reshape.61, custom-call.59), to_apply=_einsum_1.62
+  reduce.72 = f32[32,4,256]{2,1,0} reduce(call.67, constant.12), dimensions={3}, to_apply=region_2.68, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/reduce_max[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.73 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.72), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/broadcast_in_dim[shape=(32, 4, 256, 1) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.74 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.73), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.75 = f32[32,4,256]{2,1,0} reshape(broadcast.74), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.76 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.75), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  subtract.77 = f32[32,4,256,256]{2,0,3,1} subtract(call.67, broadcast.76), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  exponential.78 = f32[32,4,256,256]{2,0,3,1} exponential(subtract.77), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/exp" source_file="examples/jax/attention-mp.py" source_line=25}
+  reduce.83 = f32[32,4,256]{2,1,0} reduce(exponential.78, constant.13), dimensions={3}, to_apply=region_3.79, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.84 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.83), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/broadcast_in_dim[shape=(32, 4, 256, 1) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.85 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.84), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.86 = f32[32,4,256]{2,1,0} reshape(broadcast.85), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.87 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.86), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.88 = f32[32,4,256,256]{2,0,3,1} divide(exponential.78, broadcast.87), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  call.96 = f32[32,256,4,512]{1,0,3,2} call(divide.88, custom-call.59), to_apply=_einsum_2.91
+  reshape.97 = f32[32,256,2048]{2,1,0} reshape(call.96), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/reshape[new_sizes=(32, 256, 2048) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=51}
+  dot.98 = f32[32,256,2048]{2,1,0} dot(reshape.97, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={0}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/dot_general[dimension_numbers=(((2,), (0,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  cosine.99 = f32[32,256,2048]{2,1,0} cosine(dot.98), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/cos" source_file="examples/jax/attention-mp.py" source_line=54}
+  custom-call.101 = f32[32,256,2048]{2,1,0} custom-call(cosine.99), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/legate_axes=(\'batch\', \'seq\', \'embed\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  custom-call.102 = f32[32,256,2048]{2,1,0} custom-call(custom-call.101), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/legate_axes=(\'batch\', \'seq\', \'embed\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  dot.104 = f32[32,256,2048]{2,1,0} dot(custom-call.102, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={0}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/dot_general[dimension_numbers=(((2,), (0,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  reshape.105 = f32[32,256,4,512]{3,2,1,0} reshape(dot.104), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/reshape[new_sizes=(32, 256, 4, 512) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=39}
+  Arg_3.4 = f32[256,4,512]{2,1,0} parameter(3), sharding={replicated}
+  custom-call.103 = f32[256,4,512]{2,1,0} custom-call(Arg_3.4), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/legate_axes=(\'key\', \'heads\', \'hidden\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  call.111 = f32[32,4,256,256]{2,0,3,1} call(reshape.105, custom-call.103), to_apply=_einsum_3.106
+  reduce.116 = f32[32,4,256]{2,1,0} reduce(call.111, constant.12), dimensions={3}, to_apply=region_4.112, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/reduce_max[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.117 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.116), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/broadcast_in_dim[shape=(32, 4, 256, 1) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.118 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.117), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.119 = f32[32,4,256]{2,1,0} reshape(broadcast.118), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.120 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.119), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  subtract.121 = f32[32,4,256,256]{2,0,3,1} subtract(call.111, broadcast.120), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  exponential.122 = f32[32,4,256,256]{2,0,3,1} exponential(subtract.121), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/exp" source_file="examples/jax/attention-mp.py" source_line=25}
+  reduce.127 = f32[32,4,256]{2,1,0} reduce(exponential.122, constant.13), dimensions={3}, to_apply=region_5.123, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.128 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.127), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/broadcast_in_dim[shape=(32, 4, 256, 1) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.129 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.128), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.130 = f32[32,4,256]{2,1,0} reshape(broadcast.129), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.131 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.130), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.132 = f32[32,4,256,256]{2,0,3,1} divide(exponential.122, broadcast.131), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  call.140 = f32[32,256,4,512]{1,0,3,2} call(divide.132, custom-call.103), to_apply=_einsum_4.135
+  reshape.141 = f32[32,256,2048]{2,1,0} reshape(call.140), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/reshape[new_sizes=(32, 256, 2048) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=51}
+  dot.142 = f32[32,256,2048]{2,1,0} dot(reshape.141, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={0}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/dot_general[dimension_numbers=(((2,), (0,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  cosine.143 = f32[32,256,2048]{2,1,0} cosine(dot.142), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/cos" source_file="examples/jax/attention-mp.py" source_line=54}
+  custom-call.145 = f32[32,256,2048]{2,1,0} custom-call(cosine.143), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/legate_axes=(\'batch\', \'seq\', \'embed\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  custom-call.146 = f32[32,256,2048]{2,1,0} custom-call(custom-call.145), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/legate_axes=(\'batch\', \'seq\', \'embed\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  dot.148 = f32[32,256,2048]{2,1,0} dot(custom-call.146, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={0}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/dot_general[dimension_numbers=(((2,), (0,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  reshape.149 = f32[32,256,4,512]{3,2,1,0} reshape(dot.148), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/reshape[new_sizes=(32, 256, 4, 512) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=39}
+  Arg_4.5 = f32[256,4,512]{2,1,0} parameter(4), sharding={replicated}
+  custom-call.147 = f32[256,4,512]{2,1,0} custom-call(Arg_4.5), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/legate_axes=(\'key\', \'heads\', \'hidden\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  call.155 = f32[32,4,256,256]{2,0,3,1} call(reshape.149, custom-call.147), to_apply=_einsum_5.150
+  reduce.160 = f32[32,4,256]{2,1,0} reduce(call.155, constant.12), dimensions={3}, to_apply=region_6.156, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/reduce_max[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.161 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.160), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/broadcast_in_dim[shape=(32, 4, 256, 1) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.162 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.161), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.163 = f32[32,4,256]{2,1,0} reshape(broadcast.162), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.164 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.163), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  subtract.165 = f32[32,4,256,256]{2,0,3,1} subtract(call.155, broadcast.164), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/sub" source_file="examples/jax/attention-mp.py" source_line=25}
+  exponential.166 = f32[32,4,256,256]{2,0,3,1} exponential(subtract.165), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/exp" source_file="examples/jax/attention-mp.py" source_line=25}
+  reduce.171 = f32[32,4,256]{2,1,0} reduce(exponential.166, constant.13), dimensions={3}, to_apply=region_7.167, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.172 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.171), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/broadcast_in_dim[shape=(32, 4, 256, 1) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.173 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.172), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.174 = f32[32,4,256]{2,1,0} reshape(broadcast.173), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.175 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.174), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.176 = f32[32,4,256,256]{2,0,3,1} divide(exponential.166, broadcast.175), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  call.184 = f32[32,256,4,512]{1,0,3,2} call(divide.176, custom-call.147), to_apply=_einsum_6.179
+  reshape.185 = f32[32,256,2048]{2,1,0} reshape(call.184), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/reshape[new_sizes=(32, 256, 2048) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=51}
+  dot.186 = f32[32,256,2048]{2,1,0} dot(reshape.185, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={0}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/dot_general[dimension_numbers=(((2,), (0,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  cosine.187 = f32[32,256,2048]{2,1,0} cosine(dot.186), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/cos" source_file="examples/jax/attention-mp.py" source_line=54}
+  custom-call.189 = f32[32,256,2048]{2,1,0} custom-call(cosine.187), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/legate_axes=(\'batch\', \'seq\', \'embed\')//mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  multiply.190 = f32[32,256,2048]{2,1,0} multiply(custom-call.189, custom-call.189), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=loss;task_id=0/legate_backprop/)/mul" source_file="examples/jax/attention-mp.py" source_line=63}
+  reduce.195 = f32[] reduce(multiply.190, constant.13), dimensions={0,1,2}, to_apply=region_8.191, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=loss;task_id=0/legate_backprop/)/reduce_sum[axes=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=63}
+  custom-call.436 = f32[] custom-call(reduce.195), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/legate_gradient_scalar/no_op_marking" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=231}
+  add.196 = f32[32,256,2048]{2,1,0} add(custom-call.189, custom-call.189), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=loss;task_id=0/legate_backprop/))/add_any" source_file="examples/jax/attention-mp.py" source_line=63}
+  custom-call.197 = f32[32,256,2048]{2,1,0} custom-call(add.196), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/legate_axes=(\'batch\', \'seq\', \'embed\')//partition_transpose/mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  negate.198 = f32[32,256,2048]{2,1,0} negate(custom-call.197), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/neg" source_file="examples/jax/attention-mp.py" source_line=54}
+  sine.188 = f32[32,256,2048]{2,1,0} sine(dot.186), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/sin" source_file="examples/jax/attention-mp.py" source_line=54}
+  multiply.199 = f32[32,256,2048]{2,1,0} multiply(negate.198, sine.188), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=54}
+  dot.200 = f32[32,256,2048]{2,1,0} dot(multiply.199, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/dot_general[dimension_numbers=(((2,), (1,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  reshape.201 = f32[32,256,4,512]{3,2,1,0} reshape(dot.200), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/reshape[new_sizes=(32, 256, 4, 512) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=51}
+  call.212 = (f32[32,4,256,256]{3,2,0,1}, f32[256,4,512]{0,2,1}) call(divide.176, custom-call.147, reshape.201), to_apply=_einsum_7.202
+  get-tuple-element.213 = f32[32,4,256,256]{3,2,0,1} get-tuple-element(call.212), index=0
+  broadcast.227 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.172), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.228 = f32[32,4,256]{2,1,0} reshape(broadcast.227), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.229 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.228), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.230 = f32[32,4,256,256]{3,2,0,1} divide(get-tuple-element.213, broadcast.229), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  constant.10 = f32[] constant(1)
+  broadcast.11 = f32[32,4,256,1]{3,2,1,0} broadcast(constant.10), dimensions={}, metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/broadcast_in_dim[shape=(32, 4, 256, 1) broadcast_dimensions=()]" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.177 = f32[32,4,256,1]{3,2,1,0} multiply(reshape.172, reshape.172), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.178 = f32[32,4,256,1]{3,2,1,0} divide(broadcast.11, multiply.177), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_3;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.215 = f32[32,4,256,1]{3,2,1,0} broadcast(divide.178), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.216 = f32[32,4,256]{2,1,0} reshape(broadcast.215), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.217 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.216), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.218 = f32[32,4,256,256]{3,2,0,1} multiply(get-tuple-element.213, broadcast.217), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.219 = f32[32,4,256,256]{3,2,0,1} multiply(multiply.218, exponential.166), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  reduce.224 = f32[32,4,256]{2,1,0} reduce(multiply.219, constant.13), dimensions={3}, to_apply=region_9.220, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.225 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.224), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/reshape[new_sizes=(32, 4, 256, 1) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=25}
+  negate.226 = f32[32,4,256,1]{3,2,1,0} negate(reshape.225), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/neg" source_file="examples/jax/attention-mp.py" source_line=25}
+  reduce.235 = f32[32,4,256]{2,1,0} reduce(negate.226, constant.13), dimensions={3}, to_apply=region_10.231, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.236 = f32[32,4,256,256]{3,2,1,0} broadcast(reduce.235), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/broadcast_in_dim[shape=(32, 4, 256, 256) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  add.237 = f32[32,4,256,256]{3,2,0,1} add(divide.230, broadcast.236), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/add_any" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.238 = f32[32,4,256,256]{3,2,0,1} multiply(add.237, exponential.166), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  call.249 = (f32[32,256,4,512]{3,1,0,2}, f32[256,4,512]{2,0,1}) call(reshape.149, custom-call.147, multiply.238), to_apply=_einsum_8.239
+  get-tuple-element.250 = f32[32,256,4,512]{3,1,0,2} get-tuple-element(call.249), index=0
+  reshape.254 = f32[32,256,2048]{2,1,0} reshape(get-tuple-element.250), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/reshape[new_sizes=(32, 256, 2048) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=39}
+  dot.255 = f32[32,256,2048]{2,1,0} dot(reshape.254, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/dot_general[dimension_numbers=(((2,), (1,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  custom-call.256 = f32[32,256,2048]{2,1,0} custom-call(dot.255), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/legate_axes=(\'batch\', \'seq\', \'embed\')//partition_transpose/mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  custom-call.257 = f32[32,256,2048]{2,1,0} custom-call(custom-call.256), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/legate_axes=(\'batch\', \'seq\', \'embed\')//partition_transpose/mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  negate.258 = f32[32,256,2048]{2,1,0} negate(custom-call.257), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/neg" source_file="examples/jax/attention-mp.py" source_line=54}
+  sine.144 = f32[32,256,2048]{2,1,0} sine(dot.142), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/sin" source_file="examples/jax/attention-mp.py" source_line=54}
+  multiply.259 = f32[32,256,2048]{2,1,0} multiply(negate.258, sine.144), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=54}
+  dot.260 = f32[32,256,2048]{2,1,0} dot(multiply.259, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/dot_general[dimension_numbers=(((2,), (1,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  reshape.261 = f32[32,256,4,512]{3,2,1,0} reshape(dot.260), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/reshape[new_sizes=(32, 256, 4, 512) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=51}
+  call.272 = (f32[32,4,256,256]{3,2,0,1}, f32[256,4,512]{0,2,1}) call(divide.132, custom-call.103, reshape.261), to_apply=_einsum_9.262
+  get-tuple-element.273 = f32[32,4,256,256]{3,2,0,1} get-tuple-element(call.272), index=0
+  broadcast.287 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.128), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.288 = f32[32,4,256]{2,1,0} reshape(broadcast.287), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.289 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.288), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.290 = f32[32,4,256,256]{3,2,0,1} divide(get-tuple-element.273, broadcast.289), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.133 = f32[32,4,256,1]{3,2,1,0} multiply(reshape.128, reshape.128), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.134 = f32[32,4,256,1]{3,2,1,0} divide(broadcast.11, multiply.133), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_2;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.275 = f32[32,4,256,1]{3,2,1,0} broadcast(divide.134), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.276 = f32[32,4,256]{2,1,0} reshape(broadcast.275), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.277 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.276), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.278 = f32[32,4,256,256]{3,2,0,1} multiply(get-tuple-element.273, broadcast.277), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.279 = f32[32,4,256,256]{3,2,0,1} multiply(multiply.278, exponential.122), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  reduce.284 = f32[32,4,256]{2,1,0} reduce(multiply.279, constant.13), dimensions={3}, to_apply=region_11.280, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.285 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.284), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/reshape[new_sizes=(32, 4, 256, 1) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=25}
+  negate.286 = f32[32,4,256,1]{3,2,1,0} negate(reshape.285), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/neg" source_file="examples/jax/attention-mp.py" source_line=25}
+  reduce.295 = f32[32,4,256]{2,1,0} reduce(negate.286, constant.13), dimensions={3}, to_apply=region_12.291, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.296 = f32[32,4,256,256]{3,2,1,0} broadcast(reduce.295), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/broadcast_in_dim[shape=(32, 4, 256, 256) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  add.297 = f32[32,4,256,256]{3,2,0,1} add(divide.290, broadcast.296), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/add_any" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.298 = f32[32,4,256,256]{3,2,0,1} multiply(add.297, exponential.122), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  call.309 = (f32[32,256,4,512]{3,1,0,2}, f32[256,4,512]{2,0,1}) call(reshape.105, custom-call.103, multiply.298), to_apply=_einsum_10.299
+  get-tuple-element.310 = f32[32,256,4,512]{3,1,0,2} get-tuple-element(call.309), index=0
+  reshape.314 = f32[32,256,2048]{2,1,0} reshape(get-tuple-element.310), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/reshape[new_sizes=(32, 256, 2048) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=39}
+  dot.315 = f32[32,256,2048]{2,1,0} dot(reshape.314, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/dot_general[dimension_numbers=(((2,), (1,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  custom-call.316 = f32[32,256,2048]{2,1,0} custom-call(dot.315), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/legate_axes=(\'batch\', \'seq\', \'embed\')//partition_transpose/mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  custom-call.317 = f32[32,256,2048]{2,1,0} custom-call(custom-call.316), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/legate_axes=(\'batch\', \'seq\', \'embed\')//partition_transpose/mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  negate.318 = f32[32,256,2048]{2,1,0} negate(custom-call.317), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/neg" source_file="examples/jax/attention-mp.py" source_line=54}
+  sine.100 = f32[32,256,2048]{2,1,0} sine(dot.98), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/sin" source_file="examples/jax/attention-mp.py" source_line=54}
+  multiply.319 = f32[32,256,2048]{2,1,0} multiply(negate.318, sine.100), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=54}
+  dot.320 = f32[32,256,2048]{2,1,0} dot(multiply.319, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/dot_general[dimension_numbers=(((2,), (1,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  reshape.321 = f32[32,256,4,512]{3,2,1,0} reshape(dot.320), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/reshape[new_sizes=(32, 256, 4, 512) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=51}
+  call.332 = (f32[32,4,256,256]{3,2,0,1}, f32[256,4,512]{0,2,1}) call(divide.88, custom-call.59, reshape.321), to_apply=_einsum_11.322
+  get-tuple-element.333 = f32[32,4,256,256]{3,2,0,1} get-tuple-element(call.332), index=0
+  broadcast.347 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.84), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.348 = f32[32,4,256]{2,1,0} reshape(broadcast.347), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.349 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.348), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.350 = f32[32,4,256,256]{3,2,0,1} divide(get-tuple-element.333, broadcast.349), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.89 = f32[32,4,256,1]{3,2,1,0} multiply(reshape.84, reshape.84), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.90 = f32[32,4,256,1]{3,2,1,0} divide(broadcast.11, multiply.89), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_1;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.335 = f32[32,4,256,1]{3,2,1,0} broadcast(divide.90), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.336 = f32[32,4,256]{2,1,0} reshape(broadcast.335), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.337 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.336), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.338 = f32[32,4,256,256]{3,2,0,1} multiply(get-tuple-element.333, broadcast.337), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.339 = f32[32,4,256,256]{3,2,0,1} multiply(multiply.338, exponential.78), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  reduce.344 = f32[32,4,256]{2,1,0} reduce(multiply.339, constant.13), dimensions={3}, to_apply=region_13.340, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.345 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.344), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/reshape[new_sizes=(32, 4, 256, 1) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=25}
+  negate.346 = f32[32,4,256,1]{3,2,1,0} negate(reshape.345), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/neg" source_file="examples/jax/attention-mp.py" source_line=25}
+  reduce.355 = f32[32,4,256]{2,1,0} reduce(negate.346, constant.13), dimensions={3}, to_apply=region_14.351, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.356 = f32[32,4,256,256]{3,2,1,0} broadcast(reduce.355), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/broadcast_in_dim[shape=(32, 4, 256, 256) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  add.357 = f32[32,4,256,256]{3,2,0,1} add(divide.350, broadcast.356), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/add_any" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.358 = f32[32,4,256,256]{3,2,0,1} multiply(add.357, exponential.78), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  call.369 = (f32[32,256,4,512]{3,1,0,2}, f32[256,4,512]{2,0,1}) call(reshape.61, custom-call.59, multiply.358), to_apply=_einsum_12.359
+  get-tuple-element.370 = f32[32,256,4,512]{3,1,0,2} get-tuple-element(call.369), index=0
+  reshape.374 = f32[32,256,2048]{2,1,0} reshape(get-tuple-element.370), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/reshape[new_sizes=(32, 256, 2048) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=39}
+  dot.375 = f32[32,256,2048]{2,1,0} dot(reshape.374, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/dot_general[dimension_numbers=(((2,), (1,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  custom-call.376 = f32[32,256,2048]{2,1,0} custom-call(dot.375), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/legate_axes=(\'batch\', \'seq\', \'embed\')//partition_transpose/mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  custom-call.377 = f32[32,256,2048]{2,1,0} custom-call(custom-call.376), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/legate_axes=(\'batch\', \'seq\', \'embed\')//partition_transpose/mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  negate.378 = f32[32,256,2048]{2,1,0} negate(custom-call.377), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/neg" source_file="examples/jax/attention-mp.py" source_line=54}
+  sine.56 = f32[32,256,2048]{2,1,0} sine(dot.54), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/sin" source_file="examples/jax/attention-mp.py" source_line=54}
+  multiply.379 = f32[32,256,2048]{2,1,0} multiply(negate.378, sine.56), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=54}
+  dot.380 = f32[32,256,2048]{2,1,0} dot(multiply.379, broadcast.9), lhs_contracting_dims={2}, rhs_contracting_dims={1}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/dot_general[dimension_numbers=(((2,), (1,)), ((), ())) precision=None preferred_element_type=None]" source_file="examples/jax/attention-mp.py" source_line=32}
+  reshape.381 = f32[32,256,4,512]{3,2,1,0} reshape(dot.380), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/reshape[new_sizes=(32, 256, 4, 512) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=51}
+  call.392 = (f32[32,4,256,256]{3,2,0,1}, f32[256,4,512]{0,2,1}) call(divide.44, custom-call.15, reshape.381), to_apply=_einsum_13.382
+  get-tuple-element.394 = f32[256,4,512]{0,2,1} get-tuple-element(call.392), index=1
+  get-tuple-element.393 = f32[32,4,256,256]{3,2,0,1} get-tuple-element(call.392), index=0
+  broadcast.407 = f32[32,4,256,1]{3,2,1,0} broadcast(reshape.40), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.408 = f32[32,4,256]{2,1,0} reshape(broadcast.407), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.409 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.408), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.410 = f32[32,4,256,256]{3,2,0,1} divide(get-tuple-element.393, broadcast.409), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.45 = f32[32,4,256,1]{3,2,1,0} multiply(reshape.40, reshape.40), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  divide.46 = f32[32,4,256,1]{3,2,1,0} divide(broadcast.11, multiply.45), metadata={op_name="jit(step_fn)/jit(main)/jvp(legate_key=name=layer_0;task_id=0/legate_backprop/)/div" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.395 = f32[32,4,256,1]{3,2,1,0} broadcast(divide.46), dimensions={0,1,2,3}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.396 = f32[32,4,256]{2,1,0} reshape(broadcast.395), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.397 = f32[32,4,256,256]{3,2,1,0} broadcast(reshape.396), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.398 = f32[32,4,256,256]{3,2,0,1} multiply(get-tuple-element.393, broadcast.397), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.399 = f32[32,4,256,256]{3,2,0,1} multiply(multiply.398, exponential.34), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  reduce.404 = f32[32,4,256]{2,1,0} reduce(multiply.399, constant.13), dimensions={3}, to_apply=region_15.400, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  reshape.405 = f32[32,4,256,1]{3,2,1,0} reshape(reduce.404), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/reshape[new_sizes=(32, 4, 256, 1) dimensions=None]" source_file="examples/jax/attention-mp.py" source_line=25}
+  negate.406 = f32[32,4,256,1]{3,2,1,0} negate(reshape.405), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/neg" source_file="examples/jax/attention-mp.py" source_line=25}
+  reduce.415 = f32[32,4,256]{2,1,0} reduce(negate.406, constant.13), dimensions={3}, to_apply=region_16.411, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/reduce_sum[axes=(3,)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  broadcast.416 = f32[32,4,256,256]{3,2,1,0} broadcast(reduce.415), dimensions={0,1,2}, metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/broadcast_in_dim[shape=(32, 4, 256, 256) broadcast_dimensions=(0, 1, 2)]" source_file="examples/jax/attention-mp.py" source_line=25}
+  add.417 = f32[32,4,256,256]{3,2,0,1} add(divide.410, broadcast.416), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/add_any" source_file="examples/jax/attention-mp.py" source_line=25}
+  multiply.418 = f32[32,4,256,256]{3,2,0,1} multiply(add.417, exponential.34), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/mul" source_file="examples/jax/attention-mp.py" source_line=25}
+  call.425 = f32[256,4,512]{2,0,1} call(reshape.17, multiply.418), to_apply=_einsum_14.419
+  add.426 = f32[256,4,512]{0,2,1} add(get-tuple-element.394, call.425), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/bqhd,khd->bhqk/add_any" source_file="examples/jax/attention-mp.py" source_line=24}
+  custom-call.427 = f32[256,4,512]{2,1,0} custom-call(add.426), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_0;task_id=0/legate_backprop/))/legate_axes=(\'key\', \'heads\', \'hidden\')//partition_transpose/mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  constant.6 = f32[] constant(0.05)
+  broadcast.7 = f32[256,4,512]{2,1,0} broadcast(constant.6), dimensions={}, metadata={op_name="jit(step_fn)/jit(main)/legate_key=name=update/implicit_decomposition//mul" source_file="examples/jax/attention-mp.py" source_line=94}
+  multiply.428 = f32[256,4,512]{2,1,0} multiply(custom-call.427, broadcast.7), metadata={op_name="jit(step_fn)/jit(main)/legate_key=name=update/implicit_decomposition//mul" source_file="examples/jax/attention-mp.py" source_line=94}
+  subtract.429 = f32[256,4,512]{2,1,0} subtract(Arg_1.2, multiply.428), metadata={op_name="jit(step_fn)/jit(main)/legate_key=name=update/implicit_decomposition//sub" source_file="examples/jax/attention-mp.py" source_line=94}
+  get-tuple-element.334 = f32[256,4,512]{0,2,1} get-tuple-element(call.332), index=1
+  get-tuple-element.371 = f32[256,4,512]{2,0,1} get-tuple-element(call.369), index=1
+  add.372 = f32[256,4,512]{0,2,1} add(get-tuple-element.334, get-tuple-element.371), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/bqhd,khd->bhqk/add_any" source_file="examples/jax/attention-mp.py" source_line=24}
+  custom-call.373 = f32[256,4,512]{2,1,0} custom-call(add.372), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_1;task_id=0/legate_backprop/))/legate_axes=(\'key\', \'heads\', \'hidden\')//partition_transpose/mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  multiply.430 = f32[256,4,512]{2,1,0} multiply(custom-call.373, broadcast.7), metadata={op_name="jit(step_fn)/jit(main)/legate_key=name=update/implicit_decomposition//mul" source_file="examples/jax/attention-mp.py" source_line=94}
+  subtract.431 = f32[256,4,512]{2,1,0} subtract(Arg_2.3, multiply.430), metadata={op_name="jit(step_fn)/jit(main)/legate_key=name=update/implicit_decomposition//sub" source_file="examples/jax/attention-mp.py" source_line=94}
+  get-tuple-element.274 = f32[256,4,512]{0,2,1} get-tuple-element(call.272), index=1
+  get-tuple-element.311 = f32[256,4,512]{2,0,1} get-tuple-element(call.309), index=1
+  add.312 = f32[256,4,512]{0,2,1} add(get-tuple-element.274, get-tuple-element.311), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/bqhd,khd->bhqk/add_any" source_file="examples/jax/attention-mp.py" source_line=24}
+  custom-call.313 = f32[256,4,512]{2,1,0} custom-call(add.312), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_2;task_id=0/legate_backprop/))/legate_axes=(\'key\', \'heads\', \'hidden\')//partition_transpose/mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  multiply.432 = f32[256,4,512]{2,1,0} multiply(custom-call.313, broadcast.7), metadata={op_name="jit(step_fn)/jit(main)/legate_key=name=update/implicit_decomposition//mul" source_file="examples/jax/attention-mp.py" source_line=94}
+  subtract.433 = f32[256,4,512]{2,1,0} subtract(Arg_3.4, multiply.432), metadata={op_name="jit(step_fn)/jit(main)/legate_key=name=update/implicit_decomposition//sub" source_file="examples/jax/attention-mp.py" source_line=94}
+  get-tuple-element.214 = f32[256,4,512]{0,2,1} get-tuple-element(call.212), index=1
+  get-tuple-element.251 = f32[256,4,512]{2,0,1} get-tuple-element(call.249), index=1
+  add.252 = f32[256,4,512]{0,2,1} add(get-tuple-element.214, get-tuple-element.251), metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/bqhd,khd->bhqk/add_any" source_file="examples/jax/attention-mp.py" source_line=24}
+  custom-call.253 = f32[256,4,512]{2,1,0} custom-call(add.252), custom_call_target="Sharding", metadata={op_name="jit(step_fn)/jit(main)/transpose(jvp(legate_key=name=layer_3;task_id=0/legate_backprop/))/legate_axes=(\'key\', \'heads\', \'hidden\')//partition_transpose/mark_logical_partition" source_file="/home/jwilke/Programs/workspaces/legate-xla-client/legate-xla-bridge/lllm/api/pjit.py" source_line=65}
+  multiply.434 = f32[256,4,512]{2,1,0} multiply(custom-call.253, broadcast.7), metadata={op_name="jit(step_fn)/jit(main)/legate_key=name=update/implicit_decomposition//mul" source_file="examples/jax/attention-mp.py" source_line=94}
+  subtract.435 = f32[256,4,512]{2,1,0} subtract(Arg_4.5, multiply.434), metadata={op_name="jit(step_fn)/jit(main)/legate_key=name=update/implicit_decomposition//sub" source_file="examples/jax/attention-mp.py" source_line=94}
+  ROOT tuple.437 = (f32[], f32[256,4,512]{2,1,0}, f32[256,4,512]{2,1,0}, f32[256,4,512]{2,1,0}, f32[256,4,512]{2,1,0}) tuple(custom-call.436, subtract.429, subtract.431, subtract.433, subtract.435)
+}
+

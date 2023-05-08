@@ -16,25 +16,26 @@
 
 #pragma once
 
-#include "xla_task.h"
 #include "legate_xla_common.h"
+#include "xla_task.h"
 
 namespace legate_xla {
 
 class HLOExecutorTask : public XlaTask<HLOExecutorTask> {
- public:
+public:
   static const int TASK_ID = XLA_EXECUTE_TASK;
 
- public:
-  static void run_executable(legate::TaskContext& context);
+public:
+  static void run_executable(legate::TaskContext &context);
 
-  static void run_executable(legate::TaskContext& context, LegateExecutable* exe, int64_t run_id, int scalar_offset);
+  static void run_executable(legate::TaskContext &context,
+                             LegateExecutable *exe, int64_t run_id,
+                             int scalar_offset);
 
- public:
-  static void cpu_variant(legate::TaskContext& context);
+public:
+  static void cpu_variant(legate::TaskContext &context);
 
-  static void gpu_variant(legate::TaskContext& context);
-
+  static void gpu_variant(legate::TaskContext &context);
 };
 
-}  // namespace llm
+} // namespace legate_xla

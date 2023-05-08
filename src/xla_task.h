@@ -22,39 +22,21 @@
 namespace legate_xla {
 
 extern Legion::Logger log_xla;
-
-#ifdef LEGATE_XLA_PYTHON_PROTOTYPE
-
 struct Registry {
-  static legate::TaskRegistrar& get_registrar();
+  static legate::TaskRegistrar &get_registrar();
 };
 
-template <typename T>
-struct XlaTask : public legate::LegateTask<T> {
-  using Registrar = Registry;
-};
-
-#else
-
-struct Registry {
- public:
-  static legate::TaskRegistrar& get_registrar();
-};
-
-template <typename T>
-struct XlaTask : public legate::LegateTask<T> {
+template <typename T> struct XlaTask : public legate::LegateTask<T> {
   using Registrar = Registry;
 };
 
 // Generic initialization of LegateBuffer from host data ptr
 class XLAInitFromHostTask : public XlaTask<XLAInitFromHostTask> {
- public:
+public:
   static const int32_t TASK_ID = XlaOpCode::XLA_INIT_FROM_HOST_TASK;
 
- public:
-  static void gpu_variant(legate::TaskContext& context);
+public:
+  static void gpu_variant(legate::TaskContext &context);
 };
 
-#endif
-
-}  // namespace legate_xla
+} // namespace legate_xla

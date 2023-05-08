@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import IntEnum, unique
 from typing import Any, List, Mapping, Optional, Sequence, Set, Tuple, Union
@@ -31,7 +32,6 @@ from legate.core import (
     Library,
     Machine,
     Rect,
-#    ResourceConfig,
     Store,
     get_legate_runtime,
     get_machine,
@@ -40,7 +40,6 @@ from legate.core.shape import Shape
 from legate.core.store import StorePartition
 from legate.core.types import ReductionOp
 from legate.core.utils import OrderedSet
-#from legate.rc import ArgSpec, Argument, parse_command_args
 
 from .hlo_utils import (
     _SIZE_PRESERVING_OPS,
@@ -72,8 +71,6 @@ _CODES_TO_DTYPES = {
 
 _CHEAP_REPLICATED_OPS = {"reshape", "convert", "broadcast", "constant"}
 
-ARGS = []
-
 
 @gin.configurable
 @dataclass
@@ -82,7 +79,7 @@ class RunConfig:
     rematerialization: bool = False
 
 
-class XlaLib(Library):
+class LLMLib(Library):
     def __init__(self, name: str) -> None:
         self.name = name
         self.runtime: Union[LLMRuntime, None] = None
@@ -94,7 +91,9 @@ class XlaLib(Library):
     def get_shared_library(self) -> str:
         from lllm.install_info import libpath
 
-        return os.path.join(libpath, f"liblegate_xla{self.get_library_extension()}")
+        return os.path.join(
+            libpath, f"liblegate_xla{self.get_library_extension()}"
+        )
 
     def get_c_header(self) -> str:
         from lllm.install_info import header
@@ -113,24 +112,15 @@ class XlaLib(Library):
         assert self.shared_object is not None
         self.runtime = runtime
 
-    def get_resource_configuration(self) -> ResourceConfig:
-        assert self.shared_object is not None
-        config = ResourceConfig()
-        config.max_tasks = self.shared_object.LLM_MAX_TASKS
-        config.max_mappers = self.shared_object.LLM_MAX_MAPPERS
-        config.max_reduction_ops = self.shared_object.LLM_MAX_REDOPS
-        config.max_projections = 0
-        config.max_shardings = 0
-        return config
-
     def destroy(self) -> None:
         if self.runtime is not None:
             self.runtime.destroy()
 
 
-llm_lib = XlaLib("legate.xla")
+llm_lib = LLMLib("legate.xla")
 llm_context = get_legate_runtime().register_library(llm_lib)
 _llm = llm_lib.shared_object
+
 
 @unique
 class LLMOpCode(IntEnum):
@@ -141,8 +131,8 @@ class LLMOpCode(IntEnum):
     DISTRIBUTED_SHUTDOWN = _llm.HLO_PROTOTYPE_DISTRIBUTED_SHUTDOWN
 
 
-#@unique
-#class LLMTunable(IntEnum):
+# @unique
+# class LLMTunable(IntEnum):
 #    NUM_GPUS = _llm.LLM_TUNABLE_NUM_GPUS
 #    NUM_PROCS = _llm.LLM_TUNABLE_NUM_PROCS
 
@@ -198,7 +188,7 @@ class LLMRuntime:
     ):
         machine = self._machine
         launch_domain = Rect(lo=[0], hi=[machine.num_procs], exclusive=True)
-        runtime.legate_context.set_provenance("init_distributed")
+        runtime.legate_runtime.set_provenance("init_distributed")
         with machine:
             task = self.legate_context.create_manual_task(
                 LLMOpCode.DISTRIBUTED_INIT, launch_domain=launch_domain
@@ -210,7 +200,7 @@ class LLMRuntime:
             # workers in the cooordination service.
             task.set_concurrent(True)
             task.execute()
-            runtime.legate_context.reset_provenance()
+            runtime.legate_runtime.reset_provenance()
             # all tasks must wait for this to finish
             runtime.issue_execution_fence()
 
@@ -224,7 +214,7 @@ class LLMRuntime:
         launch_domain = Rect(lo=[0], hi=[machine.num_procs], exclusive=True)
         runtime.issue_execution_fence()
         with machine:
-            runtime.legate_context.set_provenance("shutdown_distributed")
+            runtime.legate_runtime.set_provenance("shutdown_distributed")
             task = self.legate_context.create_manual_task(
                 LLMOpCode.DISTRIBUTED_SHUTDOWN, launch_domain=launch_domain
             )
@@ -233,7 +223,7 @@ class LLMRuntime:
             # workers in the cooordination service.
             task.set_concurrent(True)
             task.execute()
-            runtime.legate_context.reset_provenance()
+            runtime.legate_runtime.reset_provenance()
 
     def load_hlo(
         self,
@@ -263,7 +253,7 @@ class LLMRuntime:
 
         launch_domain = Rect(lo=[0], hi=[machine.num_procs], exclusive=True)
         with machine:
-            runtime.legate_context.set_provenance(hlo_name)
+            runtime.legate_runtime.set_provenance(hlo_name)
             task = self.legate_context.create_manual_task(
                 LLMOpCode.HLO_LOADER,
                 launch_domain=launch_domain,
@@ -278,7 +268,7 @@ class LLMRuntime:
             task.set_side_effect(True)
             task.set_concurrent(True)
             task.execute()
-            runtime.legate_context.reset_provenance()
+            runtime.legate_runtime.reset_provenance()
 
             return hlo_id
 
@@ -320,18 +310,16 @@ class LLMRuntime:
                 for (op, store) in zip(red_ops, outputs)
                 if op is not None
             ]
-            runtime.legate_context.push_provenance(
+            runtime.legate_runtime.push_provenance(
                 f"fill partitioned inputs: {name}"
             )
             self.fill_store_partitions(machine, partitions)
-            runtime.legate_context.pop_provenance()
-            runtime.legate_context.push_provenance(
+            runtime.legate_runtime.pop_provenance()
+            runtime.legate_runtime.push_provenance(
                 f"fill unpartitioned inputs: {name}"
             )
             self.fill_stores(machine, stores + reductions)
-            runtime.legate_context.pop_provenance()
-            # self.fill_stores(machine, reductions)
-            # self.fill_stores(machine, outputs)
+            runtime.legate_runtime.pop_provenance()
 
         with machine:
             task = self.legate_context.create_manual_task(
@@ -372,7 +360,7 @@ class Tensor:
     ):
         self.dtype = dtype
         self.shape = shape
-        self.np_dtype = np.dtype(self.dtype.to_pandas_dtype())
+        self.np_dtype = np.dtype(self.dtype.to_numpy_dtype())
         self.store = runtime.legate_context.create_store(
             self.dtype, self.shape, optimize_scalar=optimize_scalar
         )
@@ -388,7 +376,6 @@ class Tensor:
             return self.replicated.size
 
         itemsize = np.dtype(self.np_dtype).itemsize
-        # print(self.dtype, self.np_dtype, itemsize)
         return np.prod(self.shape) * itemsize
 
     def replicate(self, ndevices) -> StorePartition:
@@ -479,7 +466,6 @@ class TensorSet:
                 f"cannot get microbatch {microbatch} for "
                 f"input {input.name} that was never created"
             )
-        # print(f"using {input.name} on mb={microbatch} -> {id(tensor)}")
         return tensor
 
     def get_output(
@@ -503,6 +489,7 @@ class TensorMap:
     def __init__(self):
         self.external_tensors: dict[int, Tensor] = {}
         self.internal_tensors: dict[int, TensorSet] = {}
+        self.aliases: dict[int, int] = {}
 
     @property
     def size(self) -> int:
@@ -524,7 +511,11 @@ class TensorMap:
         tensor = self._get_external(input)
         return tensor
 
+    def find_alias(self, input_id: int) -> Optional[int]:
+        return self.aliases.get(input_id)
+
     def add_parameter_alias(self, output_id: int, input_id: int) -> None:
+        self.aliases[input_id] = output_id
         tensor = self.external_tensors.get(input_id)
         if tensor is None:
             raise Exception(
@@ -583,6 +574,8 @@ class HloLayer:
         self.microbatch_outputs = None
         self.roots = None
         self.max_instruction_id = 0
+
+        self.remats = defaultdict(dict)
 
         self.pending_count = 0
 
@@ -888,7 +881,7 @@ class HloLayer:
                     opcode_str = instr.opcode
                 str_arr.append(
                     f"    {instr.name:25} id={instr.id:4} "
-                    f"op={opcode_str:25} -> {instr.operand_ids}   {instr.shape.dimensions}" # noqa: E501
+                    f"op={opcode_str:25} -> {instr.operand_ids}   {instr.shape.dimensions}"  # noqa: E501
                 )
         if self.outputs:
             str_arr.append("  Outputs")
@@ -949,6 +942,14 @@ class HloLayer:
                 if instr.opcode == "tuple":
                     tuple_elements_found[instr.id] = []
 
+                elif instr.opcode == "opt-barrier" and is_tuple_shape(instr):
+                    tuple_elements_found[instr.id] = []
+                    # the opt-barrier aliases a tuple,
+                    # they should be compressed in the same way
+                    tuple_elements_found[
+                        instr.operand_ids[0]
+                    ] = tuple_elements_found[instr.id]
+
                 elif instr.opcode == "parameter":
                     if is_tuple_shape(instr):
                         tuple_elements_found[instr.id] = []
@@ -987,7 +988,7 @@ class HloLayer:
                                 instr.operand_ids
                             ):
                                 raise Exception(
-                                    f"computation {instr.name} lost params in {self.key}"
+                                    f"{instr.name} lost params in {self.key}"
                                 )
                                 new_ids = []
                                 for idx, id in enumerate(instr.operand_ids):
@@ -1005,6 +1006,12 @@ class HloLayer:
                     _add_comp_tuple(instr.id, true_tuple_id, true_comp_id)
                     _add_comp_tuple(instr.id, false_tuple_id, false_comp_id)
                     tuple_elements_found[instr.id] = []
+
+                    if instr.id not in call_output_tuples:
+                        raise Exception(
+                            f"conditional body not found in {self.key} "
+                            "for comps {true_comp_id}, {false_comp_id}"
+                        )
 
                 elif instr.opcode == "get-tuple-element":
                     elements = tuple_elements_found.get(instr.operand_ids[0])
@@ -1071,22 +1078,32 @@ class HloLayer:
                     reindex = _reindex_elements(tuple_id)
                     compressed_comp.param_reindex = reindex
                 else:
-                    reindex = {}
-                    num_ids = 0
-                    for idx, operand_id in enumerate(tuple.operand_ids):
-                        if operand_id in self.instructions_added:
-                            reindex[idx] = num_ids
-                            num_ids += 1
-
-                    if tuple.id == comp.root_id:
-                        compressed_comp.root_reindex = reindex
+                    if tuple.opcode == "opt-barrier":
+                        # there is no reindex, we simply copy the new shape
+                        # of the operand to the instruction
+                        # the input tuple has already been reindexed
+                        input_tuple = all_instructions[tuple.operand_ids[0]]
+                        tuple.shape.CopyFrom(input_tuple.shape)
                     else:
-                        _reindex_elements(tuple_id, reindex)
+                        if tuple.id == comp.root_id:
+                            reindex = {}
+                            num_ids = 0
+                            for idx, operand_id in enumerate(
+                                tuple.operand_ids
+                            ):
+                                if operand_id in self.instructions_added:
+                                    reindex[idx] = num_ids
+                                    num_ids += 1
+                            compressed_comp.root_reindex = reindex
+                        else:
+                            reindex = _reindex_elements(tuple_id, reindex=None)
 
                 _compress_tuple(reindex, tuple)
 
             return compressed_comp
 
+        if self.entry_comp_id is None:
+            raise Exception(f"{self.key} has no entry computation")
         _visit(self.entry_comp_id)
 
     def noop(self) -> bool:
@@ -1226,8 +1243,11 @@ class HloLayer:
         )
         return microbatch_layer, post_layer
 
-    def add_rematerialization(self, comp_id: int, instr: hlo_pb2.HloInstructionProto) -> None:
-        pass
+    def add_rematerialization(
+        self, comp_id: int, instr: hlo_pb2.HloInstructionProto
+    ) -> None:
+        instr_map = self.remats[comp_id]
+        instr_map[instr.id] = instr
 
     def add_instruction(
         self,
@@ -1236,6 +1256,7 @@ class HloLayer:
         all_instructions: Optional[
             Mapping[int.hlo_pb2.HloInstructionProto]
         ] = None,
+        depth=0,
     ):
         if instr.id in self.instructions_added:
             return
@@ -1287,6 +1308,21 @@ class HloLayer:
         self.max_instruction_id = max(self.max_instruction_id, instr.id + 1000)
 
         if instr.id not in self.instructions_added:
+            comp = self.computation_map[comp_id]
+            if instr.id != comp.root_id:
+                # do not rematerialize backwards from the root
+                # we do not want to add new outputs that we don't need
+                remats = self.remats.get(comp_id)
+                if remats is not None:
+                    for operand_id in instr.operand_ids:
+                        # recurse the rematerialization tree to add all
+                        # previous instructions that should be recomputed
+                        remat = remats.get(operand_id)
+                        if remat is not None:
+                            self.add_instruction(
+                                comp_id, remat, depth=depth + 1
+                            )
+
             instr_list = self.contexts.get(comp_id)
             if instr_list is None:
                 if self.comp_tree is not None:
@@ -1302,10 +1338,9 @@ class HloLayer:
             instr_list.append(copy_instr)
             self.instructions_added[instr.id] = copy_instr
 
-
-
-
-    def _generate_hlo_module_proto(self) -> hlo_pb2.HloModuleProto:
+    def _generate_hlo_module_proto(
+        self, tensors: TensorMap
+    ) -> hlo_pb2.HloModuleProto:
         hlo_module = hlo_pb2.HloModuleProto()
         hlo_module.name = str(self.key)
 
@@ -1342,8 +1377,29 @@ class HloLayer:
             new_param.opcode = "parameter"
             # clear the op name, parameters do not have metadata op names
             # in HLO modules. make this consistent with regular Jax.
-            print(f"adding {new_param.name} as {parameter_number} on {self.key}")
             parameter_number = add_parameter(new_param, parameter_number)
+
+        inout_alias = hlo_pb2.HloInputOutputAliasProto()
+        all_outputs = self.roots + self.outputs + self.microbatch_outputs
+        for param_idx, param in enumerate(self.params):
+            matching_root_id = tensors.find_alias(param.id)
+            if matching_root_id is not None:
+                matching_root_idx = None
+                for root_idx, root in enumerate(self.roots):
+                    if root.id == matching_root_id:
+                        matching_root_idx = root_idx
+                        break
+                if matching_root_idx is not None:
+                    entry = hlo_pb2.HloInputOutputAliasProto.AliasEntryProto()
+                    if len(all_outputs) > 1:
+                        entry.output_shape_index.append(root_idx)
+                    # entry.parameter_shape_index.append(param_idx)
+                    entry.parameter_number = param_idx
+                    entry.kind = hlo_pb2.Kind.MUST_ALIAS
+                    inout_alias.entries.append(entry)
+
+        if len(inout_alias.entries) > 0:
+            hlo_module.input_output_alias.CopyFrom(inout_alias)
 
         _make_subcomp = None
         _visit_subcomp = None
@@ -1404,7 +1460,6 @@ class HloLayer:
         for instr in entry_comp_instructions:
             _add_instruction(entry_comp, instr)
 
-        all_outputs = self.roots + self.outputs + self.microbatch_outputs
         if len(all_outputs) == 1:
             # If there is a single output from this module, make that single
             # HLO instruction the ROOT (i.e. return value)
@@ -1454,12 +1509,12 @@ class HloLayer:
 
             for instr in comp.instructions:
                 if instr.opcode == "parameter":
-                    prev_param = params_seen.get(instr.parameter_number)
-                    if prev_param is not None:
+                    prev = params_seen.get(instr.parameter_number)
+                    if prev is not None:
                         raise Exception(
                             f"{comp.id} in {self.key} has multiple parameter "
                             f"no. {instr.parameter_number}: "
-                            f"{prev_param.name} and {instr.name} in {comp.name}"
+                            f"{prev.name} and {instr.name} in {comp.name}"
                         )
                     params_seen[instr.parameter_number] = instr
 
@@ -1588,8 +1643,8 @@ class HloLayer:
 
         return hlo_module
 
-    def to_module(self) -> HloModule:
-        hlo_module = self._generate_hlo_module_proto()
+    def to_module(self, tensors: TensorMap) -> HloModule:
+        hlo_module = self._generate_hlo_module_proto(tensors)
         return HloModule(
             self.key,
             parameters=self.params,
@@ -1973,6 +2028,7 @@ def color_backwards(
         tuple_operand = all_instructions[instr.operand_ids[0]]
         if tuple_operand.opcode in [
             "tuple",
+            "opt-barrier",
             "parameter",
         ]:  # only propagate through tuples, not whiles, conditionals
             tuple_colors = instruction_colors[tuple_operand.id].tuple_colors
@@ -1985,6 +2041,12 @@ def color_backwards(
                     )
     elif instr.opcode == "tuple":
         tuple_color = instruction_colors[instr.id]
+        if tuple_color.tuple_colors is None:
+            raise Exception(f"{instr.name} has no tuple colors")
+        if color.tuple_colors is None:
+            raise Exception(
+                f"{color} is not a tuple, cannot propagate to {instr.name}"
+            )
         for idx, (existing, assigned) in enumerate(
             zip(color.tuple_colors, tuple_color.tuple_colors)
         ):
@@ -1996,6 +2058,10 @@ def color_backwards(
                 color_backwards(
                     operand, merged_color, all_instructions, instruction_colors
                 )
+    elif instr.opcode == "opt-barrier":
+        # this should just copy the color directly
+        operand = all_instructions[instr.operand_ids[0]]
+        color_backwards(operand, color, all_instructions, instruction_colors)
     else:
         for operand_id in instr.operand_ids:
             operand_color = instruction_colors[operand_id]
@@ -2388,6 +2454,12 @@ def color_instructions(
                         for i in range(len(instr.operand_ids))
                     ]
                 )
+            elif instr.opcode == "opt-barrier" and is_tuple_shape(instr):
+                tuple_colors = [
+                    InstructionColoring(color=key)
+                    for _ in instr.shape.tuple_shapes
+                ]
+                color = InstructionColoring(tuple_colors=tuple_colors)
             else:
                 color = InstructionColoring(color=key)
 
@@ -2416,6 +2488,14 @@ class LayerSet:
             return layer
         return self.layers[key]
 
+    def add_rematerialization(
+        self,
+        comp: hlo_pb2.HloComputationProto,
+        instr: hlo_pb2.HloInstructionProto,
+        key: LegateKey,
+    ):
+        self.get_layer(key).add_rematerialization(comp.id, instr)
+
     def add_instruction(
         self,
         comp: hlo_pb2.HloComputationProto,
@@ -2435,8 +2515,8 @@ def decompose_into_colors(
     tuple_aliases: dict[int, int],
     param_map: Mapping[int, hlo_pb2.HloInstructionProto],
     layer_set: Optional[LayerSet] = None,
-    include_root: bool = True
-) -> HloLayer:
+    include_root: bool = True,
+) -> List[HloLayer]:
     layer_set = LayerSet(computation_map) if layer_set is None else layer_set
 
     all_instructions: dict[int, hlo_pb2.HloInstructionProto] = {}
@@ -2497,11 +2577,15 @@ def decompose_into_colors(
                 # otherwise you will get thrashing in the recomputation or
                 # you will put every activation in memory again and lose the
                 # whole advantage of rematerialization
-                if True: #"start_new_layer" not in instr.metadata.op_name or instr.id in param_map:
-                    #print(f"rematerializing {instr.name} in {color}")
+                if (
+                    "activation_checkpoint" not in instr.metadata.op_name
+                    or instr.id in param_map
+                ):
                     # copy all forward instructions to the backprop
                     bkwd_color = color.replace(is_backward=True)
-                    layer_set.add_instruction(entry_comp, instr, bkwd_color, all_instructions)
+                    layer_set.add_rematerialization(
+                        entry_comp, instr, bkwd_color
+                    )
 
     return layer_set
 
@@ -2772,8 +2856,7 @@ class HloModule:
         ]
         roots = [tensor_map.get_root(root) for root in self.batch_outputs]
         for mb in microbatches:
-            # print(f"starting microbatch {self.name} microbatch {mb}")
-            runtime.legate_context.set_provenance(f"{self.name}.mb.{mb}")
+            runtime.legate_runtime.set_provenance(f"{self.name}.mb.{mb}")
             inputs = params + [
                 tensor_map.get_input(input, mb)
                 for input in self.microbatch_inputs
@@ -2838,7 +2921,7 @@ class HloModule:
                     task_mesh,
                     init_tensors,
                 )
-            runtime.legate_context.reset_provenance()
+            runtime.legate_runtime.reset_provenance()
 
     def print_decomposition_tree(self, indent: str = "") -> None:
         if self.submodules:
@@ -2848,7 +2931,7 @@ class HloModule:
         else:
             print(indent + f"Module {self.name}")
 
-    def decompose_into_layers(self) -> None:
+    def decompose_into_layers(self, tensors: TensorMap) -> None:
         computation_map: dict[int, hlo_pb2.HloComputationProto] = dict(
             (comp.id, comp) for comp in self.hlo_module.computations
         )
@@ -2929,7 +3012,7 @@ class HloModule:
             print(layer)
 
         queue = HloLayerQueue(microbatch_layers)
-        sorted_layers = []
+        sorted_layers: list[HloLayer] = []
         cleared_layers = []
         next = queue.pop_ready()
         outputs_produced = set()
@@ -2950,7 +3033,7 @@ class HloModule:
             raise Exception("not all layers are ready")
 
         for layer in sorted_layers:
-            self.submodules.append(layer.to_module())
+            self.submodules.append(layer.to_module(tensors))
 
         if not self.roots:
             raise Exception("Module {} has no outputs".format(self.name))
@@ -3016,7 +3099,7 @@ class HloModule:
                     gradient_scalar_instr.append(instr)
 
         # there is no marked gradient scalar, return the original module
-        if gradient_scalar_instr is None:
+        if not gradient_scalar_instr:
             for instr in entry_comp.instructions:
                 if "transpose(jvp" in instr.metadata.op_name:
                     raise Exception(
@@ -3100,29 +3183,33 @@ class HloModule:
                 marked_instr = hlo_pb2.HloInstructionProto()
                 marked_instr.CopyFrom(instr)
                 if marked_instr.id in scalar_def_use_tree:
+                    if "transpose(jvp" in marked_instr.metadata.op_name:
+                        raise Exception(
+                            f"why tf is {marked_instr.name} in the forward"
+                        )
                     marked_instr.metadata.op_name += "/legate_forward/"
                 marked_comp.instructions.append(marked_instr)
             marked_module.computations.append(marked_comp)
         return marked_module
 
-    def custom_sharding_propagation(
+    def custom_marking_propagation(
         hlo_module: hlo_pb2.HloModuleProto,
     ) -> HloModule:
         # first add all sharding annotations to the module
         # and get rid of all the custom call sharding ops
-        sharded_module = hlo_pb2.HloModuleProto()
-        sharded_module.CopyFrom(hlo_module)
+        marked_module = hlo_pb2.HloModuleProto()
+        marked_module.CopyFrom(hlo_module)
         # clear the computations, we will rebuild them
-        del sharded_module.computations[:]
+        del marked_module.computations[:]
 
         all_instructions = {}
         all_sharded_instructions = {}
 
         for comp in hlo_module.computations:
-            sharded_comp = hlo_pb2.HloComputationProto()
-            sharded_comp.CopyFrom(comp)
-            del sharded_comp.instructions[:]
-            sharded_instructions = []
+            marked_comp = hlo_pb2.HloComputationProto()
+            marked_comp.CopyFrom(comp)
+            del marked_comp.instructions[:]
+            marked_instructions = []
             inserted_instructions = {}
             custom_calls_replaced = {}
 
@@ -3144,55 +3231,60 @@ class HloModule:
                     base_instruction_id = find_base_instruction(
                         instr.operand_ids[0]
                     )
-                    sharded_instr = inserted_instructions[base_instruction_id]
+                    marked_instr = inserted_instructions[base_instruction_id]
+                    if "activation_checkpoint" in instr.metadata.op_name:
+                        marked_instr.metadata.op_name += (
+                            "/activation_checkpoint/"
+                        )
+
                     if axes is not None:
                         # Add a legate_axes spec to the op metadata.
                         # The legate_axes will be converted to an actual
                         # op sharding annotation later.
-                        all_sharded_instructions[sharded_instr.id] = axes
-                        sharded_instr.metadata.op_name += (
+                        all_sharded_instructions[marked_instr.id] = axes
+                        marked_instr.metadata.op_name += (
                             f"/legate_axes={axes}/"
                         )
                     # Do not append this sharding instruction,
                     # it gets removed and ignored.
-                    custom_calls_replaced[instr.id] = sharded_instr.id
+                    custom_calls_replaced[instr.id] = marked_instr.id
                 else:
-                    sharded_instr = hlo_pb2.HloInstructionProto()
-                    sharded_instr.CopyFrom(instr)
-                    inserted_instructions[sharded_instr.id] = sharded_instr
+                    marked_instr = hlo_pb2.HloInstructionProto()
+                    marked_instr.CopyFrom(instr)
+                    inserted_instructions[marked_instr.id] = marked_instr
 
                     # Remap all operands that were replaced
                     # custom calls to the call operand
-                    del sharded_instr.operand_ids[:]
+                    del marked_instr.operand_ids[:]
                     for operand_id in instr.operand_ids:
                         if operand_id in custom_calls_replaced:
-                            sharded_instr.operand_ids.append(
+                            marked_instr.operand_ids.append(
                                 find_base_instruction(operand_id)
                             )
                         else:
-                            sharded_instr.operand_ids.append(operand_id)
-                    sharded_instructions.append(sharded_instr)
+                            marked_instr.operand_ids.append(operand_id)
+                    marked_instructions.append(marked_instr)
             if comp.root_id in custom_calls_replaced:
                 # The root was a custom call that got removed,
                 # make the operand the new ropt
-                sharded_comp.root_id = find_base_instruction(comp.root_id)
-            for sharded_instr in sharded_instructions:
+                marked_comp.root_id = find_base_instruction(comp.root_id)
+            for marked_instr in marked_instructions:
                 # This append creates a copy, which means this must
                 # come at the very end after all modifications and
                 # annotations have been done
-                sharded_comp.instructions.append(sharded_instr)
-            sharded_module.computations.append(sharded_comp)
+                marked_comp.instructions.append(marked_instr)
+            marked_module.computations.append(marked_comp)
 
         all_computations = dict(
-            (comp.id, comp) for comp in sharded_module.computations
+            (comp.id, comp) for comp in marked_module.computations
         )
 
         # now try to derive the axes for other ops that are not explicitly
         # marked with legate_axes annotations
         all_instructions = {}
-        entry_comp = find_entry_computation(sharded_module)
+        entry_comp = find_entry_computation(marked_module)
         known_axes = compute_sharding_propagation(entry_comp, all_computations)
-        for comp in sharded_module.computations:
+        for comp in marked_module.computations:
             for instr in comp.instructions:
                 # if this has no axis marking, but we were able to derive it
                 # add the annotation to the instruction now
@@ -3212,7 +3304,7 @@ class HloModule:
                             f"/legate_axes={axes}/implicit_axes/"
                         )
 
-        return sharded_module
+        return marked_module
 
     def match_inputs_and_outputs(self, tensor_map: TensorMap) -> None:
         """Find a best matching between inputs and outputs
@@ -3284,26 +3376,6 @@ class HloModule:
             if min_match is not None:
                 tensor_map.add_parameter_alias(min_match.id, param.id)
 
-        # now look for loop carried dependencies
-        all_instructions = {}
-        input_tuple = None
-        while_loop = None
-        for instr in entry_comp.instructions:
-            all_instructions[instr.id] = instr
-            if (
-                instr.opcode == "while"
-                and "microbatches=" in instr.metadata.op_name
-            ):
-                input_tuple = all_instructions[instr.operand_ids[0]]
-                while_loop = instr
-            elif instr.opcode == "get-tuple-element":
-                if (
-                    while_loop is not None
-                    and instr.operand_ids[0] == while_loop.id
-                ):
-                    loop_input_id = input_tuple.operand_ids[instr.tuple_index]
-        #            tensor_map.add_loop_carried_dependency(instr.id, loop_input_id)
-
     @staticmethod
     def create(hlo_module: hlo_pb2.HloModuleProto) -> HloModule:
         # first label instructions that are backprop/forward as necessary
@@ -3338,37 +3410,54 @@ class HloModule:
 
         # The very first thing that needs to be done is to remove all
         # the sharding custom calls and propagate the annotations
-        hlo_module = HloModule.custom_sharding_propagation(hlo_module)
-
-
+        hlo_module = HloModule.custom_marking_propagation(hlo_module)
+        # we need to re-find the entry computation from the new module
+        entry_comp = find_entry_computation(hlo_module)
+        entry_def_map: dict[int, hlo_pb2.HloInstructionProto] = dict(
+            (instr.id, instr) for instr in entry_comp.instructions
+        )
 
         all_operands = set()
         all_instructions = {}
-        layers_seen = set()
+        layer_forward_checkpoints = {}
+
+        # set the last forward instruction in each layer
+        # as the activation checkpoint
+        def _recurse_tree(
+            comp: hlo_pb2.HloComputationProto, instruction_time: int = 0
+        ):
+            for instr in comp.instructions:
+                key = LegateKey.create(instr.metadata.op_name)
+                instr.metadata.op_name += (
+                    f"/instruction_time={instruction_time}/"
+                )
+                if (
+                    key is not None and not key.is_backward
+                ):  # and instr.opcode != "custom-call":
+                    layer_forward_checkpoints[key] = instr
+                for comp_id in instr.called_computation_ids:
+                    instruction_time = _recurse_tree(
+                        all_computations[comp_id], instruction_time
+                    )
+                instruction_time += 1
+            return instruction_time
+
+        _recurse_tree(entry_comp)
+
         # reverse the computations so they go in "chronological" order
-        for comp in reversed(hlo_module.computations):
+        for comp in hlo_module.computations:
             for instr in comp.instructions:
                 all_instructions[instr.id] = instr
                 constant = find_derived_constant(instr, all_instructions)
                 for operand_id in instr.operand_ids:
                     all_operands.add(operand_id)
                 if constant is None:
-                    original_key = map_instruction_legate_key(instr)
-                    if original_key is not None and original_key not in layers_seen:
-                        print(f"{instr.name} starts new layer {original_key}")
-                        layers_seen.add(original_key)
-                        instr.metadata.op_name += "/start_new_layer/"
+                    _ = map_instruction_legate_key(instr)
                 else:
                     # anything that is a simple derivation of a constant
                     # should be replicated on all layers that need it
                     clear_legate_key(instr)
                     instr.metadata.op_name += "/replicate/"
-
-        # we need to re-find the entry computation from the new module
-        entry_comp = find_entry_computation(hlo_module)
-        entry_def_map: dict[int, hlo_pb2.HloInstructionProto] = dict(
-            (instr.id, instr) for instr in entry_comp.instructions
-        )
 
         roots, found_root_constants, output_reindex = get_roots(
             entry_comp, entry_def_map
@@ -3573,5 +3662,4 @@ def load_module(path: str) -> HloModule:
     hlo_proto = hlo_pb2.HloProto()
     hlo_proto.ParseFromString(pb)
     hlo_module = hlo_proto.hlo_module
-
     return HloModule.create(hlo_module)

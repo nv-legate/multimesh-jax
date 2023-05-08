@@ -64,12 +64,12 @@ legate_global_mesh:
   mesh_args = [
     (@mesh.InterleavedLayerMesh, %ARGS),
   ]
-""" # noqa: E501
+"""  # noqa: E501
 INTERLEAVED_MESH_STRING = _INTERLEAVED_MESH_STRING.format(
     num_layers=NUM_LAYERS * NUM_INTERLEAVES,
     size=TASK_MESH_SIZE,
     num_interleaves=NUM_INTERLEAVES,
-    num_layers_per_task = 1,
+    num_layers_per_task=1,
 )
 
 
@@ -168,7 +168,6 @@ class MeshTest(unittest.TestCase):
             offset = (lyr % NUM_LAYERS) * TASK_MESH_SIZE
             devices = [offset + i for i in range(TASK_MESH_SIZE)]
             self.assertSequenceEqual(devices, list(mesh.devices))
-
 
 
 if __name__ == "__main__":

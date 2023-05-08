@@ -82,14 +82,14 @@ def _mark_logical_partition_on_pytree(args, axis_resources):
     return args
 
 
-def _mark_gradient_scalar_impl(*args, **kwargs):
+def _no_op_impl(*args, **kwargs):
     raise Exception(
         "_mark_gradient_scalar_impl: should not be invoked. "
         "mark_gradient_scalar should only occur inside jit"
     )
 
 
-def _mark_gradient_scalar_lowering(ctx, x_node):
+def no_op_lowering(ctx, x_node):
     op = mhlo.CustomCallOp(
         [x_node.type],
         [x_node],
@@ -104,17 +104,17 @@ def _mark_gradient_scalar_lowering(ctx, x_node):
     return op.results
 
 
-mark_gradient_scalar_p = Primitive("mark_gradient_scalar")
-mark_gradient_scalar_p.def_impl(_mark_gradient_scalar_impl)
-mark_gradient_scalar_p.def_abstract_eval(lambda x: x)
-mlir.register_lowering(mark_gradient_scalar_p, _mark_gradient_scalar_lowering)
+no_op_p = Primitive("no_op_marking")
+no_op_p.def_impl(_no_op_impl)
+no_op_p.def_abstract_eval(lambda x: x)
+mlir.register_lowering(no_op_p, no_op_lowering)
 
 
-def mark_gradient_scalar_p_linear(ct, _, **kwargs):
-    return (mark_gradient_scalar_p.bind(ct, **kwargs),)
+def no_op_p_linear(ct, _, **kwargs):
+    return (no_op_p.bind(ct, **kwargs),)
 
 
-ad.deflinear2(mark_gradient_scalar_p, mark_gradient_scalar_p_linear)
+ad.deflinear2(no_op_p, no_op_p_linear)
 
 
 class LegatePjitFunction:
@@ -228,7 +228,12 @@ def partition(arg, *axis_names):
 
 def mark_gradient_scalar(arg):
     with jax.named_scope("legate_gradient_scalar"):
-        return mark_gradient_scalar_p.bind(arg)
+        return no_op_p.bind(arg)
+
+
+def checkpoint_activation(arg):
+    with jax.named_scope("activation_checkpoint"):
+        return no_op_p.bind(arg)
 
 
 def reduce_body(fxn):
