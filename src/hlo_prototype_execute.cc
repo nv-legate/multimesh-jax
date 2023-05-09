@@ -1,6 +1,7 @@
 #include "hlo_prototype_execute.h"
 #include "executable_cache.h"
 #include "hlo_executor.h"
+#include <chrono>
 
 namespace legate_xla {
 
@@ -12,8 +13,12 @@ HLOPrototypeExecuteTask::run_executable(legate::TaskContext &context,
   std::string hlo_name = context.scalars()[2].value<std::string>();
 
   auto *executable = find_executable(hlo_id);
+  auto ts_start = std::chrono::high_resolution_clock::now();
   HLOExecutorTask::run_executable(context, executable, run_id,
                                   /*scalar_offset=*/3);
+  auto ts_stop = std::chrono::high_resolution_clock::now();
+  auto measured = std::chrono::duration<double>(ts_stop - ts_start).count();
+  log_xla.info() << "HLO " << hlo_name << " ran for " << measured << "s";
 }
 
 /*static*/ void

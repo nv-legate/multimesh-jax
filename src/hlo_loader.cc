@@ -46,6 +46,8 @@ struct get_write_only_ptr {
   uint32_t partitions =
       num_partitions.has_value() ? *num_partitions : cfg.num_tasks;
   DeferredBufferAllocator allocator;
+  // only print stats (if requested) on the lowest node
+  print_stats = print_stats && (cfg.my_node == cfg.min_node);
   compiler->Compile(
       run_id,
       {.replica_count =

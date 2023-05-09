@@ -131,12 +131,6 @@ class LLMOpCode(IntEnum):
     DISTRIBUTED_SHUTDOWN = _llm.HLO_PROTOTYPE_DISTRIBUTED_SHUTDOWN
 
 
-# @unique
-# class LLMTunable(IntEnum):
-#    NUM_GPUS = _llm.LLM_TUNABLE_NUM_GPUS
-#    NUM_PROCS = _llm.LLM_TUNABLE_NUM_PROCS
-
-
 class LLMRuntime:
     def __init__(self, legate_context):
         self.legate_context = legate_context
@@ -147,7 +141,7 @@ class LLMRuntime:
 
         self._machine = get_machine()
         self._machine = self._machine.only(self._machine.preferred_kind)
-        self._launch_domain = Rect([self._machine.num_procs])
+        self._launch_domain = Rect([len(self._machine)])
         self._next_hlo_id = 100
         self._layer_name_to_hlo_id: dict[str, int] = {}
 
@@ -161,9 +155,7 @@ class LLMRuntime:
         self, machine: Machine, stores: List[StorePartition]
     ) -> None:
         with machine:
-            launch_domain = Rect(
-                lo=[0], hi=[machine.num_procs], exclusive=True
-            )
+            launch_domain = Rect(lo=[0], hi=[len(machine)], exclusive=True)
             task = self.legate_context.create_manual_task(
                 LLMOpCode.HLO_FILL,
                 launch_domain=launch_domain,
@@ -173,6 +165,9 @@ class LLMRuntime:
             task.execute()
 
     def fill_stores(self, machine: Machine, stores: List[Store]) -> None:
+        if not stores:
+            return
+
         with machine:
             task = self.legate_context.create_auto_task(
                 LLMOpCode.HLO_FILL,
@@ -187,7 +182,7 @@ class LLMRuntime:
         coordinator_port: int = 1234,
     ):
         machine = self._machine
-        launch_domain = Rect(lo=[0], hi=[machine.num_procs], exclusive=True)
+        launch_domain = Rect(lo=[0], hi=[len(machine)], exclusive=True)
         runtime.legate_runtime.set_provenance("init_distributed")
         with machine:
             task = self.legate_context.create_manual_task(
@@ -211,7 +206,7 @@ class LLMRuntime:
 
     def shutdown_distributed(self):
         machine = self._machine
-        launch_domain = Rect(lo=[0], hi=[machine.num_procs], exclusive=True)
+        launch_domain = Rect(lo=[0], hi=[len(machine)], exclusive=True)
         runtime.issue_execution_fence()
         with machine:
             runtime.legate_runtime.set_provenance("shutdown_distributed")
@@ -234,7 +229,7 @@ class LLMRuntime:
     ) -> int:
         if mesh is None:
             machine = self._machine
-            nproc = machine.num_procs
+            nproc = len(machine)
         elif debug:
             machine = self._machine
             nproc = (
@@ -242,16 +237,16 @@ class LLMRuntime:
             )
         else:
             sl = mesh.get_device_range()
-            if sl.stop > self._machine.num_procs:
+            if sl.stop > len(self._machine):
                 raise ValueError(
                     "Bad processor range for running this module; the module "
                     f"requested processors [{sl.start}...{sl.stop}), but the "
-                    f"runtime has only {self._machine.num_procs} processors."
+                    f"runtime has only {len(self._machine)} processors."
                 )
             machine = self._machine[sl]
-            nproc = machine.num_procs
+            nproc = len(machine)
 
-        launch_domain = Rect(lo=[0], hi=[machine.num_procs], exclusive=True)
+        launch_domain = Rect(lo=[0], hi=[len(machine)], exclusive=True)
         with machine:
             runtime.legate_runtime.set_provenance(hlo_name)
             task = self.legate_context.create_manual_task(
@@ -288,14 +283,11 @@ class LLMRuntime:
             sl = mesh.get_device_range()
             machine = self._machine[sl]
 
-        launch_domain = Rect(lo=[0], hi=[machine.num_procs], exclusive=True)
+        launch_domain = Rect(lo=[0], hi=[len(machine)], exclusive=True)
 
         for red_op, output in zip(red_ops, outputs):
             if red_op is None:
-                if (
-                    not isinstance(output, StorePartition)
-                    and machine.num_procs > 1
-                ):
+                if not isinstance(output, StorePartition) and len(machine) > 1:
                     raise Exception(
                         f"received non-partitioned store as output: {output}"
                     )
@@ -340,7 +332,7 @@ class LLMRuntime:
                     task.add_reduction(output, red_op)
                     task.add_scalar_arg(1, ty.int8)
 
-            if machine.num_procs > 1:
+            if len(machine) > 1:
                 task.set_concurrent(True)
 
             task.execute()
@@ -481,7 +473,6 @@ class TensorSet:
             # for outputs we can make a new tensor
             tensor = Tensor.create(input)
             self.microbatches[microbatch] = tensor
-        # print(f"make {input.name} on mb={microbatch} -> {id(tensor)}")
         return tensor
 
 
@@ -3009,7 +3000,6 @@ class HloModule:
         all_roots = set(root.id for root in roots)
         for layer in microbatch_layers:
             layer.compute_outputs(all_outputs, all_roots)
-            print(layer)
 
         queue = HloLayerQueue(microbatch_layers)
         sorted_layers: list[HloLayer] = []
