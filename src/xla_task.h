@@ -39,4 +39,13 @@ public:
   static void gpu_variant(legate::TaskContext &context);
 };
 
+// Generic initialization of LegateBuffer to zero
+class XLAInitZeroTask : public XlaTask<XLAInitZeroTask> {
+public:
+  static const int32_t TASK_ID = XlaOpCode::XLA_INIT_ZERO_TASK;
+
+public:
+  static void gpu_variant(legate::TaskContext &context);
+};
+
 } // namespace legate_xla

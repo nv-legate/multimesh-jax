@@ -43,9 +43,11 @@ public:
   static Runtime *get_runtime();
   static void initialize(legate::Runtime *core_runtime,
                          legate::LibraryContext *context);
+  static bool synchronous_mode();
 
 private:
   static Runtime *runtime_;
+  static bool synchronous_mode_;
 
 private:
   legate::Runtime *core_runtime_;

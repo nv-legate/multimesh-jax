@@ -19,6 +19,18 @@ struct get_write_only_buffer_fn {
   }
 };
 
+struct init_buffer_fn {
+  template <legate::Type::Code TYPE_CODE, int32_t DIM>
+  void operator()(legate::Store &store) {
+    using VAL = legate::legate_type_of<TYPE_CODE>;
+    auto shape = store.shape<DIM>();
+    auto acc = store.write_accessor<VAL, DIM>();
+    VAL *buffer = acc.ptr(shape);
+    size_t size = store.domain().get_volume();
+    cudaMemset(buffer, 0, size * sizeof(VAL));
+  }
+};
+
 } // namespace
 
 Legion::Logger log_xla("legate.xla");
@@ -41,9 +53,8 @@ Legion::Logger log_xla("legate.xla");
   }
 
   auto &output_store = context.outputs()[0];
-  log_xla.debug() << "XLAInitFromHostTask copying " << bytes
-                  << " bytes to store of dimension " << output_store.dim()
-                  << ", has_on_done_function = " << has_on_done_function;
+  log_xla.debug() << "XLAInitFromHostTask: copying " << bytes
+                  << " bytes to store of dimension " << output_store.dim();
   auto output_ptr =
       legate::double_dispatch(output_store.dim(), output_store.code(),
                               get_write_only_buffer_fn{}, output_store);
@@ -56,10 +67,23 @@ Legion::Logger log_xla("legate.xla");
   }
 }
 
+/*static*/ void XLAInitZeroTask::gpu_variant(legate::TaskContext &context) {
+  auto &output_store = context.outputs()[0];
+  auto output_alloc =
+      legate::double_dispatch(output_store.dim(), output_store.code(),
+                              get_write_only_buffer_fn{}, output_store);
+
+  log_xla.debug() << "XLAInitZeroTask: initializeing  " << output_alloc.size
+                  << " bytes to store of dimension " << output_store.dim();
+
+  cudaMemset(output_alloc.buffer, 0, output_alloc.size);
+}
+
 namespace // unnamed
 {
 static void __attribute__((constructor)) register_tasks(void) {
   XLAInitFromHostTask::register_variants();
+  XLAInitZeroTask::register_variants();
 }
 } // namespace
 

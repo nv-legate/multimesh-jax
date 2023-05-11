@@ -66,7 +66,6 @@ set(legate_xla_version 23.03.00)
 
 option(LegateXLA_ENABLE_PYTHON OFF "Whether to build a Python library")
 
-
 if (SKBUILD)
   set(_required REQUIRED)
   find_package(LegateXLA ${_required})
