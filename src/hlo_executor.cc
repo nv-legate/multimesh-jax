@@ -72,12 +72,14 @@ struct get_write_only_buffer_fn {
       context.scalars()[scalar_offset++].value<void *>());
   uint64_t run_id = context.scalars()[scalar_offset++].value<int64_t>();
 
+  log_xla.debug() << "HLOExecutorTask start";
 #ifndef LEGATE_XLA_PYTHON_PROTOTYPE
   auto *callbacks = context.scalars()[scalar_offset++]
                         .value<std::vector<std::function<void()>> *>();
 #endif
 
   run_executable(context, exe, run_id, scalar_offset);
+  log_xla.debug() << "HLOExecutorTask run_executable done";
 
 #ifndef LEGATE_XLA_PYTHON_PROTOTYPE
   if (callbacks->size() > 0) {
@@ -88,6 +90,7 @@ struct get_write_only_buffer_fn {
   }
   delete callbacks;
 #endif
+  log_xla.debug() << "HLOExecutorTask callbacks done";
 }
 
 /*static*/ void HLOExecutorTask::run_executable(legate::TaskContext &context,

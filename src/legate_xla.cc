@@ -106,6 +106,10 @@ void CreateCompileTask(LegateCompiler *compiler) {
   task->add_output(sync_store_handle.impl->store, part);
 
   runtime->submit(std::move(task));
+
+  if (legate_xla::Runtime::synchronous_mode()) {
+    Synchronize(sync_store_handle);
+  }
 }
 
 void CreateExecuteTask(LegateExecutable *executable,
@@ -134,6 +138,12 @@ void CreateExecuteTask(LegateExecutable *executable,
   }
 
   runtime->submit(std::move(task));
+
+  if (legate_xla::Runtime::synchronous_mode()) {
+    for (auto output : outputs) {
+      Synchronize(output);
+    }
+  }
 }
 
 void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
@@ -158,44 +168,57 @@ void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
   }
 
   runtime->submit(std::move(task));
+  log_xla.debug() << "CreateStoreFromHostBufferTask store " << output.impl
+                  << " scheduled";
+
+  if (legate_xla::Runtime::synchronous_mode()) {
+    Synchronize(output);
+  }
 }
 
-void Destroy(StoreHandle store) { delete store.impl; }
+void Destroy(StoreHandle store) {
+  log_xla.debug() << "Destroy Store " << store.impl;
+  delete store.impl;
+}
 
 void Synchronize(StoreHandle store) {
-  log_xla.debug() << "Synchronize called.";
+  log_xla.debug() << "Synchronize store " << store.impl << " start";
   auto runtime = legate_xla::Runtime::get_runtime();
   auto logical_store = store.impl->store;
   auto out_mapped = logical_store.get_physical_store(runtime->get_context());
   auto buffer_alloc = legate::double_dispatch(
       out_mapped->dim(), out_mapped->code(), get_read_only_ptr{}, *out_mapped);
+  log_xla.debug() << "Synchronize store " << store.impl << " done";
 }
 
 void CopyStoreToHostSync(StoreHandle input,
                          std::function<void(const void *)> copy_func) {
-  log_xla.debug() << "CopyStoreToHostSync called.";
+  log_xla.debug() << "CopyStoreToHostSync " << input.impl << " start";
   auto runtime = legate_xla::Runtime::get_runtime();
   auto logical_store = input.impl->store;
   auto out_mapped = logical_store.get_physical_store(runtime->get_context());
   auto buffer_alloc = legate::double_dispatch(
       out_mapped->dim(), out_mapped->code(), get_read_only_ptr{}, *out_mapped);
   copy_func(buffer_alloc);
+  log_xla.debug() << "CopyStoreToHostSync " << input.impl << " done";
 }
 
 StoreHandle CreateStore(const legate_xla::Shape &shape) {
   legate::Type::Code code = SupportedTypeToLegateType(shape.type);
 
-  log_xla.debug() << "CreateStore called with " << shape;
   // legate modification of dimensions:
-  // 1. handle scalars as arrays of size 1
+  // 1. handle scalars (dims.size() == 0) as arrays of size 1
   // 2. squash all dimensions >= 4
+  // 3. if any dimension has size 0 we create a scalar store
   // FIXME: evaluate MAX_DIM legion
   std::vector<size_t> dims(shape.dims);
+  bool is_scalar = false;
   if (dims.empty()) {
+    is_scalar = true;
     dims.push_back(1ul);
   } else if (dims.size() > 4) {
-    log_xla.debug() << "Number of dimensions(" << dims.size()
-                    << ") > 4! Collapse all dims > 3 to 4!";
+    log_xla.warning() << "Number of dimensions(" << dims.size()
+                      << ") > 4! Collapse all dims > 3 to 4!";
     uint64_t collapsed_4th = 1ul;
     while (dims.size() >= 4) {
       collapsed_4th *= dims.back();
@@ -206,8 +229,39 @@ StoreHandle CreateStore(const legate_xla::Shape &shape) {
 
   auto core_runtime = legate::Runtime::get_runtime();
 
-  return {.impl = new StoreHandleImpl{.store = core_runtime->create_store(
-                                          dims, legate::primitive_type(code))}};
+  auto total_elements =
+      std::accumulate(begin(dims), end(dims), 1, std::multiplies<size_t>());
+  if (total_elements > 0) {
+    StoreHandle result = {
+        .impl = new StoreHandleImpl{
+            .store = core_runtime->create_store(
+                dims, legate::primitive_type(code), is_scalar)}};
+    log_xla.debug() << "CreateStore " << result.impl << " done with " << shape;
+    return result;
+  } else {
+    log_xla.debug()
+        << "Create single element store to prevent empty allocation";
+    StoreHandle result = {
+        .impl = new StoreHandleImpl{.store = core_runtime->create_store(
+                                        {1}, legate::primitive_type(code))}};
+
+    // FIXME: initialize it with 0 (on host)
+    // otherwise runtime might complain when read-accessing later
+    {
+      auto runtime = legate_xla::Runtime::get_runtime();
+      auto task = runtime->create_task(XlaOpCode::XLA_INIT_ZERO_TASK);
+      auto part = task->declare_partition();
+      task->add_output(result.impl->store, part);
+      runtime->submit(std::move(task));
+
+      if (legate_xla::Runtime::synchronous_mode()) {
+        Synchronize(result);
+      }
+    }
+
+    log_xla.debug() << "CreateStore " << result.impl << " done with " << shape;
+    return result;
+  }
 }
 
 void InitLegate() {
