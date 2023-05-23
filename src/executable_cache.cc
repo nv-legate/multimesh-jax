@@ -24,25 +24,19 @@ namespace legate_xla {
 
 static std::mutex cache_lock;
 
-void ExecutableCache::register_executable(
-    uint64_t hlo_id, std::unique_ptr<LegateExecutable> executable) {
-  std::lock_guard<std::mutex> guard(cache_lock);
-  auto iter = executables_.find(hlo_id);
-  if (iter == executables_.end()) {
-    std::cerr << "No registration spot open for HLO " << hlo_id << std::endl;
-    abort();
-  }
-  // someone should have claimed the compile token for this previously
-  iter->second = std::move(executable);
-}
+bool ExecutableCache::compile_executable(
+    uint64_t hlo_id,
+    std::function<std::unique_ptr<LegateExecutable>()> invoke) {
+  cache_lock.lock();
+  auto &entry = executables_[hlo_id];
+  cache_lock.unlock();
 
-bool ExecutableCache::claim_executable_compile_token(uint64_t hlo_id) {
-  std::lock_guard<std::mutex> guard(cache_lock);
-  if (executables_.find(hlo_id) != executables_.end()) {
+  std::lock_guard<std::mutex> guard(entry.lock);
+  if (entry.executable) {
     return false;
   }
-  // drop an empty entry to keep others from building this
-  executables_[hlo_id];
+
+  entry.executable = invoke();
   return true;
 }
 
@@ -52,7 +46,7 @@ LegateExecutable *ExecutableCache::find_executable(uint64_t hlo_id) {
   if (executables_.end() == finder) {
     return nullptr;
   }
-  return finder->second.get();
+  return finder->second.executable.get();
 }
 
 static ExecutableCache &get_executable_cache() {
@@ -60,13 +54,10 @@ static ExecutableCache &get_executable_cache() {
   return executable_cache;
 }
 
-void register_executable(uint64_t hlo_id,
-                         std::unique_ptr<LegateExecutable> executable) {
-  get_executable_cache().register_executable(hlo_id, std::move(executable));
-}
-
-bool claim_executable_compile_token(uint64_t hlo_id) {
-  return get_executable_cache().claim_executable_compile_token(hlo_id);
+bool compile_executable(
+    uint64_t hlo_id,
+    std::function<std::unique_ptr<LegateExecutable>()> invoke) {
+  return get_executable_cache().compile_executable(hlo_id, std::move(invoke));
 }
 
 LegateExecutable *find_executable(uint64_t hlo_id) {

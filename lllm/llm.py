@@ -17,9 +17,11 @@ from __future__ import annotations
 import os
 import re
 import sys
+import tempfile
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import IntEnum, unique
+from pathlib import Path
 from typing import Any, List, Mapping, Optional, Sequence, Set, Tuple, Union
 
 import gin
@@ -77,6 +79,12 @@ _CHEAP_REPLICATED_OPS = {"reshape", "convert", "broadcast", "constant"}
 class RunConfig:
     explicit_replication: bool = False
     rematerialization: bool = False
+
+
+@gin.configurable
+@dataclass
+class CompileConfig:
+    modules: Optional[list[str]] = None
 
 
 class LLMLib(Library):
@@ -222,7 +230,7 @@ class LLMRuntime:
 
     def load_hlo(
         self,
-        hlo_string: str,
+        hlo_file: str,
         hlo_name: str,
         mesh: Optional[TaskMesh] = None,
         debug: bool = False,
@@ -256,7 +264,7 @@ class LLMRuntime:
             hlo_id = self._next_hlo_id
             self._next_hlo_id += 1
             task.add_scalar_arg(self._next_run_id(), ty.uint64)
-            task.add_scalar_arg(hlo_string, ty.string)
+            task.add_scalar_arg(hlo_file, ty.string)
             task.add_scalar_arg(hlo_name, ty.string)
             task.add_scalar_arg(hlo_id, ty.uint64)
             task.add_scalar_arg(nproc, ty.uint64)
@@ -2741,10 +2749,14 @@ class HloModule:
         if self.submodules:
             for submodule in self.submodules:
                 submodule._load_module(global_mesh=global_mesh, debug=debug)
-                runtime.issue_execution_fence(block=True)
         else:
             if self.hlo_module is None:
                 raise Exception(f"HloModule {self.name} has no HloModuleProto")
+
+            config = CompileConfig()
+            if config.modules is not None and self.name not in config.modules:
+                # don't build this
+                return
 
             # sharding annotations has to be the absolute last thing we do
             # when the module is loaded. The module might be split further
@@ -2752,6 +2764,11 @@ class HloModule:
             # to loading the module should the logical mesh axes be converted
             # physical device shardings
             task_mesh = self._get_task_mesh(global_mesh)
+            temp_dir = tempfile.mkdtemp()
+            # this will "leak" the temp_dir, which is fine for containers
+            # and should be okay to force manual cleanup
+            # TODO: come up with a better way to auto clean
+            hlo_file = Path(temp_dir) / f"{self.name}.pb"
             if task_mesh is not None:
                 sharded_module = self._sharded_modules_loaded.get(task_mesh)
                 if sharded_module is not None:
@@ -2764,16 +2781,20 @@ class HloModule:
                         task_mesh,
                     )
                     self._sharded_modules_loaded[task_mesh] = sharded_module
-                    hlo_str = str(sharded_module.hlo_module)
+                    with open(hlo_file, "wb") as f:
+                        f.write(sharded_module.hlo_module.SerializeToString())
                     sharded_module.id = runtime.load_hlo(
-                        hlo_str, self.name, task_mesh, debug
+                        hlo_file.as_posix(), self.name, task_mesh, debug
                     )
             else:
                 if self._default_module_loaded:
                     return
-                hlo_str = str(self.hlo_module)
+                with open(hlo_file, "wb") as f:
+                    f.write(self.hlo_module.SerializeToString())
                 self._default_module_loaded = True
-                self._default_hlo_id = runtime.load_hlo(hlo_str, self.name)
+                self._default_hlo_id = runtime.load_hlo(
+                    hlo_file.as_posix(), self.name
+                )
 
     def _get_task_mesh(
         self, global_mesh: Optional[GlobalMesh]

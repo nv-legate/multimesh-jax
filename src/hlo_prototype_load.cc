@@ -20,6 +20,7 @@
 #include "hlo_loader.h"
 #include "legate_to_xla.h"
 #include "task_utils.h"
+#include "xla_task.h"
 
 using namespace legate;
 
@@ -30,25 +31,27 @@ HLOPrototypeLoaderTask::load_and_compile(TaskContext &context,
                                          const std::string &platform_name) {
   auto &scalars = context.scalars();
   uint64_t run_id = scalars[0].value<uint64_t>();
-  auto hlo_string = scalars[1].value<std::string>();
+  auto hlo_file = scalars[1].value<std::string>();
   auto hlo_name = scalars[2].value<std::string>();
   auto hlo_id = scalars[3].value<uint64_t>();
   auto loader_npartitions = scalars[4].value<uint32_t>();
 
-  auto compiler = GetLegateCompilerFromHloProtoText(
-      hlo_string, platform_name, /*replica_count=*/1, loader_npartitions);
+  auto compiler = GetLegateCompilerFromHloProtoFile(
+      hlo_file, platform_name, /*replica_count=*/1, loader_npartitions);
 
   if (!compiler) {
     std::cerr << "Failed to get compiler" << std::endl;
     LEGATE_ABORT;
   }
 
-  if (claim_executable_compile_token(hlo_id)) {
+  compile_executable(hlo_id, [&] {
+    log_xla.info() << "Starting to compile " << hlo_name;
     HLOLoaderTask::load_and_compile(
         context, compiler.get(), run_id, platform_name, loader_npartitions,
         /*has_sync_store=*/false, /*print_stats=*/true);
-    register_executable(hlo_id, compiler->MakeExecutable());
-  }
+    log_xla.info() << "Done compiling " << hlo_name;
+    return compiler->MakeExecutable();
+  });
 }
 
 /*static*/ void HLOPrototypeLoaderTask::cpu_variant(TaskContext &context) {
