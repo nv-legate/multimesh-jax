@@ -24,6 +24,12 @@ LAST_LAYER_ARGS = (%COMMON_ARGS, {
 
 TASK_ARGS = (%COMMON_ARGS,)
 
+ScheduleConfig:
+  num_layers = 2
+  num_gangs = 2
+  forward_cost = 1
+  backward_cost = 3
+
 to_combine = {
   "last_layer" : ["layer_1", "logits", "loss"],
 }

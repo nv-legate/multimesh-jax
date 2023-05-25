@@ -19,7 +19,8 @@ do
     --fbmem 14000 \
     --gpus $2 \
     examples/hlo.py \
-    -level legate.llm=1 \
+    -level legate.xla.mapper=1 \
+    -level legate.xla=1 \
     --distributed \
     --hlo testdata/$1.pb \
     --gin testdata/$1.gin \

@@ -54,7 +54,7 @@ def run_hlo(
     alias_inputs_and_outputs: bool = False,
     dry_run: bool = False,
 ) -> None:
-    dry_run = False
+    # dry_run = False
     if gin_paths:
         gin.parse_config_files_and_bindings(gin_paths, gin_params)
 
@@ -93,7 +93,9 @@ def run_hlo(
     if coordinator_addr is not None:
         lllm.runtime.init_distributed(coordinator_addr)
 
-    model.load(global_mesh=device_mesh, debug=(load_only or dry_run))
+    model.load(
+        global_mesh=device_mesh, debug=(load_only or dry_run), dry_run=dry_run
+    )
 
     ts_finish_load = timing.time()
     print(f"module load ran for {(ts_finish_load - ts_load) * 1e-6}s")

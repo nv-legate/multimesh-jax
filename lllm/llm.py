@@ -14,6 +14,7 @@
 #
 from __future__ import annotations
 
+import functools
 import os
 import re
 import sys
@@ -42,6 +43,7 @@ from legate.core.shape import Shape
 from legate.core.store import StorePartition
 from legate.core.types import ReductionOp
 from legate.core.utils import OrderedSet
+from lllm.scheduler import Scheduler
 
 from .hlo_utils import (
     _SIZE_PRESERVING_OPS,
@@ -85,6 +87,16 @@ class RunConfig:
 @dataclass
 class CompileConfig:
     modules: Optional[list[str]] = None
+
+
+@gin.configurable
+@dataclass
+class ScheduleConfig:
+    num_layers: Optional[int] = None
+    num_gangs: Optional[int] = None
+    max_breadth: int = 10000000
+    forward_cost: float = 1.0
+    backward_cost: float = 2.0
 
 
 class LLMLib(Library):
@@ -153,6 +165,8 @@ class LLMRuntime:
         self._next_hlo_id = 100
         self._layer_name_to_hlo_id: dict[str, int] = {}
 
+        self.inited: set[int] = set()
+
     def destroy(self) -> None:
         pass
 
@@ -162,6 +176,9 @@ class LLMRuntime:
     def fill_store_partitions(
         self, machine: Machine, stores: List[StorePartition]
     ) -> None:
+        for part in stores:
+            self.inited.add(id(part))
+
         with machine:
             launch_domain = Rect(lo=[0], hi=[len(machine)], exclusive=True)
             task = self.legate_context.create_manual_task(
@@ -175,6 +192,9 @@ class LLMRuntime:
     def fill_stores(self, machine: Machine, stores: List[Store]) -> None:
         if not stores:
             return
+
+        for store in stores:
+            self.inited.add(id(store))
 
         with machine:
             task = self.legate_context.create_auto_task(
@@ -305,21 +325,37 @@ class LLMRuntime:
                 store for store in inputs if isinstance(store, StorePartition)
             ]
             stores = [store for store in inputs if isinstance(store, Store)]
+
+            uninit_partitions = [
+                part for part in partitions if id(part) not in self.inited
+            ]
+            uninit_stores = [
+                store for store in stores if id(store) not in self.inited
+            ]
+
             reductions = [
                 store
                 for (op, store) in zip(red_ops, outputs)
                 if op is not None
             ]
+            uninit_reductions = [
+                store for store in reductions if id(store) not in self.inited
+            ]
             runtime.legate_runtime.push_provenance(
                 f"fill partitioned inputs: {name}"
             )
-            self.fill_store_partitions(machine, partitions)
+            self.fill_store_partitions(machine, uninit_partitions)
             runtime.legate_runtime.pop_provenance()
             runtime.legate_runtime.push_provenance(
                 f"fill unpartitioned inputs: {name}"
             )
-            self.fill_stores(machine, stores + reductions)
+            self.fill_stores(machine, uninit_stores + uninit_reductions)
             runtime.legate_runtime.pop_provenance()
+
+            # mark all outputs as inited so they don't get filled in
+            # future tasks
+            for output in outputs:
+                self.inited.add(id(output))
 
         with machine:
             task = self.legate_context.create_manual_task(
@@ -350,6 +386,8 @@ runtime = LLMRuntime(llm_context)
 
 
 class Tensor:
+    num_created: int = 0
+
     def __init__(
         self,
         dtype,
@@ -369,6 +407,8 @@ class Tensor:
 
         self.replicated = None
         self.partitions: dict[Shape, StorePartition] = {}
+
+        Tensor.num_created += 1
 
     @property
     def size(self) -> int:
@@ -443,6 +483,7 @@ class TensorSet:
     def __init__(self):
         self.microbatches: dict[int, Tensor] = {}
         self.last_microbatch = -1
+        self.cache = []
 
     @property
     def size(self) -> int:
@@ -450,6 +491,16 @@ class TensorSet:
         for tensor in self.microbatches.values():
             size += tensor.size
         return size
+
+    def free(
+        self,
+        instr: hlo_pb2.HloInstructionProto,
+        microbatch: Optional[int] = None,
+    ):
+        if microbatch is None:
+            microbatch = self.last_microbatch
+        tensor = self.microbatches.pop(microbatch)
+        self.cache.append(tensor)
 
     def get_input(
         self,
@@ -470,16 +521,20 @@ class TensorSet:
 
     def get_output(
         self,
-        input: hlo_pb2.HloInstructionProto,
+        output: hlo_pb2.HloInstructionProto,
         microbatch: Optional[int] = None,
     ) -> Tensor:
         if microbatch is None:
             microbatch = 0
+
         self.last_microbatch = microbatch
         tensor = self.microbatches.get(microbatch)
         if tensor is None:
-            # for outputs we can make a new tensor
-            tensor = Tensor.create(input)
+            if self.cache:
+                tensor = self.cache.pop()
+            else:
+                # for outputs we can make a new tensor
+                tensor = Tensor.create(output)
             self.microbatches[microbatch] = tensor
         return tensor
 
@@ -533,6 +588,17 @@ class TensorMap:
             tensor_set = TensorSet()
             self.internal_tensors[input.name] = tensor_set
         return tensor_set.get_input(input, microbatch)
+
+    def free_internal(
+        self,
+        instr: hlo_pb2.HloInstructionProto,
+        microbatch: Optional[int] = None,
+    ) -> Tensor:
+        tensor_set = self.internal_tensors.get(instr.name)
+        if tensor_set is None:
+            tensor_set = TensorSet()
+            self.internal_tensors[instr.name] = tensor_set
+        return tensor_set.free(instr, microbatch)
 
     def get_output(
         self,
@@ -751,6 +817,10 @@ class HloLayer:
         self.microbatch_inputs = []
         for operand_id, comp_id in inputs_needed.items():
             operand = all_instructions[operand_id]
+            if operand.opcode == "constant":
+                raise Exception(
+                    f"{self.key} has input constant {operand.name}"
+                )
             if comp_id == self.entry_comp_id:
                 self.inputs.append(operand)
             else:
@@ -901,6 +971,19 @@ class HloLayer:
                     f"    {root.name:25} id={root.id:4} op={root.opcode}"
                 )
         return "\n".join(str_arr)
+
+    def add_operand_constants(
+        self, all_instructions: Mapping[int.hlo_pb2.HloInstructionProto]
+    ):
+        # this must come after tuple compression
+        for comp_id, instructions in self.contexts.items():
+            for instruction in instructions:
+                for operand_id in instruction.operand_ids:
+                    operand = all_instructions[operand_id]
+                    if operand.opcode == "constant":
+                        self.add_instruction(
+                            comp_id, operand, all_instructions
+                        )
 
     def compress_tuples(self):
         all_instructions = {}
@@ -1162,7 +1245,6 @@ class HloLayer:
                     num_microbatches, microbatch_counter_instr
                 )
 
-                # microbatch_layer.add_instruction(self.entry_comp_id, instr)
                 # we have to convert the while loop into a call instruction
                 while_call_instr = hlo_pb2.HloInstructionProto()
                 while_call_instr.opcode = "call"
@@ -1196,6 +1278,8 @@ class HloLayer:
                 # all get tuple elements of the microbatching while
                 # loop should be rolled into the microbatch part to
                 # make a new root tuple
+                # TODO: only the last microbatch actually needs to make
+                # the full root tuple
                 if (
                     instr.opcode == "get-tuple-element"
                     and instr.operand_ids[0] == microbatch_while_id
@@ -1278,13 +1362,16 @@ class HloLayer:
 
             return True
 
-        if (
-            not is_tuple_shape(instr) and all_instructions is not None
-        ):  # and instr.opcode in _
+        # adding tuple operands can create shape mismatches between
+        # branches of a conditional
+        if all_instructions is not None and not is_tuple_shape(instr):
             for operand_id in instr.operand_ids:
                 operand = all_instructions[operand_id]
-
-                if instr.opcode == "broadcast":
+                if _is_derived_constant(operand):
+                    self.add_instruction(comp_id, operand, all_instructions)
+                elif operand.opcode in ["convert", "bitcast", "constant"]:
+                    self.add_instruction(comp_id, operand, all_instructions)
+                elif instr.opcode == "broadcast":
                     # see if the operand is smaller, if so add it
                     # to shrink the surface area
                     instr_size = np.prod(instr.shape.dimensions)
@@ -1294,14 +1381,6 @@ class HloLayer:
                             comp_id, operand, all_instructions
                         )
                         continue
-
-                if _is_derived_constant(operand):
-                    self.add_instruction(comp_id, operand, all_instructions)
-                    continue
-
-                if operand.opcode in ["convert", "bitcast", "constant"]:
-                    self.add_instruction(comp_id, operand, all_instructions)
-                    continue
 
         # add 1000 to avoid any weird conflicts
         self.max_instruction_id = max(self.max_instruction_id, instr.id + 1000)
@@ -1452,7 +1531,7 @@ class HloLayer:
             instructions = self.contexts[comp_id]
             for instr in instructions:
                 _add_instruction(comp, instr)
-            comp.root_id = instructions[-1].id
+            comp.root_id = comp.instructions[-1].id
             return comp
 
         entry_comp_instructions = self.contexts[self.entry_comp_id]
@@ -1565,7 +1644,7 @@ class HloLayer:
                     if not shapes_equal(root.shape, instr.shape):
                         raise Exception(
                             f"{instr.name} differs from root {root.name}"
-                            f" in {comp.name}\n{param.shape}\n{operand.shape}"
+                            f" in {comp.name}\n{self.key}"
                         )
 
                 if instr.opcode == "conditional":
@@ -1676,6 +1755,7 @@ class HloLayerQueue:
     def pop_ready(self) -> Optional[HloLayer]:
         if not self.ready_layers:
             return None
+
         return self.ready_layers.pop(0)
 
     def finish(self, layer: HloLayer):
@@ -2730,17 +2810,23 @@ class HloModule:
         dry_run: bool = False,
     ) -> None:
         if not self._loaded:
-            self.load(global_mesh)
+            self.load(global_mesh, debug=dry_run, dry_run=dry_run)
         self._launch_module(tensor_map, global_mesh, init_tensors, dry_run)
 
     def load(
-        self, global_mesh: Optional[GlobalMesh] = None, debug: bool = False
+        self,
+        global_mesh: Optional[GlobalMesh] = None,
+        debug: bool = False,
+        dry_run: bool = False,
     ) -> None:
-        self._load_module(global_mesh, debug)
+        self._load_module(global_mesh, debug, dry_run=dry_run)
         runtime.issue_execution_fence()
 
     def _load_module(
-        self, global_mesh: Optional[GlobalMesh] = None, debug: bool = False
+        self,
+        global_mesh: Optional[GlobalMesh] = None,
+        debug: bool = False,
+        dry_run: bool = False,
     ) -> None:
         if self._loaded:
             return
@@ -2748,7 +2834,9 @@ class HloModule:
 
         if self.submodules:
             for submodule in self.submodules:
-                submodule._load_module(global_mesh=global_mesh, debug=debug)
+                submodule._load_module(
+                    global_mesh=global_mesh, debug=debug, dry_run=dry_run
+                )
         else:
             if self.hlo_module is None:
                 raise Exception(f"HloModule {self.name} has no HloModuleProto")
@@ -2783,18 +2871,21 @@ class HloModule:
                     self._sharded_modules_loaded[task_mesh] = sharded_module
                     with open(hlo_file, "wb") as f:
                         f.write(sharded_module.hlo_module.SerializeToString())
-                    sharded_module.id = runtime.load_hlo(
-                        hlo_file.as_posix(), self.name, task_mesh, debug
-                    )
+
+                    if not dry_run:
+                        sharded_module.id = runtime.load_hlo(
+                            hlo_file.as_posix(), self.name, task_mesh, debug
+                        )
             else:
                 if self._default_module_loaded:
                     return
                 with open(hlo_file, "wb") as f:
                     f.write(self.hlo_module.SerializeToString())
                 self._default_module_loaded = True
-                self._default_hlo_id = runtime.load_hlo(
-                    hlo_file.as_posix(), self.name
-                )
+                if not dry_run:
+                    self._default_hlo_id = runtime.load_hlo(
+                        hlo_file.as_posix(), self.name
+                    )
 
     def _get_task_mesh(
         self, global_mesh: Optional[GlobalMesh]
@@ -2847,14 +2938,200 @@ class HloModule:
         init_tensors: bool = False,
         dry_run: bool = False,
     ) -> None:
-        run_config = RunConfig()
-
-        self._load_module(global_mesh=global_mesh, debug=dry_run)
+        self._load_module(
+            global_mesh=global_mesh, debug=dry_run, dry_run=dry_run
+        )
+        launchers = []
         if self.submodules:
-            for submodule in self.submodules:
-                submodule(tensor_map, global_mesh, init_tensors, dry_run)
-            return
+            config = ScheduleConfig()
+            if config.num_layers is not None:
+                num_microbatch = None
+                pre_mb_launchers = []
+                post_mb_launchers = []
+                fwd_layers = []
+                bwd_layers = []
+                for submodule in self.submodules:
+                    if submodule.num_microbatches is not None:
+                        num_microbatch = submodule.num_microbatches
+                        if submodule.key.is_backward:
+                            # backwards modules go backwards
+                            bwd_layers.insert(
+                                0,
+                                submodule._get_microbatch_launchers(
+                                    global_mesh
+                                ),
+                            )
+                        else:
+                            fwd_layers.append(
+                                submodule._get_microbatch_launchers(
+                                    global_mesh
+                                )
+                            )
+                    elif num_microbatch is None:
+                        pre_mb_launchers.extend(
+                            submodule._get_microbatch_launchers(global_mesh)
+                        )
+                    else:
+                        post_mb_launchers.extend(
+                            submodule._get_microbatch_launchers(global_mesh)
+                        )
 
+                launchers.extend(pre_mb_launchers)
+
+                if num_microbatch is not None:
+                    scheduler = Scheduler(
+                        num_microbatches=num_microbatch,
+                        num_layers=config.num_layers,
+                        num_gpus=config.num_gangs,
+                        forward_cost=config.forward_cost,
+                        backward_cost=config.backward_cost,
+                        max_breadth=config.max_breadth,
+                    )
+                    _, total_order = scheduler.compute()
+
+                    for comp in total_order:
+                        # add launchers in the order computed by the scheduler
+                        layer_list = (
+                            bwd_layers if comp.backward else fwd_layers
+                        )
+                        typ = "BWD" if comp.backward else "FWD"
+                        print(
+                            f"Scheduling {typ} {comp.layer}.{comp.microbatch}"
+                        )
+                        launcher = layer_list[comp.layer][comp.microbatch]
+                        launchers.append(launcher)
+                launchers.extend(post_mb_launchers)
+
+            else:
+                # compute a default breadth-first schedule
+                for submodule in self.submodules:
+                    for launcher in submodule._get_microbatch_launchers(
+                        global_mesh
+                    ):
+                        launchers.append(launcher)
+        else:
+            launchers.extend(self._get_microbatch_launchers(global_mesh))
+
+        for launch in launchers:
+            launch(tensor_map, init_tensors, dry_run)
+
+    def _launch_microbatch(
+        self,
+        tensor_map: TensorMap,
+        init_tensors: bool,
+        dry_run: bool,
+        microbatch: int,
+        task_mesh: Optional[TaskMesh] = None,
+    ) -> None:
+        run_config = RunConfig()
+        params = [
+            tensor_map.get_parameter(param) for param in self.batch_inputs
+        ]
+        roots = [tensor_map.get_root(root) for root in self.batch_outputs]
+
+        mb_name = f"{self.name}.mb.{microbatch}"
+        runtime.legate_runtime.set_provenance(mb_name)
+        mb_inputs = [
+            tensor_map.get_input(input, microbatch)
+            for input in self.microbatch_inputs
+        ]
+
+        inputs = params + mb_inputs
+
+        mb_outputs = [
+            tensor_map.get_output(output, microbatch)
+            for output in self.microbatch_outputs
+        ]
+
+        outputs = roots + mb_outputs
+
+        if self.key.is_backward:
+            # all of the microbatch inputs can be freed up to reuse
+            for input in mb_inputs:
+                tensor_map.free_internal(input, microbatch)
+        if "post-microbatch" in self.key.name:
+            for output in mb_outputs:
+                # all of the microbatch outputs can be freed up to reuse
+                tensor_map.free_internal(output, microbatch)
+
+        if task_mesh is None:
+            hlo_id = self._default_hlo_id
+            input_stores = [tensor.store for tensor in inputs]
+            output_stores = [tensor.store for tensor in outputs]
+            if not dry_run and hlo_id == -1:
+                raise Exception(
+                    f"{self.name} produced default module with id=-1"
+                )
+            output_red_ops = [
+                ReductionOp.MAX if is_scalar(output) else None
+                for output in self.roots + self.outputs
+            ]
+
+        else:
+            sharded_module = self._sharded_modules_loaded[task_mesh]
+            hlo_id = sharded_module.id
+            input_stores = self._create_partitioned_stores(
+                inputs,
+                sharded_module.input_shardings,
+                task_mesh,
+                run_config,
+            )
+
+            # force a sanity check on the size of the inputs
+            if not run_config.explicit_replication:
+                for inp in self.interface_inputs:
+                    is_replicated_instruction(
+                        inp, sharded_module.input_shardings.get(inp.id)
+                    )
+
+            output_stores = self._create_partitioned_stores(
+                outputs,
+                sharded_module.output_shardings,
+                task_mesh,
+                run_config,
+            )
+
+            if not dry_run and hlo_id == -1:
+                raise Exception(
+                    f"{self.name} produced sharded module with id=-1"
+                )
+
+            output_red_ops = [
+                ReductionOp.MAX if isinstance(output, Store) else None
+                for output in output_stores
+            ]
+
+        for store in input_stores:
+            if (
+                isinstance(store, StorePartition)
+                and id(store) not in runtime.inited
+            ):
+                size = (
+                    np.prod(store.store.shape) * 4 // task_mesh.ndevices / 1e9
+                )
+                print(
+                    f"{self.name} fill tensor of size {size} GB"
+                    f" = {store.store.shape} / {task_mesh.ndevices}"
+                )
+
+        if not dry_run:
+            runtime.execute_hlo(
+                hlo_id,
+                self.name,
+                input_stores,
+                output_stores,
+                output_red_ops,
+                task_mesh,
+                init_tensors,
+            )
+        else:
+            for store in output_stores:
+                runtime.inited.add(id(store))
+        runtime.legate_runtime.reset_provenance()
+
+    def _get_microbatch_launchers(
+        self, global_mesh: Optional[GlobalMesh] = None
+    ):
         task_mesh = self._get_task_mesh(global_mesh)
 
         microbatches = (
@@ -2863,77 +3140,14 @@ class HloModule:
             else range(self.num_microbatches)
         )
 
-        params = [
-            tensor_map.get_parameter(param) for param in self.batch_inputs
-        ]
-        roots = [tensor_map.get_root(root) for root in self.batch_outputs]
+        launchers = []
         for mb in microbatches:
-            runtime.legate_runtime.set_provenance(f"{self.name}.mb.{mb}")
-            inputs = params + [
-                tensor_map.get_input(input, mb)
-                for input in self.microbatch_inputs
-            ]
-            outputs = roots + [
-                tensor_map.get_output(output, mb)
-                for output in self.microbatch_outputs
-            ]
-            if task_mesh is None:
-                hlo_id = self._default_hlo_id
-                input_stores = [tensor.store for tensor in inputs]
-                output_stores = [tensor.store for tensor in outputs]
-                if hlo_id == -1:
-                    raise Exception(
-                        f"{self.name} produced default module with id=-1"
-                    )
-                output_red_ops = [
-                    ReductionOp.MAX if is_scalar(output) else None
-                    for output in self.roots + self.outputs
-                ]
+            launcher = functools.partial(
+                self._launch_microbatch, microbatch=mb, task_mesh=task_mesh
+            )
+            launchers.append(launcher)
 
-            else:
-                sharded_module = self._sharded_modules_loaded[task_mesh]
-                hlo_id = sharded_module.id
-                input_stores = self._create_partitioned_stores(
-                    inputs,
-                    sharded_module.input_shardings,
-                    task_mesh,
-                    run_config,
-                )
-
-                # force a sanity check on the size of the inputs
-                if not run_config.explicit_replication:
-                    for inp in self.interface_inputs:
-                        is_replicated_instruction(
-                            inp, sharded_module.input_shardings.get(inp.id)
-                        )
-
-                output_stores = self._create_partitioned_stores(
-                    outputs,
-                    sharded_module.output_shardings,
-                    task_mesh,
-                    run_config,
-                )
-                if hlo_id == -1:
-                    raise Exception(
-                        f"{self.name} produced sharded module with id=-1"
-                    )
-
-                output_red_ops = [
-                    ReductionOp.MAX if isinstance(output, Store) else None
-                    for output in output_stores
-                ]
-
-            if not dry_run:
-                runtime.execute_hlo(
-                    hlo_id,
-                    self.name,
-                    input_stores,
-                    output_stores,
-                    output_red_ops,
-                    task_mesh,
-                    init_tensors,
-                )
-            runtime.legate_runtime.reset_provenance()
+        return launchers
 
     def print_decomposition_tree(self, indent: str = "") -> None:
         if self.submodules:
@@ -3013,6 +3227,8 @@ class HloModule:
 
         inputs_needed = set()
         for layer in microbatch_layers:
+            # make sure all constants are added before computing inputs
+            layer.add_operand_constants(all_instructions)
             inputs_needed = inputs_needed.union(
                 layer.compute_inputs(all_instructions, param_map)
             )
