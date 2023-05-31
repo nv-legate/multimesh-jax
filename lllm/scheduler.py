@@ -41,21 +41,43 @@ class Gpu:
         self.forward_active = 0
         self.max_breadth = max_breadth
         self.forward_pending: list[Computation] = []
+        self.backward_pending: list[Computation] = []
         self.order: list[Computation] = []
+        self.active: Optional[Computation] = None
 
     def add(self, comp: Computation) -> None:
-        if (
-            comp.layer == 0
-            and not comp.backward
-            and self.forward_active >= self.max_breadth
-        ):
+        if comp.backward:
+            self.backward_pending.append(comp)
+        else:
             self.forward_pending.append(comp)
             self.forward_pending.sort()
-        else:
-            self.schedule(comp)
 
-    def schedule(self, comp: Computation) -> None:
+    def schedule(self) -> None:
+        if self.active:
+            return
+
+        if self.backward_pending:
+            comp = self.backward_pending.pop(0)
+            return self._schedule_computation(comp)
+        elif self.forward_pending:
+            comp = self.forward_pending[0]
+            if comp.layer != 0 or self.forward_active < self.max_breadth:
+                self.forward_pending.pop(0)
+                return self._schedule_computation(comp)
+
+    def finish(self, comp: Computation) -> None:
+        assert self.active == comp
+        self.active = None
+        if comp.backward and comp.layer == 0:
+            self.forward_active -= 1
+        self.schedule()
+
+    def _schedule_computation(self, comp: Computation) -> None:
+        self.active = comp
+
         if comp.layer == 0 and not comp.backward:
+            if self.forward_active >= self.max_breadth:
+                raise Exception("too many forward passes were active")
             self.forward_active += 1
 
         self.order.append(comp)
@@ -64,14 +86,6 @@ class Gpu:
         self.next_free = time + comp.cost
         event = Event(self.queue, self.next_free, comp, self.graph)
         self.queue.put(event)
-
-        if comp.backward and comp.layer == 0:
-            self.forward_active -= 1
-            if self.forward_active >= self.max_breadth:
-                raise Exception("too many forward passes were active")
-            if self.forward_pending:
-                pending = self.forward_pending.pop(0)
-                self.schedule(pending)
 
 
 class Computation:
@@ -149,8 +163,14 @@ class Event:
 
     def run(self):
         self.graph.done(self.computation)
+        pending_gpus = {self.computation.gpu.id: self.computation.gpu}
         while comp := self.graph.pop():
+            pending_gpus[comp.gpu.id] = comp.gpu
             comp.gpu.add(comp)
+
+        self.computation.gpu.finish(self.computation)
+        for gpu in pending_gpus.values():
+            gpu.schedule()
 
 
 class Scheduler:
@@ -207,9 +227,12 @@ class Scheduler:
                 prev = comp
 
     def compute(self) -> Tuple[Number, List[Gpu]]:
-        start = Event(
-            self.queue, 0, Computation(0, None, None, False, 0), self.graph
+        launch_gpu = Gpu(
+            None, self.queue, self.graph, max_breadth=self.max_breadth
         )
+        launch_comp = Computation(0, None, 0, False, launch_gpu)
+        launch_gpu.active = launch_comp
+        start = Event(self.queue, 0, launch_comp, self.graph)
         start.run()
         total_order = []
         while not self.queue.empty():

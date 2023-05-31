@@ -418,12 +418,29 @@ class Tensor:
         itemsize = np.dtype(self.np_dtype).itemsize
         return np.prod(self.shape) * itemsize
 
-    def replicate(self, ndevices) -> StorePartition:
+    def replicate(self, ndevices, color_shape=None) -> StorePartition:
+        if color_shape is None:
+            color_shape = (1,) * len(self.shape)
+
+        real_tile_shapes = tuple(
+            [
+                shape_dim // color_dim
+                for shape_dim, color_dim in zip(self.shape, color_shape)
+            ]
+        )
         replicated_shape = (ndevices,) + self.shape
-        tile_shape = (1,) + self.shape
-        color_shape = (ndevices,) + (1,) * len(self.shape)
+        tile_shape = (1,) + real_tile_shapes
+
+        replicated_color_shape = (ndevices,) + tuple(color_shape)
+
         if self.replicated is not None:
-            return self.partitions[color_shape]
+            part = self.partitions.get(replicated_color_shape)
+            if part is None:
+                raise Exception(
+                    f"Tensor {self.name} has mismatched replication"
+                    f" on shape={replicated_color_shape}"
+                )
+            return part
 
         self.replicated = Tensor(
             self.dtype,
@@ -434,28 +451,34 @@ class Tensor:
         )
         partition = self.replicated.store.partition_by_tiling(tile_shape)
         self.replicated.store.set_key_partition(partition.partition)
-        self.partitions[color_shape] = partition
+        self.partitions[replicated_color_shape] = partition
         return partition
 
     def partition_by_tiling(
         self, sharding: xla_data_pb2.OpSharding
     ) -> StorePartition:
+        if sharding.replicate_on_last_tile_dim:
+            return self.replicate(
+                sharding.tile_assignment_dimensions[-1],
+                sharding.tile_assignment_dimensions[:-1],
+            )
+
         color_shape = tuple(sharding.tile_assignment_dimensions)
+
         partition = self.partitions.get(color_shape)
         if partition is not None:
             return partition
 
-        if sharding.replicate_on_last_tile_dim:
-            raise Exception(f"Bad sharding {sharding}")
-            last_tile_dim = len(color_shape) - 1
-            store = self.store.promote(
-                last_tile_dim, color_shape[last_tile_dim]
-            )
-        else:
-            store = self.store
-
+        store = self.store
         partition = store.partition_by_tiling(store.shape // color_shape)
         store.set_key_partition(partition.partition)
+
+        if self.partitions:
+            raise Exception(
+                f"changing partition on {self.name} not supported\n"
+                f"new={color_shape}\n"
+                f"existing={list(self.partitions.keys())}"
+            )
 
         self.partitions[color_shape] = partition
         return partition
@@ -1805,12 +1828,10 @@ class ShardedHloModule:
     def __init__(
         self,
         hlo_module: hlo_pb2.HloModuleProto,
-        input_shardings: Mapping[int, xla_data_pb2.OpSharding],
-        output_shardings: Mapping[int, xla_data_pb2.OpSharding],
+        shardings: Mapping[int, xla_data_pb2.OpSharding],
     ):
         self._hlo_module = hlo_module
-        self._input_shardings = input_shardings
-        self._output_shardings = output_shardings
+        self._shardings = shardings
         self._id = -1
 
     @property
@@ -1818,12 +1839,8 @@ class ShardedHloModule:
         return self._hlo_module
 
     @property
-    def input_shardings(self) -> Mapping[int, Shape]:
-        return self._input_shardings
-
-    @property
-    def output_shardings(self) -> Mapping[int, Shape]:
-        return self._output_shardings
+    def shardings(self) -> Mapping[int, Shape]:
+        return self._shardings
 
     @property
     def id(self) -> int:
@@ -1843,8 +1860,7 @@ def compute_module_sharding(
     input_ids = OrderedSet(input.id for input in inputs)
     output_ids = OrderedSet(output.id for output in outputs)
 
-    input_shardings: Mapping[int, xla_data_pb2.OpSharding] = {}
-    output_shardings: Mapping[int, xla_data_pb2.OpSharding] = {}
+    shardings: Mapping[int, xla_data_pb2.OpSharding] = {}
 
     def _shard(
         instr: hlo_pb2.HloInstructionProto,
@@ -1856,11 +1872,6 @@ def compute_module_sharding(
             and len(instr.sharding.tile_assignment_dimensions) > 0
         ):
             trace[instr.id] = instr.sharding
-        if instr.sharding.replicate_on_last_tile_dim:
-            raise Exception(
-                f"{instr.name} has unsupported replicated sharding in "
-                f"module {hlo_module.name}: {instr.metadata.op_name}"
-            )
 
     sharded_module = hlo_pb2.HloModuleProto()
     sharded_module.CopyFrom(hlo_module)
@@ -1878,16 +1889,16 @@ def compute_module_sharding(
             # this must be the tupled args parameter
             tupled_arg_param = instr
         elif instr.id in input_ids:
-            _shard(instr, input_shardings)
+            _shard(instr, shardings)
             input_parameters.append(instr)
         elif instr.id in output_ids:
-            _shard(instr, output_shardings)
+            _shard(instr, shardings)
         elif instr.id == entry_comp.root_id and is_tuple_shape(instr):
             # XLA requires tuple sharding annotation on the root tuple
             tuple_sharding = xla_data_pb2.OpSharding()
             tuple_sharding.type = xla_data_pb2.OpSharding.Type.TUPLE
             for operand_id in instr.operand_ids:
-                operand_sharding = output_shardings.get(operand_id)
+                operand_sharding = shardings.get(operand_id)
                 if operand_sharding is None:
                     operand_sharding = xla_data_pb2.OpSharding()
                     operand_sharding.type = (
@@ -1914,7 +1925,7 @@ def compute_module_sharding(
             tuple_sharding.tuple_shardings.append(parameter.sharding)
         tupled_arg_param.sharding.CopyFrom(tuple_sharding)
 
-    return ShardedHloModule(sharded_module, input_shardings, output_shardings)
+    return ShardedHloModule(sharded_module, shardings)
 
 
 def get_roots(
@@ -2842,9 +2853,10 @@ class HloModule:
                 raise Exception(f"HloModule {self.name} has no HloModuleProto")
 
             config = CompileConfig()
-            if config.modules is not None and self.name not in config.modules:
-                # don't build this
-                return
+
+            skip_load = (
+                config.modules is not None and self.name not in config.modules
+            )
 
             # sharding annotations has to be the absolute last thing we do
             # when the module is loaded. The module might be split further
@@ -2872,7 +2884,7 @@ class HloModule:
                     with open(hlo_file, "wb") as f:
                         f.write(sharded_module.hlo_module.SerializeToString())
 
-                    if not dry_run:
+                    if not dry_run and not skip_load:
                         sharded_module.id = runtime.load_hlo(
                             hlo_file.as_posix(), self.name, task_mesh, debug
                         )
@@ -2882,7 +2894,7 @@ class HloModule:
                 with open(hlo_file, "wb") as f:
                     f.write(self.hlo_module.SerializeToString())
                 self._default_module_loaded = True
-                if not dry_run:
+                if not dry_run and not skip_load:
                     self._default_hlo_id = runtime.load_hlo(
                         hlo_file.as_posix(), self.name
                     )
@@ -3031,17 +3043,23 @@ class HloModule:
 
         mb_name = f"{self.name}.mb.{microbatch}"
         runtime.legate_runtime.set_provenance(mb_name)
-        mb_inputs = [
-            tensor_map.get_input(input, microbatch)
-            for input in self.microbatch_inputs
-        ]
+        try:
+            mb_inputs = [
+                tensor_map.get_input(input, microbatch)
+                for input in self.microbatch_inputs
+            ]
+        except Exception as e:
+            raise Exception(f"problem getting inputs on {self.name}: {str(e)}")
 
         inputs = params + mb_inputs
 
-        mb_outputs = [
-            tensor_map.get_output(output, microbatch)
-            for output in self.microbatch_outputs
-        ]
+        try:
+            mb_outputs = [
+                tensor_map.get_output(output, microbatch)
+                for output in self.microbatch_outputs
+            ]
+        except Exception as e:
+            raise Exception(f"problem getting inputs on {self.name}: {str(e)}")
 
         outputs = roots + mb_outputs
 
@@ -3070,26 +3088,36 @@ class HloModule:
         else:
             sharded_module = self._sharded_modules_loaded[task_mesh]
             hlo_id = sharded_module.id
-            input_stores = self._create_partitioned_stores(
-                inputs,
-                sharded_module.input_shardings,
-                task_mesh,
-                run_config,
-            )
+            try:
+                input_stores = self._create_partitioned_stores(
+                    inputs,
+                    sharded_module.shardings,
+                    task_mesh,
+                    run_config,
+                )
+            except Exception as e:
+                raise Exception(
+                    f"problem partitioning inputs on {self.name}: {str(e)}"
+                )
 
             # force a sanity check on the size of the inputs
             if not run_config.explicit_replication:
                 for inp in self.interface_inputs:
                     is_replicated_instruction(
-                        inp, sharded_module.input_shardings.get(inp.id)
+                        inp, sharded_module.shardings.get(inp.id)
                     )
 
-            output_stores = self._create_partitioned_stores(
-                outputs,
-                sharded_module.output_shardings,
-                task_mesh,
-                run_config,
-            )
+            try:
+                output_stores = self._create_partitioned_stores(
+                    outputs,
+                    sharded_module.shardings,
+                    task_mesh,
+                    run_config,
+                )
+            except Exception as e:
+                raise Exception(
+                    f"problem partitioning outputs on {self.name}: {str(e)}"
+                )
 
             if not dry_run and hlo_id == -1:
                 raise Exception(
@@ -3419,6 +3447,72 @@ class HloModule:
             marked_module.computations.append(marked_comp)
         return marked_module
 
+    def parameter_sharding_propagation(
+        hlo_module: hlo_pb2.HloModuleProto,
+    ) -> None:
+        computations = dict(
+            (comp.id, comp) for comp in hlo_module.computations
+        )
+        instructions = {}
+
+        def _get_tuple_param(comp: hlo_pb2.HloComputationProto):
+            for instr in comp.instructions:
+                if instr.opcode == "parameter":
+                    return instr
+
+        def _helper(
+            comp: hlo_pb2.HloComputationProto,
+            param_aliases: Mapping[int, Optional[hlo_pb2.HloInstructionProto]],
+        ):
+            for instr in comp.instructions:
+                instructions[instr.id] = instr
+                if instr.opcode == "tuple":
+                    aliases = [
+                        param_aliases.get(id) for id in instr.operand_ids
+                    ]
+                    param_aliases[instr.id] = aliases
+                elif instr.opcode == "get-tuple-element":
+                    tuple_id = instr.operand_ids[0]
+                    tuple_aliases = param_aliases.get(tuple_id)
+                    if tuple_aliases is not None:
+                        alias = tuple_aliases[instr.tuple_index]
+                        if alias is not None:
+                            param_aliases[instr.id] = alias
+                elif instr.opcode == "while":
+                    body = computations[instr.called_computation_ids[0]]
+                    tuple_arg = _get_tuple_param(body)
+                    param_aliases[tuple_arg.id] = param_aliases[
+                        instr.operand_ids[0]
+                    ]
+                    _helper(body, param_aliases)
+                    param_aliases[instr.id] = param_aliases[body.root_id]
+                elif instr.opcode == "opt-barrier":
+                    alias = param_aliases.get(instr.operand_ids[0])
+                    if alias is not None:
+                        param_aliases[instr.id] = alias
+                elif instr.opcode == "custom-call":
+                    param_aliases[instr.id] = param_aliases.get(
+                        instr.operand_ids[0]
+                    )
+
+        entry_comp = find_entry_computation(hlo_module)
+        param_aliases = {}
+        for instr in entry_comp.instructions:
+            if instr.opcode == "parameter":
+                param_aliases[instr.id] = instr
+        _helper(entry_comp, param_aliases)
+
+        for id, alias in param_aliases.items():
+            if alias is not None:
+                instr = instructions[id]
+                if (
+                    instr.opcode == "custom-call"
+                    and instr.custom_call_target == "Sharding"
+                ):
+                    axes = TaskMesh.get_legate_axes(instr)
+                    if axes is not None:
+                        alias.metadata.op_name += f"/legate_axes={axes}/"
+
     def custom_marking_propagation(
         hlo_module: hlo_pb2.HloModuleProto,
     ) -> HloModule:
@@ -3513,6 +3607,11 @@ class HloModule:
         known_axes = compute_sharding_propagation(entry_comp, all_computations)
         for comp in marked_module.computations:
             for instr in comp.instructions:
+                # do not propagate shardings to parameters or outputs
+                # these should preserve the shardings the user gave them
+                if instr.opcode == "parameter":
+                    continue
+
                 # if this has no axis marking, but we were able to derive it
                 # add the annotation to the instruction now
                 if "legate_axes" not in instr.metadata.op_name:
@@ -3523,7 +3622,7 @@ class HloModule:
                         # known axes can be an arbitrary typing.Sequence
                         # we want to write these as a tuple
                         axes = tuple(axes)
-                        # mark the axes here ax implicitly derived since we may
+                        # mark the axes here as implicitly derived since we may
                         # not want to distinguish explicitly sharded from
                         # implicitly derived when choosing which instructions
                         # to add physical sharding annotations to
@@ -3604,40 +3703,49 @@ class HloModule:
                 tensor_map.add_parameter_alias(min_match.id, param.id)
 
     @staticmethod
-    def create(hlo_module: hlo_pb2.HloModuleProto) -> HloModule:
+    def create(
+        hlo_module: hlo_pb2.HloModuleProto,
+        annotate: bool = True,
+        prune: bool = True,
+    ) -> HloModule:
         # first label instructions that are backprop/forward as necessary
-        hlo_module = HloModule.backprop_label_propagation(hlo_module)
+        if annotate:
+            hlo_module = HloModule.backprop_label_propagation(hlo_module)
 
-        task_id_offsets: dict[str, int] = {}
+            task_id_offsets: dict[str, int] = {}
 
-        all_computations = dict(
-            (comp.id, comp) for comp in hlo_module.computations
-        )
-        entry_comp = all_computations[hlo_module.entry_computation_id]
+            all_computations = dict(
+                (comp.id, comp) for comp in hlo_module.computations
+            )
+            entry_comp = all_computations[hlo_module.entry_computation_id]
 
-        # before re-mapping legate keys, make sure microbatch task ids are
-        # normalized to start from zero. Somehow different layers end up
-        # with different microbatch numbering (presumably from jit/tracing?)
-        for comp in hlo_module.computations:
-            for instr in comp.instructions:
-                key = LegateKey.create(instr.metadata.op_name)
-                if key is not None and key.task_id is not None:
-                    offset = task_id_offsets.get(key.name)
-                    if offset is None:
-                        task_id_offsets[key.name] = key.task_id
-                    else:
-                        task_id_offsets[key.name] = min(key.task_id, offset)
+            # before re-mapping legate keys, make sure microbatch task ids are
+            # normalized to start from zero. Somehow different layers end up
+            # with different microbatch numbers (presumably from jit/tracing?)
+            for comp in hlo_module.computations:
+                for instr in comp.instructions:
+                    key = LegateKey.create(instr.metadata.op_name)
+                    if key is not None and key.task_id is not None:
+                        offset = task_id_offsets.get(key.name)
+                        if offset is None:
+                            task_id_offsets[key.name] = key.task_id
+                        else:
+                            task_id_offsets[key.name] = min(
+                                key.task_id, offset
+                            )
 
-        for comp in hlo_module.computations:
-            for instr in comp.instructions:
-                key = LegateKey.create(instr.metadata.op_name)
-                if key is not None and key.task_id is not None:
-                    offset = task_id_offsets.get(key.name, 0)
-                    LegateKey.set_task_id(instr, key.task_id - offset)
+            for comp in hlo_module.computations:
+                for instr in comp.instructions:
+                    key = LegateKey.create(instr.metadata.op_name)
+                    if key is not None and key.task_id is not None:
+                        offset = task_id_offsets.get(key.name, 0)
+                        LegateKey.set_task_id(instr, key.task_id - offset)
 
-        # The very first thing that needs to be done is to remove all
-        # the sharding custom calls and propagate the annotations
-        hlo_module = HloModule.custom_marking_propagation(hlo_module)
+            HloModule.parameter_sharding_propagation(hlo_module)
+            # The very first thing that needs to be done is to remove all
+            # the sharding custom calls and propagate the annotations
+            hlo_module = HloModule.custom_marking_propagation(hlo_module)
+
         # we need to re-find the entry computation from the new module
         entry_comp = find_entry_computation(hlo_module)
         entry_def_map: dict[int, hlo_pb2.HloInstructionProto] = dict(
@@ -3646,30 +3754,6 @@ class HloModule:
 
         all_operands = set()
         all_instructions = {}
-        layer_forward_checkpoints = {}
-
-        # set the last forward instruction in each layer
-        # as the activation checkpoint
-        def _recurse_tree(
-            comp: hlo_pb2.HloComputationProto, instruction_time: int = 0
-        ):
-            for instr in comp.instructions:
-                key = LegateKey.create(instr.metadata.op_name)
-                instr.metadata.op_name += (
-                    f"/instruction_time={instruction_time}/"
-                )
-                if (
-                    key is not None and not key.is_backward
-                ):  # and instr.opcode != "custom-call":
-                    layer_forward_checkpoints[key] = instr
-                for comp_id in instr.called_computation_ids:
-                    instruction_time = _recurse_tree(
-                        all_computations[comp_id], instruction_time
-                    )
-                instruction_time += 1
-            return instruction_time
-
-        _recurse_tree(entry_comp)
 
         # reverse the computations so they go in "chronological" order
         for comp in hlo_module.computations:
@@ -3678,13 +3762,15 @@ class HloModule:
                 constant = find_derived_constant(instr, all_instructions)
                 for operand_id in instr.operand_ids:
                     all_operands.add(operand_id)
-                if constant is None:
-                    _ = map_instruction_legate_key(instr)
-                else:
-                    # anything that is a simple derivation of a constant
-                    # should be replicated on all layers that need it
-                    clear_legate_key(instr)
-                    instr.metadata.op_name += "/replicate/"
+
+                if annotate:
+                    if constant is None:
+                        _ = map_instruction_legate_key(instr)
+                    else:
+                        # anything that is a simple derivation of a constant
+                        # should be replicated on all layers that need it
+                        clear_legate_key(instr)
+                        instr.metadata.op_name += "/replicate/"
 
         roots, found_root_constants, output_reindex = get_roots(
             entry_comp, entry_def_map
@@ -3697,45 +3783,50 @@ class HloModule:
         ]
         parameters.sort(key=lambda instr: instr.parameter_number)
 
-        # keeps track of whether any parameters are unused and can be
-        # pruned from the module to avoid runtime overhead
-        prune_parameters = False
-        # if any inputs get pruned, we will need to reindex them
-        input_reindex = {}
-        # we might have tupled args, in which case we need to unroll them
-        # into many parameters and ignore the parameter tuple
-        if len(parameters) == 1 and is_tuple_shape(parameters[0]):
-            param_id = parameters[0].id
-            parameters = []
-            for instr in entry_comp.instructions:
-                if (
-                    instr.opcode == "get-tuple-element"
-                    and instr.operand_ids[0] == param_id
-                ):
-                    if instr.id in all_operands:  # this parameter is used
-                        input_reindex[instr.tuple_index] = len(parameters)
-                        parameters.append(instr)
+        if prune:
+            # keeps track of whether any parameters are unused and can be
+            # pruned from the module to avoid runtime overhead
+            prune_parameters = False
+            # if any inputs get pruned, we will need to reindex them
+            input_reindex = {}
+            # we might have tupled args, in which case we need to unroll them
+            # into many parameters and ignore the parameter tuple
+            if len(parameters) == 1 and is_tuple_shape(parameters[0]):
+                param_id = parameters[0].id
+                parameters = []
+                for instr in entry_comp.instructions:
+                    if (
+                        instr.opcode == "get-tuple-element"
+                        and instr.operand_ids[0] == param_id
+                    ):
+                        if instr.id in all_operands:  # this parameter is used
+                            input_reindex[instr.tuple_index] = len(parameters)
+                            parameters.append(instr)
+                        else:
+                            # this parameter is never used, so we should
+                            # prune it and remove it from the input set
+                            prune_parameters = True
+                parameters.sort(key=lambda instr: instr.tuple_index)
+            else:
+                pruned_parameters = []
+                for idx, param in enumerate(parameters):
+                    if param.id in all_operands:  # this param is used
+                        input_reindex[idx] = len(pruned_parameters)
+                        pruned_parameters.append(param)
                     else:
                         # this parameter is never used, which means we should
                         # prune it and remove it from the input set
                         prune_parameters = True
-            parameters.sort(key=lambda instr: instr.tuple_index)
-        else:
-            pruned_parameters = []
-            for idx, param in enumerate(parameters):
-                if param.id in all_operands:  # this param is used
-                    input_reindex[idx] = len(pruned_parameters)
-                    pruned_parameters.append(param)
-                else:
-                    # this parameter is never used, which means we should
-                    # prune it and remove it from the input set
-                    prune_parameters = True
-            parameters = pruned_parameters
+                parameters = pruned_parameters
 
-        if prune_parameters or found_root_constants:
-            parameters, roots, hlo_module = HloModule.prune_module(
-                hlo_module, parameters, input_reindex, roots, output_reindex
-            )
+            if prune_parameters or found_root_constants:
+                parameters, roots, hlo_module = HloModule.prune_module(
+                    hlo_module,
+                    parameters,
+                    input_reindex,
+                    roots,
+                    output_reindex,
+                )
 
         top_key = LegateKey(hlo_module.name)
         return HloModule(
@@ -3884,9 +3975,11 @@ class HloModule:
         return new_parameters, new_roots, pruned_module
 
 
-def load_module(path: str) -> HloModule:
+def load_module(
+    path: str, annotate: bool = True, prune: bool = True
+) -> HloModule:
     pb = open(path, "rb").read()
     hlo_proto = hlo_pb2.HloProto()
     hlo_proto.ParseFromString(pb)
     hlo_module = hlo_proto.hlo_module
-    return HloModule.create(hlo_module)
+    return HloModule.create(hlo_module, annotate=annotate, prune=prune)

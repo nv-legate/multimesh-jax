@@ -139,10 +139,7 @@ def is_replicated_instruction(
         if not is_small:
             check_replicated_instruction_exception(instr)
         return True
-    if sharding.replicate_on_last_tile_dim:
-        raise Exception(
-            f"partial replication not yet supported for {instr.name}"
-        )
+
     return False
 
 
@@ -656,10 +653,7 @@ def _sharding_propagation_helper(
                     is_entry_computation=False,
                 )
                 comp_axes = comp_known_axes[called_comp.root_id]
-                for i, (instr_ax, comp_ax) in enumerate(
-                    zip(instr_axes, comp_axes)
-                ):
-                    _fill_nones(instr.shape, instr_axes, comp_axes)
+                _fill_nones(instr.shape, instr_axes, comp_axes)
 
             verify_size(instr, instr_axes, instr)
             known_axes[instr.id] = instr_axes
@@ -673,148 +667,3 @@ def compute_sharding_propagation(
 ):
     known_axes = {}
     return _sharding_propagation_helper(comp, all_computations, known_axes)
-
-
-def hlo_cost_analysis(hlo_module: hlo_pb2.HloModuleProto):
-    elementwise_flops = {}
-    dot_batch_flops = {}
-    dot_contraction_flops = {}
-    all_instructions = {}
-
-    def add_flops(
-        axes: Sequence[str],
-        table: Mapping[str, int],
-        flops: int,
-        none_repl: str,
-    ) -> None:
-        for axis in axes:
-            axis = str(axis)
-            if axis is None:
-                axis = none_repl
-
-            if axis not in table:
-                table[axis] = 0
-            table[axis] += flops
-
-    all_computations = dict(
-        (comp.id, comp) for comp in hlo_module.computations
-    )
-    total_elementwise_flops = 0
-    total_dot_flops = 0
-    total_parameter_bytes = 0
-    total_output_bytes = 0
-    entry_comp = find_entry_computation(hlo_module)
-    known_axes = compute_sharding_propagation(entry_comp, all_computations)
-
-    for instr in entry_comp.instructions:
-        all_instructions[instr.id] = instr
-        instr_axes = known_axes.get(instr.id)
-        if instr_axes is None:
-            instr_axes = [None] * len(instr.shape.dimensions)
-
-        if instr.opcode == "parameter":
-            total_parameter_bytes += instr_size(instr)
-
-        if instr.id == entry_comp.root_id:
-            if instr.shape.element_type == xla_data_pb2.PrimitiveType.TUPLE:
-                for operand_id in instr.operand_ids:
-                    operand = all_instructions[operand_id]
-                    total_output_bytes += instr_size(operand)
-            else:
-                total_output_bytes = instr_size(instr)
-
-        if instr.opcode == "dot":
-            lhs, rhs = (all_instructions[id] for id in instr.operand_ids)
-            lhs_axes = known_axes.get(lhs.id)
-            if lhs_axes is None:
-                lhs_axes = [None] * len(lhs.shape.dimensions)
-            rhs_axes = known_axes.get(rhs.id)
-            if rhs_axes is None:
-                rhs_axes = [None] * len(rhs.shape.dimensions)
-
-            dims = instr.dot_dimension_numbers
-
-            if dims.lhs_contracting_dimensions:
-                lhs_cxn_dims = dims.lhs_contracting_dimensions
-            else:
-                lhs_cxn_dims = (len(lhs.shape.dimensions()) - 1,)
-
-            if dims.lhs_batch_dimensions:
-                lhs_batch_dims = dims.lhs_batch_dimensions
-            else:
-                all_dims = set(range(len(lhs.shape.dimensions)))
-                lhs_batch_dims = list(all_dims - set(lhs_cxn_dims))
-
-            if dims.rhs_contracting_dimensions:
-                rhs_cxn_dims = dims.rhs_contracting_dimensions
-            else:
-                rhs_cxn_dims = (0,)
-
-            if dims.rhs_batch_dimensions:
-                rhs_batch_dims = dims.rhs_batch_dimensions
-            else:
-                all_dims = set(range(len(rhs.shape.dimensions)))
-                rhs_batch_dims = list(all_dims - set(rhs_cxn_dims))
-
-            all_dims = (
-                [lhs.shape.dimensions[ax] for ax in lhs_batch_dims]
-                + [lhs.shape.dimensions[ax] for ax in lhs_cxn_dims]
-                + [rhs.shape.dimensions[ax] for ax in rhs_batch_dims]
-            )
-            flops = 1
-            for dim in all_dims:
-                flops *= dim
-            total_dot_flops += flops
-
-            lhs_batch_axes = [lhs_axes[ax] for ax in lhs_batch_dims]
-            rhs_batch_axes = [rhs_axes[ax] for ax in rhs_batch_dims]
-            lhs_cxn_axes = [lhs_axes[ax] for ax in lhs_cxn_dims]
-
-            add_flops(
-                lhs_batch_axes, dot_batch_flops, flops, "unknown_lhs_batch"
-            )
-            add_flops(
-                rhs_batch_axes, dot_batch_flops, flops, "unknown_rhs_batch"
-            )
-            add_flops(
-                lhs_cxn_axes, dot_contraction_flops, flops, "unknown_cxn"
-            )
-
-        elif instr.opcode in _ELEMENTWISE_OPS:
-            flops = 1
-            for dim in instr.shape.dimensions:
-                flops *= dim
-            total_elementwise_flops += flops
-            add_flops(
-                instr_axes, elementwise_flops, flops, "unknown_elementwise"
-            )
-
-    all_axes = (
-        list(elementwise_flops.keys())
-        + list(dot_batch_flops.keys())
-        + list(dot_contraction_flops.keys())
-    )
-    all_axes = list(set(all_axes))
-    all_axes.sort()
-
-    def print_axis_flops(axis: str, flop_table: Mapping[str, int], descr: str):
-        flops = flop_table.get(axis)
-        if flops is not None:
-            print(f"    {descr:15} flops = {flops}")
-
-    dot_sanity_check = 0
-    for value in dot_batch_flops.values():
-        dot_sanity_check += value
-
-    print(f"Axis summary for Module {hlo_module.name}")
-    print("Elementwise flops:", total_elementwise_flops)
-    print("Dot flops        :", total_dot_flops)
-    print("Dot sanity       :", dot_sanity_check)
-    print("Parameter bytes  :", total_parameter_bytes)
-    print("Output bytes     :", total_output_bytes)
-
-    for axis in all_axes:
-        print(f"  Axis {axis}")
-        print_axis_flops(axis, elementwise_flops, "Elementwise")
-        print_axis_flops(axis, dot_batch_flops, "Dot Batch")
-        print_axis_flops(axis, dot_contraction_flops, "Dot Contraction")
