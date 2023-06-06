@@ -3471,7 +3471,10 @@ class HloModule:
                         param_aliases.get(id) for id in instr.operand_ids
                     ]
                     param_aliases[instr.id] = aliases
-                elif instr.opcode == "get-tuple-element":
+                elif (
+                    instr.opcode == "get-tuple-element"
+                    and instr.id not in param_aliases
+                ):
                     tuple_id = instr.operand_ids[0]
                     tuple_aliases = param_aliases.get(tuple_id)
                     if tuple_aliases is not None:
@@ -3497,9 +3500,17 @@ class HloModule:
 
         entry_comp = find_entry_computation(hlo_module)
         param_aliases = {}
+        arg_tuple = None
         for instr in entry_comp.instructions:
             if instr.opcode == "parameter":
-                param_aliases[instr.id] = instr
+                if is_tuple_shape(instr):
+                    arg_tuple = instr
+                else:
+                    param_aliases[instr.id] = instr
+            elif instr.opcode == "get-tuple-element":
+                tuple_id = instr.operand_ids[0]
+                if arg_tuple is not None and arg_tuple.id == tuple_id:
+                    param_aliases[instr.id] = instr
         _helper(entry_comp, param_aliases)
 
         for id, alias in param_aliases.items():

@@ -44,38 +44,52 @@ class Gpu:
         self.backward_pending: list[Computation] = []
         self.order: list[Computation] = []
         self.active: Optional[Computation] = None
+        self.max_active = 0
+        self.mb_active = 0
 
     def add(self, comp: Computation) -> None:
         if comp.backward:
             self.backward_pending.append(comp)
+            self.backward_pending.sort(reverse=True)
         else:
             self.forward_pending.append(comp)
-            self.forward_pending.sort()
+            self.forward_pending.sort(reverse=True)
+
+    def can_schedule_forward(self, comp: Computation) -> bool:
+        return comp.layer != self.id or self.forward_active < self.max_breadth
 
     def schedule(self) -> None:
         if self.active:
             return
 
+        want_forward = self.forward_active < self.max_breadth
+
+        # prioritize the forward
+        if want_forward and self.forward_pending:
+            comp = self.forward_pending.pop(0)
+            return self._schedule_computation(comp)
+
         if self.backward_pending:
             comp = self.backward_pending.pop(0)
             return self._schedule_computation(comp)
-        elif self.forward_pending:
-            comp = self.forward_pending[0]
-            if comp.layer != 0 or self.forward_active < self.max_breadth:
-                self.forward_pending.pop(0)
-                return self._schedule_computation(comp)
 
     def finish(self, comp: Computation) -> None:
         assert self.active == comp
         self.active = None
-        if comp.backward and comp.layer == 0:
+        if comp.backward:
             self.forward_active -= 1
         self.schedule()
 
     def _schedule_computation(self, comp: Computation) -> None:
         self.active = comp
 
-        if comp.layer == 0 and not comp.backward:
+        if comp.backward:
+            self.mb_active -= 1
+        else:
+            self.mb_active += 1
+        self.max_active = max(self.max_active, self.mb_active)
+
+        if not comp.backward:
             if self.forward_active >= self.max_breadth:
                 raise Exception("too many forward passes were active")
             self.forward_active += 1
@@ -83,7 +97,11 @@ class Gpu:
         self.order.append(comp)
 
         time = max(self.queue.time, self.next_free)
+        # if time > self.next_free:
+        #   print(f"GPU {self.id} idle from {self.next_free} to {time}")
         self.next_free = time + comp.cost
+        # print(f"GPU {self.id} running {comp.id} from "
+        #       f"{time} to {self.next_free}")
         event = Event(self.queue, self.next_free, comp, self.graph)
         self.queue.put(event)
 
@@ -108,7 +126,7 @@ class Computation:
         if self.backward != other.backward:
             return self.backward > other.backward
 
-        return self.layer > other.layer
+        return self.layer < other.layer
 
     @property
     def id(self) -> Tuple[int, int, int]:
@@ -194,7 +212,12 @@ class Scheduler:
         self.num_interleave = num_layers // num_gpus
 
         self.gpus = [
-            Gpu(gpu, self.queue, self.graph, max_breadth)
+            Gpu(
+                gpu,
+                self.queue,
+                self.graph,
+                max_breadth - self.num_interleave * gpu,
+            )
             for gpu in range(num_gpus)
         ]
 

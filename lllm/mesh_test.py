@@ -308,6 +308,53 @@ class MeshTest(unittest.TestCase):
             instr.sharding.tile_assignment_devices, [0, 1, 2, 3, 4, 5]
         )
 
+    def test_sharding_order_multi_match(self):
+        logical_axes = [("mlp", "y"), ("embed", "y")]
+        x = 2
+        y = 3
+        devices = np.arange(x * y).reshape(x, y)
+        mesh = TaskMesh(
+            matcher="n/a",
+            device_axes=("x", "y"),
+            logical_axes=logical_axes,
+            device_shape=(x, y),
+            devices=devices,
+        )
+
+        instr = hlo_pb2.HloInstructionProto()
+        instr.shape.dimensions.extend([64, 128, 256])
+        axes = (None, "mlp", "embed")
+        instr.metadata.op_name = f"/legate_axes={axes}/"
+
+        mesh.shard(instr)
+        np.testing.assert_equal(
+            instr.sharding.tile_assignment_dimensions, [1, 3, 1, 2]
+        )
+
+        logical_axes = [
+            ("embed", "y"),
+            ("mlp", "y"),
+        ]
+        x = 2
+        y = 3
+        devices = np.arange(x * y).reshape(x, y)
+        mesh = TaskMesh(
+            matcher="n/a",
+            device_axes=("x", "y"),
+            logical_axes=logical_axes,
+            device_shape=(x, y),
+            devices=devices,
+        )
+        instr = hlo_pb2.HloInstructionProto()
+        instr.shape.dimensions.extend([64, 128, 256])
+        axes = (None, "mlp", "embed")
+        instr.metadata.op_name = f"/legate_axes={axes}/"
+
+        mesh.shard(instr)
+        np.testing.assert_equal(
+            instr.sharding.tile_assignment_dimensions, [1, 1, 3, 2]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
