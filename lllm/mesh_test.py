@@ -355,6 +355,36 @@ class MeshTest(unittest.TestCase):
             instr.sharding.tile_assignment_dimensions, [1, 1, 3, 2]
         )
 
+    def test_replica_groups(self):
+        logical_axes = [("batch", "x"), ("embed", "y")]
+        x = 2
+        y = 3
+        devices = np.arange(x * y).reshape(x, y)
+        mesh = TaskMesh(
+            matcher="n/a",
+            device_axes=("x", "y"),
+            logical_axes=logical_axes,
+            device_shape=(x, y),
+            devices=devices,
+        )
+        replica_groups = mesh.get_replica_groups("batch")
+        self.assertEqual(len(replica_groups), y)
+
+        logical_axes = [("batch", "x"), ("embed", "y"), ("mlp", "z")]
+        x = 2
+        y = 3
+        z = 4
+        devices = np.arange(x * y * z).reshape(x, y, z)
+        mesh = TaskMesh(
+            matcher="n/a",
+            device_axes=("x", "y", "z"),
+            logical_axes=logical_axes,
+            device_shape=(x, y, z),
+            devices=devices,
+        )
+        replica_groups = mesh.get_replica_groups("embed")
+        self.assertEqual(len(replica_groups), x * z)
+
 
 if __name__ == "__main__":
     unittest.main()

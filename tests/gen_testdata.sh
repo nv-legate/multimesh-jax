@@ -39,5 +39,6 @@ rm -rf dump_attention
 gen_attention_data attention
 gen_attention_data attention-mp
 gen_attention_data attention-while-loop
+gen_attention_data attention-while-loop-dp
 gen_attention_data attention-ckpt
 

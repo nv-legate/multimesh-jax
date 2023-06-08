@@ -98,10 +98,10 @@ class Gpu:
 
         time = max(self.queue.time, self.next_free)
         # if time > self.next_free:
-        #   print(f"GPU {self.id} idle from {self.next_free} to {time}")
+        #  print(f"GPU {self.id} idle from {self.next_free} to {time}")
         self.next_free = time + comp.cost
         # print(f"GPU {self.id} running {comp.id} from "
-        #       f"{time} to {self.next_free}")
+        #      f"{time} to {self.next_free}")
         event = Event(self.queue, self.next_free, comp, self.graph)
         self.queue.put(event)
 

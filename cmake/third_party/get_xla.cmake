@@ -27,7 +27,7 @@ set(_bazel_options
 add_custom_command(
   OUTPUT  ${xla_library}
   COMMENT "Building tensorflow components"
-  COMMAND bazel --batch build ${_bazel_options} ${xla_target} //xla/tools:run_hlo_module --check_visibility=false
+  COMMAND bazel --batch build ${_bazel_options} ${xla_target} --check_visibility=false
   COMMAND ${soname_command}
   WORKING_DIRECTORY ${xla_SOURCE_DIR}
   DEPENDS ${xla_source_files}

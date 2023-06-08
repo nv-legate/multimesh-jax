@@ -280,6 +280,7 @@ def fori_reduce(
     name: Optional[str] = None,
     implicit_decomposition: bool = False,
     unroll: bool = True,
+    allreduce_axis: str = "batch",
 ) -> Any:
     """Runs code equivalent body_fun(i,args) for i in range(lower,upper) and
     reduces by invoking reduce(i, accum, results[i]) for i in the range.
@@ -311,6 +312,7 @@ def fori_reduce(
 
         def wrapped(i, val):
             old_result, args = val
+
             new_result = body_fun(i, args)
             with task(
                 name=name, implicit_decomposition=implicit_decomposition
@@ -327,4 +329,8 @@ def fori_reduce(
             result, args = jax.lax.fori_loop(
                 lower, upper, wrapped, (reduce_init, args)
             )
-        return result
+
+        flat_result, treedef = tree_flatten(result)
+        with jax.named_scope(f"allreduce={allreduce_axis}"):
+            allreduce_results = [no_op_p.bind(r) for r in flat_result]
+        return tree_unflatten(treedef, allreduce_results)

@@ -1,28 +1,32 @@
 from lllm import mesh
 
 
-AXES = [
-  ("batch", "ax"),
-#  ("heads", "ax"),
+MB_AXES = [
+  ("heads", "ax"),
 ]
 
-TASK_MESH = (1,)
+POST_MB_AXES = [
+  ("batch", "ax"),
+  ("heads", "ax"),
+]
+
+TASK_MESH = (2,)
 
 COMMON_ARGS = {
   "device_axes" : ('ax',),
-  "logical_axes" : %AXES,
   "device_shape" : %TASK_MESH,
 }
 
-LAYER_MESH_ARGS = (%COMMON_ARGS, {
+MB_ARGS = (%COMMON_ARGS, {
   "num_layers" : 2,
+  "logical_axes" : %MB_AXES,
 })
 
-LAST_LAYER_ARGS = (%COMMON_ARGS, {
-  "device_offset" : 1,
+POST_MB_ARGS = (%COMMON_ARGS, {
+  "num_layers" : 2,
+  "logical_axes" : %POST_MB_AXES,
 })
 
-TASK_ARGS = (%COMMON_ARGS,)
 
 ScheduleConfig:
   num_layers = 2
@@ -31,7 +35,7 @@ ScheduleConfig:
   backward_cost = 3
 
 to_combine = {
-  "last_layer" : ["layer_1", "logits", "loss"],
+  "layer_1" : ["layer_1", "logits", "loss"],
 }
 key_utils.CombineNamesTransform:
   to_combine = %to_combine
@@ -41,12 +45,6 @@ key_utils.CompressLayersTransform:
   num_layers = 4
   num_layers_per_key = 2
 
-to_combine = {
-  "last_layer" : ["layer_1", "logits", "loss"],
-}
-key_utils.CombineNamesTransform:
-  to_combine = %to_combine
-
 map_legate_key:
   transforms = [
    (@key_utils.CompressLayersTransform,()),
@@ -55,16 +53,15 @@ map_legate_key:
 
 legate_global_mesh:
   mesh_args = [
-    (@mesh.LayerMesh, "layer_{}.*", %LAYER_MESH_ARGS),
-    (@mesh.TaskMesh, "last_layer.*", %LAST_LAYER_ARGS),
-    (@mesh.TaskMesh, "jit_step.*", %TASK_ARGS),
+    (@mesh.LayerMesh, "layer_{}[.]post-microbatch.*", %POST_MB_ARGS),
+    (@mesh.LayerMesh, "layer_{}.*", %MB_ARGS),
   ]
-  debug_mode = False
+  debug_mode = True
 
 ScheduleConfig:
   num_layers = 2
-  num_gangs = 2
-  num_microbatches = 5
+  num_gangs = 1
+  num_microbatches = 3
   forward_cost = 1
   backward_cost = 3
 

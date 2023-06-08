@@ -278,6 +278,21 @@ def _sharding_propagation_helper(
             axes = list(axes)
             known_axes[id] = axes
 
+    def _recurse_to_comp(
+        instr: hlo_pb2.HloInstructionProto,
+        comp_id: int,
+        axes: Sequence[Optional[str]],
+    ):
+        body_comp = all_computations[comp_id]
+        for body_instr in body_comp.instructions:
+            if body_instr.opcode == "parameter":
+                known_axes[body_instr.id] = axes[:]
+                break
+
+        _sharding_propagation_helper(body_comp, all_computations, known_axes)
+
+        return known_axes[body_comp.root_id]
+
     while updated:
         updated = False
         # TODO: this can be made much more efficient than just looping
@@ -449,6 +464,9 @@ def _sharding_propagation_helper(
                         operand_dim += 1
                 verify_size(operand, operand_axes, instr)
 
+            elif instr.opcode == "all-reduce":
+                instr_axes = known_axes[instr.operand_ids[0]]
+
             elif instr.opcode == "reduce":
                 operand_id = instr.operand_ids[0]
                 operand = all_instructions[operand_id]
@@ -607,18 +625,10 @@ def _sharding_propagation_helper(
                     verify_size(operand, operand_axes, instr)
 
             elif instr.opcode == "while":
-                input_tuple_id = instr.operand_ids[0]
-                input_tuple_axes = known_axes[input_tuple_id]
-                # there should be a single tuple parameter
-                # propagate input tuple axes into the comp
-                body_comp = all_computations[instr.called_computation_ids[0]]
-                for body_instr in body_comp.instructions:
-                    if body_instr.opcode == "parameter":
-                        known_axes[body_instr.id] = input_tuple_axes[:]
-                        break
-
-                _sharding_propagation_helper(
-                    body_comp, all_computations, known_axes
+                instr_axes = _recurse_to_comp(
+                    instr,
+                    instr.called_computation_ids[0],
+                    known_axes[instr.operand_ids[0]],
                 )
 
             elif instr.opcode == "dynamic-slice":
@@ -632,7 +642,16 @@ def _sharding_propagation_helper(
                         operand_axes[i] = instr_ax
 
             elif instr.opcode == "conditional":
-                pass
+                _recurse_to_comp(
+                    instr,
+                    instr.called_computation_ids[0],
+                    known_axes[instr.operand_ids[1]],
+                )
+                instr_axes = _recurse_to_comp(
+                    instr,
+                    instr.called_computation_ids[1],
+                    known_axes[instr.operand_ids[2]],
+                )
 
             elif instr.opcode == "call":
                 called_comp = all_computations[instr.called_computation_ids[0]]

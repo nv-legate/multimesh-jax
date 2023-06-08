@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import collections
 import re
 from typing import Any, List, Mapping, Optional, Sequence, Tuple, Type
 
@@ -83,9 +84,30 @@ class TaskMesh(DeviceMesh):
         dev_axes.sort()
         dev_axes_str = " ".join([f"{id}:{name}" for id, name in dev_axes])
         dev_str = str(self.devices).replace("\n", "")
-        return "Mesh {}: devices={} device_axes=[{}] logical_axes={}".format(
-            self.matcher.pattern, dev_str, dev_axes_str, self.logical_axes
+        return (
+            f"Mesh {self.matcher}: devices={dev_str} "
+            f"device_axes=[{dev_axes_str}] logical_axes={self.logical_axes}"
         )
+
+    def get_logical_size(self, axis: str) -> Optional[int]:
+        for logical, device in self.logical_axes:
+            if logical == axis:
+                ax = self.device_axes[device]
+                return self.devices.shape[ax]
+
+    def get_replica_groups(self, axis: str) -> Optional[List[Sequence[int]]]:
+        for logical, device in self.logical_axes:
+            if logical == axis:
+                ax = self.device_axes[device]
+                groups = collections.defaultdict(list)
+
+                for index in np.ndindex(self.devices.shape):
+                    grp_id = index[:ax] + index[ax + 1 :]
+                    # make sure to offset to zero
+                    groups[grp_id].append(
+                        self.devices[index] - self._min_device
+                    )
+                return groups.values()
 
     def matches(self, name: str) -> bool:
         return bool(self.matcher.fullmatch(name))

@@ -95,6 +95,7 @@ class ScheduleConfig:
     num_layers: Optional[int] = None
     num_gangs: Optional[int] = None
     max_breadth: int = 10000000
+    num_microbatches: Optional[int] = None
     forward_cost: float = 1.0
     backward_cost: float = 2.0
 
@@ -1242,6 +1243,8 @@ class HloLayer:
                     for subcomp_id in instr.called_computation_ids:
                         _add_context(layer, subcomp_id)
 
+        schedule = ScheduleConfig()
+
         microbatch_root_tuple = None
         microbatch_while_id = None
         needed_instructions = set()
@@ -1259,11 +1262,17 @@ class HloLayer:
                         f"could not find number of microbatches for "
                         f"{instr.name} in {instr.metadata.op_name}"
                     )
-                num_microbatches = int(match.groups()[0])
+
+                if schedule.num_microbatches is not None:
+                    num_microbatches = schedule.num_microbatches
+                else:
+                    num_microbatches = int(match.groups()[0])
+
                 microbatch_counter_instr = all_instructions[
                     instr.operand_ids[0]
                 ]
 
+                print("have", num_microbatches, "microbatches on", self.key)
                 microbatch_layer.set_microbatches(
                     num_microbatches, microbatch_counter_instr
                 )
@@ -1873,8 +1882,131 @@ def compute_module_sharding(
         ):
             trace[instr.id] = instr.sharding
 
+    allreduce_comps = []
+
+    def _add_simple_add(instr, comp_id: int):
+        add_comp = hlo_pb2.HloComputationProto()
+        add_comp.name = instr.name + ".add"
+        add_comp.id = comp_id
+
+        param_1 = hlo_pb2.HloInstructionProto()
+        param_1.opcode = "parameter"
+        param_1.shape.element_type = instr.shape.element_type
+        param_1.name = instr.name + ".param1"
+        param_1.parameter_number = 0
+        param_1.id = instr.id + 1
+        param_2 = hlo_pb2.HloInstructionProto()
+        param_2.CopyFrom(param_1)
+        param_2.name = instr.name + ".param2"
+        param_2.parameter_number = 1
+        param_2.id = param_1.id + 1
+
+        root = hlo_pb2.HloInstructionProto()
+        root.shape.CopyFrom(param_1.shape)
+        root.name = instr.name + ".add_root"
+        root.id = param_2.id + 1
+        root.operand_ids.extend((param_1.id, param_2.id))
+        root.opcode = "add"
+
+        add_comp.root_id = root.id
+        add_comp.instructions.extend((param_1, param_2, root))
+        allreduce_comps.append(add_comp)
+
+    def _add_sharded_reduce(instr):
+        all_reduce_comp = hlo_pb2.HloComputationProto()
+        all_reduce_comp.name = instr.name + ".allreduce"
+        all_reduce_comp.id = instr.id + 8675309
+
+        param = hlo_pb2.HloInstructionProto()
+        param.CopyFrom(instr)
+        param.ClearField("operand_ids")
+        param.opcode = "parameter"
+        param.name = instr.name + ".param"
+        param.parameter_number = 0
+        param.id = instr.id * 11 + 867530
+
+        broadcast = hlo_pb2.HloInstructionProto()
+        broadcast.opcode = "broadcast"
+        broadcast.name = instr.name + ".broadcast"
+        broadcast.id = param.id + 1
+        broadcast.operand_ids.append(param.id)
+        broadcast.shape.CopyFrom(param.shape)
+        last_dim = len(broadcast.shape.dimensions)
+        # all dimensions in the brodcast except the last
+        broadcast.dimensions.extend(range(last_dim))
+
+        ar_axis = re.compile("allreduce=(.*?)/").search(instr.metadata.op_name)
+        if ar_axis is None:
+            raise Exception("all-reduce instruction not given all-reduce axis")
+        ar_axis = ar_axis.groups()[0]
+        axes = TaskMesh.get_legate_axes(param)
+        if axes is None:
+            axes = (ar_axis,)
+        else:
+            axes = axes + (ar_axis,)
+        broadcast.metadata.op_name += f"/legate_axes={axes}/"
+        reduce_dim = mesh.get_logical_size(ar_axis)
+        broadcast.shape.dimensions.append(reduce_dim)
+        broadcast.shape.layout.minor_to_major.insert(0, last_dim)
+
+        broadcast.shape.is_dynamic_dimension.append(False)
+        mesh.shard(broadcast)
+
+        reduce = hlo_pb2.HloInstructionProto()
+        reduce.shape.CopyFrom(param.shape)
+        reduce.opcode = "reduce"
+        reduce.metadata.op_name = param.metadata.op_name
+        reduce.name = instr.name + ".reduce"
+        reduce.operand_ids.append(broadcast.id)
+        reduce.shape.CopyFrom(param.shape)
+        reduce.dimensions.append(last_dim)
+
+        zero = hlo_pb2.HloInstructionProto()
+        zero.opcode = "constant"
+        zero.shape.element_type = reduce.shape.element_type
+        zero.name = instr.name + ".zero"
+        zero.id = broadcast.id + 1
+        # set empty layout
+        zero.shape.layout.CopyFrom(xla_data_pb2.LayoutProto())
+        zero.literal.shape.CopyFrom(zero.shape)
+        if zero.shape.element_type == xla_data_pb2.PrimitiveType.F32:
+            zero.literal.f32s.append(0)
+        elif zero.shape.element_type == xla_data_pb2.PrimitiveType.S32:
+            zero.literal.s32s.append(0)
+        reduce.operand_ids.append(zero.id)
+
+        reduce.id = zero.id + 1
+
+        comp_id = all_reduce_comp.id + 1743
+        reduce.called_computation_ids.append(comp_id)
+
+        _add_simple_add(reduce, comp_id)
+
+        all_reduce_comp.root_id = reduce.id
+        all_reduce_comp.instructions.extend((param, broadcast, zero, reduce))
+        allreduce_comps.append(all_reduce_comp)
+
+        # change the all-reduce into a sharded reduce
+        instr.opcode = "call"
+        instr.called_computation_ids.append(all_reduce_comp.id)
+
+    for comp in hlo_module.computations:
+        for instr in comp.instructions:
+            # this will add the all-reduce as a sharded reduce
+            # which XLA will convert to an all-reduce. We cannot add the
+            # all-reduce directly because the sharding propagation chokes
+            # on all-reduces that are cross-replica
+            if (
+                "allreduce=" in instr.metadata.op_name
+                and instr.opcode == "all-reduce"
+            ):
+                _add_sharded_reduce(instr)
+
     sharded_module = hlo_pb2.HloModuleProto()
     sharded_module.CopyFrom(hlo_module)
+    del sharded_module.computations[:]
+    sharded_module.computations.extend(allreduce_comps)
+    sharded_module.computations.extend(hlo_module.computations)
     entry_comp = find_entry_computation(sharded_module)
 
     tupled_arg_param: Optional[hlo_pb2.HloInstructionProto] = None
@@ -3162,19 +3294,21 @@ class HloModule:
     ):
         task_mesh = self._get_task_mesh(global_mesh)
 
-        microbatches = (
-            [None]
-            if self.num_microbatches is None
-            else range(self.num_microbatches)
-        )
+        if self.num_microbatches is None:
+            return [
+                functools.partial(
+                    self._launch_microbatch,
+                    microbatch=None,
+                    task_mesh=task_mesh,
+                )
+            ]
 
-        launchers = []
-        for mb in microbatches:
-            launcher = functools.partial(
+        launchers = [
+            functools.partial(
                 self._launch_microbatch, microbatch=mb, task_mesh=task_mesh
             )
-            launchers.append(launcher)
-
+            for mb in range(self.num_microbatches)
+        ]
         return launchers
 
     def print_decomposition_tree(self, indent: str = "") -> None:
@@ -3563,23 +3697,36 @@ class HloModule:
                     base_instruction_id = find_base_instruction(
                         instr.operand_ids[0]
                     )
-                    marked_instr = inserted_instructions[base_instruction_id]
-                    if "activation_checkpoint" in instr.metadata.op_name:
-                        marked_instr.metadata.op_name += (
-                            "/activation_checkpoint/"
-                        )
 
-                    if axes is not None:
-                        # Add a legate_axes spec to the op metadata.
-                        # The legate_axes will be converted to an actual
-                        # op sharding annotation later.
-                        all_sharded_instructions[marked_instr.id] = axes
-                        marked_instr.metadata.op_name += (
-                            f"/legate_axes={axes}/"
-                        )
-                    # Do not append this sharding instruction,
-                    # it gets removed and ignored.
-                    custom_calls_replaced[instr.id] = marked_instr.id
+                    if "allreduce=" in instr.metadata.op_name:
+                        base_instruction = all_instructions[
+                            base_instruction_id
+                        ]
+                        all_reduce = hlo_pb2.HloInstructionProto()
+                        all_reduce.opcode = "all-reduce"
+                        all_reduce.name = "all-reduce." + base_instruction.name
+                        all_reduce.operand_ids.append(base_instruction_id)
+                        all_reduce.id = instr.id
+                        all_reduce.shape.CopyFrom(instr.shape)
+                        all_reduce.metadata.op_name = instr.metadata.op_name
+                        inserted_instructions[instr.id] = all_reduce
+                        marked_instructions.append(all_reduce)
+                    else:
+                        marked_instr = inserted_instructions[
+                            base_instruction_id
+                        ]
+
+                        if axes is not None:
+                            # Add a legate_axes spec to the op metadata.
+                            # The legate_axes will be converted to an actual
+                            # op sharding annotation later.
+                            all_sharded_instructions[marked_instr.id] = axes
+                            marked_instr.metadata.op_name += (
+                                f"/legate_axes={axes}/"
+                            )
+                        # Do not append this sharding instruction,
+                        # it gets removed and ignored.
+                        custom_calls_replaced[instr.id] = marked_instr.id
                 else:
                     marked_instr = hlo_pb2.HloInstructionProto()
                     marked_instr.CopyFrom(instr)
