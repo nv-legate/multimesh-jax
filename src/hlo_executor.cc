@@ -134,9 +134,9 @@ struct get_write_only_buffer_fn {
   // stream will be incorrect since it will not include the blocking time.
   bool block_host_until_done = true;
 
-  auto ts_start = std::chrono::high_resolution_clock::now();
   bool success =
       exe->Execute(run_id, inputs, outputs, &allocator, device_assignment);
+
   // Check that the stream ran and finished correctly
   if (!success) {
     log_xla.error() << "[HLOExecutor] HLO failed!";

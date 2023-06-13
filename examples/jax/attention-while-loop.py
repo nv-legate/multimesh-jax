@@ -72,9 +72,7 @@ def step_fn(
         offset = i * microbatch_size
         starts = [offset] + [0] * (batch.ndim - 1)
         lengths = [microbatch_size] + list(batch.shape[1:])
-        print(num_microbatches, microbatch_size, starts, lengths)
         microbatch = jax.lax.dynamic_slice(batch, starts, lengths)
-        print("microbatch", microbatch.shape)
         return grad_fn(params, microbatch, num_heads)
 
     def reduce_fun(i, x, y):
@@ -84,7 +82,6 @@ def step_fn(
         return tree_unflatten(treedef, result)
 
     reduce_init = (0, pytree_zeros(params))
-    # num_microbatches = len(microbatches)
     value, grads = fori_reduce(
         0,
         num_microbatches,
@@ -125,7 +122,6 @@ def run_step(
         else:
             return np.zeros(shape, np.float32)
 
-    # microbatches = [generator(input_shape) for _ in range(num_microbatches)]
     batch = generator(input_shape)
     params = [generator(param_shape) for _ in range(num_layers)]
 

@@ -18,28 +18,33 @@
 
 #include "legate_xla_common.h"
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 
 namespace legate_xla {
 
 class ExecutableCache {
+  struct Entry {
+    std::unique_ptr<LegateExecutable> executable;
+    std::mutex lock;
+  };
+
 public:
   void register_executable(uint64_t hlo_id,
                            std::unique_ptr<LegateExecutable> executable);
 
-  bool claim_executable_compile_token(uint64_t hlo_id);
+  bool
+  compile_executable(uint64_t hlo_id,
+                     std::function<std::unique_ptr<LegateExecutable>()> invoke);
   LegateExecutable *find_executable(uint64_t hlo_id);
-  // ExecutableInfo& get_executable_info(uint64_t hlo_id);
 
 private:
-  std::unordered_map<uint64_t, std::unique_ptr<LegateExecutable>> executables_;
+  std::unordered_map<uint64_t, Entry> executables_;
 };
 
-bool claim_executable_compile_token(uint64_t hlo_id);
-
-void register_executable(uint64_t hlo_id,
-                         std::unique_ptr<LegateExecutable> executable);
+bool compile_executable(
+    uint64_t hlo_id, std::function<std::unique_ptr<LegateExecutable>()> invoke);
 
 LegateExecutable *find_executable(uint64_t hlo_id);
 

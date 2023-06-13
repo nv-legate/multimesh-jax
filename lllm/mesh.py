@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import collections
 import re
 from typing import Any, List, Mapping, Optional, Sequence, Tuple, Type
 
@@ -83,9 +84,30 @@ class TaskMesh(DeviceMesh):
         dev_axes.sort()
         dev_axes_str = " ".join([f"{id}:{name}" for id, name in dev_axes])
         dev_str = str(self.devices).replace("\n", "")
-        return "Mesh {}: devices={} device_axes=[{}] logical_axes={}".format(
-            self.matcher.pattern, dev_str, dev_axes_str, self.logical_axes
+        return (
+            f"Mesh {self.matcher}: devices={dev_str} "
+            f"device_axes=[{dev_axes_str}] logical_axes={self.logical_axes}"
         )
+
+    def get_logical_size(self, axis: str) -> Optional[int]:
+        for logical, device in self.logical_axes:
+            if logical == axis:
+                ax = self.device_axes[device]
+                return self.devices.shape[ax]
+
+    def get_replica_groups(self, axis: str) -> Optional[List[Sequence[int]]]:
+        for logical, device in self.logical_axes:
+            if logical == axis:
+                ax = self.device_axes[device]
+                groups = collections.defaultdict(list)
+
+                for index in np.ndindex(self.devices.shape):
+                    grp_id = index[:ax] + index[ax + 1 :]
+                    # make sure to offset to zero
+                    groups[grp_id].append(
+                        self.devices[index] - self._min_device
+                    )
+                return groups.values()
 
     def matches(self, name: str) -> bool:
         return bool(self.matcher.fullmatch(name))
@@ -204,6 +226,7 @@ class TaskMesh(DeviceMesh):
         instr.metadata.op_name += f"/mesh_axes={logical_axes}/"
 
         tile_dims = [1] * len(instr.shape.dimensions)
+        tile_axes = [None] * len(instr.shape.dimensions)
         for logical_ax, axis_nums in logical_axis_numbers.items():
             device_axes = logical_axes[logical_ax]
             if len(device_axes) == len(axis_nums):
@@ -214,6 +237,7 @@ class TaskMesh(DeviceMesh):
                     tile_dims[axis] = self.devices.shape[
                         self.device_axes[device_ax]
                     ]
+                    tile_axes[axis] = self.device_axes[device_ax]
             elif len(device_axes) == 1:
                 # a logical axis name is used more than once
                 # and there is exactly one device axis that matches
@@ -223,6 +247,11 @@ class TaskMesh(DeviceMesh):
                 tile_dims[axis] = self.devices.shape[
                     self.device_axes[device_ax]
                 ]
+                tile_axes[axis] = self.device_axes[device_ax]
+            elif len(device_axes) == 0:
+                # no sharding on these dims
+                for axis in axis_nums:
+                    tile_dims[axis] = 1
             elif len(axis_nums) == 1:
                 # more than one device axis assigned to a single logical axis
                 axis = axis_nums[0]
@@ -230,16 +259,44 @@ class TaskMesh(DeviceMesh):
                 for device_ax in device_axes:
                     tile_dim *= self.devices.shape[self.device_axes[device_ax]]
                 tile_dims[axis] = tile_dim
-            elif len(device_axes) == 0:
-                # no sharding on these dims
-                for axis in axis_nums:
-                    tile_dims[axis] = 1
+                tile_axes[axis] = [self.device_axes[ax] for ax in device_axes]
             else:
                 raise Exception(
                     f"mismatched logical and device axes with multiple "
                     f"matches for axes={axes} on {instr.name}: "
                     f"{device_axes} assigned to {axis_nums}"
                 )
+
+        # To understand the permutation below, suppose the tensor
+        # axes map to device axes (None,1,0). This means the
+        # device mesh needs to be reordered to match the tile
+        # assignments.
+        # (None,0,0) -> (0, 0) = 0
+        # (None,0,1) -> (1, 0) = 4
+        # (None,1,0) -> (0, 1) = 1
+        # (None,1,1) -> (1, 1) = 5
+        # (None,2,0) -> (0, 2) = 2
+        # (None,2,1) -> (1, 2) = 6
+        # (None,3,0) -> (1, 1) = 3
+        # (None,3,1) -> (1, 2) = 7
+
+        device_axis_order = []
+        for ax in tile_axes:
+            if ax is None:
+                continue
+
+            if isinstance(ax, int):
+                device_axis_order.append(ax)
+            else:
+                device_axis_order.extend(ax)
+
+        replicated_axes = [
+            ax
+            for ax in range(len(self.device_axes))
+            if ax not in device_axis_order
+        ]
+        axis_permutation = device_axis_order + replicated_axes
+        device_permutation = np.transpose(self.devices, axes=axis_permutation)
 
         total_size = 1
         for dim in tile_dims:
@@ -250,13 +307,13 @@ class TaskMesh(DeviceMesh):
             extra_dim = self.devices.size // total_size
             sharding.tile_assignment_dimensions.append(extra_dim)
             sharding.replicate_on_last_tile_dim = True
-            raise Exception(
-                f"{instr.name} with shape={instr.shape.dimensions} "
-                f"has partial replication on axes={axes}"
-            )
+
         # TODO: support a different device ordering
         # Devices should be relative numberings from 0...n
-        sharding.tile_assignment_devices.extend(np.arange(self.devices.size))
+        # so we substract the offset self._min_device
+        sharding.tile_assignment_devices.extend(
+            device_permutation.flatten() - self._min_device
+        )
         instr.sharding.CopyFrom(sharding)
         dim_prod = 1
         for entry in sharding.tile_assignment_dimensions:

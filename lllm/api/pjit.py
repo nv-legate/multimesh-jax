@@ -5,6 +5,7 @@ import jax
 import jax.numpy as jnp
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import mhlo
+from jax._src.pjit import flatten_axis_resources
 from jax.core import Primitive
 from jax.experimental import PartitionSpec as P
 from jax.interpreters import ad, mlir
@@ -57,6 +58,8 @@ ad.deflinear2(mark_logical_partition_p, mark_logical_partition_p_linear)
 
 
 def _mark_arg(pspec, arg):
+    if pspec is None:
+        return arg
     pspec = tuple(pspec)
     if len(pspec) < len(arg.shape):
         padding = len(arg.shape) - len(pspec)
@@ -67,13 +70,14 @@ def _mark_arg(pspec, arg):
 
 def _mark_logical_partition_on_pytree(args, axis_resources):
     if axis_resources is not None:
-        axis_flat, _ = tree_flatten(axis_resources)
         flat_args, arg_treedef = tree_flatten(args)
+        axis_flat = flatten_axis_resources(
+            "ugh", arg_treedef, axis_resources, tupled_args=True
+        )
         if len(axis_flat) != len(flat_args):
             raise Exception(
-                "axis_resources={} does not match args of length {}".format(
-                    str(axis_resources), len(flat_args)
-                )
+                f"axis_resources of length {len(axis_flat)}"
+                f" does not match args of length {len(flat_args)}"
             )
         flat_marked_args = [
             _mark_arg(pspec, arg) for pspec, arg in zip(axis_flat, flat_args)
@@ -123,11 +127,12 @@ class LegatePjitFunction:
         self.out_axis_resources = out_axis_resources
         self.fun = fun
 
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
         marked_args = _mark_logical_partition_on_pytree(
             args, self.in_axis_resources
         )
         outputs = self.fun(*marked_args)
+
         return _mark_logical_partition_on_pytree(
             outputs, self.out_axis_resources
         )
@@ -275,6 +280,7 @@ def fori_reduce(
     name: Optional[str] = None,
     implicit_decomposition: bool = False,
     unroll: bool = True,
+    allreduce_axis: str = "batch",
 ) -> Any:
     """Runs code equivalent body_fun(i,args) for i in range(lower,upper) and
     reduces by invoking reduce(i, accum, results[i]) for i in the range.
@@ -306,6 +312,7 @@ def fori_reduce(
 
         def wrapped(i, val):
             old_result, args = val
+
             new_result = body_fun(i, args)
             with task(
                 name=name, implicit_decomposition=implicit_decomposition
@@ -322,4 +329,8 @@ def fori_reduce(
             result, args = jax.lax.fori_loop(
                 lower, upper, wrapped, (reduce_init, args)
             )
-        return result
+
+        flat_result, treedef = tree_flatten(result)
+        with jax.named_scope(f"allreduce={allreduce_axis}"):
+            allreduce_results = [no_op_p.bind(r) for r in flat_result]
+        return tree_unflatten(treedef, allreduce_results)

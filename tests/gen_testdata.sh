@@ -3,8 +3,7 @@
 txtfile=dump_gen/module_0000.jit_step_fn.before_optimizations.txt
 pbfile=dump_gen/module_0000.jit_step_fn.before_optimizations.hlo.pb
 
-#examples="constant_output dot_layers implicit_decomposition many_layers microbatches pruned replicate simple_layers"
-examples=dot_layers
+examples="constant_output dot_layers implicit_decomposition many_layers microbatches pruned simple_layers"
 
 rm -rf dump_gen
 for example in $examples
@@ -37,8 +36,9 @@ rm -rf dump_attention
 
 }
 
-#gen_attention_data attention
-#gen_attention_data attention-mp
-#gen_attention_data attention-while-loop
+gen_attention_data attention
+gen_attention_data attention-mp
+gen_attention_data attention-while-loop
+gen_attention_data attention-while-loop-dp
 gen_attention_data attention-ckpt
 

@@ -1,11 +1,12 @@
 import unittest
 
 import gin
+import numpy as np
 from google.protobuf import text_format
 from tensorflow.compiler.xla import xla_data_pb2
 from tensorflow.compiler.xla.service import hlo_pb2
 
-from lllm.mesh import legate_global_mesh
+from lllm.mesh import TaskMesh, legate_global_mesh
 
 TEST_HLO_PROTO = """shape {
   dimensions: 16
@@ -28,7 +29,6 @@ AXES = (
 TASK_MESH = ({size},)
 
 ARGS = {{
-  "matcher_template" : "layer_{{}}.*",
   "num_layers" : %NUM_LAYERS,
   "device_axes" : ('ax',),
   "logical_axes" : %AXES,
@@ -37,7 +37,7 @@ ARGS = {{
 
 legate_global_mesh:
   mesh_args = [
-    (@mesh.LayerMesh, %ARGS),
+    (@mesh.LayerMesh, "layer_{{}}.*", (%ARGS,)),
   ]
 """.format(  # noqa: E501
     num_layers=NUM_LAYERS, size=TASK_MESH_SIZE
@@ -52,7 +52,6 @@ AXES = (
 TASK_MESH = ({size},)
 
 ARGS = {{
-  "matcher_template" : "layer_{{}}.*",
   "num_layers" : {num_layers},
   "num_interleaves" : {num_interleaves},
   "device_axes" : ('ax',),
@@ -62,7 +61,7 @@ ARGS = {{
 
 legate_global_mesh:
   mesh_args = [
-    (@mesh.InterleavedLayerMesh, %ARGS),
+    (@mesh.InterleavedLayerMesh, "layer_{{}}.*", (%ARGS,)),
   ]
 """  # noqa: E501
 INTERLEAVED_MESH_STRING = _INTERLEAVED_MESH_STRING.format(
@@ -82,7 +81,6 @@ AXES = (
 TASK_MESH = ({size},)
 
 ARGS = {{
-  "matcher" : "layer.*",
   "device_axes" : ('ax',),
   "logical_axes" : %AXES,
   "device_shape" : %TASK_MESH,
@@ -90,7 +88,7 @@ ARGS = {{
 
 legate_global_mesh:
   mesh_args = [
-    (@mesh.TaskMesh, %ARGS),
+    (@mesh.TaskMesh, "layer.*", (%ARGS,)),
   ]
 """.format(
     size=TASK_MESH_SIZE
@@ -168,6 +166,224 @@ class MeshTest(unittest.TestCase):
             offset = (lyr % NUM_LAYERS) * TASK_MESH_SIZE
             devices = [offset + i for i in range(TASK_MESH_SIZE)]
             self.assertSequenceEqual(devices, list(mesh.devices))
+
+    def test_permuted_axes_full_replication(self):
+        logical_axes = [
+            ("data", "x"),
+            ("model", "y"),
+        ]
+        model = 4
+        data = 2
+        devices = np.arange(data * model).reshape(data, model)
+        mesh = TaskMesh(
+            matcher="n/a",
+            device_axes=("x", "y"),
+            logical_axes=logical_axes,
+            device_shape=(data, model),
+            devices=devices,
+        )
+        instr = hlo_pb2.HloInstructionProto()
+        instr.shape.dimensions.extend([64, 128, 256])
+        axes = ("data", "model", "data")
+        instr.metadata.op_name += f"/legate_axes={axes}/"
+
+        mesh.shard(instr)
+
+        self.assertEqual(
+            np.prod(instr.sharding.tile_assignment_dimensions), model * data
+        )
+        self.assertEqual(instr.sharding.tile_assignment_dimensions[-1], data)
+        self.assertFalse(instr.sharding.replicate_on_last_tile_dim)
+
+        # 1st and 2nd axes should get permuted here
+        correct = [0, 4, 1, 5, 2, 6, 3, 7]
+        np.testing.assert_equal(
+            instr.sharding.tile_assignment_devices, correct
+        )
+
+    def test_partial_replication(self):
+        logical_axes = [
+            ("data", "x"),
+            ("model", "y"),
+        ]
+        model = 4
+        data = 2
+        devices = np.arange(data * model).reshape(data, model)
+        mesh = TaskMesh(
+            matcher="n/a",
+            device_axes=("x", "y"),
+            logical_axes=logical_axes,
+            device_shape=(data, model),
+            devices=devices,
+        )
+        instr = hlo_pb2.HloInstructionProto()
+        instr.shape.dimensions.extend([64, 128, 256])
+        axes = (None, None, "model")
+        instr.metadata.op_name = f"/legate_axes={axes}/"
+
+        mesh.shard(instr)
+
+        self.assertEqual(
+            np.prod(instr.sharding.tile_assignment_dimensions), model * data
+        )
+        self.assertEqual(instr.sharding.tile_assignment_dimensions[-1], data)
+        self.assertTrue(instr.sharding.replicate_on_last_tile_dim)
+        self.assertEqual(
+            len(instr.sharding.tile_assignment_dimensions), len(axes) + 1
+        )
+
+        # 1st and 2nd axes should get permuted here
+        correct = [0, 4, 1, 5, 2, 6, 3, 7]
+        # [ 0 4 ]
+        # [ 1 5 ]
+        # [ 2 6 ]
+        # [ 3 7 ]
+        # Tile [0,0,0,0]=0 -> [0,0,0]=0
+        # Tile [0,0,0,1]=1 -> [0,0,0]=0
+        # Tile [0,0,1,0]=2 -> [0,0,1]=1
+        # Tile [0,0,1,1]=3 -> [0,0,1]=1
+        # Devices 0, 2, 4, 6 should have one set of replicas
+        # Devices 1, 3, 5, 7 should the other set of replicas
+        np.testing.assert_equal(
+            instr.sharding.tile_assignment_devices, correct
+        )
+
+        axes = (None, "data", None)
+        instr.metadata.op_name = f"/legate_axes={axes}/"
+
+        mesh.shard(instr)
+
+        self.assertEqual(
+            np.prod(instr.sharding.tile_assignment_dimensions), model * data
+        )
+        self.assertEqual(instr.sharding.tile_assignment_dimensions[-1], model)
+        self.assertTrue(instr.sharding.replicate_on_last_tile_dim)
+        self.assertEqual(
+            len(instr.sharding.tile_assignment_dimensions), len(axes) + 1
+        )
+
+        # the model (y-axis) is the replicating axis
+        # Tile [0,0,0,0]=0 -> [0,0,0]=0
+        # Tile [0,0,0,1]=1 -> [0,0,0]=0
+        # Tile [0,0,0,2]=2 -> [0,0,0]=0
+        # Tile [0,0,0,3]=3 -> [0,0,0]=0
+        # Tile [0,1,0,0]=4 -> [0,0,0]=1
+        # Tile [0,1,0,1]=5 -> [0,0,0]=1
+        # Tile [0,1,0,2]=6 -> [0,0,0]=1
+        # Tile [0,1,0,3]=7 -> [0,0,0]=1
+        # Devices 0, 4 should have one set of replicas
+        # Devices 1, 5 should have one set of replicas, etc
+        correct = [0, 1, 2, 3, 4, 5, 6, 7]
+        # [ 0 1 ]
+        # [ 2 3 ]
+        # [ 4 5 ]
+        # [ 6 7 ]
+        np.testing.assert_equal(
+            instr.sharding.tile_assignment_devices, correct
+        )
+
+    def test_multidevice_axes(self):
+        logical_axes = [("data", "x"), ("data", "z"), ("model", "y")]
+        x = 2
+        y = 1
+        z = 3
+        devices = np.arange(x * y * z).reshape(x, y, z)
+        mesh = TaskMesh(
+            matcher="n/a",
+            device_axes=("x", "y", "z"),
+            logical_axes=logical_axes,
+            device_shape=(x, y, z),
+            devices=devices,
+        )
+        instr = hlo_pb2.HloInstructionProto()
+        instr.shape.dimensions.extend([64, 128, 256])
+        axes = (None, "data", "model")
+        instr.metadata.op_name = f"/legate_axes={axes}/"
+
+        mesh.shard(instr)
+        np.testing.assert_equal(
+            instr.sharding.tile_assignment_dimensions, [1, 6, 1]
+        )
+        np.testing.assert_equal(
+            instr.sharding.tile_assignment_devices, [0, 1, 2, 3, 4, 5]
+        )
+
+    def test_sharding_order_multi_match(self):
+        logical_axes = [("mlp", "y"), ("embed", "y")]
+        x = 2
+        y = 3
+        devices = np.arange(x * y).reshape(x, y)
+        mesh = TaskMesh(
+            matcher="n/a",
+            device_axes=("x", "y"),
+            logical_axes=logical_axes,
+            device_shape=(x, y),
+            devices=devices,
+        )
+
+        instr = hlo_pb2.HloInstructionProto()
+        instr.shape.dimensions.extend([64, 128, 256])
+        axes = (None, "mlp", "embed")
+        instr.metadata.op_name = f"/legate_axes={axes}/"
+
+        mesh.shard(instr)
+        np.testing.assert_equal(
+            instr.sharding.tile_assignment_dimensions, [1, 3, 1, 2]
+        )
+
+        logical_axes = [
+            ("embed", "y"),
+            ("mlp", "y"),
+        ]
+        x = 2
+        y = 3
+        devices = np.arange(x * y).reshape(x, y)
+        mesh = TaskMesh(
+            matcher="n/a",
+            device_axes=("x", "y"),
+            logical_axes=logical_axes,
+            device_shape=(x, y),
+            devices=devices,
+        )
+        instr = hlo_pb2.HloInstructionProto()
+        instr.shape.dimensions.extend([64, 128, 256])
+        axes = (None, "mlp", "embed")
+        instr.metadata.op_name = f"/legate_axes={axes}/"
+
+        mesh.shard(instr)
+        np.testing.assert_equal(
+            instr.sharding.tile_assignment_dimensions, [1, 1, 3, 2]
+        )
+
+    def test_replica_groups(self):
+        logical_axes = [("batch", "x"), ("embed", "y")]
+        x = 2
+        y = 3
+        devices = np.arange(x * y).reshape(x, y)
+        mesh = TaskMesh(
+            matcher="n/a",
+            device_axes=("x", "y"),
+            logical_axes=logical_axes,
+            device_shape=(x, y),
+            devices=devices,
+        )
+        replica_groups = mesh.get_replica_groups("batch")
+        self.assertEqual(len(replica_groups), y)
+
+        logical_axes = [("batch", "x"), ("embed", "y"), ("mlp", "z")]
+        x = 2
+        y = 3
+        z = 4
+        devices = np.arange(x * y * z).reshape(x, y, z)
+        mesh = TaskMesh(
+            matcher="n/a",
+            device_axes=("x", "y", "z"),
+            logical_axes=logical_axes,
+            device_shape=(x, y, z),
+            devices=devices,
+        )
+        replica_groups = mesh.get_replica_groups("embed")
+        self.assertEqual(len(replica_groups), x * z)
 
 
 if __name__ == "__main__":

@@ -52,15 +52,16 @@ def run_hlo(
     gin_params: list[str] = [],
     print_layers: bool = False,
     alias_inputs_and_outputs: bool = False,
-    dry_run: bool = False,
+    load_dry_run: bool = False,
+    exec_dry_run: bool = False,
 ) -> None:
-    dry_run = False
+    # dry_run = False
     if gin_paths:
         gin.parse_config_files_and_bindings(gin_paths, gin_params)
 
     device_mesh = legate_global_mesh()
     print("mesh=", device_mesh)
-    model = lllm.load_module(path)
+    model = lllm.load_module(path, annotate=exec_async)
 
     all_tensors = model.create_tensors(match_inputs=alias_inputs_and_outputs)
 
@@ -93,7 +94,11 @@ def run_hlo(
     if coordinator_addr is not None:
         lllm.runtime.init_distributed(coordinator_addr)
 
-    model.load(global_mesh=device_mesh, debug=(load_only or dry_run))
+    model.load(
+        global_mesh=device_mesh,
+        debug=(load_only or load_dry_run or exec_dry_run),
+        dry_run=load_dry_run,
+    )
 
     ts_finish_load = timing.time()
     print(f"module load ran for {(ts_finish_load - ts_load) * 1e-6}s")
@@ -106,18 +111,18 @@ def run_hlo(
         all_tensors,
         global_mesh=device_mesh,
         init_tensors=True,
-        dry_run=dry_run,
+        dry_run=exec_dry_run,
     )
 
     for _ in range(nwarmup):
-        model(all_tensors, global_mesh=device_mesh, dry_run=dry_run)
+        model(all_tensors, global_mesh=device_mesh, dry_run=exec_dry_run)
 
     print(f"Global tensor size is {all_tensors.size/1e9} GB")
 
     ts_start = timing.time()
 
     for _ in range(niter):
-        model(all_tensors, global_mesh=device_mesh, dry_run=dry_run)
+        model(all_tensors, global_mesh=device_mesh, dry_run=exec_dry_run)
 
     ts_end = timing.time()
 
@@ -192,11 +197,18 @@ if __name__ == "__main__":
         help="Whether to dump dot output for the HLO module",
     )
     parser.add_argument(
-        "--dry-run",
+        "--load-dry-run",
         action="store_true",
-        dest="dry_run",
+        dest="load_dry_run",
         default=False,
-        help="Whether to do a dry run that doesnt execute",
+        help="Do a dry run that doesnt actually compile all modules",
+    )
+    parser.add_argument(
+        "--exec-dry-run",
+        action="store_true",
+        dest="exec_dry_run",
+        default=False,
+        help="Do a dry run that doesnt actually execute all modules",
     )
     parser.add_argument(
         "--async",
@@ -257,6 +269,13 @@ if __name__ == "__main__":
         dest="alias_inputs",
         help="Alias inputs to the best matching output",
     )
+    parser.add_argument(
+        "--enable-triton",
+        action="store_true",
+        default=False,
+        dest="enable_triton",
+        help="Whether to enable triton gemms",
+    )
     args, _ = parser.parse_known_args()
 
     xla_flags = []
@@ -271,6 +290,9 @@ if __name__ == "__main__":
 
     if args.dump_hlo_dot:
         xla_flags.append("--xla_dump_hlo_as_dot")
+
+    triton_flag = "true" if args.enable_triton else "false"
+    xla_flags.append(f"--xla_gpu_enable_triton_gemm={triton_flag}")
 
     if xla_flags:
         os.environ["XLA_FLAGS"] = " ".join(xla_flags)
@@ -317,5 +339,6 @@ if __name__ == "__main__":
         args.gin_params,
         args.print_layers,
         args.alias_inputs,
-        args.dry_run,
+        args.load_dry_run,
+        args.exec_dry_run,
     )
