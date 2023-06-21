@@ -267,8 +267,6 @@ StoreHandle CreateStore(const legate_xla::Shape &shape) {
 void InitLegate() {
   legate_parse_config();
   legate_core_perform_registration();
-  legate::Runtime::get_runtime()->post_startup_initialization(
-      Legion::Runtime::get_context());
   legate_xla_perform_registration();
 }
 
