@@ -120,7 +120,6 @@ void CreateExecuteTask(LegateExecutable *executable,
   auto core_runtime = legate::Runtime::get_runtime();
 
   auto task = runtime->create_task(XlaOpCode::XLA_EXECUTE_TASK);
-  auto part = task->declare_partition();
 
   task->add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(executable)));
   task->add_scalar_arg(legate::Scalar(GetRunId()));
@@ -129,11 +128,13 @@ void CreateExecuteTask(LegateExecutable *executable,
       legate::Scalar(reinterpret_cast<uint64_t>(std::move(on_done))));
 
   for (auto input : inputs) {
-    task->add_input(input.impl->store, part);
+    task->add_input(input.impl->store,
+                    task->find_or_declare_partition(input.impl->store));
   }
 
   for (auto output : outputs) {
-    task->add_output(output.impl->store, part);
+    task->add_output(output.impl->store,
+                     task->find_or_declare_partition(output.impl->store));
     task->add_scalar_arg(legate::Scalar(false));
   }
 
@@ -185,7 +186,7 @@ void Synchronize(StoreHandle store) {
   log_xla.debug() << "Synchronize store " << store.impl << " start";
   auto runtime = legate_xla::Runtime::get_runtime();
   auto logical_store = store.impl->store;
-  auto out_mapped = logical_store.get_physical_store(runtime->get_context());
+  auto out_mapped = logical_store.get_physical_store();
   auto buffer_alloc = legate::double_dispatch(
       out_mapped->dim(), out_mapped->code(), get_read_only_ptr{}, *out_mapped);
   log_xla.debug() << "Synchronize store " << store.impl << " done";
@@ -196,7 +197,7 @@ void CopyStoreToHostSync(StoreHandle input,
   log_xla.debug() << "CopyStoreToHostSync " << input.impl << " start";
   auto runtime = legate_xla::Runtime::get_runtime();
   auto logical_store = input.impl->store;
-  auto out_mapped = logical_store.get_physical_store(runtime->get_context());
+  auto out_mapped = logical_store.get_physical_store();
   auto buffer_alloc = legate::double_dispatch(
       out_mapped->dim(), out_mapped->code(), get_read_only_ptr{}, *out_mapped);
   copy_func(buffer_alloc);
@@ -265,8 +266,7 @@ StoreHandle CreateStore(const legate_xla::Shape &shape) {
 }
 
 void InitLegate() {
-  legate_parse_config();
-  legate_core_perform_registration();
+  legate::start(0, nullptr);
   legate_xla_perform_registration();
 }
 
