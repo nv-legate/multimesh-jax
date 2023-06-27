@@ -39,7 +39,7 @@ public:
   load_and_compile(legate::TaskContext &context, LegateCompiler *compiler,
                    uint64_t run_id, const std::string &platform_name,
                    std::optional<uint32_t> num_partitions = std::nullopt,
-                   bool has_sync_store = true, bool print_stats = false);
+                   bool print_stats = false);
 
   static void load_and_compile(legate::TaskContext &context,
                                const std::string &platform_name);

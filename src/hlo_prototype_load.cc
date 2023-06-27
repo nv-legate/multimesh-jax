@@ -46,9 +46,9 @@ HLOPrototypeLoaderTask::load_and_compile(TaskContext &context,
 
   compile_executable(hlo_id, [&] {
     log_xla.info() << "Starting to compile " << hlo_name;
-    HLOLoaderTask::load_and_compile(
-        context, compiler.get(), run_id, platform_name, loader_npartitions,
-        /*has_sync_store=*/false, /*print_stats=*/true);
+    HLOLoaderTask::load_and_compile(context, compiler.get(), run_id,
+                                    platform_name, loader_npartitions,
+                                    /*print_stats=*/true);
     log_xla.info() << "Done compiling " << hlo_name;
     return compiler->MakeExecutable();
   });

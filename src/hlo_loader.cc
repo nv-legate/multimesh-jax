@@ -23,25 +23,10 @@ using namespace legate;
 
 namespace legate_xla {
 
-namespace {
-
-struct get_write_only_ptr {
-  template <legate::Type::Code TYPE_CODE, int32_t DIM>
-  void *operator()(legate::Store &store) {
-    using VAL = legate::legate_type_of<TYPE_CODE>;
-    auto shape = store.shape<DIM>();
-    auto acc = store.write_accessor<VAL, DIM>();
-    void *buffer = static_cast<void *>(acc.ptr(shape));
-    return buffer;
-  }
-};
-
-} // namespace
-
 /*static*/ void HLOLoaderTask::load_and_compile(
     TaskContext &context, LegateCompiler *compiler, uint64_t run_id,
     const std::string &platform_name, std::optional<uint32_t> num_partitions,
-    bool has_sync_store, bool print_stats) {
+    bool print_stats) {
   auto cfg = get_task_config(context);
   uint32_t partitions =
       num_partitions.has_value() ? *num_partitions : cfg.num_tasks;
@@ -49,32 +34,34 @@ struct get_write_only_ptr {
   // only print stats (if requested) on the lowest node
   print_stats = print_stats && (cfg.my_node == cfg.min_node);
 
-  compiler->Compile(
-      run_id,
-      {.replica_count =
-           1, // TODO: we do not handle psum calls or replica all-reduces
-       .num_partitions = (int)partitions,
-       .run_hlo_passes = true,
-       .stream_executor_index = cfg.local_proc_id,
-       .allocator = &allocator,
-       .print_stats = print_stats});
-
-  // FIXME: could this run on multiple gpus?
-  if (has_sync_store) {
-    auto &sync_store = context.outputs()[0];
-    auto output_ptr = legate::double_dispatch(
-        sync_store.dim(), sync_store.code(), get_write_only_ptr{}, sync_store);
+  try {
+    compiler->Compile(
+        run_id,
+        {.replica_count =
+             1, // TODO: we do not handle psum calls or replica all-reduces
+         .num_partitions = (int)partitions,
+         .run_hlo_passes = true,
+         .stream_executor_index = cfg.local_proc_id,
+         .allocator = &allocator,
+         .print_stats = print_stats});
+  } catch (const std::exception &e) {
+    log_xla.error() << "Standard exception caught during 'Compile', message '"
+                    << e.what() << "'";
+  } catch (...) {
+    log_xla.error() << "Exception caught during 'Compile'";
   }
 }
 
 /*static*/ void
 HLOLoaderTask::load_and_compile(TaskContext &context,
                                 const std::string &platform_name) {
+  log_xla.debug() << "HLOLoaderTask start";
   auto &scalars = context.scalars();
   LegateCompiler *compiler =
       reinterpret_cast<LegateCompiler *>(scalars[0].value<void *>());
   uint64_t run_id = scalars[1].value<uint64_t>();
   load_and_compile(context, compiler, run_id, platform_name);
+  log_xla.debug() << "HLOLoaderTask done";
 }
 
 /*static*/ void HLOLoaderTask::cpu_variant(TaskContext &context) {

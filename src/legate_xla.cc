@@ -1,5 +1,6 @@
 #include "legate_mapper.h"
 #include "legate_xla_common.h"
+#include "legate_xla_utils.h"
 #include "xla_task.h"
 #include "xla_to_legate.h"
 
@@ -15,6 +16,28 @@ int64_t GetRunId() {
   static std::atomic<int64_t> counter{0};
   return counter.fetch_add(1);
 }
+
+int64_t GetStoreId() {
+  static std::atomic<int64_t> counter{0};
+  return counter.fetch_add(1);
+}
+
+struct get_read_only_ptr {
+  template <legate::Type::Code TYPE_CODE, int32_t DIM>
+  const void *operator()(legate::Store &store) {
+    using VAL = legate::legate_type_of<TYPE_CODE>;
+    auto shape = store.shape<DIM>();
+    auto acc = store.read_accessor<VAL, DIM>();
+    const void *buffer = static_cast<const void *>(acc.ptr(shape));
+    return buffer;
+  }
+};
+
+} // namespace
+
+struct StoreHandleImpl {
+  legate::LogicalStore store;
+};
 
 legate::Type::Code SupportedTypeToLegateType(SupportedType type) {
   legate::Type::Code code;
@@ -72,73 +95,101 @@ legate::Type::Code SupportedTypeToLegateType(SupportedType type) {
   return code;
 }
 
-struct get_read_only_ptr {
-  template <legate::Type::Code TYPE_CODE, int32_t DIM>
-  const void *operator()(legate::Store &store) {
-    using VAL = legate::legate_type_of<TYPE_CODE>;
-    auto shape = store.shape<DIM>();
-    auto acc = store.read_accessor<VAL, DIM>();
-    const void *buffer = static_cast<const void *>(acc.ptr(shape));
-    return buffer;
+size_t SupportedTypeSizeOf(SupportedType type) {
+  size_t bytesize = 0;
+  switch (type) {
+  case SupportedType::PRED:
+  case SupportedType::S8:
+  case SupportedType::U8:
+    bytesize = 1;
+    break;
+  case SupportedType::F16:
+  case SupportedType::BF16:
+  case SupportedType::S16:
+  case SupportedType::U16:
+    bytesize = 2;
+    break;
+  case SupportedType::F32:
+  case SupportedType::S32:
+  case SupportedType::U32:
+    bytesize = 4;
+    break;
+  case SupportedType::F64:
+  case SupportedType::S64:
+  case SupportedType::U64:
+  case SupportedType::C64:
+    bytesize = 8;
+    break;
+  case SupportedType::C128:
+    bytesize = 16;
+    break;
+  default:
+    std::cerr << "Unsupported SupportedType type "
+              << static_cast<std::underlying_type<SupportedType>::type>(type)
+              << std::endl;
+    break;
   }
-};
+  return bytesize;
+}
 
-} // namespace
-
-struct StoreHandleImpl {
-  legate::LogicalStore store;
-};
+size_t ShapeNumElements(Shape shape) {
+  if (shape.dims.empty()) {
+    // this is a scalar
+    return 1ul;
+  } else {
+    return std::accumulate(begin(shape.dims), end(shape.dims), 1,
+                           std::multiplies<size_t>());
+  }
+}
 
 void CreateCompileTask(LegateCompiler *compiler) {
+  LOCK;
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
 
   auto task = runtime->create_task(XlaOpCode::XLA_COMPILE_TASK);
-  auto part = task->declare_partition();
 
   task->add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(compiler)));
   task->add_scalar_arg(legate::Scalar(GetRunId()));
   // number of partitions
   task->add_scalar_arg(legate::Scalar(int64_t(1)));
 
-  auto sync_store_handle = compiler->SyncStoreHandle();
-
-  task->add_output(sync_store_handle.impl->store, part);
-
   runtime->submit(std::move(task));
-
-  if (legate_xla::Runtime::synchronous_mode()) {
-    Synchronize(sync_store_handle);
-  }
+  log_xla.debug() << "CreateCompileTask scheduled";
 }
 
 void CreateExecuteTask(LegateExecutable *executable,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
                        std::vector<std::function<void()>> *on_done) {
-  auto runtime = legate_xla::Runtime::get_runtime();
-  auto core_runtime = legate::Runtime::get_runtime();
+  {
+    LOCK;
+    auto runtime = legate_xla::Runtime::get_runtime();
+    auto core_runtime = legate::Runtime::get_runtime();
 
-  auto task = runtime->create_task(XlaOpCode::XLA_EXECUTE_TASK);
+    auto task = runtime->create_task(XlaOpCode::XLA_EXECUTE_TASK);
 
-  task->add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(executable)));
-  task->add_scalar_arg(legate::Scalar(GetRunId()));
+    task->add_scalar_arg(
+        legate::Scalar(reinterpret_cast<uint64_t>(executable)));
+    task->add_scalar_arg(legate::Scalar(GetRunId()));
 
-  task->add_scalar_arg(
-      legate::Scalar(reinterpret_cast<uint64_t>(std::move(on_done))));
+    task->add_scalar_arg(
+        legate::Scalar(reinterpret_cast<uint64_t>(std::move(on_done))));
 
-  for (auto input : inputs) {
-    task->add_input(input.impl->store,
-                    task->find_or_declare_partition(input.impl->store));
+    for (auto input : inputs) {
+      task->add_input(input.impl->store,
+                      task->find_or_declare_partition(input.impl->store));
+    }
+
+    for (auto output : outputs) {
+      task->add_output(output.impl->store,
+                       task->find_or_declare_partition(output.impl->store));
+      task->add_scalar_arg(legate::Scalar(false));
+    }
+
+    runtime->submit(std::move(task));
+    log_xla.debug() << "CreateExecuteTask scheduled";
   }
-
-  for (auto output : outputs) {
-    task->add_output(output.impl->store,
-                     task->find_or_declare_partition(output.impl->store));
-    task->add_scalar_arg(legate::Scalar(false));
-  }
-
-  runtime->submit(std::move(task));
 
   if (legate_xla::Runtime::synchronous_mode()) {
     for (auto output : outputs) {
@@ -150,25 +201,28 @@ void CreateExecuteTask(LegateExecutable *executable,
 void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
                                    StoreHandle output,
                                    std::function<void()> on_done) {
-  auto runtime = legate_xla::Runtime::get_runtime();
-  auto core_runtime = legate::Runtime::get_runtime();
+  {
+    LOCK;
+    auto runtime = legate_xla::Runtime::get_runtime();
+    auto core_runtime = legate::Runtime::get_runtime();
 
-  auto task = runtime->create_task(XlaOpCode::XLA_INIT_FROM_HOST_TASK);
-  auto part = task->declare_partition();
-  task->add_output(output.impl->store, part);
-  task->add_scalar_arg(legate::Scalar(static_cast<uint64_t>(num_bytes)));
-  task->add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(data)));
+    auto task = runtime->create_task(XlaOpCode::XLA_INIT_FROM_HOST_TASK);
+    auto part = task->declare_partition();
+    task->add_output(output.impl->store, part);
+    task->add_scalar_arg(legate::Scalar(static_cast<uint64_t>(num_bytes)));
+    task->add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(data)));
 
-  if (on_done) {
-    task->add_scalar_arg(legate::Scalar(true));
-    auto on_done_copy = std::make_unique<std::function<void()>>(on_done);
-    task->add_scalar_arg(
-        legate::Scalar(reinterpret_cast<uint64_t>(on_done_copy.release())));
-  } else {
-    task->add_scalar_arg(legate::Scalar(false));
+    if (on_done) {
+      task->add_scalar_arg(legate::Scalar(true));
+      auto on_done_copy = std::make_unique<std::function<void()>>(on_done);
+      task->add_scalar_arg(
+          legate::Scalar(reinterpret_cast<uint64_t>(on_done_copy.release())));
+    } else {
+      task->add_scalar_arg(legate::Scalar(false));
+    }
+
+    runtime->submit(std::move(task));
   }
-
-  runtime->submit(std::move(task));
   log_xla.debug() << "CreateStoreFromHostBufferTask store " << output.impl
                   << " scheduled";
 
@@ -178,11 +232,14 @@ void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
 }
 
 void Destroy(StoreHandle store) {
+  LOCK;
   log_xla.debug() << "Destroy Store " << store.impl;
+  // no need to synchronize -- just removing the reference
   delete store.impl;
 }
 
 void Synchronize(StoreHandle store) {
+  LOCK;
   log_xla.debug() << "Synchronize store " << store.impl << " start";
   auto runtime = legate_xla::Runtime::get_runtime();
   auto logical_store = store.impl->store;
@@ -194,6 +251,7 @@ void Synchronize(StoreHandle store) {
 
 void CopyStoreToHostSync(StoreHandle input,
                          std::function<void(const void *)> copy_func) {
+  LOCK;
   log_xla.debug() << "CopyStoreToHostSync " << input.impl << " start";
   auto runtime = legate_xla::Runtime::get_runtime();
   auto logical_store = input.impl->store;
@@ -206,7 +264,6 @@ void CopyStoreToHostSync(StoreHandle input,
 
 StoreHandle CreateStore(const legate_xla::Shape &shape) {
   legate::Type::Code code = SupportedTypeToLegateType(shape.type);
-
   // legate modification of dimensions:
   // 1. handle scalars (dims.size() == 0) as arrays of size 1
   // 2. squash all dimensions >= 4
@@ -230,39 +287,39 @@ StoreHandle CreateStore(const legate_xla::Shape &shape) {
 
   auto core_runtime = legate::Runtime::get_runtime();
 
-  auto total_elements =
-      std::accumulate(begin(dims), end(dims), 1, std::multiplies<size_t>());
-  if (total_elements > 0) {
-    StoreHandle result = {
-        .impl = new StoreHandleImpl{
-            .store = core_runtime->create_store(
-                dims, legate::primitive_type(code), is_scalar)}};
-    log_xla.debug() << "CreateStore " << result.impl << " done with " << shape;
-    return result;
+  StoreHandle result;
+  if (ShapeNumElements(shape) > 0) {
+    LOCK;
+    result = {.impl =
+                  new StoreHandleImpl{
+                      .store = core_runtime->create_store(
+                          dims, legate::primitive_type(code), is_scalar)},
+              .id = GetStoreId()};
   } else {
-    log_xla.debug()
-        << "Create single element store to prevent empty allocation";
-    StoreHandle result = {
-        .impl = new StoreHandleImpl{.store = core_runtime->create_store(
-                                        {1}, legate::primitive_type(code))}};
-
-    // FIXME: initialize it with 0 (on host)
-    // otherwise runtime might complain when read-accessing later
     {
+      LOCK;
+      log_xla.debug()
+          << "Create single element store to prevent empty allocation";
+      result = {.impl =
+                    new StoreHandleImpl{.store = core_runtime->create_store(
+                                            {1}, legate::primitive_type(code))},
+                .id = GetStoreId()};
+
+      // FIXME: initialize it with 0 (on host)
+      // otherwise runtime might complain when read-accessing later
       auto runtime = legate_xla::Runtime::get_runtime();
       auto task = runtime->create_task(XlaOpCode::XLA_INIT_ZERO_TASK);
       auto part = task->declare_partition();
       task->add_output(result.impl->store, part);
       runtime->submit(std::move(task));
-
-      if (legate_xla::Runtime::synchronous_mode()) {
-        Synchronize(result);
-      }
     }
 
-    log_xla.debug() << "CreateStore " << result.impl << " done with " << shape;
-    return result;
+    if (legate_xla::Runtime::synchronous_mode()) {
+      Synchronize(result);
+    }
   }
+  log_xla.debug() << "CreateStore " << result.impl << " done with " << shape;
+  return result;
 }
 
 void InitLegate() {

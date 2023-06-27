@@ -19,6 +19,7 @@ limitations under the License.
 #include "legate_xla_c.h"
 #include "legate_xla_common.h"
 #include "xla_task.h"
+#include <mutex>
 
 namespace legate_xla {
 
@@ -44,16 +45,21 @@ public:
   static void initialize(legate::Runtime *core_runtime,
                          legate::LibraryContext *context);
   static bool synchronous_mode();
+  static std::mutex &get_mutex();
 
 private:
   static Runtime *runtime_;
   static bool synchronous_mode_;
+  static std::mutex mutex_;
 
 private:
   legate::Runtime *core_runtime_;
   legate::LibraryContext *context_;
   std::vector<legate::LogicalStore> temporary_stores;
 };
+
+#define LOCK                                                                   \
+  const std::lock_guard<std::mutex> lock(legate_xla::Runtime::get_mutex())
 
 // Registration callback for Legate JAX
 /*static*/ void
