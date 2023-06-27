@@ -62,7 +62,15 @@ Legion::Logger log_xla("legate.xla");
   cudaMemcpy(output_ptr.buffer, input_ptr, bytes, cudaMemcpyHostToDevice);
 
   if (has_on_done_function) {
-    (*on_done_function)();
+    try {
+      (*on_done_function)();
+    } catch (const std::exception &e) {
+      log_xla.error() << "Standard exception caught during on_done callback "
+                         "excecution, message '"
+                      << e.what() << "'";
+    } catch (...) {
+      log_xla.error() << "Exception caught during on_done callback excecution";
+    }
     delete on_done_function;
   }
 }
@@ -73,7 +81,7 @@ Legion::Logger log_xla("legate.xla");
       legate::double_dispatch(output_store.dim(), output_store.code(),
                               get_write_only_buffer_fn{}, output_store);
 
-  log_xla.debug() << "XLAInitZeroTask: initializeing  " << output_alloc.size
+  log_xla.debug() << "XLAInitZeroTask: initializing  " << output_alloc.size
                   << " bytes to store of dimension " << output_store.dim();
 
   cudaMemset(output_alloc.buffer, 0, output_alloc.size);
