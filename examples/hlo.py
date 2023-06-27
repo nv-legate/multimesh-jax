@@ -218,6 +218,13 @@ if __name__ == "__main__":
         help="Turn on asynchronous execution using Legate",
     )
     parser.add_argument(
+        "--async-collective",
+        action="store_true",
+        default=False,
+        dest="async_collective",
+        help="Turn on all XLA asynchronous collectives",
+    )
+    parser.add_argument(
         "--distributed",
         action="store_true",
         default=False,
@@ -290,6 +297,14 @@ if __name__ == "__main__":
 
     if args.dump_hlo_dot:
         xla_flags.append("--xla_dump_hlo_as_dot")
+
+    if args.async_collective:
+        xla_flags.append("--xla_gpu_enable_async_all_reduce")
+        xla_flags.append("--xla_gpu_enable_async_all_gather")
+        xla_flags.append("--xla_gpu_enable_async_reduce_scatter")
+        xla_flags.append("--xla_gpu_enable_async_all_to_all")
+        xla_flags.append("--xla_gpu_enable_async_collective_permute")
+        xla_flags.append("--xla_gpu_enable_latency_hiding_scheduler")
 
     triton_flag = "true" if args.enable_triton else "false"
     xla_flags.append(f"--xla_gpu_enable_triton_gemm={triton_flag}")
