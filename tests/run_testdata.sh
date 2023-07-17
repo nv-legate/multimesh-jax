@@ -1,5 +1,10 @@
 #! /usr/bin/env bash
 
+
+export TF_CPP_MIN_LOG_LEVEL=0
+export TF_CPP_MAX_LOG_LEVEL=5
+export TF_CPP_VMODULE=gpu_compiler=2
+
 for example in \
  "attention 2 async" \
  "attention-ckpt 2 async" \

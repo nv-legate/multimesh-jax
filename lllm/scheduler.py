@@ -200,6 +200,10 @@ class Scheduler:
         forward_cost: Number,
         backward_cost: Number,
         max_breadth: int,
+        first_layer_forward_cost: Optional[Number] = None,
+        first_layer_backward_cost: Optional[Number] = None,
+        last_layer_forward_cost: Optional[Number] = None,
+        last_layer_backward_cost: Optional[Number] = None,
     ):
         self.num_microbatches = num_microbatches
         self.num_layers = num_layers
@@ -210,6 +214,31 @@ class Scheduler:
         self.queue = EventQueue()
         self.graph = PipelineGraph()
         self.num_interleave = num_layers // num_gpus
+        self.first_layer_forward_cost = (
+            first_layer_forward_cost or forward_cost
+        )
+        self.first_layer_backward_cost = (
+            first_layer_backward_cost or backward_cost
+        )
+        self.last_layer_forward_cost = last_layer_forward_cost or forward_cost
+        self.last_layer_backward_cost = (
+            last_layer_backward_cost or backward_cost
+        )
+
+        def cost_function(layer: int, fwd: bool):
+            if layer == 0:
+                return (
+                    self.first_layer_forward_cost
+                    if fwd
+                    else self.first_layer_backward_cost
+                )
+            if layer == (self.num_layers - 1):
+                return (
+                    self.last_layer_forward_cost
+                    if fwd
+                    else self.last_layer_backward_cost
+                )
+            return self.forward_cost if fwd else self.backward_cost
 
         self.gpus = [
             Gpu(
@@ -226,7 +255,7 @@ class Scheduler:
             for layer in range(num_layers):
                 gpu = self.gpus[layer % num_gpus]
                 comp = Computation(
-                    cost=forward_cost,
+                    cost=cost_function(layer, fwd=True),
                     layer=layer,
                     microbatch=mb,
                     backward=False,
@@ -240,7 +269,7 @@ class Scheduler:
             for layer in reversed(range(num_layers)):
                 gpu = self.gpus[layer % num_gpus]
                 comp = Computation(
-                    cost=backward_cost,
+                    cost=cost_function(layer, fwd=False),
                     layer=layer,
                     microbatch=mb,
                     backward=True,
