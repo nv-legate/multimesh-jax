@@ -33,16 +33,20 @@ std::vector<LogicalStore> &Runtime::get_tmp_stores() {
   return temporary_stores;
 }
 
-std::unique_ptr<AutoTask> Runtime::create_task(XlaOpCode task_id) {
+AutoTask Runtime::create_task(XlaOpCode task_id) {
   return core_runtime_->create_task(context_, task_id);
 }
 
-std::unique_ptr<ManualTask>
-Runtime::create_task(XlaOpCode task_id, const legate::Shape &launch_shape) {
+ManualTask Runtime::create_task(XlaOpCode task_id,
+                                const legate::Shape &launch_shape) {
   return core_runtime_->create_task(context_, task_id, launch_shape);
 }
 
-void Runtime::submit(std::unique_ptr<legate::Task> task) {
+void Runtime::submit(legate::AutoTask task) {
+  core_runtime_->submit(std::move(task));
+}
+
+void Runtime::submit(legate::ManualTask task) {
   core_runtime_->submit(std::move(task));
 }
 

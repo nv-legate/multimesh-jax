@@ -21,17 +21,26 @@
 execute_process(
   COMMAND ${CMAKE_C_COMPILER}
     -E -DLEGATE_USE_PYTHON_CFFI
-    -I "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    -P "${CMAKE_CURRENT_SOURCE_DIR}/src/legate_xla_c.h"
+    -I "${CMAKE_CURRENT_SOURCE_DIR}/src/base"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/src/base/legate_xla_c.h"
   ECHO_ERROR_VARIABLE
   OUTPUT_VARIABLE header
   COMMAND_ERROR_IS_FATAL ANY
 )
 
 set(libpath "")
+
+if (LegateXLA_ENABLE_PYTHON)
+  set(pyroot lllm)
+  set(libname liblegate_hlo_runner)
+else()
+  set(pyroot jax_plugins/legate)
+  set(libname liblegate_plugin)
+endif()
+
 configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/lllm/install_info.py.in"
-  "${CMAKE_CURRENT_SOURCE_DIR}/lllm/install_info.py"
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/install_info.py.in"
+  "${CMAKE_CURRENT_SOURCE_DIR}/${pyroot}/install_info.py"
 @ONLY)
 
 add_library(xla_python INTERFACE)

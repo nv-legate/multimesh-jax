@@ -17,3 +17,6 @@ extern "C" bool InitDistributedRuntime(const std::string &coordinator_addr,
                                        int proc_id, int gpus_per_proc);
 
 extern "C" bool ShutdownDistributedRuntime();
+
+struct PJRT_Api;
+extern "C" const PJRT_Api *GetLegatePjrtApi();

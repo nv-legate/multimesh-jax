@@ -1,10 +1,11 @@
 #include "legate_mapper.h"
+#include "legate_to_xla.h"
 #include "legate_xla_common.h"
 #include "xla_task.h"
 #include "xla_to_legate.h"
 
-#ifndef LEGATE_XLA_PYTHON_PROTOTYPE
 #include <core/data/logical_store.h>
+#include <core/task/task.h>
 
 #include "legate_runtime.h"
 
@@ -94,47 +95,41 @@ void CreateCompileTask(LegateCompiler *compiler) {
   auto core_runtime = legate::Runtime::get_runtime();
 
   auto task = runtime->create_task(XlaOpCode::XLA_COMPILE_TASK);
-  auto part = task->declare_partition();
+  auto part = task.declare_partition();
 
-  task->add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(compiler)));
-  task->add_scalar_arg(legate::Scalar(GetRunId()));
+  task.add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(compiler)));
+  task.add_scalar_arg(legate::Scalar(GetRunId()));
   // number of partitions
-  task->add_scalar_arg(legate::Scalar(int64_t(1)));
-
-  auto sync_store_handle = compiler->SyncStoreHandle();
-
-  task->add_output(sync_store_handle.impl->store, part);
+  task.add_scalar_arg(legate::Scalar(int64_t(1)));
 
   runtime->submit(std::move(task));
-
-  if (legate_xla::Runtime::synchronous_mode()) {
-    Synchronize(sync_store_handle);
-  }
 }
 
 void CreateExecuteTask(LegateExecutable *executable,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
                        std::vector<std::function<void()>> *on_done) {
+
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
 
   auto task = runtime->create_task(XlaOpCode::XLA_EXECUTE_TASK);
-  auto part = task->declare_partition();
 
-  task->add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(executable)));
-  task->add_scalar_arg(legate::Scalar(GetRunId()));
+  task.add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(executable)));
+  task.add_scalar_arg(legate::Scalar(GetRunId()));
 
-  task->add_scalar_arg(
+  task.add_scalar_arg(
       legate::Scalar(reinterpret_cast<uint64_t>(std::move(on_done))));
 
   for (auto input : inputs) {
-    task->add_input(input.impl->store, part);
+    task.add_input(input.impl->store,
+                   task.find_or_declare_partition(input.impl->store));
   }
 
   for (auto output : outputs) {
-    task->add_output(output.impl->store, part);
-    task->add_scalar_arg(legate::Scalar(false));
+    task.add_output(output.impl->store,
+                    task.find_or_declare_partition(output.impl->store));
+    task.add_scalar_arg(legate::Scalar(false));
   }
 
   runtime->submit(std::move(task));
@@ -153,18 +148,18 @@ void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
   auto core_runtime = legate::Runtime::get_runtime();
 
   auto task = runtime->create_task(XlaOpCode::XLA_INIT_FROM_HOST_TASK);
-  auto part = task->declare_partition();
-  task->add_output(output.impl->store, part);
-  task->add_scalar_arg(legate::Scalar(static_cast<uint64_t>(num_bytes)));
-  task->add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(data)));
+  auto part = task.declare_partition();
+  task.add_output(output.impl->store, part);
+  task.add_scalar_arg(legate::Scalar(static_cast<uint64_t>(num_bytes)));
+  task.add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(data)));
 
   if (on_done) {
-    task->add_scalar_arg(legate::Scalar(true));
+    task.add_scalar_arg(legate::Scalar(true));
     auto on_done_copy = std::make_unique<std::function<void()>>(on_done);
-    task->add_scalar_arg(
+    task.add_scalar_arg(
         legate::Scalar(reinterpret_cast<uint64_t>(on_done_copy.release())));
   } else {
-    task->add_scalar_arg(legate::Scalar(false));
+    task.add_scalar_arg(legate::Scalar(false));
   }
 
   runtime->submit(std::move(task));
@@ -185,7 +180,7 @@ void Synchronize(StoreHandle store) {
   log_xla.debug() << "Synchronize store " << store.impl << " start";
   auto runtime = legate_xla::Runtime::get_runtime();
   auto logical_store = store.impl->store;
-  auto out_mapped = logical_store.get_physical_store(runtime->get_context());
+  auto out_mapped = logical_store.get_physical_store();
   auto buffer_alloc = legate::double_dispatch(
       out_mapped->dim(), out_mapped->code(), get_read_only_ptr{}, *out_mapped);
   log_xla.debug() << "Synchronize store " << store.impl << " done";
@@ -196,7 +191,7 @@ void CopyStoreToHostSync(StoreHandle input,
   log_xla.debug() << "CopyStoreToHostSync " << input.impl << " start";
   auto runtime = legate_xla::Runtime::get_runtime();
   auto logical_store = input.impl->store;
-  auto out_mapped = logical_store.get_physical_store(runtime->get_context());
+  auto out_mapped = logical_store.get_physical_store();
   auto buffer_alloc = legate::double_dispatch(
       out_mapped->dim(), out_mapped->code(), get_read_only_ptr{}, *out_mapped);
   copy_func(buffer_alloc);
@@ -250,8 +245,8 @@ StoreHandle CreateStore(const legate_xla::Shape &shape) {
     {
       auto runtime = legate_xla::Runtime::get_runtime();
       auto task = runtime->create_task(XlaOpCode::XLA_INIT_ZERO_TASK);
-      auto part = task->declare_partition();
-      task->add_output(result.impl->store, part);
+      auto part = task.declare_partition();
+      task.add_output(result.impl->store, part);
       runtime->submit(std::move(task));
 
       if (legate_xla::Runtime::synchronous_mode()) {
@@ -265,10 +260,7 @@ StoreHandle CreateStore(const legate_xla::Shape &shape) {
 }
 
 void InitLegate() {
-  legate_parse_config();
-  legate_core_perform_registration();
-  legate::Runtime::get_runtime()->post_startup_initialization(
-      Legion::Runtime::get_context());
+  legate::start(0, nullptr);
   legate_xla_perform_registration();
 }
 
@@ -284,52 +276,16 @@ std::ostream &operator<<(std::ostream &os, const Shape &shape) {
   return os;
 }
 
-} // namespace legate_xla
-#else
+void initialize_runtime_and_context(legate::Runtime *runtime,
+                                    legate::LibraryContext *context) {
 
-namespace legate_xla {
-
-void Synchronize(StoreHandle store) {
-  /** never called, but needed to provide symbol */
-}
-
-StoreHandle CreateStore(const legate_xla::Shape &shape) {
-  /** never called, but needed to provide symbol */
-  return StoreHandle{};
-}
-
-} // namespace legate_xla
-#endif
-
-namespace legate_xla {
-namespace {
-static constexpr char library_name[] = "legate.xla";
-}
-
-/*static*/ void registration_callback() {
-  legate::ResourceConfig config;
-  config.max_tasks = 64;
-  config.max_projections = 0;
-  // We register one sharding functor for each new projection functor
-  config.max_shardings = 0;
-  config.max_reduction_ops = 0;
-
-  auto runtime = legate::Runtime::get_runtime();
-
-  auto context =
-      runtime->create_library(library_name, config, std::make_unique<Mapper>());
-#ifndef LEGATE_XLA_PYTHON_PROTOTYPE
   legate_xla::Runtime::initialize(runtime, context);
-#endif
-
-  Registry::get_registrar().register_all_tasks(context);
 }
 
 } // namespace legate_xla
 
 extern "C" {
 
-void legate_xla_perform_registration() {
-  legate::Core::perform_registration<&legate_xla::registration_callback>();
-}
+struct PJRT_Api;
+const PJRT_Api *GetPjrtApi() { return GetLegatePjrtApi(); }
 }

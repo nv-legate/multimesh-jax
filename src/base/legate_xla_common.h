@@ -97,8 +97,6 @@ class LegateCompiler {
 public:
   virtual void Compile(uint64_t run_id, const CompileConfig &config) = 0;
 
-  virtual StoreHandle SyncStoreHandle() const = 0;
-
   virtual std::unique_ptr<LegateExecutable> MakeExecutable() = 0;
 };
 

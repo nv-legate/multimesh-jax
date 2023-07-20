@@ -113,7 +113,7 @@ class LLMLib(Library):
         from lllm.install_info import libpath
 
         return os.path.join(
-            libpath, f"liblegate_xla{self.get_library_extension()}"
+            libpath, f"liblegate_hlo_runner{self.get_library_extension()}"
         )
 
     def get_c_header(self) -> str:
@@ -288,7 +288,7 @@ class LLMRuntime:
             task.add_scalar_arg(hlo_file, ty.string)
             task.add_scalar_arg(hlo_name, ty.string)
             task.add_scalar_arg(hlo_id, ty.uint64)
-            task.add_scalar_arg(nproc, ty.uint64)
+            task.add_scalar_arg(nproc, ty.uint32)
             task.set_side_effect(True)
             task.set_concurrent(True)
             task.execute()

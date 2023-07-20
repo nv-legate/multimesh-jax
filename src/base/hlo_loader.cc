@@ -41,7 +41,7 @@ struct get_write_only_ptr {
 /*static*/ void HLOLoaderTask::load_and_compile(
     TaskContext &context, LegateCompiler *compiler, uint64_t run_id,
     const std::string &platform_name, std::optional<uint32_t> num_partitions,
-    bool has_sync_store, bool print_stats) {
+    bool print_stats) {
   auto cfg = get_task_config(context);
   uint32_t partitions =
       num_partitions.has_value() ? *num_partitions : cfg.num_tasks;
@@ -58,13 +58,6 @@ struct get_write_only_ptr {
        .stream_executor_index = cfg.local_proc_id,
        .allocator = &allocator,
        .print_stats = print_stats});
-
-  // FIXME: could this run on multiple gpus?
-  if (has_sync_store) {
-    auto &sync_store = context.outputs()[0];
-    auto output_ptr = legate::double_dispatch(
-        sync_store.dim(), sync_store.code(), get_write_only_ptr{}, sync_store);
-  }
 }
 
 /*static*/ void

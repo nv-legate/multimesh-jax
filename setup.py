@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-from setuptools import find_packages
+from setuptools import find_namespace_packages, find_packages
 from skbuild import setup
 
 import versioneer
@@ -36,7 +36,8 @@ setup(
     packages=find_packages(
         where=".",
         include=["lllm*"],
-    ),
+    )
+    + find_namespace_packages(include=["jax_plugins.*"]),
     include_package_data=True,
     cmdclass=versioneer.get_cmdclass(),
     install_requires=["numpy>=1.22"],

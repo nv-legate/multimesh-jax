@@ -62,13 +62,10 @@ rapids_cpm_init()
 
 set(legate_xla_version 23.03.00)
 
-
-
 option(LegateXLA_ENABLE_PYTHON OFF "Whether to build a Python library")
 
 if (SKBUILD)
-  set(_required REQUIRED)
-  find_package(LegateXLA ${_required})
+  find_package(LegateXLA)
 else()
   set(LegateXLA_FOUND FALSE)
 endif()
@@ -81,12 +78,6 @@ endif()
 
 include(GNUInstallDirs)
 rapids_cmake_install_lib_dir(lib_dir)
-
-install(
-  FILES src/legate_xla_common.h
-        src/legate_to_xla.h
-        src/xla_to_legate.h
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 if (SKBUILD)
   include(legate_xla_python.cmake)

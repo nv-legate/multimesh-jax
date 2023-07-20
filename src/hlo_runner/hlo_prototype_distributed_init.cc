@@ -27,6 +27,9 @@ namespace legate_xla {
 using namespace Legion;
 using namespace legate;
 
+void initialize_runtime_and_context(legate::Runtime *runtime,
+                                    legate::LibraryContext *context) {}
+
 /*static*/ void HloPrototypeDistributedInitTask::init_distributed(
     legate::TaskContext &context) {
   std::string coordinator_address = context.scalars()[0].value<std::string>();

@@ -73,15 +73,13 @@ struct get_write_only_buffer_fn {
   uint64_t run_id = context.scalars()[scalar_offset++].value<int64_t>();
 
   log_xla.debug() << "HLOExecutorTask start";
-#ifndef LEGATE_XLA_PYTHON_PROTOTYPE
+
   auto *callbacks = context.scalars()[scalar_offset++]
                         .value<std::vector<std::function<void()>> *>();
-#endif
 
   run_executable(context, exe, run_id, scalar_offset);
   log_xla.debug() << "HLOExecutorTask run_executable done";
 
-#ifndef LEGATE_XLA_PYTHON_PROTOTYPE
   if (callbacks->size() > 0) {
     log_xla.debug() << "Running total of " << callbacks->size() << " callbacks";
     for (auto &fn : *callbacks) {
@@ -89,7 +87,7 @@ struct get_write_only_buffer_fn {
     }
   }
   delete callbacks;
-#endif
+
   log_xla.debug() << "HLOExecutorTask callbacks done";
 }
 
@@ -110,7 +108,7 @@ struct get_write_only_buffer_fn {
 
   // first 2 scalars are exe and ID values
   for (size_t idx = scalar_offset; idx < total_outputs + scalar_offset; ++idx) {
-    bool is_red = context.scalars()[idx].value<char>();
+    bool is_red = context.scalars()[idx].value<bool>();
     Store &store = is_red ? context.reductions()[red_idx++]
                           : context.outputs()[output_idx++];
 

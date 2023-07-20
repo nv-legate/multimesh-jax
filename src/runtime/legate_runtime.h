@@ -32,10 +32,11 @@ public:
   legate::LibraryContext *get_context() const { return context_; }
 
 public:
-  std::unique_ptr<legate::AutoTask> create_task(XlaOpCode task_id);
-  std::unique_ptr<legate::ManualTask>
-  create_task(XlaOpCode task_id, const legate::Shape &launch_shape);
-  void submit(std::unique_ptr<legate::Task> task);
+  legate::AutoTask create_task(XlaOpCode task_id);
+  legate::ManualTask create_task(XlaOpCode task_id,
+                                 const legate::Shape &launch_shape);
+  void submit(legate::AutoTask task);
+  void submit(legate::ManualTask task);
   void issue_execution_fence(bool block = false);
   std::vector<legate::LogicalStore> &get_tmp_stores();
 
@@ -54,10 +55,5 @@ private:
   legate::LibraryContext *context_;
   std::vector<legate::LogicalStore> temporary_stores;
 };
-
-// Registration callback for Legate JAX
-/*static*/ void
-registration_callback(Legion::Machine machine, Legion::Runtime *legion_runtime,
-                      const std::set<Legion::Processor> &local_procs);
 
 } // namespace legate_xla
