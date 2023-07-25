@@ -26,6 +26,8 @@ namespace legate_xla {
 
 /*static*/ bool Runtime::synchronous_mode_ = false;
 
+/*static*/ std::mutex Runtime::mutex_ = std::mutex();
+
 Runtime::Runtime(legate::Runtime *core_runtime, legate::LibraryContext *context)
     : core_runtime_(core_runtime), context_(context) {}
 
@@ -57,6 +59,8 @@ void Runtime::issue_execution_fence(bool block) {
 /*static*/ Runtime *Runtime::get_runtime() { return runtime_; }
 
 /*static*/ bool Runtime::synchronous_mode() { return synchronous_mode_; }
+
+/*static*/ std::mutex &Runtime::get_mutex() { return mutex_; }
 
 /*static*/ void Runtime::initialize(legate::Runtime *core_runtime,
                                     legate::LibraryContext *context) {

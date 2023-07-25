@@ -83,7 +83,15 @@ struct get_write_only_buffer_fn {
   if (callbacks->size() > 0) {
     log_xla.debug() << "Running total of " << callbacks->size() << " callbacks";
     for (auto &fn : *callbacks) {
-      fn();
+      try {
+        fn();
+      } catch (const std::exception &e) {
+        log_xla.error()
+            << "Standard exception caught during callback excecution, message '"
+            << e.what() << "'";
+      } catch (...) {
+        log_xla.error() << "Exception caught during callback excecution";
+      }
     }
   }
   delete callbacks;
@@ -132,13 +140,24 @@ struct get_write_only_buffer_fn {
   // stream will be incorrect since it will not include the blocking time.
   bool block_host_until_done = true;
 
-  bool success =
-      exe->Execute(run_id, inputs, outputs, &allocator, device_assignment);
+  bool success;
+
+  try {
+    success =
+        exe->Execute(run_id, inputs, outputs, &allocator, device_assignment);
+  } catch (const std::exception &e) {
+    log_xla.error() << "Standard exception caught during 'Execute', message '"
+                    << e.what() << "'";
+  } catch (...) {
+    log_xla.error() << "Exception caught during 'Execute'";
+  }
 
   // Check that the stream ran and finished correctly
   if (!success) {
     log_xla.error() << "[HLOExecutor] HLO failed!";
+#ifdef LEGATE_XLA_PYTHON_PROTOTYPE
     LEGATE_ABORT;
+#endif
   }
 }
 
