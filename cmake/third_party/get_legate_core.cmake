@@ -16,21 +16,48 @@
 
 function(find_or_configure_legate_core)
 
+  set(PKG_VERSION ${LegateXLA_VERSION})
+  include("${rapids-cmake-dir}/export/detail/parse_version.cmake")
+  rapids_export_parse_version(${PKG_VERSION} legate_core PKG_VERSION)
+
+  include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
+  rapids_cpm_package_details(LegateCore version git_repo git_branch shallow exclude_from_all)
+
+  set(version ${PKG_VERSION})
+
+  if (legate_core_REPOSITORY)
+    set(git_repo ${legate_core_REPOSITORY})
+  endif()
+
+  if (legate_core_BRANCH)
+    set(git_branch ${legate_core_BRANCH})
+  endif()
+
   set(FIND_PKG_ARGS
       GLOBAL_TARGETS     legate::core
       BUILD_EXPORT_SET   legate_xla-exports
       INSTALL_EXPORT_SET legate_xla-exports)
 
-  rapids_find_package(legate_core EXACT CONFIG REQUIRED ${FIND_PKG_ARGS})
+  if((NOT CPM_legate_core_SOURCE) AND (NOT CPM_DOWNLOAD_legate_core))
+    set(_find_mode QUIET)
+    if(legate_core_DIR OR legate_core_ROOT)
+      set(_find_mode REQUIRED)
+    endif()
+    rapids_find_package(legate_core ${version} EXACT CONFIG QUIET ${FIND_PKG_ARGS})
+  endif()
 
-
-  set(Legion_USE_CUDA ${Legion_USE_CUDA} PARENT_SCOPE)
-  set(Legion_USE_OpenMP ${Legion_USE_OpenMP} PARENT_SCOPE)
-  set(Legion_BOUNDS_CHECKS ${Legion_BOUNDS_CHECKS} PARENT_SCOPE)
-
-  message(VERBOSE "Legion_USE_CUDA=${Legion_USE_CUDA}")
-  message(VERBOSE "Legion_USE_OpenMP=${Legion_USE_OpenMP}")
-  message(VERBOSE "Legion_BOUNDS_CHECKS=${Legion_BOUNDS_CHECKS}")
+  if(legate_core_FOUND)
+    message(STATUS "CPM: using local package Legate@${version}")
+  else()
+    rapids_cpm_find(legate_core ${version} ${FIND_PKG_ARGS}
+        CPM_ARGS
+          GIT_REPOSITORY ${git_repo}
+          GIT_BRANCH ${git_branch}
+          FIND_PACKAGE_ARGUMENTS EXACT
+          OPTIONS
+            Legion_USE_CUDA ON
+    )
+  endif()
 endfunction()
 
 

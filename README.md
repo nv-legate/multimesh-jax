@@ -1,54 +1,114 @@
-# Legate-XLA Bridge
+# Legate-JAX
 
-This repository contains the wrapper library used to connect XLA (Jax) and the Legate runtime.
+This repository contains the wrapper library used to connect XLA (JAX) and the Legate runtime.
 The repository can be used in two different modes:
 
-1. XLA plugin client: This creates an XLA plugin client that can be used in Jax. The Legate-XLA bridge
-needs to first build `liblegate_xla.so`, which can then be imported by XLA.
-2. HLO replay prototype: This builds a subset of XLA into a `liblegate_hlo_prototype.so`, which is imported by the Legate-XLA bridge in a HLO replay tool independent of Jax.
+1. XLA plugin client: This creates an XLA plugin client that can be used in JAX. Legate-JAX
+builds `liblegate_plugin.so`, which can then be imported by JAX.
+2. HLO replay prototype: This builds a subset of XLA into a `liblegate_hlo_prototype.so`, which is imported by the Legate-XLA bridge in a HLO replay tool independent of JAX.
 
 The HLO replay tool is intended only for performance optimization and development workflow.
-Users are expected to use Legate through the plugin client.
+Users are expected to use Legate-JAX through the plugin client.
 
 ## Building the XLA client
 
-The Legate plugin client needs to be incorporated into a custom jaxlib installation.
-A few additional steps are required relative to a regular Jax installation:
-
-### Download and Build the Legate-XLA bridge
-
-Users can either use an existing Legate installation or have the Legate-XLA bridge build and install its own Legate. If using an existing Legate, users should specify the location using `Legate_ROOT`:
+The Legate plugin client needs to include functionality from a customized XLA,
+which is built using Bazel. To perform a standard CUDA installation, the user
+can simply run:
 
 ```
-> cmake -DLegate_ROOT=<...> -S . -B build
-> cmake --build build
-> cmake --install build
+$ python -m pip install .
 ```
 
-### Download the Legate-compatible fork of XLA
+in the source folder. The scikit-build (via CMake) will download all dependencies, drive the XLA Bazel build, and install the Python wheel to create the Legate-JAX plugin (`jax_plugins.legate`). The default pip installation currently needs to download from
+repositories that require credentials. For development builds - or to avoid login credentials - the user can add extra options.
 
-Users should down the `legate` branch from the (XLA fork)[https://gitlab-master.nvidia.com/legate/xla].
-There is no build step required here - only downloading the source.
-The relevant files for building a Legate plugin client are all found in `/xla/pjrt/legate/`.
+The following CMake flags are useful for the underlying scikit-build that
+does the pip installation:
+
+* `-DCPM_xla_SOURCE=<...>`: An already downloaded XLA source folder.
+* `-DCPM_legate_core_SOURCE=<...>`: An already downloaded Legate C++ core.
+* `-DLegion_USE_CUDA=(ON|OFF)`: Whether to build with CUDA support. The default is ON.
+
+These options can be placed in an environment variable read by scikit-build:
+
+```
+$ SKBUILD_CONFIGURE_OPTIONS="-DCPM_xla_SOURCE=/src/xla ...." \
+python -m pip install . -vv
+```
+
+The XLA build can take a very long time to finish so we recommend building with `-vv` so
+that the progress is printed to the screen.
+
+The [XLA fork](https://gitlab-master.nvidia.com/legate/xla) has extra files
+for building a Legate plugin client in `/xla/pjrt/legate/`.
 The files there provide the necessary Legate-specific implementations of:
 
 1. `PjRtClient`
 1. `PjRtBuffer`
 1. `PjRtLoadedExecutable`
 
-### Download and Build Jaxlib
+### Development Builds
 
-After downloading Jax, the custom jaxlib should be built by 1) pointing to the custom XLA branch and 2) enabling the plugin client:
+Users can either use an existing Legate installation or have the Legate-JAX build and install its own Legate. If using an existing Legate, users should specify the location using `Legate_ROOT`:
 
 ```
-> XLA_LEGATE_ROOT=<...> \
-python build/build.py \
+$ cmake -DLegate_ROOT=<...> -S . -B build
+$ cmake --build build
+```
+
+Once the build is complete, an editable installation of the plugin client can be done:
+
+```
+$ SETUPTOOLS_ENABLE_FEATURES="legacy-editable" \
+SKBUILD_CONFIGURE_OPTIONS="-Dlegate_core_ROOT=<...>" \
+python -m pip install --editable . -vv
+```
+
+### JAX and Jaxlib Compatibility
+
+In most cases, a standard JAX and Jaxlib installation will be compatible with Legate-JAX,
+if JAX/Jaxlib are the most recent version and XLA is top-of-tree for the plugin client.
+If JAX sanity checks fail with a version incompatibility, then Jaxlib will need to be
+installed from source using the same XLA checkout used to build the Legate-JAX client.
+Download the [JAX source code](https://github.com/google/jax.git). In the JAX source folder, run
+
+```
+$ python build/build.py \
   --enable_cuda \
-  --enable_plugin_device \
   --bazel_options=--override_repository=xla=<...>
 ```
+After a long build, it will print a message like the following about
+the generated wheel that can be installed:
 
-The command requires the root (either install or build tree) of Legate be provided in the environment variable `XLA_LEGATE_ROOT`. This allows XLA to import and depend on the Legate-XLA bridge built in the previous step.
-The jaxlib default XLA repository must be overridden.
-Once completed, the build will provide a Python wheel that can be installed that will have a Legate XLA client that can be selected by specifying `"plugin"` for the backend type.
+```
+To install the newly-built jaxlib wheel, run:
+  pip install dist/jaxlib-0.4.14.whl --force-reinstall
+```
+
+## Running with the custom XLA client
+
+Legate (and the underlying Legion layer) requires numerous settings to be configured
+via the `LEGION_DEFAULT_ARGS` environment variable. For a single node with 2 GPUS, an example would be:
+
+```
+$ export LEGION_DEFAULT_ARGS="
+ -lg:local 0 \
+ -ll:cpu 4 \
+ -ll:gpu 2 \
+ -cuda:skipbusy \
+ -ll:util 2 \
+ -ll:csize 4000 \
+ -ll:fsize 4000 \
+ -ll:zsize 32 \
+ -ll:networks none \
+ -lg:eager_alloc_percentage 50"
+ ```
+
+ Consult the Legion documentation for full details on the Legion command-line options.
+ Once the Legion arguments are configured, the user can run:
+
+ ```
+ $ JAX_PLATFORMS=legate python my_jax_program.py
+ ```
 

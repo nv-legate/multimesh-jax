@@ -30,7 +30,7 @@ execute_process(
 
 set(libpath "")
 
-if (LegateXLA_ENABLE_PYTHON)
+if (LegateXLA_HLO_RUNNER)
   set(pyroot lllm)
   set(libname liblegate_hlo_runner)
 else()

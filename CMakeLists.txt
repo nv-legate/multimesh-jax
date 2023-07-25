@@ -15,7 +15,8 @@
 #=============================================================================
 
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
-project(LegataXLA LANGUAGES C CXX CUDA)
+project(LegateXLA LANGUAGES C CXX CUDA)
+set(LegateXLA_VERSION 23.07.00)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -48,7 +49,7 @@ endif()
 
 
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
-  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-22.08/RAPIDS.cmake
+  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-23.08/RAPIDS.cmake
        ${CMAKE_BINARY_DIR}/legate-xla-RAPIDS.cmake)
 endif()
 include(${CMAKE_BINARY_DIR}/legate-xla-RAPIDS.cmake)
@@ -58,11 +59,11 @@ include(rapids-cuda)
 include(rapids-export)
 include(rapids-find)
 
-rapids_cpm_init()
+rapids_cpm_init(OVERRIDE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json)
 
-set(legate_xla_version 23.03.00)
-
-option(LegateXLA_ENABLE_PYTHON OFF "Whether to build a Python library")
+option(LegateXLA_HLO_RUNNER OFF
+       "Whether to build the HLO runner instead of the plugin client")
+option(LegateXLA_ENABLE_CUDA ON "Whether to build with CUDA")
 
 if (SKBUILD)
   find_package(LegateXLA)

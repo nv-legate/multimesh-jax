@@ -21,7 +21,7 @@ from skbuild import setup
 import versioneer
 
 setup(
-    name="Legate LLM",
+    name="Legate JAX",
     version=versioneer.get_version(),
     description="Legate Prototype for Large Language Models",
     url="TBD",
