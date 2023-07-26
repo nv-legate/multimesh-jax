@@ -1,4 +1,3 @@
-#include "core/mapping/base_mapper.h"
 #include "legate.h"
 #include <core/mapping/mapping.h>
 

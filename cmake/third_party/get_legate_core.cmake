@@ -43,7 +43,7 @@ function(find_or_configure_legate_core)
     if(legate_core_DIR OR legate_core_ROOT)
       set(_find_mode REQUIRED)
     endif()
-    rapids_find_package(legate_core ${version} EXACT CONFIG QUIET ${FIND_PKG_ARGS})
+    rapids_find_package(legate_core ${version} EXACT CONFIG ${_find_mode} ${FIND_PKG_ARGS})
   endif()
 
   if(legate_core_FOUND)
