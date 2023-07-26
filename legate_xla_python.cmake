@@ -70,7 +70,7 @@ Imported Targets:
 
 ]=])
 
-set(code_string "")
+set(code_string "set(LegateXLA_HLO_RUNNER ${LegateXLA_HLO_RUNNER})")
 
 rapids_export(
   INSTALL xla_python

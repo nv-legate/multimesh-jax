@@ -37,12 +37,14 @@ install(TARGETS legate_hlo_runner
         DESTINATION ${lib_dir}
         EXPORT legate-xla-exports)
 
+set(code_string "set(LegateXLA_HLO_RUNNER ${LegateXLA_HLO_RUNNER})")
 rapids_export(
   INSTALL LegateXLA
   EXPORT_SET legate-xla-exports
   GLOBAL_TARGETS xla-bridge
   NAMESPACE legate::
   LANGUAGES ${ENABLED_LANGUAGES}
+  FINAL_CODE_BLOCK code_string
 )
 
 # build export targets
@@ -51,5 +53,6 @@ rapids_export(
   EXPORT_SET legate-xla-exports
   GLOBAL_TARGETS xla-bridge
   NAMESPACE legate::
-  LANGUAGES ${ENABLED_LANGUAES}
+  LANGUAGES ${ENABLED_LANGUAGES}
+  FINAL_CODE_BLOCK code_string
 )
