@@ -28,7 +28,7 @@ namespace legate_xla {
 
 /*static*/ std::mutex Runtime::mutex_ = std::mutex();
 
-Runtime::Runtime(legate::Runtime *core_runtime, legate::LibraryContext *context)
+Runtime::Runtime(legate::Runtime *core_runtime, legate::Library context)
     : core_runtime_(core_runtime), context_(context) {}
 
 std::vector<LogicalStore> &Runtime::get_tmp_stores() {
@@ -63,9 +63,9 @@ void Runtime::issue_execution_fence(bool block) {
 /*static*/ std::mutex &Runtime::get_mutex() { return mutex_; }
 
 /*static*/ void Runtime::initialize(legate::Runtime *core_runtime,
-                                    legate::LibraryContext *context) {
+                                    legate::Library library) {
   if (nullptr == runtime_)
-    runtime_ = new Runtime(core_runtime, context);
+    runtime_ = new Runtime(core_runtime, library);
 
   char *env_str = getenv("LEGATE_XLA_SYNCHRONOUS_MODE");
   if (env_str && std::atoi(env_str) > 0) {

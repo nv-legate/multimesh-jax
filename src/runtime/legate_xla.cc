@@ -240,7 +240,7 @@ void Synchronize(StoreHandle store) {
   auto logical_store = store.impl->store;
   auto out_mapped = logical_store.get_physical_store();
   auto buffer_alloc = legate::double_dispatch(
-      out_mapped->dim(), out_mapped->code(), get_read_only_ptr{}, *out_mapped);
+      out_mapped.dim(), out_mapped.code(), get_read_only_ptr{}, out_mapped);
   log_xla.debug() << "Synchronize store " << store.impl << " done";
 }
 
@@ -252,7 +252,7 @@ void CopyStoreToHostSync(StoreHandle input,
   auto logical_store = input.impl->store;
   auto out_mapped = logical_store.get_physical_store();
   auto buffer_alloc = legate::double_dispatch(
-      out_mapped->dim(), out_mapped->code(), get_read_only_ptr{}, *out_mapped);
+      out_mapped.dim(), out_mapped.code(), get_read_only_ptr{}, out_mapped);
   copy_func(buffer_alloc);
   log_xla.debug() << "CopyStoreToHostSync " << input.impl << " done";
 }
@@ -332,7 +332,7 @@ std::ostream &operator<<(std::ostream &os, const Shape &shape) {
 }
 
 void initialize_runtime_and_context(legate::Runtime *runtime,
-                                    legate::LibraryContext *context) {
+                                    legate::Library context) {
 
   legate_xla::Runtime::initialize(runtime, context);
 }

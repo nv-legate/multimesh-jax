@@ -28,14 +28,14 @@ using namespace Legion;
 using namespace legate;
 
 void initialize_runtime_and_context(legate::Runtime *runtime,
-                                    legate::LibraryContext *context) {}
+                                    legate::Library context) {}
 
 /*static*/ void HloPrototypeDistributedInitTask::init_distributed(
     legate::TaskContext &context) {
   std::string coordinator_address = context.scalars()[0].value<std::string>();
   int port = context.scalars()[1].value<int32_t>();
 
-  auto device_id_range = context.machine_desc().processor_range();
+  auto device_id_range = context.machine().processor_range();
   auto task_id = static_cast<int32_t>(context.get_task_index()[0]);
   auto num_tasks = device_id_range.count();
   auto local_proc_id = static_cast<int32_t>((device_id_range.low + task_id) %

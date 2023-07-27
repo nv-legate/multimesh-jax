@@ -5,7 +5,7 @@ using namespace legate;
 namespace legate_xla {
 
 TaskConfig get_task_config(TaskContext &context) {
-  auto device_id_range = context.machine_desc().processor_range();
+  auto device_id_range = context.machine().processor_range();
   auto task_id = static_cast<int32_t>(context.get_task_index()[0]);
   return {
       .device_id_range = device_id_range,

@@ -28,7 +28,7 @@ using namespace legate;
 
 /*static*/ void HloPrototypeDistributedShutdownTask::shutdown_distributed(
     legate::TaskContext &context) {
-  auto device_id_range = context.machine_desc().processor_range();
+  auto device_id_range = context.machine().processor_range();
   auto task_id = static_cast<int32_t>(context.get_task_index()[0]);
   auto num_tasks = device_id_range.count();
   auto local_proc_id = static_cast<int32_t>((device_id_range.low + task_id) %

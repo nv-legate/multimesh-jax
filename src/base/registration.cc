@@ -9,8 +9,7 @@ static constexpr char library_name[] = "legate.xla";
 }
 
 extern void initialize_runtime_and_context(legate::Runtime *runtime,
-                                           legate::LibraryContext *context);
-
+                                           legate::Library library);
 /*static*/ void registration_callback() {
   legate::ResourceConfig config;
   config.max_tasks = 64;

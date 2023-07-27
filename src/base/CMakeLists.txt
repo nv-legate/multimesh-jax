@@ -20,3 +20,7 @@ add_library(
 
 target_include_directories(legate_xla_base PUBLIC ${CMAKE_CURRENT_SOURCE_DIRECTORY})
 target_link_libraries(legate_xla_base PUBLIC legate::core)
+
+if (LegateXLA_HLO_RUNNER)
+  target_compile_definitions(legate_xla_base PRIVATE LegateXLA_HLO_RUNNER)
+endif()

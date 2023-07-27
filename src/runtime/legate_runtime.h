@@ -27,10 +27,7 @@ namespace legate_xla {
 
 struct Runtime {
 public:
-  Runtime(legate::Runtime *core_runtime, legate::LibraryContext *context);
-
-public:
-  legate::LibraryContext *get_context() const { return context_; }
+  Runtime(legate::Runtime *core_runtime, legate::Library context);
 
 public:
   legate::AutoTask create_task(XlaOpCode task_id);
@@ -44,7 +41,7 @@ public:
 public:
   static Runtime *get_runtime();
   static void initialize(legate::Runtime *core_runtime,
-                         legate::LibraryContext *context);
+                         legate::Library library);
   static bool synchronous_mode();
   static std::mutex &get_mutex();
 
@@ -55,7 +52,7 @@ private:
 
 private:
   legate::Runtime *core_runtime_;
-  legate::LibraryContext *context_;
+  legate::Library context_;
   std::vector<legate::LogicalStore> temporary_stores;
 };
 
