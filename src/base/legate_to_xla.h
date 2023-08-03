@@ -20,3 +20,5 @@ extern "C" bool ShutdownDistributedRuntime();
 
 struct PJRT_Api;
 extern "C" const PJRT_Api *GetLegatePjrtApi();
+
+extern "C" void ShutdownClient();

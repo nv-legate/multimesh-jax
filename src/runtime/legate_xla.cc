@@ -314,9 +314,28 @@ StoreHandle CreateStore(const legate_xla::Shape &shape) {
   return result;
 }
 
-void InitLegate() {
-  legate::start(0, nullptr);
-  legate_xla_perform_registration();
+enum LegateState { UNINITIALIZED, STARTING, STARTED, STOPPING, STOPPED };
+static std::atomic<int> legate_state{UNINITIALIZED};
+
+void StartLegate() {
+
+  static int not_started = UNINITIALIZED;
+  if (legate_state.compare_exchange_strong(not_started, int(STARTING))) {
+    log_xla.info() << "Starting Legate";
+    legate::start(0, nullptr);
+    legate_xla_perform_registration();
+    legate_state = STARTED;
+  }
+}
+
+void StopLegate() {
+
+  static int started = STARTED;
+  if (legate_state.compare_exchange_strong(started, int(STOPPING))) {
+    log_xla.info() << "Stopping Legate";
+    legate::finish();
+    legate_state = STOPPED;
+  }
 }
 
 std::ostream &operator<<(std::ostream &os, const Shape &shape) {

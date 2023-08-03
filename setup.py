@@ -37,9 +37,12 @@ setup(
         where=".",
         include=["lllm*"],
     )
-    + find_namespace_packages(include=["jax_plugins.*"]),
+    + find_namespace_packages(include=["jax_plugins.*", "legate.*"]),
     include_package_data=True,
+    package_data={
+        "legate.jax": ["*.so"],
+    },
     cmdclass=versioneer.get_cmdclass(),
-    install_requires=["numpy>=1.22"],
+    install_requires=["numpy>=1.22", "pybind11[global]"],
     zip_safe=False,
 )

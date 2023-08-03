@@ -22,6 +22,8 @@ void CopyStoreToHostSync(StoreHandle input,
 
 void Destroy(StoreHandle store);
 
-void InitLegate();
+void StartLegate();
+
+void StopLegate();
 
 } // namespace legate_xla
