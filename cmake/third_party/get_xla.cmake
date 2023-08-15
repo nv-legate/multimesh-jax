@@ -42,7 +42,7 @@ function(find_or_configure_xla)
   add_custom_command(
     OUTPUT  ${xla_library}
     COMMENT "Building tensorflow components"
-    COMMAND XLA_LEGATE_SOURCE_DIR=${CMAKE_SOURCE_DIR} bazel --batch build ${_bazel_options} ${xla_target} --check_visibility=false
+    COMMAND rm -rf "${xla_SOURCE_DIR}/bazel-bin" && XLA_LEGATE_SOURCE_DIR=${CMAKE_SOURCE_DIR} bazel --batch build ${_bazel_options} ${xla_target} --check_visibility=false
     WORKING_DIRECTORY ${xla_SOURCE_DIR}
     DEPENDS ${xla_source_files}
     USES_TERMINAL
