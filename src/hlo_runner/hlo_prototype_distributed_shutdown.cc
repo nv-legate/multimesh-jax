@@ -27,7 +27,7 @@ using namespace Legion;
 using namespace legate;
 
 /*static*/ void HloPrototypeDistributedShutdownTask::shutdown_distributed(
-    legate::TaskContext &context) {
+    legate::TaskContext context) {
   auto device_id_range = context.machine().processor_range();
   auto task_id = static_cast<int32_t>(context.get_task_index()[0]);
   auto num_tasks = device_id_range.count();
@@ -45,7 +45,7 @@ using namespace legate;
 }
 
 /*static*/ void
-HloPrototypeDistributedShutdownTask::cpu_variant(TaskContext &context) {
+HloPrototypeDistributedShutdownTask::cpu_variant(TaskContext context) {
   shutdown_distributed(context);
 }
 

@@ -5,7 +5,7 @@
 namespace legate_xla {
 
 /*static*/ void
-HLOPrototypeExecuteTask::gpu_variant(legate::TaskContext &context) {
+HLOPrototypeExecuteTask::gpu_variant(legate::TaskContext context) {
   run_executable(context, "gpu");
 }
 

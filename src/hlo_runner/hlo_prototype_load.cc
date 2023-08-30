@@ -27,7 +27,7 @@ using namespace legate;
 namespace legate_xla {
 
 /*static*/ void
-HLOPrototypeLoaderTask::load_and_compile(TaskContext &context,
+HLOPrototypeLoaderTask::load_and_compile(TaskContext context,
                                          const std::string &platform_name) {
   auto &scalars = context.scalars();
   uint64_t run_id = scalars[0].value<uint64_t>();
@@ -54,7 +54,7 @@ HLOPrototypeLoaderTask::load_and_compile(TaskContext &context,
   });
 }
 
-/*static*/ void HLOPrototypeLoaderTask::cpu_variant(TaskContext &context) {
+/*static*/ void HLOPrototypeLoaderTask::cpu_variant(TaskContext context) {
   load_and_compile(context, "cpu");
 }
 

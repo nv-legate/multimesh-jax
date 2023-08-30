@@ -6,7 +6,7 @@
 namespace legate_xla {
 
 /*static*/ void
-HLOPrototypeExecuteTask::run_executable(legate::TaskContext &context,
+HLOPrototypeExecuteTask::run_executable(legate::TaskContext context,
                                         const std::string &platform) {
   uint64_t run_id = context.scalars()[0].value<uint64_t>();
   uint64_t hlo_id = context.scalars()[1].value<uint64_t>();
@@ -22,7 +22,7 @@ HLOPrototypeExecuteTask::run_executable(legate::TaskContext &context,
 }
 
 /*static*/ void
-HLOPrototypeExecuteTask::cpu_variant(legate::TaskContext &context) {
+HLOPrototypeExecuteTask::cpu_variant(legate::TaskContext context) {
   run_executable(context, "cpu");
 }
 

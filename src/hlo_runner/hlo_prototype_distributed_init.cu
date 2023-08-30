@@ -20,7 +20,7 @@
 namespace legate_xla {
 
 /*static*/ void
-HloPrototypeDistributedInitTask::gpu_variant(legate::TaskContext &context) {
+HloPrototypeDistributedInitTask::gpu_variant(legate::TaskContext context) {
   init_distributed(context);
   CHECK_CUDA(cudaPeekAtLastError());
 }

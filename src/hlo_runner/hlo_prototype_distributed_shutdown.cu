@@ -3,7 +3,7 @@
 namespace legate_xla {
 
 /*static*/ void
-HloPrototypeDistributedShutdownTask::gpu_variant(legate::TaskContext &context) {
+HloPrototypeDistributedShutdownTask::gpu_variant(legate::TaskContext context) {
   shutdown_distributed(context);
 }
 

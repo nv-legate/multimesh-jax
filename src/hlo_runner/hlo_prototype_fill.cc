@@ -39,8 +39,9 @@ struct fill_buffer_fn {
 
 } // namespace
 
-/*static*/ void HLOFillTask::cpu_variant(TaskContext &context) {
-  for (auto &store : context.outputs()) {
+/*static*/ void HLOFillTask::cpu_variant(TaskContext context) {
+  for (auto &array : context.outputs()) {
+    auto store = array.data();
     legate::double_dispatch(store.dim(), store.code(), fill_buffer_fn{}, store);
   }
 }

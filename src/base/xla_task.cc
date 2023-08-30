@@ -40,7 +40,7 @@ Legion::Logger log_xla("legate.xla");
   return registrar;
 }
 
-/*static*/ void XLAInitFromHostTask::gpu_variant(legate::TaskContext &context) {
+/*static*/ void XLAInitFromHostTask::gpu_variant(legate::TaskContext context) {
   auto &scalars = context.scalars();
   auto bytes = scalars[0].value<uint64_t>();
   auto input_ptr = reinterpret_cast<void *>(scalars[1].value<uint64_t>());
@@ -52,7 +52,7 @@ Legion::Logger log_xla("legate.xla");
         reinterpret_cast<std::function<void()> *>(scalars[3].value<uint64_t>());
   }
 
-  auto &output_store = context.outputs()[0];
+  auto output_store = context.outputs()[0].data();
   log_xla.debug() << "XLAInitFromHostTask: copying " << bytes
                   << " bytes to store of dimension " << output_store.dim();
   auto output_ptr =
@@ -75,8 +75,8 @@ Legion::Logger log_xla("legate.xla");
   }
 }
 
-/*static*/ void XLAInitZeroTask::gpu_variant(legate::TaskContext &context) {
-  auto &output_store = context.outputs()[0];
+/*static*/ void XLAInitZeroTask::gpu_variant(legate::TaskContext context) {
+  auto output_store = context.outputs()[0].data();
   auto output_alloc =
       legate::double_dispatch(output_store.dim(), output_store.code(),
                               get_write_only_buffer_fn{}, output_store);

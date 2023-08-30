@@ -66,7 +66,7 @@ struct get_write_only_buffer_fn {
 
 } // namespace
 
-/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext &context) {
+/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext context) {
   int scalar_offset = 0;
   LegateExecutable *exe = reinterpret_cast<LegateExecutable *>(
       context.scalars()[scalar_offset++].value<void *>());
@@ -99,13 +99,14 @@ struct get_write_only_buffer_fn {
   log_xla.debug() << "HLOExecutorTask callbacks done";
 }
 
-/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext &context,
+/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext context,
                                                 LegateExecutable *exe,
                                                 int64_t run_id,
                                                 int scalar_offset) {
   std::vector<legate_xla::BufferAllocation> inputs, outputs;
 
-  for (auto &store : context.inputs()) {
+  for (auto &array : context.inputs()) {
+    auto store = array.data();
     inputs.push_back(legate::double_dispatch(store.dim(), store.code(),
                                              get_read_only_buffer_fn{}, store));
   }
@@ -117,8 +118,8 @@ struct get_write_only_buffer_fn {
   // first 2 scalars are exe and ID values
   for (size_t idx = scalar_offset; idx < total_outputs + scalar_offset; ++idx) {
     bool is_red = context.scalars()[idx].value<bool>();
-    Store &store = is_red ? context.reductions()[red_idx++]
-                          : context.outputs()[output_idx++];
+    Store store = is_red ? context.reductions()[red_idx++].data()
+                         : context.outputs()[output_idx++].data();
 
     outputs.push_back(legate::double_dispatch(
         store.dim(), store.code(), get_write_only_buffer_fn{}, store, is_red));
@@ -161,7 +162,7 @@ struct get_write_only_buffer_fn {
   }
 }
 
-/*static*/ void HLOExecutorTask::cpu_variant(TaskContext &context) {
+/*static*/ void HLOExecutorTask::cpu_variant(TaskContext context) {
   run_executable(context);
 }
 
@@ -170,6 +171,7 @@ namespace // unnamed
 static void __attribute__((constructor)) register_tasks(void) {
   legate::VariantOptions options;
   options.return_size = 16384;
+
   HLOExecutorTask::register_variants(
       {{LEGATE_CPU_VARIANT, options}, {LEGATE_GPU_VARIANT, options}});
 }

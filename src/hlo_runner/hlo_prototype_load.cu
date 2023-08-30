@@ -20,7 +20,7 @@
 namespace legate_xla {
 
 /*static*/ void
-HLOPrototypeLoaderTask::gpu_variant(legate::TaskContext &context) {
+HLOPrototypeLoaderTask::gpu_variant(legate::TaskContext context) {
   load_and_compile(context, "gpu");
 }
 

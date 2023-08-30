@@ -27,12 +27,12 @@ public:
   static const int TASK_ID = HLO_PROTOTYPE_DISTRIBUTED_INIT;
 
 public:
-  static void init_distributed(legate::TaskContext &context);
+  static void init_distributed(legate::TaskContext context);
 
 public:
-  static void cpu_variant(legate::TaskContext &context);
+  static void cpu_variant(legate::TaskContext context);
 #ifdef LEGATE_USE_CUDA
-  static void gpu_variant(legate::TaskContext &context);
+  static void gpu_variant(legate::TaskContext context);
 #endif
 };
 

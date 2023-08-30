@@ -11,6 +11,6 @@ struct TaskConfig {
   uint32_t my_node;
 };
 
-TaskConfig get_task_config(legate::TaskContext &context);
+TaskConfig get_task_config(const legate::TaskContext &context);
 
 } // namespace legate_xla

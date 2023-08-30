@@ -30,12 +30,12 @@ public:
   static constexpr int32_t TASK_ID = HLO_PROTOTYPE_LOAD;
 
 public:
-  static void cpu_variant(legate::TaskContext &context);
+  static void cpu_variant(legate::TaskContext context);
 
-  static void gpu_variant(legate::TaskContext &context);
+  static void gpu_variant(legate::TaskContext context);
 
 public:
-  static void load_and_compile(legate::TaskContext &context,
+  static void load_and_compile(legate::TaskContext context,
                                const std::string &platform_name);
 };
 

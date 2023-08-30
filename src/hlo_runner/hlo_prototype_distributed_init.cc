@@ -30,8 +30,8 @@ using namespace legate;
 void initialize_runtime_and_context(legate::Runtime *runtime,
                                     legate::Library context) {}
 
-/*static*/ void HloPrototypeDistributedInitTask::init_distributed(
-    legate::TaskContext &context) {
+/*static*/ void
+HloPrototypeDistributedInitTask::init_distributed(legate::TaskContext context) {
   std::string coordinator_address = context.scalars()[0].value<std::string>();
   int port = context.scalars()[1].value<int32_t>();
 
@@ -62,7 +62,7 @@ void initialize_runtime_and_context(legate::Runtime *runtime,
 }
 
 /*static*/ void
-HloPrototypeDistributedInitTask::cpu_variant(TaskContext &context) {
+HloPrototypeDistributedInitTask::cpu_variant(TaskContext context) {
   init_distributed(context);
 }
 

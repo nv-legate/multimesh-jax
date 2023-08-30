@@ -30,18 +30,18 @@ public:
   static constexpr int32_t TASK_ID = XLA_COMPILE_TASK;
 
 public:
-  static void cpu_variant(legate::TaskContext &context);
+  static void cpu_variant(legate::TaskContext context);
 
-  static void gpu_variant(legate::TaskContext &context);
+  static void gpu_variant(legate::TaskContext context);
 
 public:
   static void
-  load_and_compile(legate::TaskContext &context, LegateCompiler *compiler,
+  load_and_compile(legate::TaskContext context, LegateCompiler *compiler,
                    uint64_t run_id, const std::string &platform_name,
                    std::optional<uint32_t> num_partitions = std::nullopt,
                    bool print_stats = false);
 
-  static void load_and_compile(legate::TaskContext &context,
+  static void load_and_compile(legate::TaskContext context,
                                const std::string &platform_name);
 };
 

@@ -24,7 +24,7 @@ using namespace legate;
 namespace legate_xla {
 
 /*static*/ void HLOLoaderTask::load_and_compile(
-    TaskContext &context, LegateCompiler *compiler, uint64_t run_id,
+    TaskContext context, LegateCompiler *compiler, uint64_t run_id,
     const std::string &platform_name, std::optional<uint32_t> num_partitions,
     bool print_stats) {
   auto cfg = get_task_config(context);
@@ -53,7 +53,7 @@ namespace legate_xla {
 }
 
 /*static*/ void
-HLOLoaderTask::load_and_compile(TaskContext &context,
+HLOLoaderTask::load_and_compile(TaskContext context,
                                 const std::string &platform_name) {
   log_xla.debug() << "HLOLoaderTask start";
   auto &scalars = context.scalars();
@@ -64,7 +64,7 @@ HLOLoaderTask::load_and_compile(TaskContext &context,
   log_xla.debug() << "HLOLoaderTask done";
 }
 
-/*static*/ void HLOLoaderTask::cpu_variant(TaskContext &context) {
+/*static*/ void HLOLoaderTask::cpu_variant(TaskContext context) {
   load_and_compile(context, "cpu");
 }
 
