@@ -85,12 +85,8 @@ public:
                        const std::vector<BufferAllocation> &outputs,
                        TaskMemoryAllocator *allocator,
                        const DeviceAssignment &device_assignment) const = 0;
-};
 
-struct StoreHandleImpl;
-
-struct StoreHandle {
-  StoreHandleImpl *impl;
+  virtual const std::vector<size_t> &LaunchShape() const = 0;
 };
 
 class LegateCompiler {
@@ -98,6 +94,10 @@ public:
   virtual void Compile(uint64_t run_id, const CompileConfig &config) = 0;
 
   virtual std::unique_ptr<LegateExecutable> MakeExecutable() = 0;
+
+  virtual const std::vector<size_t> &LaunchShape() const = 0;
+
+  virtual uint64_t HloId() const = 0;
 };
 
 enum class SupportedType {
@@ -121,6 +121,19 @@ enum class SupportedType {
 struct Shape {
   SupportedType type;
   std::vector<size_t> dims;
+  std::vector<size_t> tile_shape;
+  size_t replicated = 1;
+};
+
+struct Tile {
+  std::vector<size_t> origin;
+  std::vector<size_t> dims;
+};
+
+struct StoreHandleImpl;
+
+struct StoreHandle {
+  std::shared_ptr<StoreHandleImpl> impl;
 };
 
 std::ostream &operator<<(std::ostream &os, const Shape &shape);

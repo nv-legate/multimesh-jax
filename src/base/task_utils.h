@@ -1,4 +1,5 @@
 #include "legate.h"
+#include <condition_variable>
 
 namespace legate_xla {
 
@@ -12,5 +13,20 @@ struct TaskConfig {
 };
 
 TaskConfig get_task_config(const legate::TaskContext &context);
+
+class TaskWaiter {
+public:
+  TaskWaiter(int64_t num_tasks) : ready_(false), num_pending_{num_tasks} {}
+
+  void Wait();
+
+  void Signal();
+
+private:
+  bool ready_;
+  std::atomic<int64_t> num_pending_;
+  std::condition_variable cv_;
+  std::mutex m_;
+};
 
 } // namespace legate_xla

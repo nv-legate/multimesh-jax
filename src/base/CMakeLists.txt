@@ -8,6 +8,8 @@ set(_srcs
   hlo_loader.cu
   legate_mapper.cc
   registration.cc
+  shard_getter.cc
+  shard_getter.cu
   task_utils.cc
   xla_task.cc
 )

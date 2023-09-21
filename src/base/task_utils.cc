@@ -19,4 +19,21 @@ TaskConfig get_task_config(const TaskContext &context) {
   };
 }
 
+void TaskWaiter::Wait() {
+  std::unique_lock lk(m_);
+  cv_.wait(lk, [&] { return ready_; });
+}
+
+void TaskWaiter::Signal() {
+  int64_t remainining = num_pending_.fetch_add(int64_t(-1));
+  if (remainining == 1) {
+    // off by one, 1 means this was the last one to run
+    {
+      std::lock_guard lk(m_);
+      ready_ = true;
+    }
+    cv_.notify_one();
+  }
+}
+
 } // namespace legate_xla

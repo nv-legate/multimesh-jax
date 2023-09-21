@@ -80,7 +80,7 @@ struct get_write_only_buffer_fn {
   run_executable(context, exe, run_id, scalar_offset);
   log_xla.debug() << "HLOExecutorTask run_executable done";
 
-  if (callbacks->size() > 0) {
+  if (false) { // callbacks->size() > 0) {
     log_xla.debug() << "Running total of " << callbacks->size() << " callbacks";
     for (auto &fn : *callbacks) {
       try {
@@ -94,7 +94,7 @@ struct get_write_only_buffer_fn {
       }
     }
   }
-  delete callbacks;
+  // delete callbacks;
 
   log_xla.debug() << "HLOExecutorTask callbacks done";
 }

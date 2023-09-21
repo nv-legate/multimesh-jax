@@ -16,6 +16,7 @@
 
 #include "hlo_loader.h"
 #include "allocator.h"
+#include "executable_cache.h"
 #include "legate_to_xla.h"
 #include "task_utils.h"
 
@@ -25,31 +26,38 @@ namespace legate_xla {
 
 /*static*/ void HLOLoaderTask::load_and_compile(
     TaskContext context, LegateCompiler *compiler, uint64_t run_id,
-    const std::string &platform_name, std::optional<uint32_t> num_partitions,
-    bool print_stats) {
-  auto cfg = get_task_config(context);
-  uint32_t partitions =
-      num_partitions.has_value() ? *num_partitions : cfg.num_tasks;
-  DeferredBufferAllocator allocator;
-  // only print stats (if requested) on the lowest node
-  print_stats = print_stats && (cfg.my_node == cfg.min_node);
+    const std::string &platform_name, const HloLoaderOptions &options) {
 
-  try {
-    compiler->Compile(
-        run_id,
-        {.replica_count =
-             1, // TODO: we do not handle psum calls or replica all-reduces
-         .num_partitions = (int)partitions,
-         .run_hlo_passes = true,
-         .stream_executor_index = cfg.local_proc_id,
-         .allocator = &allocator,
-         .print_stats = print_stats});
-  } catch (const std::exception &e) {
-    log_xla.error() << "Standard exception caught during 'Compile', message '"
-                    << e.what() << "'";
-  } catch (...) {
-    log_xla.error() << "Exception caught during 'Compile'";
-  }
+  uint64_t hlo_id =
+      options.hlo_id.has_value() ? *options.hlo_id : compiler->HloId();
+  // only one GPU per node should be running the compilation
+  compile_executable(hlo_id, [&] {
+    auto cfg = get_task_config(context);
+    uint32_t partitions = options.num_partitions.has_value()
+                              ? *options.num_partitions
+                              : cfg.num_tasks;
+    DeferredBufferAllocator allocator;
+    // only print stats (if requested) on the lowest node
+    bool print_stats = options.print_stats && (cfg.my_node == cfg.min_node);
+
+    try {
+      compiler->Compile(
+          run_id,
+          {.replica_count =
+               1, // TODO: we do not handle psum calls or replica all-reduces
+           .num_partitions = (int)partitions,
+           .run_hlo_passes = true,
+           .stream_executor_index = cfg.local_proc_id,
+           .allocator = &allocator,
+           .print_stats = print_stats});
+    } catch (const std::exception &e) {
+      log_xla.error() << "Standard exception caught during 'Compile', message '"
+                      << e.what() << "'";
+    } catch (...) {
+      log_xla.error() << "Exception caught during 'Compile'";
+    }
+    return compiler->MakeExecutable();
+  });
 }
 
 /*static*/ void

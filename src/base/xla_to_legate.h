@@ -11,16 +11,19 @@ void CreateExecuteTask(LegateExecutable *executable,
 
 StoreHandle CreateStore(const legate_xla::Shape &shape);
 
+StoreHandle Reshard(const StoreHandle &handle,
+                    const std::vector<size_t> &tile_shape);
+
+void SliceLocalShards(const StoreHandle &handle,
+                      std::vector<void *> &local_shards);
+
 void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
-                                   StoreHandle output,
+                                   StoreHandle &output,
                                    std::function<void()> on_done);
 
-void Synchronize(StoreHandle store);
+void Synchronize(const StoreHandle &store);
 
-void CopyStoreToHostSync(StoreHandle input,
-                         std::function<void(const void *)> copy_func);
-
-void Destroy(StoreHandle store);
+void Destroy(StoreHandle &store);
 
 void StartLegate();
 

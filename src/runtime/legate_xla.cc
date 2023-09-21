@@ -1,20 +1,38 @@
 #include "legate_mapper.h"
 #include "legate_to_xla.h"
 #include "legate_xla_common.h"
+#include "task_utils.h"
 #include "xla_task.h"
 #include "xla_to_legate.h"
 
 #include <core/data/logical_store.h>
 #include <core/task/task.h>
+#include <tuple>
+#include <unistd.h>
+#include <utility>
 
 #include "legate_runtime.h"
 
 namespace legate_xla {
 namespace {
 
+template <class T> struct RefCountScalarArg {
+  T arg;
+  std::atomic<int> refcount{0};
+};
+
 int64_t GetRunId() {
   static std::atomic<int64_t> counter{0};
   return counter.fetch_add(1);
+}
+
+size_t LaunchSize(const Shape &shape) {
+  size_t size = shape.replicated;
+  for (size_t dim = 0; dim < shape.dims.size(); ++dim) {
+    size_t color_shape = shape.dims[dim] / shape.tile_shape[dim];
+    size *= color_shape;
+  }
+  return size;
 }
 
 struct get_read_only_ptr {
@@ -28,10 +46,35 @@ struct get_read_only_ptr {
   }
 };
 
+struct ReplicatedStoreShape {
+  size_t replication = 1;
+  std::vector<size_t> dims;
+  std::vector<size_t> tile_shape;
+};
+
+ReplicatedStoreShape ComputeStoreShape(const Shape &shape) {
+  std::vector<size_t> dims;
+  std::vector<size_t> tile_shape;
+  ReplicatedStoreShape store_shape{.replication = shape.replicated};
+  if (shape.replicated > 1) {
+    store_shape.dims.push_back(shape.replicated);
+    store_shape.dims.insert(dims.end(), shape.dims.begin(), shape.dims.end());
+    store_shape.tile_shape.push_back(1);
+    store_shape.tile_shape.insert(tile_shape.end(), shape.tile_shape.begin(),
+                                  shape.tile_shape.end());
+  } else {
+    store_shape.dims = shape.dims;
+    store_shape.tile_shape = shape.tile_shape;
+  }
+  return store_shape;
+}
+
 } // namespace
 
 struct StoreHandleImpl {
   legate::LogicalStore store;
+  Shape shape;
+  std::optional<legate::LogicalStorePartition> partition;
 };
 
 legate::Type::Code SupportedTypeToLegateType(SupportedType type) {
@@ -142,8 +185,8 @@ void CreateCompileTask(LegateCompiler *compiler) {
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
 
-  auto task = runtime->create_task(XlaOpCode::XLA_COMPILE_TASK);
-  auto part = task.declare_partition();
+  legate::Shape launch_shape = compiler->LaunchShape();
+  auto task = runtime->create_task(XlaOpCode::XLA_COMPILE_TASK, launch_shape);
 
   task.add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(compiler)));
   task.add_scalar_arg(legate::Scalar(GetRunId()));
@@ -163,7 +206,10 @@ void CreateExecuteTask(LegateExecutable *executable,
     auto runtime = legate_xla::Runtime::get_runtime();
     auto core_runtime = legate::Runtime::get_runtime();
 
-    auto task = runtime->create_task(XlaOpCode::XLA_EXECUTE_TASK);
+    legate::Shape launch_shape(executable->LaunchShape());
+    legate::Shape flattened({launch_shape.volume()});
+
+    auto task = runtime->create_task(XlaOpCode::XLA_EXECUTE_TASK, flattened);
 
     task.add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(executable)));
     task.add_scalar_arg(legate::Scalar(GetRunId()));
@@ -171,14 +217,20 @@ void CreateExecuteTask(LegateExecutable *executable,
     task.add_scalar_arg(
         legate::Scalar(reinterpret_cast<uint64_t>(std::move(on_done))));
 
-    for (auto input : inputs) {
-      task.add_input(input.impl->store,
-                     task.find_or_declare_partition(input.impl->store));
+    for (const auto &input : inputs) {
+      if (input.impl->partition.has_value()) {
+        task.add_input(*input.impl->partition);
+      } else {
+        task.add_input(input.impl->store);
+      }
     }
 
-    for (auto output : outputs) {
-      task.add_output(output.impl->store,
-                      task.find_or_declare_partition(output.impl->store));
+    for (const auto &output : outputs) {
+      if (output.impl->partition.has_value()) {
+        task.add_output(*output.impl->partition);
+      } else {
+        task.add_output(output.impl->store);
+      }
       task.add_scalar_arg(legate::Scalar(false));
     }
 
@@ -187,14 +239,14 @@ void CreateExecuteTask(LegateExecutable *executable,
   }
 
   if (legate_xla::Runtime::synchronous_mode()) {
-    for (auto output : outputs) {
+    for (const auto &output : outputs) {
       Synchronize(output);
     }
   }
 }
 
 void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
-                                   StoreHandle output,
+                                   StoreHandle &output,
                                    std::function<void()> on_done) {
   {
     LOCK;
@@ -209,9 +261,10 @@ void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
 
     if (on_done) {
       task.add_scalar_arg(legate::Scalar(true));
-      auto on_done_copy = std::make_unique<std::function<void()>>(on_done);
-      task.add_scalar_arg(
-          legate::Scalar(reinterpret_cast<uint64_t>(on_done_copy.release())));
+      auto on_done_copy =
+          std::make_unique<std::function<void()>>(std::move(on_done));
+      auto arg = reinterpret_cast<uint64_t>(on_done_copy.release());
+      task.add_scalar_arg(legate::Scalar(arg));
     } else {
       task.add_scalar_arg(legate::Scalar(false));
     }
@@ -226,14 +279,14 @@ void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
   }
 }
 
-void Destroy(StoreHandle store) {
+void Destroy(StoreHandle &store) {
   LOCK;
-  log_xla.debug() << "Destroy Store " << store.impl;
+  log_xla.debug() << "Destroy Store";
   // no need to synchronize -- just removing the reference
-  delete store.impl;
+  store.impl = nullptr;
 }
 
-void Synchronize(StoreHandle store) {
+void Synchronize(const StoreHandle &store) {
   LOCK;
   log_xla.debug() << "Synchronize store " << store.impl << " start";
   auto runtime = legate_xla::Runtime::get_runtime();
@@ -244,72 +297,69 @@ void Synchronize(StoreHandle store) {
   log_xla.debug() << "Synchronize store " << store.impl << " done";
 }
 
-void CopyStoreToHostSync(StoreHandle input,
-                         std::function<void(const void *)> copy_func) {
-  LOCK;
-  log_xla.debug() << "CopyStoreToHostSync " << input.impl << " start";
+void SliceLocalShards(const StoreHandle &handle,
+                      std::vector<void *> &local_shards) {
   auto runtime = legate_xla::Runtime::get_runtime();
-  auto logical_store = input.impl->store;
-  auto out_mapped = logical_store.get_physical_store();
-  auto buffer_alloc = legate::double_dispatch(
-      out_mapped.dim(), out_mapped.code(), get_read_only_ptr{}, out_mapped);
-  copy_func(buffer_alloc);
-  log_xla.debug() << "CopyStoreToHostSync " << input.impl << " done";
+  auto core_runtime = legate::Runtime::get_runtime();
+  auto task = runtime->create_task(XlaOpCode::XLA_SHARD_GETTER_TASK,
+                                   {LaunchSize(handle.impl->shape)});
+
+  TaskWaiter waiter{int64_t(local_shards.size())};
+  task.add_scalar_arg(reinterpret_cast<uint64_t>(local_shards.data()));
+  task.add_scalar_arg(reinterpret_cast<uint64_t>(&waiter));
+
+  // Treat this as an output for future synchronization purposes
+  if (handle.impl->partition.has_value()) {
+    task.add_input(*handle.impl->partition);
+  } else {
+    task.add_input(handle.impl->store);
+  }
+  runtime->submit(std::move(task));
+
+  waiter.Wait();
+}
+
+StoreHandle Reshard(const StoreHandle &handle,
+                    const std::vector<size_t> &tile_shape) {
+  if (tile_shape != handle.impl->shape.tile_shape) {
+    Shape new_shape = handle.impl->shape;
+    new_shape.tile_shape = tile_shape;
+    ReplicatedStoreShape store_shape = ComputeStoreShape(new_shape);
+    auto new_impl = std::make_shared<StoreHandleImpl>(
+        StoreHandleImpl{.store = handle.impl->store, .shape = new_shape});
+    new_impl->partition =
+        new_impl->store.partition_by_tiling(store_shape.tile_shape);
+    return StoreHandle{.impl = std::move(new_impl)};
+  }
+  // just return back the original handle, no resharding
+  return handle;
 }
 
 StoreHandle CreateStore(const legate_xla::Shape &shape) {
   legate::Type::Code code = SupportedTypeToLegateType(shape.type);
-  // legate modification of dimensions:
-  // 1. handle scalars (dims.size() == 0) as arrays of size 1
-  // 2. squash all dimensions >= 4
-  // 3. if any dimension has size 0 we create a scalar store
-  // FIXME: evaluate MAX_DIM legion
-  std::vector<size_t> dims(shape.dims);
+
+  auto store_shape = ComputeStoreShape(shape);
+
   bool is_scalar = false;
-  if (dims.empty()) {
-    is_scalar = true;
-    dims.push_back(1ul);
-  } else if (dims.size() > 4) {
-    log_xla.warning() << "Number of dimensions(" << dims.size()
-                      << ") > 4! Collapse all dims > 3 to 4!";
-    uint64_t collapsed_4th = 1ul;
-    while (dims.size() >= 4) {
-      collapsed_4th *= dims.back();
-      dims.pop_back();
-    }
-    dims.push_back(collapsed_4th);
-  }
 
   auto core_runtime = legate::Runtime::get_runtime();
 
-  StoreHandle result;
-  if (ShapeNumElements(shape) > 0) {
-    LOCK;
-    result = {.impl = new StoreHandleImpl{
-                  .store = core_runtime->create_store(
-                      dims, legate::primitive_type(code), is_scalar)}};
-  } else {
-    {
-      LOCK;
-      log_xla.debug()
-          << "Create single element store to prevent empty allocation";
-      result = {
-          .impl = new StoreHandleImpl{.store = core_runtime->create_store(
-                                          {1}, legate::primitive_type(code))}};
+  LOCK;
+  StoreHandle result = {
+      .impl = std::make_shared<StoreHandleImpl>(StoreHandleImpl{
+          .store = core_runtime->create_store(
+              store_shape.dims, legate::primitive_type(code), is_scalar),
+          .shape = shape})};
 
-      // FIXME: initialize it with 0 (on host)
-      // otherwise runtime might complain when read-accessing later
-      auto runtime = legate_xla::Runtime::get_runtime();
-      auto task = runtime->create_task(XlaOpCode::XLA_INIT_ZERO_TASK);
-      auto part = task.declare_partition();
-      task.add_output(result.impl->store, part);
-      runtime->submit(std::move(task));
-    }
-
-    if (legate_xla::Runtime::synchronous_mode()) {
-      Synchronize(result);
-    }
+  if (!store_shape.tile_shape.empty()) {
+    result.impl->partition =
+        result.impl->store.partition_by_tiling(store_shape.tile_shape);
   }
+
+  if (legate_xla::Runtime::synchronous_mode()) {
+    Synchronize(result);
+  }
+
   log_xla.debug() << "CreateStore " << result.impl << " done with " << shape;
   return result;
 }
@@ -345,7 +395,10 @@ std::ostream &operator<<(std::ostream &os, const Shape &shape) {
      << ",dim=[";
   for (auto i : shape.dims)
     ss << i << ",";
-  ss << "])";
+  ss << "]),tile=[";
+  for (auto i : shape.tile_shape)
+    ss << i << ",";
+  ss << "], replication=" << shape.replicated;
   os << ss.str();
   return os;
 }

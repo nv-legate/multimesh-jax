@@ -25,15 +25,9 @@
 
 namespace legate_xla {
 
-struct HloLoaderOptions {
-  bool print_stats = false;
-  std::optional<uint32_t> num_partitions = std::nullopt;
-  std::optional<uint64_t> hlo_id = std::nullopt;
-};
-
-class HLOLoaderTask : public XlaTask<HLOLoaderTask> {
+class ShardGetterTask : public XlaTask<ShardGetterTask> {
 public:
-  static constexpr int32_t TASK_ID = XLA_COMPILE_TASK;
+  static constexpr int32_t TASK_ID = XLA_SHARD_GETTER_TASK;
 
 public:
   static void cpu_variant(legate::TaskContext context);
@@ -41,13 +35,7 @@ public:
   static void gpu_variant(legate::TaskContext context);
 
 public:
-  static void
-  load_and_compile(legate::TaskContext context, LegateCompiler *compiler,
-                   uint64_t run_id, const std::string &platform_name,
-                   const HloLoaderOptions &options = HloLoaderOptions{});
-
-  static void load_and_compile(legate::TaskContext context,
-                               const std::string &platform_name);
+  static void get_shard(legate::TaskContext context);
 };
 
 } // namespace legate_xla

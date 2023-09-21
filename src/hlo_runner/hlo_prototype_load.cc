@@ -44,14 +44,10 @@ HLOPrototypeLoaderTask::load_and_compile(TaskContext context,
     LEGATE_ABORT;
   }
 
-  compile_executable(hlo_id, [&] {
-    log_xla.info() << "Starting to compile " << hlo_name;
-    HLOLoaderTask::load_and_compile(context, compiler.get(), run_id,
-                                    platform_name, loader_npartitions,
-                                    /*print_stats=*/true);
-    log_xla.info() << "Done compiling " << hlo_name;
-    return compiler->MakeExecutable();
-  });
+  log_xla.info() << "Starting to compile " << hlo_name;
+  HLOLoaderTask::load_and_compile(context, compiler.get(), run_id,
+                                  platform_name, loader_npartitions,
+                                  /*print_stats=*/true);
 }
 
 /*static*/ void HLOPrototypeLoaderTask::cpu_variant(TaskContext context) {
