@@ -87,6 +87,8 @@ public:
                        const DeviceAssignment &device_assignment) const = 0;
 
   virtual const std::vector<size_t> &LaunchShape() const = 0;
+
+  virtual std::string Name() const = 0;
 };
 
 class LegateCompiler {

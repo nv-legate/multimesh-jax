@@ -11,8 +11,8 @@ TaskConfig get_task_config(const TaskContext &context) {
       .device_id_range = device_id_range,
       .task_id = task_id,
       .num_tasks = (int32_t)device_id_range.count(),
-      .local_proc_id = static_cast<int32_t>((device_id_range.low + task_id) %
-                                            device_id_range.per_node_count),
+      .local_device_id = static_cast<int32_t>((device_id_range.low + task_id) %
+                                              device_id_range.per_node_count),
       .min_node = device_id_range.low / device_id_range.per_node_count,
       .my_node =
           (device_id_range.low + task_id) / device_id_range.per_node_count,

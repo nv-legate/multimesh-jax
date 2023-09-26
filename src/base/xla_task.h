@@ -31,9 +31,9 @@ template <typename T> struct XlaTask : public legate::LegateTask<T> {
 };
 
 // Generic initialization of LegateBuffer from host data ptr
-class XLAInitFromHostTask : public XlaTask<XLAInitFromHostTask> {
+class XLACopyDeviceToDevice : public XlaTask<XLACopyDeviceToDevice> {
 public:
-  static const int32_t TASK_ID = XlaOpCode::XLA_INIT_FROM_HOST_TASK;
+  static const int32_t TASK_ID = XlaOpCode::XLA_COPY_DEVICE_TO_DEVICE;
 
 public:
   static void gpu_variant(legate::TaskContext context);

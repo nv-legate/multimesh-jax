@@ -1,4 +1,5 @@
 #include "legate_xla_common.h"
+#include <set>
 
 namespace legate_xla {
 
@@ -11,15 +12,23 @@ void CreateExecuteTask(LegateExecutable *executable,
 
 StoreHandle CreateStore(const legate_xla::Shape &shape);
 
+void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
+                        size_t num_local_devices);
+
 StoreHandle Reshard(const StoreHandle &handle,
                     const std::vector<size_t> &tile_shape);
 
+std::set<int> GetLocalDevices(int my_node);
+
 void SliceLocalShards(const StoreHandle &handle,
-                      std::vector<void *> &local_shards);
+                      std::vector<void *> &local_shard,
+                      const std::vector<size_t> &devices, size_t shard_id);
 
 void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
                                    StoreHandle &output,
                                    std::function<void()> on_done);
+
+void PrintMachineConfig();
 
 void Synchronize(const StoreHandle &store);
 

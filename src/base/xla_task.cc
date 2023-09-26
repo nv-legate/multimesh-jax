@@ -1,6 +1,9 @@
 #include "xla_task.h"
 
+#include "cuda.h"
 #include "legate_xla_common.h"
+#include "task_utils.h"
+#include <core/utilities/dispatch.h>
 
 namespace legate_xla {
 
@@ -40,39 +43,27 @@ Legion::Logger log_xla("legate.xla");
   return registrar;
 }
 
-/*static*/ void XLAInitFromHostTask::gpu_variant(legate::TaskContext context) {
-  auto &scalars = context.scalars();
-  auto bytes = scalars[0].value<uint64_t>();
-  auto input_ptr = reinterpret_cast<void *>(scalars[1].value<uint64_t>());
-
-  auto has_on_done_function = scalars[2].value<bool>();
-  std::function<void()> *on_done_function;
-  if (has_on_done_function) {
-    on_done_function =
-        reinterpret_cast<std::function<void()> *>(scalars[3].value<uint64_t>());
-  }
-
+/*static*/ void
+XLACopyDeviceToDevice::gpu_variant(legate::TaskContext context) {
   auto output_store = context.outputs()[0].data();
-  log_xla.debug() << "XLAInitFromHostTask: copying " << bytes
-                  << " bytes to store of dimension " << output_store.dim();
-  auto output_ptr =
+  auto output_buffer =
       legate::double_dispatch(output_store.dim(), output_store.code(),
                               get_write_only_buffer_fn{}, output_store);
 
-  cudaMemcpy(output_ptr.buffer, input_ptr, bytes, cudaMemcpyHostToDevice);
+  const void *src =
+      reinterpret_cast<void *>(context.scalar(0).value<uint64_t>());
+  uint64_t src_size = context.scalar(1).value<uint64_t>();
+  TaskWaiter *waiter =
+      reinterpret_cast<TaskWaiter *>(context.scalar(2).value<uint64_t>());
 
-  if (has_on_done_function) {
-    try {
-      (*on_done_function)();
-    } catch (const std::exception &e) {
-      log_xla.error() << "Standard exception caught during on_done callback "
-                         "excecution, message '"
-                      << e.what() << "'";
-    } catch (...) {
-      log_xla.error() << "Exception caught during on_done callback excecution";
-    }
-    delete on_done_function;
+  if (output_buffer.size != src_size) {
+    std::cerr << "Device-to-device copy has mistmatched sizes "
+              << output_buffer.size << " != " << src_size << std::endl;
+    abort();
   }
+  cudaMemcpy(output_buffer.buffer, src, src_size, cudaMemcpyDeviceToDevice);
+
+  waiter->Signal();
 }
 
 /*static*/ void XLAInitZeroTask::gpu_variant(legate::TaskContext context) {
@@ -90,7 +81,7 @@ Legion::Logger log_xla("legate.xla");
 namespace // unnamed
 {
 static void __attribute__((constructor)) register_tasks(void) {
-  XLAInitFromHostTask::register_variants();
+  XLACopyDeviceToDevice::register_variants();
   XLAInitZeroTask::register_variants();
 }
 } // namespace

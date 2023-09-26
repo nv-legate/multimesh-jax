@@ -47,7 +47,7 @@ namespace legate_xla {
                1, // TODO: we do not handle psum calls or replica all-reduces
            .num_partitions = (int)partitions,
            .run_hlo_passes = true,
-           .stream_executor_index = cfg.local_proc_id,
+           .stream_executor_index = cfg.local_device_id,
            .allocator = &allocator,
            .print_stats = print_stats});
     } catch (const std::exception &e) {

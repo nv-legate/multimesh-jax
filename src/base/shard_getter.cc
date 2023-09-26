@@ -44,14 +44,18 @@ struct get_read_only_ptr {
   const void **shard_buffers =
       reinterpret_cast<const void **>(context.scalar(0).value<uint64_t>());
   const auto &array = context.input(0);
-  const void *buffer = legate::double_dispatch(
-      array.dim(), array.data().code(), get_read_only_ptr{}, array.data());
 
   auto *waiter =
-      reinterpret_cast<TaskWaiter *>(context.scalar(1).value<uint64_t>());
+      reinterpret_cast<TaskWaiter *>(context.scalar(2).value<uint64_t>());
 
-  shard_buffers[cfg.local_proc_id] = buffer;
-  waiter->Signal();
+  int64_t num_shards = context.scalar(1).value<int64_t>();
+
+  if (cfg.local_device_id < num_shards) {
+    const void *buffer = legate::double_dispatch(
+        array.dim(), array.data().code(), get_read_only_ptr{}, array.data());
+    shard_buffers[cfg.local_device_id] = buffer;
+    waiter->Signal();
+  }
 }
 
 /*static*/ void ShardGetterTask::cpu_variant(TaskContext context) {

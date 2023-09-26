@@ -114,7 +114,7 @@ struct get_write_only_buffer_fn {
   size_t total_outputs = context.outputs().size() + context.reductions().size();
   int output_idx = 0;
   int red_idx = 0;
-
+  auto cfg = get_task_config(context);
   // first 2 scalars are exe and ID values
   for (size_t idx = scalar_offset; idx < total_outputs + scalar_offset; ++idx) {
     bool is_red = context.scalars()[idx].value<bool>();
@@ -125,10 +125,8 @@ struct get_write_only_buffer_fn {
         store.dim(), store.code(), get_write_only_buffer_fn{}, store, is_red));
   }
 
-  auto cfg = get_task_config(context);
-
   DeferredBufferAllocator allocator;
-  DeviceAssignment device_assignment({.local_device_id = cfg.local_proc_id,
+  DeviceAssignment device_assignment({.local_device_id = cfg.local_device_id,
                                       .replica_count = 1,
                                       .num_partitions = cfg.num_tasks});
 
