@@ -53,16 +53,23 @@ XLACopyDeviceToDevice::gpu_variant(legate::TaskContext context) {
   const void *src =
       reinterpret_cast<void *>(context.scalar(0).value<uint64_t>());
   uint64_t src_size = context.scalar(1).value<uint64_t>();
+
+  log_xla.debug() << "CopyDeviceToDevice from " << src << " -> "
+                  << output_buffer.buffer << " of size " << src_size;
+
   TaskWaiter *waiter =
       reinterpret_cast<TaskWaiter *>(context.scalar(2).value<uint64_t>());
 
-  if (output_buffer.size != src_size) {
-    std::cerr << "Device-to-device copy has mistmatched sizes "
-              << output_buffer.size << " != " << src_size << std::endl;
-    abort();
+  if (src_size != 0) {
+    if (output_buffer.size != src_size) {
+      std::cerr << "Device-to-device copy has mismatched sizes "
+                << output_buffer.size << " != " << src_size << std::endl;
+      abort();
+    }
+    cudaMemcpy(output_buffer.buffer, src, src_size, cudaMemcpyDeviceToDevice);
   }
-  cudaMemcpy(output_buffer.buffer, src, src_size, cudaMemcpyDeviceToDevice);
 
+  log_xla.debug() << "Done copying, signal waiter";
   waiter->Signal();
 }
 

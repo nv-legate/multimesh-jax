@@ -29,8 +29,16 @@ int64_t GetRunId() {
 size_t LaunchSize(const Shape &shape) {
   size_t size = shape.replicated;
   for (size_t dim = 0; dim < shape.dims.size(); ++dim) {
-    size_t color_shape = shape.dims[dim] / shape.tile_shape[dim];
-    size *= color_shape;
+    if (shape.tile_shape[dim] == 0) {
+      if (shape.dims[dim] != 0) {
+        std::cerr << "Tile shape is zero, but dim is non-zero for " << shape
+                  << std::endl;
+        abort();
+      }
+    } else {
+      size_t color_shape = shape.dims[dim] / shape.tile_shape[dim];
+      size *= color_shape;
+    }
   }
   return size;
 }
@@ -53,13 +61,26 @@ Shape ComputeStoreShape(const Shape &shape) {
     store_shape.dims.insert(store_shape.dims.end(), shape.dims.begin(),
                             shape.dims.end());
     store_shape.tile_shape.push_back(1);
-    const auto &tile_shape =
-        shape.tile_shape.empty() ? shape.dims : shape.tile_shape;
-    store_shape.tile_shape.insert(store_shape.tile_shape.end(),
-                                  tile_shape.begin(), tile_shape.end());
+  } else if (shape.dims.empty()) {
+    store_shape.dims = {1};
+    store_shape.tile_shape = {1};
+    return store_shape;
   } else {
     store_shape.dims = shape.dims;
-    store_shape.tile_shape = shape.tile_shape;
+  }
+
+  const auto &tile_shape =
+      shape.tile_shape.empty() ? shape.dims : shape.tile_shape;
+  store_shape.tile_shape.insert(store_shape.tile_shape.end(),
+                                tile_shape.begin(), tile_shape.end());
+
+  for (auto idx = 0; idx < store_shape.dims.size(); ++idx) {
+    if (store_shape.dims[idx] == 0) {
+      store_shape.dims[idx] = 1;
+    }
+    if (store_shape.tile_shape[idx] == 0) {
+      store_shape.tile_shape[idx] = 1;
+    }
   }
   return store_shape;
 }
@@ -242,7 +263,10 @@ void CreateExecuteTask(LegateExecutable *executable,
 
 void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
                         size_t num_local_devices) {
+  log_xla.debug() << "CopyDeviceToDevice";
+
   LOCK;
+
   size_t launch_size = LaunchSize(store.impl->shape);
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
@@ -266,7 +290,7 @@ void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
 
 void Destroy(StoreHandle &store) {
   LOCK;
-  log_xla.debug() << "Destroy Store";
+  log_xla.debug() << "Destroy store";
   // no need to synchronize -- just removing the reference
   store.impl = nullptr;
 }
@@ -350,16 +374,15 @@ std::set<int> GetLocalDevices(int my_node) {
 }
 
 StoreHandle CreateStore(const legate_xla::Shape &shape) {
-
   legate::Type::Code code = SupportedTypeToLegateType(shape.type);
 
   auto store_shape = ComputeStoreShape(shape);
-
   bool is_scalar = false;
 
+  log_xla.debug() << "CreateStore, logical=" << shape
+                  << ", actual=" << store_shape;
   LOCK;
   auto core_runtime = legate::Runtime::get_runtime();
-
   StoreHandle result = {
       .impl = std::make_shared<StoreHandleImpl>(StoreHandleImpl{
           .store = core_runtime->create_store(
@@ -369,15 +392,16 @@ StoreHandle CreateStore(const legate_xla::Shape &shape) {
   if (result.impl->shape.tile_shape.empty()) {
     result.impl->shape.tile_shape = shape.dims;
   }
-  result.impl->partition =
-      result.impl->store.partition_by_tiling(store_shape.tile_shape);
+
+  if (!store_shape.tile_shape.empty()) {
+    result.impl->partition =
+        result.impl->store.partition_by_tiling(store_shape.tile_shape);
+  }
 
   if (legate_xla::Runtime::synchronous_mode()) {
     Synchronize(result);
   }
 
-  std::cerr << "CreateStore " << result.impl << ", logical=" << shape
-            << ", actual=" << store_shape << std::endl;
   return result;
 }
 

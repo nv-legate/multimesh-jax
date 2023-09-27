@@ -103,6 +103,7 @@ struct get_write_only_buffer_fn {
                                                 LegateExecutable *exe,
                                                 int64_t run_id,
                                                 int scalar_offset) {
+  log_xla.debug() << "Running task " << exe->Name();
   std::vector<legate_xla::BufferAllocation> inputs, outputs;
 
   for (auto &array : context.inputs()) {
@@ -135,12 +136,7 @@ struct get_write_only_buffer_fn {
     device_assignment(0, idx) = device_id;
   }
 
-  // If this is set to false, the execution profile and ComputeTimeNs for the
-  // stream will be incorrect since it will not include the blocking time.
-  bool block_host_until_done = true;
-
   bool success;
-
   try {
     success =
         exe->Execute(run_id, inputs, outputs, &allocator, device_assignment);
