@@ -28,14 +28,13 @@ template <typename T> pybind11::capsule EncapsulateFunction(T *fn) {
   return pybind11::capsule(bit_cast<void *>(fn), "xla._CUSTOM_CALL_TARGET");
 }
 
-void no_op_entrypoint(){}
+void no_op_entrypoint() {}
 
 PYBIND11_MODULE(legate_jax_impl, m) {
   m.def("shutdown", []() -> void {
     legate_xla::StopLegate();
     ShutdownLegateClient();
   });
-  m.def("no_op_custom_call", [](){
-    return EncapsulateFunction(no_op_entrypoint);
-  });
+  m.def("no_op_custom_call",
+        []() { return EncapsulateFunction(no_op_entrypoint); });
 }

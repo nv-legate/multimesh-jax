@@ -1,0 +1,80 @@
+from collections.abc import Iterable
+from functools import partial
+from typing import Optional
+
+import jax
+from jax._src.lib.mlir import ir
+from jax._src.lib.mlir.dialects import mhlo
+from jax.core import Primitive
+from jax.interpreters import ad, mlir
+
+
+def _no_op_impl(*args, **kwargs):
+    raise Exception(
+        "_mark_gradient_scalar_impl: should not be invoked. "
+        "mark_gradient_scalar should only occur inside jit"
+    )
+
+
+def i32_attr(i):
+    return ir.IntegerAttr.get(ir.IntegerType.get_signless(32), i)
+
+
+def no_op_lowering(
+    ctx, *args, abstract, target: str, config: Optional[str] = None
+):
+    config = "" if config is None else config
+    result = abstract(*args)
+    result = result if isinstance(result, Iterable) else [result]
+
+    op = mhlo.CustomCallOp(
+        [x.type for x in result],
+        [x for x in args],
+        call_target_name=ir.StringAttr.get(target),
+        has_side_effect=ir.BoolAttr.get(False),
+        backend_config=ir.StringAttr.get(config),
+        api_version=i32_attr(1),
+        called_computations=ir.ArrayAttr.get([]),
+        operand_layouts=None,
+        result_layouts=None,
+    )
+    return op.results
+
+
+def no_op(name: str, abstract, config: Optional[str] = None):
+    no_op_p = Primitive(name)
+    no_op_p.def_impl(_no_op_impl)
+    no_op_p.def_abstract_eval(abstract)
+    mlir.register_lowering(
+        no_op_p,
+        partial(no_op_lowering, abstract=abstract, target=name, config=config),
+    )
+
+    def no_op_p_linear(ct, _, **kwargs):
+        return (no_op_p.bind(ct, **kwargs),)
+
+    ad.deflinear2(no_op_p, no_op_p_linear)
+
+    def wrapped(*args, **kwargs):
+        with jax.named_scope(name):
+            return no_op_p.bind(*args, **kwargs)
+
+    return wrapped
+
+
+mark_gradient = no_op(name="Marking", config="gradient", abstract=lambda x: x)
+mark_loss = no_op(name="Marking", config="loss", abstract=lambda x: x)
+
+
+def abstract_microbatch(x, dim, size):
+    return x
+
+
+mark_microbatch = no_op(name="Microbatch", abstract=abstract_microbatch)
+
+
+def microbatch(x, dim: int, size: int):
+    offset = [0] * len(x.shape)
+    sizes = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
+    slice = jax.lax.dynamic_slice(x, offset, sizes)
+    return mark_microbatch(slice, dim, size)
