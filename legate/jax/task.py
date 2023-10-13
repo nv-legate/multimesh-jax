@@ -3,6 +3,7 @@ from typing import Optional
 import jax
 from jax._src.ad_checkpoint import _optimization_barrier
 
+from .lib import should_ignore_transforms
 from .no_op import no_op
 
 
@@ -15,6 +16,9 @@ def finish_task(inp):
 
 
 def task(fxn, name: Optional[str] = None, counter=[0]):
+    if should_ignore_transforms():
+        return fxn
+
     if name is None:
         name = f"{fxn.__name__}.{counter[0]}"
         counter[0] += 1
