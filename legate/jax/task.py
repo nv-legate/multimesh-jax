@@ -7,14 +7,6 @@ from .lib import should_ignore_transforms
 from .no_op import no_op
 
 
-def start_task(inp):
-    return _optimization_barrier(inp)
-
-
-def finish_task(inp):
-    return _optimization_barrier(inp)
-
-
 def task(fxn, name: Optional[str] = None, counter=[0]):
     if should_ignore_transforms():
         return fxn
@@ -35,6 +27,16 @@ def task(fxn, name: Optional[str] = None, counter=[0]):
     mark_output_bwd = no_op(
         name="Task", config=f"output:{name}.bwd", abstract=lambda x: x
     )
+
+    def start_task(inp):
+        return _optimization_barrier(
+            jax.tree_util.tree_map(mark_input_fwd, inp)
+        )
+
+    def finish_task(inp):
+        return _optimization_barrier(
+            jax.tree_util.tree_map(mark_output_fwd, inp)
+        )
 
     start = jax.custom_vjp(start_task)
     finish = jax.custom_vjp(finish_task)

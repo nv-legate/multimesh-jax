@@ -27,12 +27,29 @@ function(find_or_configure_xla)
   endif()
 
   set(xla_library "${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${xla_library_name}")
-  set(xla_target "//xla/pjrt/legate:${xla_library_name}")
 
   file(GLOB xla_source_files
        "${xla_SOURCE_DIR}/xla/pjrt/legate/*.cc"
        "${xla_SOURCE_DIR}/xla/pjrt/legate/*.h"
        "${xla_SOURCE_DIR}/xla/pjrt/legate/BUILD")
+
+
+  option(LegateXla_ENABLE_TESTS
+         "Whether to bazel build the tests in the XLA directory"
+         ON)
+
+  set(test_names
+    hlo_partition_test
+  )
+
+
+  set(target_names "//xla/pjrt/legate:${xla_library_name}")
+  if (LegateXla_ENABLE_TESTS)
+    foreach(test ${test_names})
+      list(APPEND target_names "//xla/pjrt/legate:${test}")
+      list(APPEND xla_source_files "${xla_SOURCE_DIR}/xla/pjrt/legate/${test}.cc")
+    endforeach()
+  endif()
 
   set(_bazel_options
     --define open_source_build=true
@@ -41,8 +58,8 @@ function(find_or_configure_xla)
 
   add_custom_command(
     OUTPUT  ${xla_library}
-    COMMENT "Building tensorflow components"
-    COMMAND rm -rf "${xla_SOURCE_DIR}/bazel-bin" && XLA_LEGATE_SOURCE_DIR=${CMAKE_SOURCE_DIR} bazel --batch build ${_bazel_options} ${xla_target} --check_visibility=false
+    COMMENT "Building XLA components..."
+    COMMAND rm -rf "${xla_SOURCE_DIR}/bazel-bin" && XLA_LEGATE_SOURCE_DIR=${CMAKE_SOURCE_DIR} bazel --batch build ${_bazel_options} ${target_names} --check_visibility=false
     WORKING_DIRECTORY ${xla_SOURCE_DIR}
     DEPENDS ${xla_source_files}
     USES_TERMINAL
@@ -74,6 +91,18 @@ function(find_or_configure_xla)
   )
 
   install(IMPORTED_RUNTIME_ARTIFACTS xla)
+
+  if (LegateXla_ENABLE_TESTS)
+    foreach(test ${test_names})
+      add_executable(${test} IMPORTED)
+      set_target_properties(${test} PROPERTIES IMPORTED_LOCATION ${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${test})
+      add_dependencies(${test} xla_build)
+      message("Adding test ${test}")
+      add_test(NAME ${test} COMMAND ${test} WORKING_DIRECTORY ${xla_SOURCE_DIR})
+    endforeach()
+  endif()
+
+
 endfunction()
 
 find_or_configure_xla()

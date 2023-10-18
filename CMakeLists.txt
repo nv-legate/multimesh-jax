@@ -61,6 +61,8 @@ include(rapids-find)
 
 rapids_cpm_init(OVERRIDE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json)
 
+enable_testing()
+
 option(LegateXLA_HLO_RUNNER OFF
        "Whether to build the HLO runner instead of the plugin client")
 option(LegateXLA_ENABLE_CUDA ON "Whether to build with CUDA")
