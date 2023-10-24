@@ -85,11 +85,31 @@ XLACopyDeviceToDevice::gpu_variant(legate::TaskContext context) {
   cudaMemset(output_alloc.buffer, 0, output_alloc.size);
 }
 
+void XLABufferFromHostBufferTask::gpu_variant(legate::TaskContext context) {
+  log_xla.debug() << "XlaBufferFromHostBufferTask: running";
+  auto output_store = context.outputs()[0].data();
+  auto output_alloc =
+      legate::double_dispatch(output_store.dim(), output_store.code(),
+                              get_write_only_buffer_fn{}, output_store);
+  auto *action = reinterpret_cast<BufferFromHostBufferAction *>(
+      context.scalar(0).value<uint64_t>());
+  int32_t device = context.scalar(1).value<int32_t>();
+  auto cfg = get_task_config(context);
+  action->Act(output_alloc.buffer, cfg.local_device_id);
+  bool blocking = context.scalar(2).value<bool>();
+  if (blocking) {
+    TaskWaiter *waiter =
+        reinterpret_cast<TaskWaiter *>(context.scalar(3).value<uint64_t>());
+    waiter->Signal();
+  }
+}
+
 namespace // unnamed
 {
 static void __attribute__((constructor)) register_tasks(void) {
   XLACopyDeviceToDevice::register_variants();
   XLAInitZeroTask::register_variants();
+  XLABufferFromHostBufferTask::register_variants();
 }
 } // namespace
 

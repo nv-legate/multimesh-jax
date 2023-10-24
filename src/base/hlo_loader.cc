@@ -65,10 +65,11 @@ HLOLoaderTask::load_and_compile(TaskContext context,
                                 const std::string &platform_name) {
   log_xla.debug() << "HLOLoaderTask start";
   auto &scalars = context.scalars();
-  LegateCompiler *compiler =
-      reinterpret_cast<LegateCompiler *>(scalars[0].value<void *>());
+  auto *compiler_hold = reinterpret_cast<TaskArgHold<LegateCompiler> *>(
+      scalars[0].value<uint64_t>());
   uint64_t run_id = scalars[1].value<uint64_t>();
-  load_and_compile(context, compiler, run_id, platform_name);
+  load_and_compile(context, compiler_hold->get(), run_id, platform_name);
+  Release(compiler_hold, context.machine().processor_range().per_node_count);
   log_xla.debug() << "HLOLoaderTask done";
 }
 

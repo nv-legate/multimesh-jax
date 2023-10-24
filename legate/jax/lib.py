@@ -12,11 +12,13 @@ _ignore_transforms = 0
 
 
 @contextmanager
-def ignore_transforms():
+def ignore_transforms(ignore: bool = True):
     global _ignore_transforms
-    _ignore_transforms += 1
+    if ignore:
+        _ignore_transforms += 1
     yield
-    _ignore_transforms -= 1
+    if ignore:
+        _ignore_transforms -= 1
 
 
 def should_ignore_transforms() -> bool:

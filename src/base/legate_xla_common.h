@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <stdint.h>
@@ -86,7 +87,13 @@ public:
                        TaskMemoryAllocator *allocator,
                        const DeviceAssignment &device_assignment) const = 0;
 
+  virtual std::pair<int, int> MachineSlice() const = 0;
+
   virtual const std::vector<size_t> &LaunchShape() const = 0;
+
+  virtual int ReplicaCount() const = 0;
+
+  virtual int NumPartitions() const = 0;
 
   virtual std::string Name() const = 0;
 };
@@ -97,9 +104,48 @@ public:
 
   virtual std::unique_ptr<LegateExecutable> MakeExecutable() = 0;
 
+  virtual std::pair<int, int> MachineSlice() const = 0;
+
   virtual const std::vector<size_t> &LaunchShape() const = 0;
 
+  virtual std::string Name() const = 0;
+
   virtual uint64_t HloId() const = 0;
+};
+
+template <class T> class TaskArgHold {
+public:
+  explicit TaskArgHold(const std::shared_ptr<T> &&arg) : arg_(arg) {}
+
+  T *operator->() const { return arg_.get(); }
+
+  T *get() const { return arg_.get(); }
+
+  bool release(int num_total_holds) {
+    int num_done = num_finished_.fetch_add(1);
+    return num_done == (num_total_holds - 1);
+  }
+
+private:
+  std::shared_ptr<T> arg_;
+  std::atomic<int> num_finished_{0};
+};
+
+template <class T> TaskArgHold<T> *Hold(const std::shared_ptr<T> &arg) {
+  return new TaskArgHold{arg};
+}
+
+template <class T> void Release(TaskArgHold<T> *hold, int num_total_holds) {
+  if (hold->release(num_total_holds)) {
+    delete hold;
+  }
+}
+
+class BufferFromHostBufferAction {
+public:
+  virtual void Act(void *dst, int local_device_id) = 0;
+
+  virtual ~BufferFromHostBufferAction() = default;
 };
 
 enum class SupportedType {

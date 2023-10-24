@@ -19,6 +19,7 @@
 #include "allocator.h"
 #include "core/utilities/dispatch.h"
 #include "legate_to_xla.h"
+#include "legate_xla_common.h"
 #include "task_utils.h"
 #include "xla_task.h"
 #include <chrono>
@@ -68,16 +69,18 @@ struct get_write_only_buffer_fn {
 
 /*static*/ void HLOExecutorTask::run_executable(legate::TaskContext context) {
   int scalar_offset = 0;
-  LegateExecutable *exe = reinterpret_cast<LegateExecutable *>(
+  auto *compiler_hold = reinterpret_cast<TaskArgHold<LegateCompiler> *>(
       context.scalars()[scalar_offset++].value<void *>());
+  auto *compiler = compiler_hold->get();
+  auto exe = compiler->MakeExecutable();
   uint64_t run_id = context.scalars()[scalar_offset++].value<int64_t>();
 
-  log_xla.debug() << "HLOExecutorTask start";
+  log_xla.debug() << "HLOExecutorTask start " << exe->Name();
 
   auto *callbacks = context.scalars()[scalar_offset++]
                         .value<std::vector<std::function<void()>> *>();
 
-  run_executable(context, exe, run_id, scalar_offset);
+  run_executable(context, exe.get(), run_id, scalar_offset);
   log_xla.debug() << "HLOExecutorTask run_executable done";
 
   if (false) { // callbacks->size() > 0) {
@@ -95,6 +98,7 @@ struct get_write_only_buffer_fn {
     }
   }
   // delete callbacks;
+  Release(compiler_hold, context.machine().processor_range().per_node_count);
 
   log_xla.debug() << "HLOExecutorTask callbacks done";
 }
@@ -103,7 +107,13 @@ struct get_write_only_buffer_fn {
                                                 LegateExecutable *exe,
                                                 int64_t run_id,
                                                 int scalar_offset) {
-  log_xla.debug() << "Running task " << exe->Name();
+  auto cfg = get_task_config(context);
+  log_xla.debug() << "Running task " << exe->Name() << " for device "
+                  << cfg.local_device_id << " in range ["
+                  << cfg.device_id_range.low << "," << cfg.device_id_range.high
+                  << ")"
+                  << " with replicas=" << exe->ReplicaCount()
+                  << "  and partitions=" << exe->NumPartitions();
   std::vector<legate_xla::BufferAllocation> inputs, outputs;
 
   for (auto &array : context.inputs()) {
@@ -115,7 +125,7 @@ struct get_write_only_buffer_fn {
   size_t total_outputs = context.outputs().size() + context.reductions().size();
   int output_idx = 0;
   int red_idx = 0;
-  auto cfg = get_task_config(context);
+
   // first 2 scalars are exe and ID values
   for (size_t idx = scalar_offset; idx < total_outputs + scalar_offset; ++idx) {
     bool is_red = context.scalars()[idx].value<bool>();
@@ -126,10 +136,18 @@ struct get_write_only_buffer_fn {
         store.dim(), store.code(), get_write_only_buffer_fn{}, store, is_red));
   }
 
+  if (cfg.num_tasks != (exe->ReplicaCount() * exe->NumPartitions())) {
+    std::cerr << exe->Name() << " launched with " << cfg.num_tasks
+              << " tasks, but requested device assignment of size "
+              << exe->ReplicaCount() << "x" << exe->NumPartitions()
+              << std::endl;
+    abort();
+  }
+
   DeferredBufferAllocator allocator;
   DeviceAssignment device_assignment({.local_device_id = cfg.local_device_id,
-                                      .replica_count = 1,
-                                      .num_partitions = cfg.num_tasks});
+                                      .replica_count = exe->ReplicaCount(),
+                                      .num_partitions = exe->NumPartitions()});
 
   for (uint32_t device_id = cfg.device_id_range.low, idx = 0;
        device_id < cfg.device_id_range.high; ++device_id, ++idx) {

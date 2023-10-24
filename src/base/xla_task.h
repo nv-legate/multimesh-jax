@@ -48,4 +48,13 @@ public:
   static void gpu_variant(legate::TaskContext context);
 };
 
+class XLABufferFromHostBufferTask
+    : public XlaTask<XLABufferFromHostBufferTask> {
+public:
+  static const int32_t TASK_ID = XlaOpCode::XLA_BUFFER_FROM_HOST_BUFFER_TASK;
+
+public:
+  static void gpu_variant(legate::TaskContext context);
+};
+
 } // namespace legate_xla

@@ -196,38 +196,63 @@ size_t ShapeNumElements(Shape shape) {
   }
 }
 
-void CreateCompileTask(LegateCompiler *compiler) {
+void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler_hold) {
+  auto *compiler = compiler_hold->get();
   LOCK;
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
-
+  auto machine = core_runtime->get_machine();
+  auto [start, stop] = compiler->MachineSlice();
+  legate::MachineTracker tracker(machine.slice(start, stop));
+  log_xla.debug() << "CreateCompileTask scheduling on slice [" << start << ","
+                  << stop << ")";
   legate::Shape launch_shape = compiler->LaunchShape();
+  if ((stop - start) < launch_shape.volume()) {
+    std::cerr << "Not enough devices to run launch shape " << launch_shape
+              << " on task " << compiler->Name() << std::endl;
+    abort();
+  }
   auto task = runtime->create_task(XlaOpCode::XLA_COMPILE_TASK, launch_shape);
 
-  task.add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(compiler)));
+  task.add_scalar_arg(
+      legate::Scalar(reinterpret_cast<uint64_t>(compiler_hold)));
   task.add_scalar_arg(legate::Scalar(GetRunId()));
   // number of partitions
   task.add_scalar_arg(legate::Scalar(int64_t(1)));
 
   runtime->submit(std::move(task));
-  log_xla.debug() << "CreateCompileTask scheduled";
 }
 
-void CreateExecuteTask(LegateExecutable *executable,
-                       const std::vector<StoreHandle> &inputs,
-                       const std::vector<StoreHandle> &outputs,
-                       std::vector<std::function<void()>> *on_done) {
+void CreateExecuteTask(
+    TaskArgHold<LegateCompiler> *compiler_hold, // *executable,
+    const std::vector<StoreHandle> &inputs,
+    const std::vector<StoreHandle> &outputs,
+    std::vector<std::function<void()>> *on_done) {
   {
+    auto *compiler = compiler_hold->get();
+
+    // LegateExecutable* executable = compiler->MakeExecutable().release();
+    legate::Shape launch_shape(compiler->LaunchShape());
+    legate::Shape flattened({launch_shape.volume()});
+
     LOCK;
     auto runtime = legate_xla::Runtime::get_runtime();
     auto core_runtime = legate::Runtime::get_runtime();
-
-    legate::Shape launch_shape(executable->LaunchShape());
-    legate::Shape flattened({launch_shape.volume()});
-
+    auto machine = core_runtime->get_machine();
+    auto [start, stop] = compiler->MachineSlice();
+    legate::MachineTracker tracker(machine.slice(start, stop));
+    log_xla.debug() << "CreateExecuteTask " << compiler->Name()
+                    << " for launch shape " << flattened << " on slice ["
+                    << start << "," << stop << ")";
+    if ((stop - start) < launch_shape.volume()) {
+      std::cerr << "Not enough devices to run launch shape " << launch_shape
+                << " on task " << compiler->Name() << std::endl;
+      abort();
+    }
     auto task = runtime->create_task(XlaOpCode::XLA_EXECUTE_TASK, flattened);
 
-    task.add_scalar_arg(legate::Scalar(reinterpret_cast<uint64_t>(executable)));
+    task.add_scalar_arg(
+        legate::Scalar(reinterpret_cast<uint64_t>(compiler_hold)));
     task.add_scalar_arg(legate::Scalar(GetRunId()));
 
     task.add_scalar_arg(
@@ -251,7 +276,6 @@ void CreateExecuteTask(LegateExecutable *executable,
     }
 
     runtime->submit(std::move(task));
-    log_xla.debug() << "CreateExecuteTask scheduled";
   }
 
   if (legate_xla::Runtime::synchronous_mode()) {
@@ -263,11 +287,10 @@ void CreateExecuteTask(LegateExecutable *executable,
 
 void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
                         size_t num_local_devices) {
-  log_xla.debug() << "CopyDeviceToDevice";
+  size_t launch_size = LaunchSize(store.impl->shape);
+  log_xla.debug() << "CopyDeviceToDevice with launch size " << launch_size;
 
   LOCK;
-
-  size_t launch_size = LaunchSize(store.impl->shape);
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
   auto task =
@@ -304,6 +327,38 @@ void Synchronize(const StoreHandle &store) {
   auto buffer_alloc = legate::double_dispatch(
       out_mapped.dim(), out_mapped.code(), get_read_only_ptr{}, out_mapped);
   log_xla.debug() << "Synchronize store " << store.impl << " done";
+}
+
+void BufferFromHostBuffer(BufferFromHostBufferAction *action, StoreHandle store,
+                          int device, int num_local_devices, bool blocking) {
+  size_t launch_size = LaunchSize(store.impl->shape);
+  log_xla.debug() << "legate_xla::BufferFromHostBuffer with launch size "
+                  << launch_size;
+
+  LOCK;
+  auto runtime = legate_xla::Runtime::get_runtime();
+  auto core_runtime = legate::Runtime::get_runtime();
+  auto task = runtime->create_task(XlaOpCode::XLA_BUFFER_FROM_HOST_BUFFER_TASK,
+                                   {launch_size});
+
+  TaskWaiter waiter(launch_size);
+  task.add_scalar_arg(reinterpret_cast<uint64_t>(action));
+  task.add_scalar_arg(static_cast<int32_t>(device));
+  task.add_scalar_arg(blocking);
+  if (blocking) {
+    task.add_scalar_arg(reinterpret_cast<uint64_t>(&waiter));
+  }
+
+  if (store.impl->partition.has_value()) {
+    task.add_output(*store.impl->partition);
+  } else {
+    task.add_output(store.impl->store);
+  }
+  runtime->submit(std::move(task));
+
+  if (blocking) {
+    waiter.Wait();
+  }
 }
 
 void SliceLocalShards(const StoreHandle &handle,
@@ -409,8 +464,7 @@ enum LegateState { UNINITIALIZED, STARTING, STARTED, STOPPING, STOPPED };
 static std::atomic<int> legate_state{UNINITIALIZED};
 
 void StartLegate() {
-
-  static int not_started = UNINITIALIZED;
+  int not_started = UNINITIALIZED;
   if (legate_state.compare_exchange_strong(not_started, int(STARTING))) {
     log_xla.info() << "Starting Legate";
     legate::start(0, nullptr);
@@ -420,8 +474,7 @@ void StartLegate() {
 }
 
 void StopLegate() {
-
-  static int started = STARTED;
+  int started = STARTED;
   if (legate_state.compare_exchange_strong(started, int(STOPPING))) {
     log_xla.info() << "Stopping Legate";
     legate::finish();

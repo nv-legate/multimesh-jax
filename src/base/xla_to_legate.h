@@ -3,9 +3,9 @@
 
 namespace legate_xla {
 
-void CreateCompileTask(LegateCompiler *compiler);
+void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler);
 
-void CreateExecuteTask(LegateExecutable *executable,
+void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
                        std::vector<std::function<void()>> *on_done);
@@ -27,6 +27,10 @@ void SliceLocalShards(const StoreHandle &handle,
 void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
                                    StoreHandle &output,
                                    std::function<void()> on_done);
+
+void BufferFromHostBuffer(BufferFromHostBufferAction *action,
+                          StoreHandle output, int device, int num_devices,
+                          bool blocking = false);
 
 void PrintMachineConfig();
 

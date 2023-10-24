@@ -35,30 +35,23 @@ class TaskTest(LegateJaxTestCase):
     )
     def test_add_sequence(self, dtypes):
         shape = [4, 4]
-        rng = jtu.rand_default(self.rng())
 
         def args_maker():
-            return [rng(shape, dtype) for dtype in dtypes]
+            return [
+                jnp.arange(np.prod(shape), dtype=dtype).reshape(shape)
+                for dtype in dtypes
+            ]
 
-        def np_fxn(*arrs):
-            res = arrs[:]
-            for _ in range(3):
-                res = [r + a for (r, a) in zip(res, arrs)]
-            return res
-
-        def task(lhs, rhs):
+        def f(lhs, rhs):
             return [l + r for (l, r) in zip(lhs, rhs)]
-
-        task = legate.jax.task(task)
 
         def jnp_fxn(*arrs):
             res = arrs[:]
             for _ in range(3):
-                res = task(res, arrs)
+                res = legate.jax.task(f)(res, arrs)
             return res
 
-        self._CheckAgainstNumpy(np_fxn, jnp_fxn, args_maker)
-        self._CompileAndCheck(jnp_fxn, args_maker)
+        self._test_against_cuda(jnp_fxn, args_maker)
 
     def test_task_gradients(self):
         def arg_maker():
