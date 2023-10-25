@@ -25,7 +25,7 @@ void TaskWaiter::Wait() {
   cv_.wait(lk, [&] { return ready_; });
 }
 
-void TaskWaiter::Signal() {
+int64_t TaskWaiter::Signal() {
   int64_t remainining = num_pending_.fetch_add(int64_t(-1));
   if (remainining == 1) {
     // off by one, 1 means this was the last one to run
@@ -35,6 +35,7 @@ void TaskWaiter::Signal() {
     }
     cv_.notify_one();
   }
+  return remainining - 1;
 }
 
 } // namespace legate_xla

@@ -21,7 +21,25 @@ Mapper::task_target(const mapping::Task &task,
 std::vector<mapping::StoreMapping>
 Mapper::store_mappings(const mapping::Task &task,
                        const std::vector<mapping::StoreTarget> &options) {
-  return {};
+  std::vector<mapping::StoreMapping> mappings;
+  mappings.reserve(task.num_inputs() + task.num_outputs() +
+                   task.num_reductions());
+
+  auto default_option = options.front();
+  auto append_mapping = [&](const auto &arrays) {
+    for (auto &array : arrays) {
+      auto stores = array.stores();
+      for (auto &store : stores) {
+        mappings.push_back(legate::mapping::StoreMapping::default_mapping(
+            store, default_option, /*exact=*/true));
+      }
+    }
+  };
+
+  append_mapping(task.inputs());
+  append_mapping(task.outputs());
+  append_mapping(task.reductions());
+  return mappings;
 }
 
 Scalar Mapper::tunable_value(TunableID tunable_id) {

@@ -21,7 +21,7 @@ public:
 
   void Wait();
 
-  void Signal();
+  int64_t Signal();
 
 private:
   bool ready_;

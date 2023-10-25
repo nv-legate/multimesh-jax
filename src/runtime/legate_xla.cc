@@ -91,6 +91,7 @@ struct StoreHandleImpl {
   legate::LogicalStore store;
   Shape shape;
   std::optional<legate::LogicalStorePartition> partition;
+  std::string name;
 };
 
 legate::Type::Code SupportedTypeToLegateType(SupportedType type) {
@@ -244,6 +245,17 @@ void CreateExecuteTask(
     log_xla.debug() << "CreateExecuteTask " << compiler->Name()
                     << " for launch shape " << flattened << " on slice ["
                     << start << "," << stop << ")";
+    if (log_xla.want_debug()) {
+      for (const auto &input : inputs) {
+        log_xla.debug() << compiler->Name() << " has input " << input.impl->name
+                        << " with shape " << input.impl->shape;
+      }
+      for (const auto &output : outputs) {
+        log_xla.debug() << compiler->Name() << " has output "
+                        << output.impl->name << " with shape "
+                        << output.impl->shape;
+      }
+    }
     if ((stop - start) < launch_shape.volume()) {
       std::cerr << "Not enough devices to run launch shape " << launch_shape
                 << " on task " << compiler->Name() << std::endl;
@@ -333,7 +345,7 @@ void BufferFromHostBuffer(BufferFromHostBufferAction *action, StoreHandle store,
                           int device, int num_local_devices, bool blocking) {
   size_t launch_size = LaunchSize(store.impl->shape);
   log_xla.debug() << "legate_xla::BufferFromHostBuffer with launch size "
-                  << launch_size;
+                  << launch_size << " num_local_devices=" << num_local_devices;
 
   LOCK;
   auto runtime = legate_xla::Runtime::get_runtime();
@@ -341,7 +353,7 @@ void BufferFromHostBuffer(BufferFromHostBufferAction *action, StoreHandle store,
   auto task = runtime->create_task(XlaOpCode::XLA_BUFFER_FROM_HOST_BUFFER_TASK,
                                    {launch_size});
 
-  TaskWaiter waiter(launch_size);
+  TaskWaiter waiter(num_local_devices);
   task.add_scalar_arg(reinterpret_cast<uint64_t>(action));
   task.add_scalar_arg(static_cast<int32_t>(device));
   task.add_scalar_arg(blocking);
@@ -428,14 +440,15 @@ std::set<int> GetLocalDevices(int my_node) {
   return gpus;
 }
 
-StoreHandle CreateStore(const legate_xla::Shape &shape) {
+StoreHandle CreateStore(const legate_xla::Shape &shape,
+                        std::optional<std::string> name) {
   legate::Type::Code code = SupportedTypeToLegateType(shape.type);
 
   auto store_shape = ComputeStoreShape(shape);
   bool is_scalar = false;
 
-  log_xla.debug() << "CreateStore, logical=" << shape
-                  << ", actual=" << store_shape;
+  log_xla.debug() << "CreateStore " << (name.has_value() ? *name : "")
+                  << ": logical=" << shape << ", actual=" << store_shape;
   LOCK;
   auto core_runtime = legate::Runtime::get_runtime();
   StoreHandle result = {
@@ -446,6 +459,10 @@ StoreHandle CreateStore(const legate_xla::Shape &shape) {
 
   if (result.impl->shape.tile_shape.empty()) {
     result.impl->shape.tile_shape = shape.dims;
+  }
+
+  if (name.has_value()) {
+    result.impl->name = *name;
   }
 
   if (!store_shape.tile_shape.empty()) {

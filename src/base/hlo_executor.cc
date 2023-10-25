@@ -109,7 +109,7 @@ struct get_write_only_buffer_fn {
                                                 int scalar_offset) {
   auto cfg = get_task_config(context);
   log_xla.debug() << "Running task " << exe->Name() << " for device "
-                  << cfg.local_device_id << " in range ["
+                  << cfg.my_device_id << " in range ["
                   << cfg.device_id_range.low << "," << cfg.device_id_range.high
                   << ")"
                   << " with replicas=" << exe->ReplicaCount()
