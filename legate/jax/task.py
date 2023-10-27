@@ -1,13 +1,26 @@
-from typing import Optional
+import json
+from typing import Any, Optional, Sequence
 
 import jax
 from jax._src.ad_checkpoint import _optimization_barrier
+from jax.lax import with_sharding_constraint
+from jax.tree_util import tree_map
 
 from .lib import should_ignore_transforms
 from .no_op import no_op
 
+# color 0 is a reserved value
+_next_color = 1
 
-def task(fxn, name: Optional[str] = None, counter=[0]):
+
+def task(
+    fxn,
+    name: Optional[str] = None,
+    counter=[0],
+    sharding: Optional[Any] = None,
+    devices: Optional[Sequence[Any]] = None,
+):
+    global _next_color
     if should_ignore_transforms():
         return fxn
 
@@ -15,65 +28,85 @@ def task(fxn, name: Optional[str] = None, counter=[0]):
         name = f"{fxn.__name__}.{counter[0]}"
         counter[0] += 1
 
-    mark_input_fwd = no_op(
-        name="Task", config=f"input:{name}.fwd", abstract=lambda x: x
-    )
-    mark_output_fwd = no_op(
-        name="Task", config=f"output:{name}.fwd", abstract=lambda x: x
-    )
-    mark_input_bwd = no_op(
-        name="Task", config=f"input:{name}.bwd", abstract=lambda x: x
-    )
-    mark_output_bwd = no_op(
-        name="Task", config=f"output:{name}.bwd", abstract=lambda x: x
-    )
+    if devices is None:
+        devices = []
+    else:
+        devices = [d.id for d in devices]
+
+    def _next_config_str(dependency_type: str, phase: str):
+        global _next_color
+        args = dict(
+            type=dependency_type,
+            name=f"{phase}.{name}",
+            devices=devices,
+            color=_next_color,
+        )
+        _next_color += 1
+        return json.dumps(args)
 
     def start_task(inp):
-        return _optimization_barrier(
-            jax.tree_util.tree_map(mark_input_fwd, inp)
+        mark_input_fwd = no_op(
+            name="Task",
+            config=_next_config_str("input", "fwd"),
+            abstract=lambda x: x,
         )
+        result = _optimization_barrier(tree_map(mark_input_fwd, inp))
+        if sharding is not None:
+            result = with_sharding_constraint(result, sharding)
+        return result
 
     def finish_task(inp):
-        return _optimization_barrier(
-            jax.tree_util.tree_map(mark_output_fwd, inp)
+        mark_output_fwd = no_op(
+            name="Task",
+            config=_next_config_str("output", "fwd"),
+            abstract=lambda x: x,
         )
+        return _optimization_barrier(tree_map(mark_output_fwd, inp))
 
     start = jax.custom_vjp(start_task)
     finish = jax.custom_vjp(finish_task)
 
     def args_task_barrier_fwd(inp):
+        mark_input_fwd = no_op(
+            name="Task",
+            config=_next_config_str("input", "fwd"),
+            abstract=lambda x: x,
+        )
         with jax.named_scope(f"args_{name}_forward"):
-            return (
-                _optimization_barrier(
-                    jax.tree_util.tree_map(mark_input_fwd, inp)
-                ),
-                None,
-            )
+            result = _optimization_barrier(tree_map(mark_input_fwd, inp))
+            if sharding is not None:
+                result = with_sharding_constraint(result, sharding)
+            return result, None
 
     def args_task_barrier_bwd(_, g):
+        mark_output_bwd = no_op(
+            name="Task",
+            config=_next_config_str("output", "bwd"),
+            abstract=lambda x: x,
+        )
         with jax.named_scope(f"args_{name}_backward"):
-            return (
-                _optimization_barrier(
-                    jax.tree_util.tree_map(mark_output_bwd, g)
-                ),
-            )
+            return (_optimization_barrier(tree_map(mark_output_bwd, g)),)
 
     def result_task_barrier_fwd(inp):
+        mark_output_fwd = no_op(
+            name="Task",
+            config=_next_config_str("output", "fwd"),
+            abstract=lambda x: x,
+        )
         with jax.named_scope(f"result_{name}_forward"):
             return (
-                _optimization_barrier(
-                    jax.tree_util.tree_map(mark_output_fwd, inp)
-                ),
+                _optimization_barrier(tree_map(mark_output_fwd, inp)),
                 None,
             )
 
     def result_task_barrier_bwd(_, g):
+        mark_input_bwd = no_op(
+            name="Task",
+            config=_next_config_str("input", "bwd"),
+            abstract=lambda x: x,
+        )
         with jax.named_scope(f"result_{name}_backward"):
-            return (
-                _optimization_barrier(
-                    jax.tree_util.tree_map(mark_input_bwd, g)
-                ),
-            )
+            return (_optimization_barrier(tree_map(mark_input_bwd, g)),)
 
     start.defvjp(args_task_barrier_fwd, args_task_barrier_bwd)
     finish.defvjp(result_task_barrier_fwd, result_task_barrier_bwd)
