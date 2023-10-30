@@ -11,7 +11,8 @@ from .no_op import no_op
 
 # color 0 is a reserved value
 _next_color = 1
-
+_task_depth = 0
+_current_color = None
 
 def task(
     fxn,
@@ -21,6 +22,8 @@ def task(
     devices: Optional[Sequence[Any]] = None,
 ):
     global _next_color
+    global _task_depth
+
     if should_ignore_transforms():
         return fxn
 
@@ -33,7 +36,7 @@ def task(
     else:
         devices = [d.id for d in devices]
 
-    def _next_config_str(dependency_type: str, phase: str):
+    def _config_str(dependency_type: str, phase: str):
         global _next_color
         args = dict(
             type=dependency_type,
@@ -41,13 +44,21 @@ def task(
             devices=devices,
             color=_next_color,
         )
-        _next_color += 1
         return json.dumps(args)
 
     def start_task(inp):
+        global _task_depth
+        global _next_color
+        _task_depth += 1
+        # no nesting of tasks, only the outermost
+        # task is actually carved out
+        if _task_depth > 1:
+            return inp
+
+        _next_color += 1
         mark_input_fwd = no_op(
             name="Task",
-            config=_next_config_str("input", "fwd"),
+            config=_config_str("input", "fwd"),
             abstract=lambda x: x,
         )
         result = _optimization_barrier(tree_map(mark_input_fwd, inp))
@@ -56,9 +67,16 @@ def task(
         return result
 
     def finish_task(inp):
+        global _task_depth
+        _task_depth -= 1
+        if _task_depth > 0:
+            # no nesting of tasks, only the outermost
+            # task is actually carved out
+            return inp
+
         mark_output_fwd = no_op(
             name="Task",
-            config=_next_config_str("output", "fwd"),
+            config=_config_str("output", "fwd"),
             abstract=lambda x: x,
         )
         return _optimization_barrier(tree_map(mark_output_fwd, inp))
@@ -67,9 +85,18 @@ def task(
     finish = jax.custom_vjp(finish_task)
 
     def args_task_barrier_fwd(inp):
+        global _task_depth
+        global _next_color
+        _task_depth += 1
+        # no nesting of tasks, only the outermost
+        # task is actually carved out
+        if _task_depth > 1:
+            return inp, None
+
+        _next_color += 1
         mark_input_fwd = no_op(
             name="Task",
-            config=_next_config_str("input", "fwd"),
+            config=_config_str("input", "fwd"),
             abstract=lambda x: x,
         )
         with jax.named_scope(f"args_{name}_forward"):
@@ -79,18 +106,32 @@ def task(
             return result, None
 
     def args_task_barrier_bwd(_, g):
+        global _task_depth
+        _task_depth -= 1
+        if _task_depth > 0:
+            # no nesting of tasks, only the outermost
+            # task is actually carved out
+            return g,
+
         mark_output_bwd = no_op(
             name="Task",
-            config=_next_config_str("output", "bwd"),
+            config=_config_str("output", "bwd"),
             abstract=lambda x: x,
         )
         with jax.named_scope(f"args_{name}_backward"):
             return (_optimization_barrier(tree_map(mark_output_bwd, g)),)
 
     def result_task_barrier_fwd(inp):
+        global _task_depth
+        _task_depth += 1
+        # no nesting of tasks, only the outermost
+        # task is actually carved out
+        if _task_depth > 1:
+            return inp, None
+
         mark_output_fwd = no_op(
             name="Task",
-            config=_next_config_str("output", "fwd"),
+            config=_config_str("output", "fwd"),
             abstract=lambda x: x,
         )
         with jax.named_scope(f"result_{name}_forward"):
@@ -100,9 +141,19 @@ def task(
             )
 
     def result_task_barrier_bwd(_, g):
+        global _task_depth
+        global _next_color
+        _task_depth += 1
+        # no nesting of tasks, only the outermost
+        # task is actually carved out
+        if _task_depth > 1:
+            return g,
+
+        _next_color += 1
+
         mark_input_bwd = no_op(
             name="Task",
-            config=_next_config_str("input", "bwd"),
+            config=_config_str("input", "bwd"),
             abstract=lambda x: x,
         )
         with jax.named_scope(f"result_{name}_backward"):
