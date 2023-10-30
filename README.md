@@ -67,11 +67,11 @@ python -m pip install --editable . -vv
 
 ### JAX and Jaxlib Compatibility
 
-In most cases, a standard JAX and Jaxlib installation will be compatible with Legate-JAX,
+
+In the future, a standard JAX and Jaxlib installation should be compatible with Legate-JAX,
 if JAX/Jaxlib are the most recent version and XLA is top-of-tree for the plugin client.
-If JAX sanity checks fail with a version incompatibility, then Jaxlib will need to be
-installed from source using the same XLA checkout used to build the Legate-JAX client.
-Download the [JAX source code](https://github.com/google/jax.git). In the JAX source folder, run
+For now, the Jaxlib will need to be installed from source for the custom XLA fork used to build the Legate-JAX client.
+Download the modified [JAX source code](https://github.com/nv-legate/jax.git). In the JAX source folder, run
 
 ```
 $ python build/build.py \
@@ -112,3 +112,14 @@ $ export LEGION_DEFAULT_ARGS="
  $ JAX_PLATFORMS=legate python my_jax_program.py
  ```
 
+## Development workflows
+
+Until more changes can be upstreamed, Legate-Jax will use a rebase model with the base branch updated weekly from the upstream Jax and XLA repositories.
+Development should still use pull requests for merging and reviews, though. To open a pull request to either the nv-legate XLA or JAX repos, do the following steps:
+
+1. Rebase all changes onto the most recent `legate-main` branch. `legate-main` is updated weekly on Monday morning.
+2. Open a pull request against `legate-main`. Only your additional commits should appear. If a large number of commits appears with a merge-base that is not the most recent `legate-main`, then the PR needs to be rebased.
+If the pull request is not merged into `legate-main` by the next Monday, the PR will need to be rebased again onto the updated `legate-main`.
+
+Despite the extra challenges introduced by weekly rebasing, this ensures the cleanest possible updating of the base branch and ensures Legate provides a linear history on top of the most recent XLA and Jax code.
+The Legate XLA Bridge repo does not require rebasing since there is no upstream.
