@@ -25,6 +25,13 @@ class HLOExecutorTask : public XlaTask<HLOExecutorTask> {
 public:
   static const int TASK_ID = XLA_EXECUTE_TASK;
 
+  enum {
+    ScalarCompilerPointer = 0,
+    ScalarRunId,
+    ScalarCallbacks,
+    NumScalarArgs,
+  };
+
 public:
   static void run_executable(legate::TaskContext context);
 

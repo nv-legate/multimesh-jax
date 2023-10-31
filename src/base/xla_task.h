@@ -35,6 +35,12 @@ class XLACopyDeviceToDevice : public XlaTask<XLACopyDeviceToDevice> {
 public:
   static const int32_t TASK_ID = XlaOpCode::XLA_COPY_DEVICE_TO_DEVICE;
 
+  enum ScalarArgs {
+    ScalarSourcePointer = 0,
+    ScalarSourceSize,
+    ScalarTaskWaiter
+  };
+
 public:
   static void gpu_variant(legate::TaskContext context);
 };
@@ -52,6 +58,8 @@ class XLABufferFromHostBufferTask
     : public XlaTask<XLABufferFromHostBufferTask> {
 public:
   static const int32_t TASK_ID = XlaOpCode::XLA_BUFFER_FROM_HOST_BUFFER_TASK;
+
+  enum ScalarArgs { ScalarAction, ScalarIsBlocking, ScalarTaskWaiter };
 
 public:
   static void gpu_variant(legate::TaskContext context);

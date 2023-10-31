@@ -68,19 +68,18 @@ struct get_write_only_buffer_fn {
 } // namespace
 
 /*static*/ void HLOExecutorTask::run_executable(legate::TaskContext context) {
-  int scalar_offset = 0;
   auto *compiler_hold = reinterpret_cast<TaskArgHold<LegateCompiler> *>(
-      context.scalars()[scalar_offset++].value<void *>());
+      context.scalars()[ScalarCompilerPointer].value<void *>());
   auto *compiler = compiler_hold->get();
   auto exe = compiler->MakeExecutable();
-  uint64_t run_id = context.scalars()[scalar_offset++].value<int64_t>();
+  uint64_t run_id = context.scalars()[ScalarRunId].value<int64_t>();
 
   log_xla.debug() << "HLOExecutorTask start " << exe->Name();
 
-  auto *callbacks = context.scalars()[scalar_offset++]
+  auto *callbacks = context.scalars()[ScalarCallbacks]
                         .value<std::vector<std::function<void()>> *>();
 
-  run_executable(context, exe.get(), run_id, scalar_offset);
+  run_executable(context, exe.get(), run_id, NumScalarArgs);
   log_xla.debug() << "HLOExecutorTask run_executable done";
 
   if (false) { // callbacks->size() > 0) {

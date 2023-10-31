@@ -141,11 +141,11 @@ template <class T> void Release(TaskArgHold<T> *hold, int num_total_holds) {
   }
 }
 
-class BufferFromHostBufferAction {
+class BufferAction {
 public:
   virtual void Act(void *dst, int local_device_id) = 0;
 
-  virtual ~BufferFromHostBufferAction() = default;
+  virtual ~BufferAction() = default;
 };
 
 enum class SupportedType {

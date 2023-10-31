@@ -23,15 +23,10 @@ std::set<int> GetLocalDevices(int my_node);
 
 void SliceLocalShards(const StoreHandle &handle,
                       std::vector<void *> &local_shard,
-                      const std::vector<size_t> &devices, size_t shard_id);
+                      const std::vector<size_t> &devices);
 
-void CreateStoreFromHostBufferTask(const void *data, uint64_t num_bytes,
-                                   StoreHandle &output,
-                                   std::function<void()> on_done);
-
-void BufferFromHostBuffer(BufferFromHostBufferAction *action,
-                          StoreHandle output, int device, int num_devices,
-                          bool blocking = false);
+void BufferFromHostBuffer(BufferAction *action, StoreHandle output,
+                          int num_devices, bool blocking = false);
 
 void PrintMachineConfig();
 

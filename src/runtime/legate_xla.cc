@@ -341,8 +341,8 @@ void Synchronize(const StoreHandle &store) {
   log_xla.debug() << "Synchronize store " << store.impl << " done";
 }
 
-void BufferFromHostBuffer(BufferFromHostBufferAction *action, StoreHandle store,
-                          int device, int num_local_devices, bool blocking) {
+void BufferFromHostBuffer(BufferAction *action, StoreHandle store,
+                          int num_local_devices, bool blocking) {
   size_t launch_size = LaunchSize(store.impl->shape);
   log_xla.debug() << "legate_xla::BufferFromHostBuffer with launch size "
                   << launch_size << " num_local_devices=" << num_local_devices;
@@ -355,7 +355,6 @@ void BufferFromHostBuffer(BufferFromHostBufferAction *action, StoreHandle store,
 
   TaskWaiter waiter(num_local_devices);
   task.add_scalar_arg(reinterpret_cast<uint64_t>(action));
-  task.add_scalar_arg(static_cast<int32_t>(device));
   task.add_scalar_arg(blocking);
   if (blocking) {
     task.add_scalar_arg(reinterpret_cast<uint64_t>(&waiter));
@@ -375,7 +374,7 @@ void BufferFromHostBuffer(BufferFromHostBufferAction *action, StoreHandle store,
 
 void SliceLocalShards(const StoreHandle &handle,
                       std::vector<void *> &local_shards,
-                      const std::vector<size_t> &devices, size_t my_shard_id) {
+                      const std::vector<size_t> &devices) {
   size_t start = devices.front();
   size_t stop = devices.back() + 1;
   size_t check = start;
