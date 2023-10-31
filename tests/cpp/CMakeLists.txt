@@ -36,14 +36,11 @@ find_package(legate_core REQUIRED)
 enable_testing()
 
 file(GLOB main_SRC ${PROJECT_SOURCE_DIR}/main.cc)
-file(GLOB integration_SRC ${PROJECT_SOURCE_DIR}/integration/*.cc)
-file(GLOB unit_SRC ${PROJECT_SOURCE_DIR}/unit/*.cc)
+set(unit_SRC
+ api/create_store.cc)
 
-add_executable(cpp_tests ${main_SRC} ${integration_SRC} ${unit_SRC})
-message("EnvironmentVariableName = $ENV{XLA_LEGATE_ROOT}")
-target_link_libraries(cpp_tests PRIVATE "$ENV{XLA_LEGATE_ROOT}/lib/liblegate_xla.so" PRIVATE legate::core PRIVATE GTest::gtest)
-target_include_directories(cpp_tests PRIVATE "$ENV{XLA_LEGATE_ROOT}/include")
-
+add_executable(cpp_tests ${main_SRC} ${unit_SRC})
+target_link_libraries(cpp_tests PRIVATE legate::core legate::xla_runtime GTest::gtest)
 
 include(GoogleTest)
 gtest_discover_tests(cpp_tests)

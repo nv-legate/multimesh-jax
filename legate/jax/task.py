@@ -14,6 +14,7 @@ _next_color = 1
 _task_depth = 0
 _current_color = None
 
+
 def task(
     fxn,
     name: Optional[str] = None,
@@ -111,7 +112,7 @@ def task(
         if _task_depth > 0:
             # no nesting of tasks, only the outermost
             # task is actually carved out
-            return g,
+            return (g,)
 
         mark_output_bwd = no_op(
             name="Task",
@@ -147,7 +148,7 @@ def task(
         # no nesting of tasks, only the outermost
         # task is actually carved out
         if _task_depth > 1:
-            return g,
+            return (g,)
 
         _next_color += 1
 

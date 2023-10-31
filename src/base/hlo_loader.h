@@ -35,6 +35,11 @@ class HLOLoaderTask : public XlaTask<HLOLoaderTask> {
 public:
   static constexpr int32_t TASK_ID = XLA_COMPILE_TASK;
 
+  enum ScalarArgs {
+    ScalarCompilerPointer,
+    ScalarRunId,
+  };
+
 public:
   static void cpu_variant(legate::TaskContext context);
 

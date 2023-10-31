@@ -50,15 +50,15 @@ XLACopyDeviceToDevice::gpu_variant(legate::TaskContext context) {
       legate::double_dispatch(output_store.dim(), output_store.code(),
                               get_write_only_buffer_fn{}, output_store);
 
-  const void *src =
-      reinterpret_cast<void *>(context.scalar(0).value<uint64_t>());
-  uint64_t src_size = context.scalar(1).value<uint64_t>();
+  const void *src = reinterpret_cast<void *>(
+      context.scalar(ScalarSourcePointer).value<uint64_t>());
+  uint64_t src_size = context.scalar(ScalarSourceSize).value<uint64_t>();
 
   log_xla.debug() << "CopyDeviceToDevice from " << src << " -> "
                   << output_buffer.buffer << " of size " << src_size;
 
-  TaskWaiter *waiter =
-      reinterpret_cast<TaskWaiter *>(context.scalar(2).value<uint64_t>());
+  TaskWaiter *waiter = reinterpret_cast<TaskWaiter *>(
+      context.scalar(ScalarTaskWaiter).value<uint64_t>());
 
   if (src_size != 0) {
     if (output_buffer.size != src_size) {
@@ -91,15 +91,14 @@ void XLABufferFromHostBufferTask::gpu_variant(legate::TaskContext context) {
   auto output_alloc =
       legate::double_dispatch(output_store.dim(), output_store.code(),
                               get_write_only_buffer_fn{}, output_store);
-  auto *action = reinterpret_cast<BufferFromHostBufferAction *>(
-      context.scalar(0).value<uint64_t>());
-  int32_t device = context.scalar(1).value<int32_t>();
+  auto *action = reinterpret_cast<BufferAction *>(
+      context.scalar(ScalarAction).value<uint64_t>());
   auto cfg = get_task_config(context);
   action->Act(output_alloc.buffer, cfg.local_device_id);
-  bool blocking = context.scalar(2).value<bool>();
+  bool blocking = context.scalar(ScalarIsBlocking).value<bool>();
   if (blocking) {
-    TaskWaiter *waiter =
-        reinterpret_cast<TaskWaiter *>(context.scalar(3).value<uint64_t>());
+    TaskWaiter *waiter = reinterpret_cast<TaskWaiter *>(
+        context.scalar(ScalarTaskWaiter).value<uint64_t>());
     waiter->Signal();
   }
 }

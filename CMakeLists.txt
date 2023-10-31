@@ -84,4 +84,7 @@ rapids_cmake_install_lib_dir(lib_dir)
 
 if (SKBUILD)
   include(legate_xla_python.cmake)
+elseif(NOT LegateXLA_HLO_RUNNER)
+  add_subdirectory(tests/cpp)
 endif()
+

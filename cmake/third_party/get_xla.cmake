@@ -40,6 +40,7 @@ function(find_or_configure_xla)
 
   set(test_names
     hlo_partition_test
+    legate_buffer_action_test
   )
 
 
@@ -97,7 +98,6 @@ function(find_or_configure_xla)
       add_executable(${test} IMPORTED)
       set_target_properties(${test} PROPERTIES IMPORTED_LOCATION ${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${test})
       add_dependencies(${test} xla_build)
-      message("Adding test ${test}")
       add_test(NAME ${test} COMMAND ${test} WORKING_DIRECTORY ${xla_SOURCE_DIR})
     endforeach()
   endif()
