@@ -68,6 +68,7 @@ private:
 
 class LegateExecutable {
 public:
+  virtual ~LegateExecutable() {}
   /**
   * @brief
   *

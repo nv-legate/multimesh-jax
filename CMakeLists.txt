@@ -67,6 +67,14 @@ option(LegateXLA_HLO_RUNNER OFF
        "Whether to build the HLO runner instead of the plugin client")
 option(LegateXLA_ENABLE_CUDA ON "Whether to build with CUDA")
 
+option(LegateXLA_ASAN OFF "Whether to build with address saniziter")
+if (LegateXLA_ASAN)
+  add_compile_options(-fsanitize=address)
+  add_link_options(-fsanitize=address)
+  add_compile_options(-fno-common)
+endif()
+
+
 if (SKBUILD)
   find_package(LegateXLA)
 else()

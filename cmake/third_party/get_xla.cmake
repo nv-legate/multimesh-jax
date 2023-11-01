@@ -52,12 +52,18 @@ function(find_or_configure_xla)
     endforeach()
   endif()
 
-  set(_bazel_options
-    --define open_source_build=true
-    --define framework_shared_object=false
-    --config=cuda)
+ set(_bazel_options
+   --define open_source_build=true
+   --define framework_shared_object=false
+   --config=cuda
+ )
+ if (LegateXLA_ASAN)
+   list (APPEND _bazel_options
+     --copt -fsanitize=address
+     --linkopt -fsanitize=address)
+ endif()
 
-  add_custom_command(
+ add_custom_command(
     OUTPUT  ${xla_library}
     COMMENT "Building XLA components..."
     COMMAND rm -rf "${xla_SOURCE_DIR}/bazel-bin" && XLA_LEGATE_SOURCE_DIR=${CMAKE_SOURCE_DIR} bazel --batch build ${_bazel_options} ${target_names} --check_visibility=false
