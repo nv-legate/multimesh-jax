@@ -43,6 +43,6 @@ add_executable(cpp_tests ${main_SRC} ${unit_SRC})
 target_link_libraries(cpp_tests PRIVATE legate::core legate::xla_runtime GTest::gtest)
 
 include(GoogleTest)
-gtest_discover_tests(cpp_tests)
+gtest_add_tests(TARGET cpp_tests)
 
 install(TARGETS cpp_tests DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/cmake-install")
