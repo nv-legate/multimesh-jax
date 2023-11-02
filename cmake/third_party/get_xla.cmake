@@ -34,10 +34,6 @@ function(find_or_configure_xla)
        "${xla_SOURCE_DIR}/xla/pjrt/legate/BUILD")
 
 
-  option(LegateXla_ENABLE_TESTS
-         "Whether to bazel build the tests in the XLA directory"
-         ON)
-
   set(test_names
     hlo_partition_test
     legate_buffer_action_test

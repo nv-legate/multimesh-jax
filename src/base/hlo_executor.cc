@@ -147,10 +147,11 @@ struct get_write_only_buffer_fn {
   DeviceAssignment device_assignment({.local_device_id = cfg.local_device_id,
                                       .replica_count = exe->ReplicaCount(),
                                       .num_partitions = exe->NumPartitions()});
-
-  for (uint32_t device_id = cfg.device_id_range.low, idx = 0;
-       device_id < cfg.device_id_range.high; ++device_id, ++idx) {
-    device_assignment(0, idx) = device_id;
+  uint32_t device_id = cfg.device_id_range.low;
+  for (int r = 0; r < exe->ReplicaCount(); ++r) {
+    for (int c = 0; c < exe->NumPartitions(); ++c) {
+      device_assignment(r, c) = device_id++;
+    }
   }
 
   bool success;

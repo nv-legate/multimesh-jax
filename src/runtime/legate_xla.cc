@@ -520,9 +520,3 @@ void initialize_runtime_and_context(legate::Runtime *runtime,
 }
 
 } // namespace legate_xla
-
-extern "C" {
-
-struct PJRT_Api;
-const PJRT_Api *GetPjrtApi() { return GetLegatePjrtApi(); }
-}

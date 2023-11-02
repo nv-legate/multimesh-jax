@@ -30,17 +30,7 @@ template <typename T> pybind11::capsule EncapsulateFunction(T *fn) {
 
 void no_op_entrypoint() {}
 
-static void AtExit() { legate_xla::StopLegate(); }
-
 PYBIND11_MODULE(legate_jax_impl, m) {
-  m.def("shutdown", []() -> void {
-    // Make sure to clear all handles held by Legate
-    // so that nothing gets deleted during program cleanup
-    ShutdownLegateClient();
-    // Delay shutting down Legate until atexit
-    // so that all Legate shutdown occurs after PyFinalize
-    atexit(AtExit);
-  });
   m.def("no_op_custom_call",
         []() { return EncapsulateFunction(no_op_entrypoint); });
 }
