@@ -74,6 +74,7 @@ if (LegateXLA_ASAN)
   add_compile_options(-fno-common)
 endif()
 
+option(LegateXla_ENABLE_TESTS "Whether to build the tests" ON)
 
 if (SKBUILD)
   find_package(LegateXLA)
@@ -92,7 +93,7 @@ rapids_cmake_install_lib_dir(lib_dir)
 
 if (SKBUILD)
   include(legate_xla_python.cmake)
-elseif(NOT LegateXLA_HLO_RUNNER)
+elseif(NOT LegateXLA_HLO_RUNNER AND LegateXLA_ENABLE_TESTS)
   add_subdirectory(tests/cpp)
 endif()
 

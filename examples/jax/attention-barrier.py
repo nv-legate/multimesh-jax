@@ -12,8 +12,6 @@ import legate.jax
 
 NUM_HEADS = 2
 
-legate.jax.init()
-
 
 def scale_dot_product_attention(q, k, v):
     attn_weights = jnp.einsum("bqhd,bkhd->bhqk", q, k)
@@ -176,5 +174,3 @@ if __name__ == "__main__":
         args.hidden_size,
         args.abstract,
     )
-
-    legate.jax.shutdown()

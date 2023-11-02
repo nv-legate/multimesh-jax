@@ -1,17 +1,63 @@
 #! /usr/bin/env bash
 
-# the path of Python test to run
-test_path=$1
+VALID_ARGS=$(getopt -o ab:d:f:g:x --long asan,build-dir:,dump,debug:,filter:,gpus: -- "$@")
+if [[ $? -ne 0 ]]; then
+    exit 1;
+fi
 
-# the degree of debug output (VLOG)
-debug=${2:-0}
+debug=0
+gpus=`nvidia-smi --list-gpus | wc -l`
+build_dir="build"
 
-# no. gpus
-system_gpus=`nvidia-smi --list-gpus | wc -l`
-gpus=${4:-${system_gpus}}
+eval set -- "$VALID_ARGS"
+while [ : ]; do
+  case "$1" in
+    -a | --asan)
+        echo "Running with address sanitizer"
+        export ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:halt_on_error=1:new_delete_type_mismatch=0
+        export LD_PRELOAD="$(gcc -print-file-name=libasan.so) $(gcc -print-file-name=libstdc++.so)"
+        shift
+        ;;
+    -b | --build-dir)
+        build_dir=$2
+        shift 2
+        ;;
+    -d | --debug)
+        echo "Running with debug=$2"
+        debug=$2
+        shift 2
+        ;;
+    -g | --gpus)
+        gpus=$2
+        shift 2
+        ;;
+    -f | --filter)
+        echo "Running filtered tests $2"
+        filter=$2
+        shift 2
+        ;;
+    -x | --dump)
+        echo "Dumping XLA output"
+        export XLA_FLAGS="--xla_dump_to=dump --xla_dump_hlo_as_text"
+        shift
+        ;;
+    --) shift;
+        break
+        ;;
+  esac
+done
+
+if [ $debug -eq "0" ]; then
+  min_level=3
+  level=""
+else
+  min_level=0
+  level="-level legate.xla=1"
+fi
+
 
 if [ ! -z $test ]; then
-  test_flag="--gtest_filter=*${test}*"
+  filter="--R ${test}"
 fi
 
 if [ $debug -eq "0" ]; then
@@ -20,7 +66,7 @@ else
   level="-level legate.xla=1"
 fi
 
-
+export OMPI_MCA_plm=isolated
 export LEGION_DEFAULT_ARGS="-ll:py 0 \
  -lg:local 0 \
  -ll:cpu 4 \
@@ -32,6 +78,14 @@ export LEGION_DEFAULT_ARGS="-ll:py 0 \
  -ll:zsize 32 \
  ${level} \
  -lg:eager_alloc_percentage 50"
+export JAX_TRACEBACK_FILTERING=off
+export XLA_PYTHON_CLIENT_PREALLOCATE=false
+export TF_CPP_MIN_LOG_LEVEL=$min_level
+export TF_CPP_MAX_LOG_LEVEL=$debug
+export TF_CPP_VMODULE=legate_pjrt_buffer=$debug,legate_computation=$debug,legate_pjrt_client=$debug,hlo_partition=$debug,legate_pjrt_executable=$debug
 
-ctest --extra-verbose --test-dir $test_path
+echo "Running with ${gpus} GPUS"
+echo "Running tests from directory ${build_dir}"
+
+ctest --extra-verbose --test-dir $build_dir $filter
 

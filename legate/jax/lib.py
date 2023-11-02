@@ -1,11 +1,9 @@
-import atexit
 from contextlib import contextmanager
 
 import jax
 from jax import value_and_grad as jax_value_and_grad
 from jax.tree_util import tree_flatten, tree_unflatten
 
-from .legate_jax_impl import shutdown
 from .no_op import mark_gradient, mark_loss
 
 _ignore_transforms = 0
@@ -50,4 +48,4 @@ def init():
     # gradients and scalars. The new tasking system should
     # just work. Verify before removing this comment.
     # jax.value_and_grad = value_and_grad
-    atexit.register(shutdown)
+    pass
