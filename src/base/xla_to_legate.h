@@ -1,4 +1,5 @@
 #include "legate_xla_common.h"
+#include <optional>
 #include <set>
 
 namespace legate_xla {
