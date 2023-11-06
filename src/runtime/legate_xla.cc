@@ -6,6 +6,7 @@
 #include "xla_to_legate.h"
 
 #include <core/data/logical_store.h>
+#include <core/mapping/mapping.h>
 #include <core/task/task.h>
 #include <tuple>
 #include <unistd.h>
@@ -421,6 +422,12 @@ StoreHandle Reshard(const StoreHandle &handle,
   }
   // just return back the original handle, no resharding
   return handle;
+}
+
+bool IsGpu() {
+  auto core_runtime = legate::Runtime::get_runtime();
+  auto target = core_runtime->get_machine().preferred_target();
+  return target == legate::mapping::TaskTarget::GPU;
 }
 
 std::set<int> GetLocalDevices(int my_node) {

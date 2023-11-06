@@ -23,7 +23,7 @@ using namespace Legion;
 using namespace legate;
 
 /*static*/ void HLOExecutorTask::gpu_variant(TaskContext context) {
-  run_executable(context);
+  run_executable(context, /*cpu=*/false);
   CHECK_CUDA(cudaPeekAtLastError());
 }
 

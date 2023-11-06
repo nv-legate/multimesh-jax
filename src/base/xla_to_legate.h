@@ -22,6 +22,8 @@ StoreHandle Reshard(const StoreHandle &handle,
 
 std::set<int> GetLocalDevices(int my_node);
 
+bool IsGpu();
+
 void SliceLocalShards(const StoreHandle &handle,
                       std::vector<void *> &local_shard,
                       const std::vector<size_t> &devices);

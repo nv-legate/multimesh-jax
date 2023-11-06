@@ -86,7 +86,8 @@ public:
                        const std::vector<BufferAllocation> &inputs,
                        const std::vector<BufferAllocation> &outputs,
                        TaskMemoryAllocator *allocator,
-                       const DeviceAssignment &device_assignment) const = 0;
+                       const DeviceAssignment &device_assignment,
+                       bool cpu) const = 0;
 
   virtual std::pair<int, int> MachineSlice() const = 0;
 

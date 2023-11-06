@@ -85,7 +85,15 @@ XLACopyDeviceToDevice::gpu_variant(legate::TaskContext context) {
   cudaMemset(output_alloc.buffer, 0, output_alloc.size);
 }
 
+void XLABufferFromHostBufferTask::cpu_variant(legate::TaskContext context) {
+  run_task(context);
+}
+
 void XLABufferFromHostBufferTask::gpu_variant(legate::TaskContext context) {
+  run_task(context);
+}
+
+void XLABufferFromHostBufferTask::run_task(legate::TaskContext context) {
   log_xla.debug() << "XlaBufferFromHostBufferTask: running";
   auto output_store = context.outputs()[0].data();
   auto output_alloc =

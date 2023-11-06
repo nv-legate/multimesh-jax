@@ -2,12 +2,13 @@
 jax_dir=`python -c 'import jax; from pathlib import Path; print(Path(jax.__file__).parent.parent)'`
 echo $jax_dir
 
-VALID_ARGS=$(getopt -o ad:f:gn:t:x --long asan,dump,debug:,filter:,gdb,gpus:,test: -- "$@")
+VALID_ARGS=$(getopt -o ac:d:f:gn:t:x --long asan,cpus:,dump,debug:,filter:,gdb,gpus:,test: -- "$@")
 if [[ $? -ne 0 ]]; then
     exit 1;
 fi
 
 gpus=`nvidia-smi --list-gpus | wc -l`
+cpus=4
 debug=0
 launcher=""
 
@@ -19,6 +20,12 @@ while [ : ]; do
         export ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:halt_on_error=1:new_delete_type_mismatch=0
         export LD_PRELOAD="$(gcc -print-file-name=libasan.so) $(gcc -print-file-name=libstdc++.so)"
         shift
+        ;;
+    -c | --cpus)
+        echo "Running $2 CPUS"
+        cpus=$2
+        export XLA_FLAGS="${XLA_FLAGS} --xla_force_host_platform_device_count=$2"
+        shift 2
         ;;
     -d | --debug)
         echo "Running with debug=$2"
@@ -58,7 +65,7 @@ fi
 
 export LEGION_DEFAULT_ARGS="-ll:py 0 \
  -lg:local 0 \
- -ll:cpu 4 \
+ -ll:cpu $cpus \
  -ll:gpu $gpus \
  -cuda:skipbusy \
  -ll:util 2 \
