@@ -21,11 +21,8 @@ with legate.jax.ignore_transforms(False):
         return g(f(x))
 
     def args_maker():
-        spec = P(
-            "x",
-        )
         mesh = Mesh(np.array(jax.devices()), ("x",))
-        sh = jax.sharding.NamedSharding(mesh, spec)
+        sh = jax.sharding.NamedSharding(mesh, P("x"))
         return (
             jax.lax.with_sharding_constraint(
                 jnp.arange(8, dtype=np.float32), sh

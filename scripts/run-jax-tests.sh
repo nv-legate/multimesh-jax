@@ -2,7 +2,7 @@
 jax_dir=`python -c 'import jax; from pathlib import Path; print(Path(jax.__file__).parent.parent)'`
 echo $jax_dir
 
-VALID_ARGS=$(getopt -o ad:f:g:t:x --long asan,dump,debug:,filter:,gpus:,test: -- "$@")
+VALID_ARGS=$(getopt -o ad:f:gn:t:x --long asan,dump,debug:,filter:,gdb,gpus:,test: -- "$@")
 if [[ $? -ne 0 ]]; then
     exit 1;
 fi
@@ -10,6 +10,7 @@ fi
 gpus=`nvidia-smi --list-gpus | wc -l`
 test=lax_numpy_test
 debug=0
+launcher=""
 
 eval set -- "$VALID_ARGS"
 while [ : ]; do
@@ -25,9 +26,13 @@ while [ : ]; do
         debug=$2
         shift 2
         ;;
-    -g | --gpus)
+    -n | --gpus)
         gpus=$2
         shift 2
+        ;;
+    -g | --gdb)
+        launcher="gdb --args"
+        shift
         ;;
     -f | --filter)
         echo "Running filtered tests $2"
@@ -86,7 +91,7 @@ function run_jax_test() {
   if [ ! -z $filter ]; then
     test_flag="--test_targets=${filter}"
   fi
-  python $jax_dir/tests/$test.py $test_flag
+  $launcher python $jax_dir/tests/$test.py $test_flag
 }
 
 echo "Running test ${test}"

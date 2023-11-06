@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-VALID_ARGS=$(getopt -o ab:d:f:g:x --long asan,build-dir:,dump,debug:,filter:,gpus: -- "$@")
+VALID_ARGS=$(getopt -o ab:d:f:n:x --long asan,build-dir:,dump,debug:,filter:,gpus: -- "$@")
 if [[ $? -ne 0 ]]; then
     exit 1;
 fi
@@ -27,7 +27,7 @@ while [ : ]; do
         debug=$2
         shift 2
         ;;
-    -g | --gpus)
+    -n | --gpus)
         gpus=$2
         shift 2
         ;;
