@@ -8,6 +8,7 @@ if [[ $? -ne 0 ]]; then
 fi
 
 gpus=`nvidia-smi --list-gpus | wc -l`
+cpus=4
 test=lax_numpy_test
 debug=0
 launcher=""
@@ -72,7 +73,7 @@ fi
 
 export LEGION_DEFAULT_ARGS="-ll:py 0 \
  -lg:local 0 \
- -ll:cpu 4 \
+ -ll:cpu $cpus \
  -ll:gpu $gpus \
  -cuda:skipbusy \
  -ll:util 2 \
@@ -90,17 +91,11 @@ export JAX_TRACEBACK_FILTERING=off
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export JAX_COMPILER_DETAILED_LOGGING_MIN_OPS=0
 
-function run_jax_test() {
-  test=$1
-  filter=$2
-  if [ ! -z $filter ]; then
-    test_flag="--test_targets=${filter}"
-  fi
-  $launcher python $jax_dir/tests/$test.py $test_flag
-}
-
 echo "Running test ${test}"
 echo "Running with ${gpus} GPUS"
 
-run_jax_test $test $filter
+if [ ! -z $filter ]; then
+  test_flag="--test_targets=${filter}"
+fi
+$launcher python $jax_dir/tests/$test.py $test_flag
 

@@ -91,7 +91,7 @@ public:
 
   virtual std::pair<int, int> MachineSlice() const = 0;
 
-  virtual const std::vector<size_t> &LaunchShape() const = 0;
+  virtual size_t LaunchSize() const = 0;
 
   virtual int ReplicaCount() const = 0;
 
@@ -108,7 +108,7 @@ public:
 
   virtual std::pair<int, int> MachineSlice() const = 0;
 
-  virtual const std::vector<size_t> &LaunchShape() const = 0;
+  virtual size_t LaunchSize() const = 0;
 
   virtual std::string Name() const = 0;
 

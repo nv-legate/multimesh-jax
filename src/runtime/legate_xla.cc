@@ -208,13 +208,13 @@ void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler_hold) {
   legate::MachineTracker tracker(machine.slice(start, stop));
   log_xla.debug() << "CreateCompileTask scheduling on slice [" << start << ","
                   << stop << ")";
-  legate::Shape launch_shape = compiler->LaunchShape();
-  if ((stop - start) < launch_shape.volume()) {
-    std::cerr << "Not enough devices to run launch shape " << launch_shape
+  size_t launch_size = compiler->LaunchSize();
+  if ((stop - start) < launch_size) {
+    std::cerr << "Not enough devices to run launch size " << launch_size
               << " on task " << compiler->Name() << std::endl;
     abort();
   }
-  auto task = runtime->create_task(XlaOpCode::XLA_COMPILE_TASK, launch_shape);
+  auto task = runtime->create_task(XlaOpCode::XLA_COMPILE_TASK, {launch_size});
 
   task.add_scalar_arg(
       legate::Scalar(reinterpret_cast<uint64_t>(compiler_hold)));
@@ -233,9 +233,8 @@ void CreateExecuteTask(
   {
     auto *compiler = compiler_hold->get();
 
-    // LegateExecutable* executable = compiler->MakeExecutable().release();
-    legate::Shape launch_shape(compiler->LaunchShape());
-    legate::Shape flattened({launch_shape.volume()});
+    size_t launch_size = compiler->LaunchSize();
+    legate::Shape flattened({launch_size});
 
     LOCK;
     auto runtime = legate_xla::Runtime::get_runtime();
@@ -257,8 +256,8 @@ void CreateExecuteTask(
                         << output.impl->shape;
       }
     }
-    if ((stop - start) < launch_shape.volume()) {
-      std::cerr << "Not enough devices to run launch shape " << launch_shape
+    if ((stop - start) < launch_size) {
+      std::cerr << "Not enough devices to run launch shape " << launch_size
                 << " on task " << compiler->Name() << std::endl;
       abort();
     }
