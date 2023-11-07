@@ -63,6 +63,10 @@ public:
 
 public:
   static void gpu_variant(legate::TaskContext context);
+  static void cpu_variant(legate::TaskContext context);
+
+private:
+  static void run_task(legate::TaskContext context);
 };
 
 } // namespace legate_xla

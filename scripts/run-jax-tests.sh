@@ -2,7 +2,7 @@
 jax_dir=`python -c 'import jax; from pathlib import Path; print(Path(jax.__file__).parent.parent)'`
 echo $jax_dir
 
-VALID_ARGS=$(getopt -o ad:f:gn:t:x --long asan,dump,debug:,filter:,gdb,gpus:,test: -- "$@")
+VALID_ARGS=$(getopt -o ac:d:f:gn:t:x --long asan,dump,debug:,filter:,gdb,cpus:,gpus:,test: -- "$@")
 if [[ $? -ne 0 ]]; then
     exit 1;
 fi
@@ -24,6 +24,11 @@ while [ : ]; do
     -d | --debug)
         echo "Running with debug=$2"
         debug=$2
+        shift 2
+        ;;
+    -c | --cpus)
+        cpus=$2
+        export XLA_FLAGS="${XLA_FLAGS} --xla_force_host_platform_device_count=$2"
         shift 2
         ;;
     -n | --gpus)

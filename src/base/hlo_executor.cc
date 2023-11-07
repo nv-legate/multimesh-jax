@@ -67,7 +67,8 @@ struct get_write_only_buffer_fn {
 
 } // namespace
 
-/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext context) {
+/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext context,
+                                                bool cpu) {
   auto *compiler_hold = reinterpret_cast<TaskArgHold<LegateCompiler> *>(
       context.scalars()[ScalarCompilerPointer].value<void *>());
   auto *compiler = compiler_hold->get();
@@ -79,7 +80,7 @@ struct get_write_only_buffer_fn {
   auto *callbacks = context.scalars()[ScalarCallbacks]
                         .value<std::vector<std::function<void()>> *>();
 
-  run_executable(context, exe.get(), run_id, NumScalarArgs);
+  run_executable(context, exe.get(), run_id, NumScalarArgs, cpu);
   log_xla.debug() << "HLOExecutorTask run_executable done";
 
   if (false) { // callbacks->size() > 0) {
@@ -105,7 +106,7 @@ struct get_write_only_buffer_fn {
 /*static*/ void HLOExecutorTask::run_executable(legate::TaskContext context,
                                                 LegateExecutable *exe,
                                                 int64_t run_id,
-                                                int scalar_offset) {
+                                                int scalar_offset, bool cpu) {
   auto cfg = get_task_config(context);
   log_xla.debug() << "Running task " << exe->Name() << " for device "
                   << cfg.my_device_id << " in range ["
@@ -156,8 +157,8 @@ struct get_write_only_buffer_fn {
 
   bool success;
   try {
-    success =
-        exe->Execute(run_id, inputs, outputs, &allocator, device_assignment);
+    success = exe->Execute(run_id, inputs, outputs, &allocator,
+                           device_assignment, cpu);
   } catch (const std::exception &e) {
     log_xla.error() << "Standard exception caught during 'Execute', message '"
                     << e.what() << "'";
@@ -175,7 +176,7 @@ struct get_write_only_buffer_fn {
 }
 
 /*static*/ void HLOExecutorTask::cpu_variant(TaskContext context) {
-  run_executable(context);
+  run_executable(context, /*cpu=*/true);
 }
 
 namespace // unnamed
