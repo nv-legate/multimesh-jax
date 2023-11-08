@@ -17,11 +17,14 @@ Legion:
   version = "23.09.0"
   ucx = True
   asan = %asan
+  max_dim = 5
 
 LegateXla:
   branch = "main"
   copy_image = True
+  prototype = False
   asan = %asan
+  editable = True
 
 Legate:
   repo = "git@github.com:nv-legate/legate.core.internal"
@@ -38,6 +41,10 @@ Jax:
   repo = "git@github.com:nv-legate/jax.git"
   copy_image = True
   provider = @Repo
+  editable = True
+
+Repo:
+  skip_existing = True
 
 Legere:
   use_global_rc = False
