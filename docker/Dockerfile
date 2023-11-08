@@ -157,7 +157,7 @@ RUN cd /opt/legate && \
 COPY jax /opt/jax
 
 RUN cd /opt/jax && \
-  conda run --no-capture-out -n legere python -m pip install .
+  conda run --no-capture-out -n legere python -m pip install -e .
 
 COPY legate_xla /opt/legate_xla
 
@@ -167,13 +167,13 @@ RUN cd /opt/legate_xla && \
 -DCMAKE_LIBRARY_PATH:STRING=/usr/lib/x86_64-linux-gnu -DCMAKE_CXX_STANDARD:STRING=17 \
 -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Release \
 -DCPM_xla_SOURCE:PATH=/opt/xla_extension -Dlegate_core_ROOT:PATH=/opt/install/miniconda/envs/legere \
--DLegateXLA_HLO_RUNNER:BOOL=ON -DLegateXLA_ASAN:BOOL=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON \
+-DLegateXLA_HLO_RUNNER:BOOL=OFF -DLegateXLA_ASAN:BOOL=OFF \
+-DCMAKE_INSTALL_RPATH:PATH=/opt/install/miniconda/envs/legere/lib \
 -DCMAKE_INSTALL_PREFIX:PATH=/opt/install/miniconda/envs/legere && \
   conda run --no-capture-out -n legere cmake --build build
 
 RUN cd /opt/legate_xla && \
   export CMAKE_ARGS="-DCPM_xla_SOURCE:PATH=/opt/xla_extension -DLegateXLA_ROOT:PATH=/opt/legate_xla/build" && \
-  export SETUPTOOLS_ENABLE_FEATURES=legacy-editable && \
   conda run --no-capture-out -n legere cmake --install build --prefix \
 /opt/install/miniconda/envs/legere && \
   conda run --no-capture-out -n legere python -m pip install -e .
