@@ -10,7 +10,7 @@ extern "C" void RegisterImplicitTask(
 
 namespace py = pybind11;
 
-extern "C" void ShutdownLegateClient();
+extern "C" void LegateShutdown();
 
 template <class To, class From>
 typename std::enable_if<sizeof(To) == sizeof(From) &&
@@ -38,6 +38,7 @@ template <typename T> pybind11::capsule EncapsulateFunction(T *fn) {
 void no_op_entrypoint() {}
 
 PYBIND11_MODULE(legate_jax_impl, m) {
+  m.def("shutdown", []() { LegateShutdown(); });
   m.def("no_op_custom_call",
         []() { return EncapsulateFunction(no_op_entrypoint); });
   m.def("register_axes", [](py::str task_regex, py::list py_devices,

@@ -203,6 +203,7 @@ size_t ShapeNumElements(Shape shape) {
 void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler_hold) {
   auto *compiler = compiler_hold->get();
   LOCK;
+  legate::ProvenanceTracker provenance(compiler->Name());
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
   auto machine = core_runtime->get_machine();
@@ -233,6 +234,7 @@ void CreateExecuteTask(
     const std::vector<StoreHandle> &outputs,
     std::vector<std::function<void()>> *on_done) {
   {
+
     auto *compiler = compiler_hold->get();
 
     size_t launch_size = compiler->LaunchSize();
@@ -243,6 +245,7 @@ void CreateExecuteTask(
     auto core_runtime = legate::Runtime::get_runtime();
     auto machine = core_runtime->get_machine();
     auto [start, stop] = compiler->MachineSlice();
+    legate::ProvenanceTracker provenance(compiler->Name());
     legate::MachineTracker tracker(machine.slice(start, stop));
     log_xla.debug() << "CreateExecuteTask " << compiler->Name()
                     << " for launch shape " << flattened << " on slice ["
@@ -515,6 +518,7 @@ void StopLegate() {
     log_xla.info() << "Stopping Legate";
     auto rc = legate::finish();
     legate_state = STOPPED;
+    log_xla.info() << "Legate stopped!";
   }
 }
 
@@ -550,3 +554,11 @@ void initialize_runtime_and_context(legate::Runtime *runtime,
 }
 
 } // namespace legate_xla
+
+extern "C" void LegateShutdown() {
+  // Make sure to clear all handles held by Legate
+  // so that nothing gets deleted during program cleanup
+  legate_xla::log_xla.info() << "Shutting down Legate";
+  legate_xla::StopLegate();
+  ShutdownLegateClient();
+}
