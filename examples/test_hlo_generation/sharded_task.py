@@ -18,12 +18,12 @@ with legate.jax.ignore_transforms(False):
     def f(x, scale):
         return x * x * scale
 
-    f = legate.jax.task(f, sharding=(sh, replicated))
+    f = legate.jax.task(f, out_shardings=(sh, replicated))
 
     def g(x, y):
         return (jnp.cos(x) + y).sum()
 
-    g = legate.jax.task(g, sharding=(sh, replicated))
+    g = legate.jax.task(g, out_shardings=(sh, replicated))
 
     def c(x, scale):
         return g(f(x, scale), x)

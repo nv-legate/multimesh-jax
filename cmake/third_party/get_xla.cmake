@@ -39,6 +39,7 @@ function(find_or_configure_xla)
   set(test_names
     hlo_partition_test
     legate_buffer_action_test
+    legate_sharding_test
   )
 
 

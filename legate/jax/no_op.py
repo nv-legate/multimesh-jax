@@ -11,8 +11,8 @@ from jax.interpreters import ad, mlir
 
 def _no_op_impl(*args, **kwargs):
     raise Exception(
-        "_mark_gradient_scalar_impl: should not be invoked. "
-        "mark_gradient_scalar should only occur inside jit"
+        "no_op should not be invoked outside jit, "
+        "this is for marking operations for jit"
     )
 
 
