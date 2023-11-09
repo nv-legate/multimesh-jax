@@ -1,13 +1,17 @@
 #! /usr/bin/env bash
 
-VALID_ARGS=$(getopt -o ab:d:f:n:x --long asan,build-dir:,dump,debug:,filter:,gpus: -- "$@")
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+VALID_ARGS=$(getopt -o ab:d:f:gn:o:x --long asan,build-dir:,dump,debug:,filter:,gdb,gpus:,out: -- "$@")
 if [[ $? -ne 0 ]]; then
     exit 1;
 fi
 
 debug=0
 gpus=`nvidia-smi --list-gpus | wc -l`
-build_dir="build"
+# the default build directory with the tests is the
+# $(top_source_dir)/build
+build_dir="$SCRIPT_DIR/../build"
+output=""
 
 eval set -- "$VALID_ARGS"
 while [ : ]; do
@@ -34,6 +38,11 @@ while [ : ]; do
     -f | --filter)
         echo "Running filtered tests $2"
         filter=$2
+        shift 2
+        ;;
+    -o | --output)
+        echo "Piping output to $2"
+        output=$2
         shift 2
         ;;
     -x | --dump)
@@ -87,5 +96,13 @@ export TF_CPP_VMODULE=legate_pjrt_buffer=$debug,legate_computation=$debug,legate
 echo "Running with ${gpus} GPUS"
 echo "Running tests from directory ${build_dir}"
 
-ctest --extra-verbose --test-dir $build_dir $filter
+if [ -z $output ]; then
+  if [ -z $filter ]; then
+    output=test.out
+  else
+    output=test.$filter.out
+  fi
+fi
+
+ctest --extra-verbose --test-dir $build_dir $filter 2>&1 | tee $output
 
