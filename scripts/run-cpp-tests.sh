@@ -65,8 +65,8 @@ else
 fi
 
 
-if [ ! -z $test ]; then
-  filter="--R ${test}"
+if [ ! -z $filter ]; then
+  filter="-R ${filter}"
 fi
 
 if [ $debug -eq "0" ]; then
@@ -95,9 +95,12 @@ export TF_CPP_VMODULE=legate_pjrt_buffer=$debug,legate_computation=$debug,legate
 
 echo "Running with ${gpus} GPUS"
 echo "Running tests from directory ${build_dir}"
+if [ ! -z "$filter" ]; then
+  echo "Running with filter ${filter}"
+fi
 
 if [ -z $output ]; then
-  if [ -z $filter ]; then
+  if [ -z "$filter" ]; then
     output=test.out
   else
     output=test.$filter.out

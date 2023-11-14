@@ -4,17 +4,17 @@ import numpy as np
 
 import legate.jax
 
-with legate.jax.ignore_transforms():
+with legate.jax.ignore_transforms(False):
 
     def f(x, scale):
         return x * x * scale
 
-    f = legate.jax.task(f)
+    f = legate.jax.task(f, devices=jax.devices())
 
     def g(x, y):
         return (jnp.cos(x) + y).sum()
 
-    g = legate.jax.task(g)
+    g = legate.jax.task(g, devices=jax.devices())
 
     def c(x, scale):
         return g(f(x, scale), x)

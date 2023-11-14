@@ -18,8 +18,9 @@ _current_color = None
 def task(
     fxn,
     name: Optional[str] = None,
+    *,
     counter=[0],
-    sharding: Optional[Any] = None,
+    out_shardings: Optional[Any] = None,
     devices: Optional[Sequence[Any]] = None,
 ):
     global _next_color
@@ -58,13 +59,13 @@ def task(
 
         _next_color += 1
         mark_input_fwd = no_op(
-            name="Task",
+            name="TaskStart",
             config=_config_str("input", "fwd"),
             abstract=lambda x: x,
         )
         result = _optimization_barrier(tree_map(mark_input_fwd, inp))
-        if sharding is not None:
-            result = with_sharding_constraint(result, sharding)
+        if out_shardings is not None:
+            result = with_sharding_constraint(result, out_shardings)
         return result
 
     def finish_task(inp):
@@ -76,7 +77,7 @@ def task(
             return inp
 
         mark_output_fwd = no_op(
-            name="Task",
+            name="TaskEnd",
             config=_config_str("output", "fwd"),
             abstract=lambda x: x,
         )
@@ -96,14 +97,14 @@ def task(
 
         _next_color += 1
         mark_input_fwd = no_op(
-            name="Task",
+            name="TaskStart",
             config=_config_str("input", "fwd"),
             abstract=lambda x: x,
         )
         with jax.named_scope(f"args_{name}_forward"):
             result = _optimization_barrier(tree_map(mark_input_fwd, inp))
-            if sharding is not None:
-                result = with_sharding_constraint(result, sharding)
+            if out_shardings is not None:
+                result = with_sharding_constraint(result, out_shardings)
             return result, None
 
     def args_task_barrier_bwd(_, g):
@@ -115,7 +116,7 @@ def task(
             return (g,)
 
         mark_output_bwd = no_op(
-            name="Task",
+            name="TaskEnd",
             config=_config_str("output", "bwd"),
             abstract=lambda x: x,
         )
@@ -124,14 +125,14 @@ def task(
 
     def result_task_barrier_fwd(inp):
         global _task_depth
-        _task_depth += 1
+        _task_depth -= 1
         # no nesting of tasks, only the outermost
         # task is actually carved out
         if _task_depth > 1:
             return inp, None
 
         mark_output_fwd = no_op(
-            name="Task",
+            name="TaskEnd",
             config=_config_str("output", "fwd"),
             abstract=lambda x: x,
         )
@@ -153,7 +154,7 @@ def task(
         _next_color += 1
 
         mark_input_bwd = no_op(
-            name="Task",
+            name="TaskStart",
             config=_config_str("input", "bwd"),
             abstract=lambda x: x,
         )
