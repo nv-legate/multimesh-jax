@@ -34,12 +34,12 @@ namespace {
 struct get_read_only_buffer_fn {
   template <legate::Type::Code TYPE_CODE, int32_t DIM>
 
-  BufferAllocation operator()(legate::Store &store) {
-    using VAL = legate::legate_type_of<TYPE_CODE>;
+  BufferAllocation operator()(legate::PhysicalStore &store) {
+    using VAL = legate::type_of<TYPE_CODE>;
     auto shape = store.shape<DIM>();
     auto acc = store.read_accessor<VAL, DIM>();
     size_t size =
-        sizeof(legate::legate_type_of<TYPE_CODE>) * store.domain().get_volume();
+        sizeof(legate::type_of<TYPE_CODE>) * store.domain().get_volume();
     void *buffer =
         const_cast<void *>(static_cast<const void *>(acc.ptr(shape)));
     return BufferAllocation{.buffer = buffer, .size = size};
@@ -48,8 +48,8 @@ struct get_read_only_buffer_fn {
 
 struct get_write_only_buffer_fn {
   template <legate::Type::Code TYPE_CODE, int32_t DIM>
-  BufferAllocation operator()(legate::Store &store, bool is_red) {
-    using VAL = legate::legate_type_of<TYPE_CODE>;
+  BufferAllocation operator()(legate::PhysicalStore &store, bool is_red) {
+    using VAL = legate::type_of<TYPE_CODE>;
     auto shape = store.shape<DIM>();
     void *buffer = nullptr;
     if (is_red) {
@@ -60,7 +60,7 @@ struct get_write_only_buffer_fn {
       buffer = static_cast<void *>(acc.ptr(shape));
     }
     size_t size =
-        sizeof(legate::legate_type_of<TYPE_CODE>) * store.domain().get_volume();
+        sizeof(legate::type_of<TYPE_CODE>) * store.domain().get_volume();
     return BufferAllocation{.buffer = buffer, .size = size};
   }
 };
@@ -129,8 +129,8 @@ struct get_write_only_buffer_fn {
   // first 2 scalars are exe and ID values
   for (size_t idx = scalar_offset; idx < total_outputs + scalar_offset; ++idx) {
     bool is_red = context.scalars()[idx].value<bool>();
-    Store store = is_red ? context.reductions()[red_idx++].data()
-                         : context.outputs()[output_idx++].data();
+    auto store = is_red ? context.reductions()[red_idx++].data()
+                        : context.outputs()[output_idx++].data();
 
     outputs.push_back(legate::double_dispatch(
         store.dim(), store.code(), get_write_only_buffer_fn{}, store, is_red));

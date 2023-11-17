@@ -11,21 +11,21 @@ namespace {
 
 struct get_write_only_buffer_fn {
   template <legate::Type::Code TYPE_CODE, int32_t DIM>
-  BufferAllocation operator()(legate::Store &store) {
-    using VAL = legate::legate_type_of<TYPE_CODE>;
+  BufferAllocation operator()(legate::PhysicalStore &store) {
+    using VAL = legate::type_of<TYPE_CODE>;
     auto shape = store.shape<DIM>();
     auto acc = store.write_accessor<VAL, DIM>();
     void *buffer = static_cast<void *>(acc.ptr(shape));
     size_t size =
-        sizeof(legate::legate_type_of<TYPE_CODE>) * store.domain().get_volume();
+        sizeof(legate::type_of<TYPE_CODE>) * store.domain().get_volume();
     return BufferAllocation{.buffer = buffer, .size = size};
   }
 };
 
 struct init_buffer_fn {
   template <legate::Type::Code TYPE_CODE, int32_t DIM>
-  void operator()(legate::Store &store) {
-    using VAL = legate::legate_type_of<TYPE_CODE>;
+  void operator()(legate::PhysicalStore &store) {
+    using VAL = legate::type_of<TYPE_CODE>;
     auto shape = store.shape<DIM>();
     auto acc = store.write_accessor<VAL, DIM>();
     VAL *buffer = acc.ptr(shape);
@@ -111,12 +111,33 @@ void XLABufferFromHostBufferTask::run_task(legate::TaskContext context) {
   }
 }
 
+void XLASetScalarTask::cpu_variant(legate::TaskContext context) {
+  int32_t scalar = context.scalar(0).value<int32_t>();
+  auto output_store = context.outputs()[0].data();
+  auto output_alloc =
+      legate::double_dispatch(output_store.dim(), output_store.code(),
+                              get_write_only_buffer_fn{}, output_store);
+  int32_t *dst = static_cast<int32_t *>(output_alloc.buffer);
+  *dst = scalar;
+}
+
+void XLASetScalarTask::gpu_variant(legate::TaskContext context) {
+  int32_t scalar = context.scalar(0).value<int32_t>();
+  auto output_store = context.outputs()[0].data();
+  auto output_alloc =
+      legate::double_dispatch(output_store.dim(), output_store.code(),
+                              get_write_only_buffer_fn{}, output_store);
+  cudaMemcpy(output_alloc.buffer, &scalar, sizeof(int32_t),
+             cudaMemcpyHostToDevice);
+}
+
 namespace // unnamed
 {
 static void __attribute__((constructor)) register_tasks(void) {
   XLACopyDeviceToDevice::register_variants();
   XLAInitZeroTask::register_variants();
   XLABufferFromHostBufferTask::register_variants();
+  XLASetScalarTask::register_variants();
 }
 } // namespace
 

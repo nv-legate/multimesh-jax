@@ -18,6 +18,7 @@
 
 #include "legate.h"
 #include "legate_xla_c.h"
+#include <core/task/task_context.h>
 
 namespace legate_xla {
 
@@ -52,6 +53,15 @@ public:
 
 public:
   static void gpu_variant(legate::TaskContext context);
+};
+
+class XLASetScalarTask : public XlaTask<XLASetScalarTask> {
+public:
+  static const int32_t TASK_ID = XlaOpCode::XLA_SET_SCALAR_TASK;
+
+public:
+  static void gpu_variant(legate::TaskContext context);
+  static void cpu_variant(legate::TaskContext context);
 };
 
 class XLABufferFromHostBufferTask
