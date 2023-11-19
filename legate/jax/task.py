@@ -2,6 +2,7 @@ import json
 from typing import Any, Optional, Sequence
 
 import jax
+import jax.numpy as jnp
 from jax._src.ad_checkpoint import _optimization_barrier
 from jax.lax import with_sharding_constraint
 from jax.tree_util import tree_map
@@ -9,10 +10,9 @@ from jax.tree_util import tree_map
 from .lib import should_ignore_transforms
 from .no_op import no_op
 
-# color 0 is a reserved value
+# colors 0 and 1 are reserved values
 _next_color = 1
 _task_depth = 0
-_current_color = None
 
 
 def task(
@@ -169,5 +169,88 @@ def task(
             new_args = start(args)
             res = fxn(*new_args)
             return finish(res)
+
+    return wrapped
+
+
+def abstract_microbatch(x):
+    return x
+
+
+def microbatch(
+    fxn,
+    dim: int,
+    size: int,
+    argnum: int = 0,
+    num_stages: Optional[int] = None,
+    max_breadth: Optional[int] = None,
+):
+    if should_ignore_transforms():
+        return fxn
+
+    def wrapped(*args, **kwargs):
+        x = args[argnum]
+        num_microbatches = x.shape[dim] // size
+        if num_microbatches == 1:
+            return fxn(*args, **kwargs)
+
+        json_args = dict(
+            num_stages=num_stages,
+            max_breadth=max_breadth,
+            num_microbatches=num_microbatches,
+            slice_dim=dim,
+            size=size,
+        )
+
+        mark_microbatch = no_op(
+            name="Microbatch",
+            abstract=abstract_microbatch,
+            config=json.dumps(json_args),
+        )
+        mark_microbatch_slice = no_op(
+            name="MicrobatchSlice",
+            abstract=abstract_microbatch,
+            config=json.dumps(json_args),
+        )
+        mark_microbatch_init = no_op(
+            name="MicrobatchInit",
+            abstract=abstract_microbatch,
+            config=json.dumps(json_args),
+        )
+
+        sizes = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
+        offsets = [0] * len(x.shape)
+        slice = jax.lax.dynamic_slice(x, offsets, sizes)
+
+        new_args = args[:argnum] + (slice,) + args[argnum + 1 :]
+        result_shapes = jax.eval_shape(fxn, *new_args, **kwargs)
+
+        initial_results = tree_map(
+            lambda x: jnp.zeros(x.shape, dtype=x.dtype), result_shapes
+        )
+        initial_results = tree_map(mark_microbatch_init, initial_results)
+
+        x = mark_microbatch(x)
+
+        def body_fun(_, loop_args):
+            (offset, prev_args) = loop_args
+            offsets[dim] = offset
+            slice = mark_microbatch_slice(
+                jax.lax.dynamic_slice(x, offsets, sizes)
+            )
+            # prep the offsets for the next loop
+            offset += size
+            flat_prev, treedef = jax.tree_util.tree_flatten(prev_args)
+            new_args = args[:argnum] + (slice,) + args[argnum + 1 :]
+            results = fxn(*new_args, **kwargs)
+            flat_results, _ = jax.tree_util.tree_flatten(results)
+            new_results = [x + y for x, y in zip(flat_prev, flat_results)]
+            return (offset, jax.tree_util.tree_unflatten(treedef, new_results))
+
+        offset = 0
+        offset, result = jax.lax.fori_loop(
+            0, num_microbatches, body_fun, (offset, initial_results)
+        )
+        return result
 
     return wrapped
