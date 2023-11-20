@@ -6,8 +6,10 @@
 #include "xla_to_legate.h"
 
 #include <core/data/logical_store.h>
+#include <core/data/scalar.h>
 #include <core/mapping/mapping.h>
 #include <core/task/task.h>
+#include <numeric>
 #include <tuple>
 #include <unistd.h>
 #include <utility>
@@ -46,8 +48,8 @@ size_t LaunchSize(const Shape &shape) {
 
 struct get_read_only_ptr {
   template <legate::Type::Code TYPE_CODE, int32_t DIM>
-  const void *operator()(legate::Store &store) {
-    using VAL = legate::legate_type_of<TYPE_CODE>;
+  const void *operator()(legate::PhysicalStore &store) {
+    using VAL = legate::type_of<TYPE_CODE>;
     auto shape = store.shape<DIM>();
     auto acc = store.read_accessor<VAL, DIM>();
     const void *buffer = static_cast<const void *>(acc.ptr(shape));
@@ -206,8 +208,8 @@ void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler_hold) {
   auto machine = core_runtime->get_machine();
   auto [start, stop] = compiler->MachineSlice();
   legate::MachineTracker tracker(machine.slice(start, stop));
-  log_xla.debug() << "CreateCompileTask scheduling on slice [" << start << ","
-                  << stop << ")";
+  log_xla.debug() << "CreateCompileTask " << compiler->Name()
+                  << " scheduling on slice [" << start << "," << stop << ")";
   size_t launch_size = compiler->LaunchSize();
   if ((stop - start) < launch_size) {
     std::cerr << "Not enough devices to run launch size " << launch_size
@@ -248,12 +250,16 @@ void CreateExecuteTask(
     if (log_xla.want_debug()) {
       for (const auto &input : inputs) {
         log_xla.debug() << compiler->Name() << " has input " << input.impl->name
-                        << " with shape " << input.impl->shape;
+                        << " with shape " << input.impl->shape
+                        << ", store=" << input.impl.get() << ", partitioned="
+                        << input.impl->partition.has_value();
       }
       for (const auto &output : outputs) {
         log_xla.debug() << compiler->Name() << " has output "
                         << output.impl->name << " with shape "
-                        << output.impl->shape;
+                        << output.impl->shape << ", store=" << output.impl.get()
+                        << ", partitioned="
+                        << output.impl->partition.has_value();
       }
     }
     if ((stop - start) < launch_size) {
@@ -375,6 +381,7 @@ void BufferFromHostBuffer(BufferAction *action, StoreHandle store,
 void SliceLocalShards(const StoreHandle &handle,
                       std::vector<void *> &local_shards,
                       const std::vector<size_t> &devices) {
+  LOCK;
   size_t start = devices.front();
   size_t stop = devices.back() + 1;
   size_t check = start;
@@ -457,10 +464,11 @@ StoreHandle CreateStore(const legate_xla::Shape &shape,
   LOCK;
   auto core_runtime = legate::Runtime::get_runtime();
   StoreHandle result = {
-      .impl = std::make_shared<StoreHandleImpl>(StoreHandleImpl{
-          .store = core_runtime->create_store(
-              store_shape.dims, legate::primitive_type(code), is_scalar),
-          .shape = shape})};
+      .impl = std::make_shared<StoreHandleImpl>(
+          StoreHandleImpl{.store = core_runtime->create_store(
+                              legate::Shape(std::move(store_shape.dims)),
+                              legate::primitive_type(code), is_scalar),
+                          .shape = shape})};
 
   if (result.impl->shape.tile_shape.empty()) {
     result.impl->shape.tile_shape = shape.dims;
@@ -482,6 +490,22 @@ StoreHandle CreateStore(const legate_xla::Shape &shape,
   return result;
 }
 
+void SetScalar(legate_xla::StoreHandle handle, size_t launch_size,
+               int32_t scalar) {
+  auto runtime = legate_xla::Runtime::get_runtime();
+  auto core_runtime = legate::Runtime::get_runtime();
+  auto task =
+      runtime->create_task(XlaOpCode::XLA_SET_SCALAR_TASK, {launch_size});
+  legate::Scalar wtf(scalar);
+  task.add_scalar_arg(scalar);
+  if (handle.impl->partition.has_value()) {
+    task.add_output(*handle.impl->partition);
+  } else {
+    task.add_output(handle.impl->store);
+  }
+  runtime->submit(std::move(task));
+}
+
 enum LegateState { UNINITIALIZED, STARTING, STARTED, STOPPING, STOPPED };
 static std::atomic<int> legate_state{UNINITIALIZED};
 
@@ -489,7 +513,7 @@ void StopLegate() {
   int started = STARTED;
   if (legate_state.compare_exchange_strong(started, int(STOPPING))) {
     log_xla.info() << "Stopping Legate";
-    legate::finish();
+    auto rc = legate::finish();
     legate_state = STOPPED;
   }
 }
@@ -498,7 +522,7 @@ void StartLegate() {
   int not_started = UNINITIALIZED;
   if (legate_state.compare_exchange_strong(not_started, int(STARTING))) {
     log_xla.info() << "Starting Legate";
-    legate::start(0, nullptr);
+    auto rc = legate::start(0, nullptr);
     legate_xla_perform_registration();
     legate_state = STARTED;
   }

@@ -31,6 +31,9 @@ void SliceLocalShards(const StoreHandle &handle,
 void BufferFromHostBuffer(BufferAction *action, StoreHandle output,
                           int num_devices, bool blocking = false);
 
+void SetScalar(legate_xla::StoreHandle handle, size_t launch_size,
+               int32_t scalar);
+
 void PrintMachineConfig();
 
 void Synchronize(const StoreHandle &store);

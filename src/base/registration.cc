@@ -30,6 +30,4 @@ extern void initialize_runtime_and_context(legate::Runtime *runtime,
 
 } // namespace legate_xla
 
-void legate_xla_perform_registration() {
-  legate::Core::perform_registration<&legate_xla::registration_callback>();
-}
+void legate_xla_perform_registration() { legate_xla::registration_callback(); }

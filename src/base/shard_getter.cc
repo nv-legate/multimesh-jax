@@ -21,6 +21,8 @@
 #include "shard_getter.h"
 #include "task_utils.h"
 #include <condition_variable>
+#include <core/data/logical_store.h>
+#include <core/data/physical_store.h>
 #include <mutex>
 
 using namespace legate;
@@ -29,8 +31,8 @@ namespace legate_xla {
 
 struct get_read_only_ptr {
   template <legate::Type::Code TYPE_CODE, int32_t DIM>
-  const void *operator()(const legate::Store &store) {
-    using VAL = legate::legate_type_of<TYPE_CODE>;
+  const void *operator()(const legate::PhysicalStore &store) {
+    using VAL = legate::type_of<TYPE_CODE>;
     auto shape = store.shape<DIM>();
     auto acc = store.read_accessor<VAL, DIM>();
     const void *buffer = static_cast<const void *>(acc.ptr(shape));
