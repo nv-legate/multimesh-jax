@@ -64,17 +64,3 @@ def no_op(name: str, abstract, config: Optional[str] = None):
 
 mark_gradient = no_op(name="Marking", config="gradient", abstract=lambda x: x)
 mark_loss = no_op(name="Marking", config="loss", abstract=lambda x: x)
-
-
-def abstract_microbatch(x, dim, size):
-    return x
-
-
-mark_microbatch = no_op(name="Microbatch", abstract=abstract_microbatch)
-
-
-def microbatch(x, dim: int, size: int):
-    offset = [0] * len(x.shape)
-    sizes = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
-    slice = jax.lax.dynamic_slice(x, offset, sizes)
-    return mark_microbatch(slice, dim, size)
