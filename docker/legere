@@ -14,7 +14,7 @@ XlaExtension:
 
 Legion:
   copy_image = True
-  version = "23.09.0"
+  version = "23.11.0"
   ucx = True
   asan = %asan
   max_dim = 5
