@@ -89,7 +89,7 @@ RUN cd /opt/legion && \
 -DCMAKE_LIBRARY_PATH:STRING=/usr/lib/x86_64-linux-gnu -DCMAKE_CXX_STANDARD:STRING=17 \
 -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Release -DLegion_USE_CUDA:BOOL=ON \
 -DLegion_MAX_DIM:STRING=4 -DLegion_USE_OpenMP:BOOL=ON -DLegion_USE_GASNet:BOOL=OFF \
--DLegion_USE_Python:BOOL=ON -DLegion_VERSION:STRING=23.09.0 -DLegion_BUILD_BINDINGS:BOOL=ON \
+-DLegion_USE_Python:BOOL=ON -DLegion_VERSION:STRING=23.11.0 -DLegion_BUILD_BINDINGS:BOOL=ON \
 -DLegion_REDOP_COMPLEX:BOOL=ON -DLegion_HIJACK_CUDART:BOOL=OFF -DLegion_GPU_REDUCTIONS:BOOL=OFF \
 -DLegion_REDOP_HALF:BOOL=ON -DCUDA_NVCC_FLAGS:STRING=-std=c++17 \
 -DLegion_DEFAULT_LOCAL_FIELDS:STRING=0 -DLegion_NETWORKS:STRING=ucx \
@@ -174,6 +174,7 @@ RUN cd /opt/legate_xla && \
 
 RUN cd /opt/legate_xla && \
   export CMAKE_ARGS="-DCPM_xla_SOURCE:PATH=/opt/xla_extension -DLegateXLA_ROOT:PATH=/opt/legate_xla/build" && \
+  export SETUPTOOLS_ENABLE_FEATURES=legacy-editable && \
   conda run --no-capture-out -n legere cmake --install build --prefix \
 /opt/install/miniconda/envs/legere && \
   conda run --no-capture-out -n legere python -m pip install -e .

@@ -85,6 +85,8 @@ export LEGION_DEFAULT_ARGS="-ll:py 0 \
  -ll:csize 4000 \
  -ll:fsize 4000 \
  -ll:zsize 32 \
+ -ll:networks none \
+ -ll:ib_rsize 0 \
  ${level} \
  -lg:eager_alloc_percentage 50"
 export JAX_TRACEBACK_FILTERING=off
