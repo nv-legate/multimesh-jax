@@ -2,6 +2,8 @@ function(find_or_configure_xla)
   include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
   rapids_cpm_package_details(OpenXLA version git_repo git_branch shallow exclude_from_all)
 
+  set(LegateXLA_BAZEL_REMOTE_CACHE "" CACHE STRING "An optional remote cache for bazel builds")
+
   if (xla_REPOSITORY)
     set(git_repo ${legate_core_REPOSITORY})
   endif()
@@ -57,6 +59,11 @@ function(find_or_configure_xla)
    list (APPEND _bazel_options
      --copt -fsanitize=address
      --linkopt -fsanitize=address)
+ endif()
+
+ if (LegateXLA_BAZEL_REMOTE_CACHE)
+    list (APPEND _bazel_options
+     --remote_cache ${LegateXLA_BAZEL_REMOTE_CACHE})
  endif()
 
  add_custom_command(
