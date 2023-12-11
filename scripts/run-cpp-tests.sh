@@ -93,7 +93,7 @@ export JAX_TRACEBACK_FILTERING=off
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export TF_CPP_MIN_LOG_LEVEL=$min_level
 export TF_CPP_MAX_LOG_LEVEL=$debug
-export TF_CPP_VMODULE=legate_pjrt_buffer=$debug,legate_computation=$debug,legate_pjrt_client=$debug,hlo_partition=$debug,legate_pjrt_executable=$debug
+export TF_CPP_VMODULE=legate_pjrt_buffer=$debug,legate_computation=$debug,legate_pjrt_client=$debug,hlo_partition=$debug,legate_pjrt_executable=$debug,legate_store_cache=$debug
 
 echo "Running with ${gpus} GPUS"
 echo "Running tests from directory ${build_dir}"

@@ -1,5 +1,6 @@
 from .install_info import libpath
 from pathlib import Path
+import atexit
 
 
 def initialize():
@@ -9,3 +10,7 @@ def initialize():
     xb.register_plugin(
         "legate", priority=500, library_path=str(lib), options=None
     )
+
+    import legate.jax
+
+    atexit.register(legate.jax.shutdown)
