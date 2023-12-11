@@ -1,10 +1,12 @@
+import json
 from contextlib import contextmanager
+from typing import Any
 
 import jax
-from jax import value_and_grad as jax_value_and_grad
+from jax._src.pjit import flatten_axis_resources
 from jax.tree_util import tree_flatten, tree_unflatten
 
-from .no_op import mark_gradient, mark_loss
+from .no_op import no_op
 
 _ignore_transforms = 0
 
@@ -28,24 +30,34 @@ def should_ignore_transforms() -> bool:
     return backend.platform != "legate"
 
 
-def value_and_grad(fxn):
-    jf = jax_value_and_grad(fxn)
-    if should_ignore_transforms():
-        return jf
+def with_sharding_constraint_wrapper(x: Any, axis_resources: Any):
+    flat_args, arg_treedef = tree_flatten(x)
+    axis_flat = flatten_axis_resources(
+        "legate-jax", arg_treedef, axis_resources, tupled_args=True
+    )
+    if len(axis_flat) != len(flat_args):
+        raise Exception(
+            f"axis_resources of length {len(axis_flat)}"
+            f" does not match args of length {len(flat_args)}"
+        )
 
-    def wrapped(*args, **kwargs):
-        value, grads = jf(*args, **kwargs)
-        new_value = mark_loss(value)
-        flat_grads, tree = tree_flatten(grads)
-        new_grads = [mark_gradient(g) for g in flat_grads]
-        return new_value, tree_unflatten(tree, new_grads)
+    def _mark_arg(pspec, arg):
+        json_str = json.dumps(
+            {
+                "axes": list(pspec.spec),
+            }
+        )
+        mark_sharding = no_op(
+            name="AutoSharding", config=json_str, abstract=lambda x: x
+        )
+        return mark_sharding(arg)
 
-    return wrapped
+    flat_marked_args = [
+        _mark_arg(pspec, arg) for pspec, arg in zip(axis_flat, flat_args)
+    ]
+    return tree_unflatten(arg_treedef, flat_marked_args)
 
 
-def init():
-    # TODO: I don't think it is required anymore to mark
-    # gradients and scalars. The new tasking system should
-    # just work. Verify before removing this comment.
-    # jax.value_and_grad = value_and_grad
-    pass
+def init(auto_shard: bool = False) -> None:
+    if auto_shard:
+        jax.lax.with_sharding_constraint = with_sharding_constraint_wrapper
