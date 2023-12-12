@@ -38,7 +38,7 @@ struct DeviceConfig {
 
 class DeviceAssignment {
 public:
-  DeviceAssignment(const DeviceConfig &config)
+  explicit DeviceAssignment(const DeviceConfig &config)
       : local_device_id_(config.local_device_id),
         replica_count_(config.replica_count),
         num_partitions_(config.num_partitions),
@@ -102,6 +102,8 @@ public:
 
 class LegateCompiler {
 public:
+  virtual ~LegateCompiler() = default;
+
   virtual void Compile(uint64_t run_id, const CompileConfig &config) = 0;
 
   virtual std::unique_ptr<LegateExecutable> MakeExecutable() = 0;
@@ -117,7 +119,7 @@ public:
 
 template <class T> class TaskArgHold {
 public:
-  explicit TaskArgHold(const std::shared_ptr<T> &&arg) : arg_(arg) {}
+  explicit TaskArgHold(const std::shared_ptr<T> &arg) : arg_(arg) {}
 
   T *operator->() const { return arg_.get(); }
 
@@ -184,6 +186,7 @@ struct StoreHandleImpl;
 
 struct StoreHandle {
   std::shared_ptr<StoreHandleImpl> impl;
+  bool attached{false};
 };
 
 std::ostream &operator<<(std::ostream &os, const Shape &shape);

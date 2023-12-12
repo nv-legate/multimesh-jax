@@ -14,7 +14,7 @@
  *
  */
 
-#include "shard_getter.h"
+#include "shard_assemble.h"
 #include "allocator.h"
 #include "executable_cache.h"
 #include "legate_to_xla.h"
@@ -28,23 +28,22 @@ using namespace legate;
 
 namespace legate_xla {
 
-struct get_read_only_ptr {
+struct get_write_ptr {
   template <legate::Type::Code TYPE_CODE, int32_t DIM>
-  const void *operator()(const legate::PhysicalStore &store) {
+  auto operator()(const legate::PhysicalStore &store) {
     using VAL = legate::type_of<TYPE_CODE>;
     auto shape = store.shape<DIM>();
-    auto acc = store.read_accessor<VAL, DIM>();
-    const void *buffer = static_cast<const void *>(acc.ptr(shape));
-    return buffer;
+    auto acc = store.write_accessor<VAL, DIM>();
+    void *buffer = static_cast<void *>(acc.ptr(shape));
+    return std::make_pair(buffer, store.domain().get_volume() * sizeof(VAL));
   }
 };
 
-/*static*/ void ShardGetterTask::get_shard(TaskContext context) {
-  log_xla.debug() << "ShardGetterTask start";
+/*static*/ void ShardAssembleTask::assemble_shard(TaskContext context) {
+  log_xla.debug() << "ShardAssembleTask start";
   auto cfg = get_task_config(context);
-  const void **shard_buffers = reinterpret_cast<const void **>(
-      context.scalar(ScalarBufferPointers).value<uint64_t>());
-  const auto &array = context.input(0);
+
+  const auto &array = context.output(0);
 
   int64_t num_shards = context.scalar(ScalarNumShards).value<int64_t>();
 
@@ -52,21 +51,23 @@ struct get_read_only_ptr {
       context.scalar(ScalarTaskWaiter).value<uint64_t>());
 
   if (cfg.local_device_id < num_shards) {
-    const void *buffer = legate::double_dispatch(
-        array.dim(), array.data().code(), get_read_only_ptr{}, array.data());
-    shard_buffers[cfg.local_device_id] = buffer;
+    void *shard = context.scalar(ScalarBufferPointers + cfg.local_device_id)
+                      .value<void *>();
+    auto [buffer, size] = legate::double_dispatch(
+        array.dim(), array.data().code(), get_write_ptr{}, array.data());
+    cudaMemcpy(buffer, shard, size, cudaMemcpyDeviceToDevice);
     waiter->Signal();
   }
 }
 
-/*static*/ void ShardGetterTask::cpu_variant(TaskContext context) {
-  get_shard(context);
+/*static*/ void ShardAssembleTask::cpu_variant(TaskContext context) {
+  assemble_shard(context);
 }
 
 namespace // unnamed
 {
 static void __attribute__((constructor)) register_tasks(void) {
-  ShardGetterTask::register_variants();
+  ShardAssembleTask::register_variants();
 }
 } // namespace
 

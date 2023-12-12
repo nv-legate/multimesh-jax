@@ -64,12 +64,16 @@ public:
   static void cpu_variant(legate::TaskContext context);
 };
 
-class XLABufferFromHostBufferTask
-    : public XlaTask<XLABufferFromHostBufferTask> {
+class XLAStoreBufferActionTask : public XlaTask<XLAStoreBufferActionTask> {
 public:
-  static const int32_t TASK_ID = XlaOpCode::XLA_BUFFER_FROM_HOST_BUFFER_TASK;
+  static const int32_t TASK_ID = XlaOpCode::XLA_STORE_BUFFER_ACTION;
 
-  enum ScalarArgs { ScalarAction, ScalarIsBlocking, ScalarTaskWaiter };
+  enum ScalarArgs {
+    ScalarIsBlocking,
+    ScalarTaskWaiter,
+    ScalarNumActions,
+    ScalarAction
+  };
 
 public:
   static void gpu_variant(legate::TaskContext context);
@@ -77,6 +81,15 @@ public:
 
 private:
   static void run_task(legate::TaskContext context);
+};
+
+class XLAMaterializeTask : public XlaTask<XLAMaterializeTask> {
+public:
+  static const int32_t TASK_ID = XlaOpCode::XLA_MATERIALIZE_TASK;
+
+public:
+  static void gpu_variant(legate::TaskContext context);
+  static void cpu_variant(legate::TaskContext context);
 };
 
 } // namespace legate_xla

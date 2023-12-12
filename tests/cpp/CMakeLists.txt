@@ -37,10 +37,12 @@ enable_testing()
 
 file(GLOB main_SRC ${PROJECT_SOURCE_DIR}/main.cc)
 set(unit_SRC
- api/create_store.cc)
+ api/create_store.cc
+ api/assemble_shards.cc
+)
 
 add_executable(cpp_tests ${main_SRC} ${unit_SRC})
-target_link_libraries(cpp_tests PRIVATE legate::core legate::xla_runtime GTest::gtest)
+target_link_libraries(cpp_tests PRIVATE legate::core legate::xla_runtime GTest::gtest GTest::gmock)
 
 include(GoogleTest)
 gtest_add_tests(TARGET cpp_tests)
