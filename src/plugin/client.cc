@@ -6,7 +6,7 @@ extern "C" {
 struct PJRT_Api;
 
 const PJRT_Api *GetPjrtApi() {
-  legate_xla::StartLegate();
   return GetLegatePjrtApi();
 }
+
 }
