@@ -22,10 +22,10 @@
 
 using SupportedType = legate_xla::SupportedType;
 static constexpr std::array all_types = {
-    SupportedType::F32, SupportedType::F64, SupportedType::S8,
-    SupportedType::S16, SupportedType::S32, SupportedType::S64,
-    SupportedType::U8,  SupportedType::U16, SupportedType::U32,
-    SupportedType::U64};
+    SupportedType::S32, SupportedType::F32, SupportedType::F64,
+    SupportedType::S8,  SupportedType::S16, SupportedType::S32,
+    SupportedType::S64, SupportedType::U8,  SupportedType::U16,
+    SupportedType::U32, SupportedType::U64};
 
 class TestBufferAction : public legate_xla::BufferAction {
 public:
@@ -56,12 +56,16 @@ void test_create_store_tmpl(legate_xla::Shape shape, size_t num_devices) {
     const T *src = &elements[shard_num_elements * device];
     cudaMemcpy(dst, src, shard_size, cudaMemcpyHostToDevice);
   });
+  std::vector<legate_xla::BufferAction *> actions;
+  actions.reserve(num_devices);
+  for (int dev = 0; dev < num_devices; ++dev) {
+    actions.push_back(&action);
+  }
 
-  legate_xla::BufferFromHostBuffer(&action, store, num_devices,
-                                   /*blocking=*/true);
+  legate_xla::StoreBufferAction(actions, store, {.blocking = true});
 
   std::vector<void *> local_shards(num_devices);
-  std::vector<size_t> local_devices(num_devices);
+  std::vector<int64_t> local_devices(num_devices);
   std::iota(local_devices.begin(), local_devices.end(), 0);
   legate_xla::SliceLocalShards(store, local_shards, local_devices);
 

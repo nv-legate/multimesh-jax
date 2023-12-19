@@ -26,3 +26,5 @@ int main(int argc, char **argv) {
 // Needed to satisfy XLA symbols from the runtime library
 struct PJRT_Api;
 extern "C" const PJRT_Api *GetLegatePjrtApi() { return nullptr; }
+
+extern "C" void ShutdownLegateClient() {}

@@ -11,30 +11,43 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler,
                        const std::vector<StoreHandle> &outputs,
                        std::vector<std::function<void()>> *on_done);
 
-StoreHandle CreateStore(const legate_xla::Shape &shape,
-                        std::optional<std::string> name = std::nullopt);
-
 void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
                         size_t num_local_devices);
 
-StoreHandle Reshard(const StoreHandle &handle,
-                    const std::vector<size_t> &tile_shape);
+StoreHandle CreateStore(const legate_xla::Shape &shape,
+                        std::optional<std::string> name = std::nullopt);
+
+StoreHandle Reshard(const StoreHandle &handle, const legate_xla::Shape &shape);
+
+void SliceLocalShards(const StoreHandle &handle,
+                      std::vector<void *> &local_shards,
+                      const std::vector<int64_t> &devices);
+
+struct Shard {
+  const void *data;
+  int64_t local_device_id;
+  std::vector<size_t> shape_index;
+  size_t size;
+};
+
+StoreHandle AssembleShards(const legate_xla::Shape &shape,
+                           const std::vector<Shard> &shards);
 
 std::set<int> GetLocalDevices(int my_node);
 
 bool IsGpu();
 
-void SliceLocalShards(const StoreHandle &handle,
-                      std::vector<void *> &local_shard,
-                      const std::vector<size_t> &devices);
+struct BufferActionConfig {
+  bool blocking{false};
+  std::optional<std::pair<int, int>> machine_slice{std::nullopt};
+};
 
-void BufferFromHostBuffer(BufferAction *action, StoreHandle output,
-                          int num_devices, bool blocking = false);
+void StoreBufferAction(const std::vector<BufferAction *> &actions,
+                       const StoreHandle &store,
+                       BufferActionConfig config = {});
 
 void SetScalar(legate_xla::StoreHandle handle, size_t launch_size,
                int32_t scalar);
-
-void PrintMachineConfig();
 
 void Synchronize(const StoreHandle &store);
 

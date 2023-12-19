@@ -74,7 +74,7 @@ if (LegateXLA_ASAN)
   add_compile_options(-fno-common)
 endif()
 
-option(LegateXla_ENABLE_TESTS "Whether to build the tests" ON)
+option(LegateXLA_ENABLE_TESTS "Whether to build the tests" ON)
 
 if (SKBUILD)
   find_package(LegateXLA)

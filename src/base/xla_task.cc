@@ -85,23 +85,24 @@ XLACopyDeviceToDevice::gpu_variant(legate::TaskContext context) {
   cudaMemset(output_alloc.buffer, 0, output_alloc.size);
 }
 
-void XLABufferFromHostBufferTask::cpu_variant(legate::TaskContext context) {
+void XLAStoreBufferActionTask::cpu_variant(legate::TaskContext context) {
   run_task(context);
 }
 
-void XLABufferFromHostBufferTask::gpu_variant(legate::TaskContext context) {
+void XLAStoreBufferActionTask::gpu_variant(legate::TaskContext context) {
   run_task(context);
 }
 
-void XLABufferFromHostBufferTask::run_task(legate::TaskContext context) {
-  log_xla.debug() << "XlaBufferFromHostBufferTask: running";
+void XLAStoreBufferActionTask::run_task(legate::TaskContext context) {
+  log_xla.debug() << "XLAStoreBufferActionTask: running";
   auto output_store = context.outputs()[0].data();
   auto output_alloc =
       legate::double_dispatch(output_store.dim(), output_store.code(),
                               get_write_only_buffer_fn{}, output_store);
-  auto *action = reinterpret_cast<BufferAction *>(
-      context.scalar(ScalarAction).value<uint64_t>());
   auto cfg = get_task_config(context);
+  auto *action = reinterpret_cast<BufferAction *>(
+      context.scalar(ScalarAction + cfg.local_device_id).value<uint64_t>());
+
   action->Act(output_alloc.buffer, cfg.local_device_id);
   bool blocking = context.scalar(ScalarIsBlocking).value<bool>();
   if (blocking) {
@@ -131,13 +132,18 @@ void XLASetScalarTask::gpu_variant(legate::TaskContext context) {
              cudaMemcpyHostToDevice);
 }
 
+void XLAMaterializeTask::cpu_variant(legate::TaskContext context) {}
+
+void XLAMaterializeTask::gpu_variant(legate::TaskContext context) {}
+
 namespace // unnamed
 {
 static void __attribute__((constructor)) register_tasks(void) {
   XLACopyDeviceToDevice::register_variants();
   XLAInitZeroTask::register_variants();
-  XLABufferFromHostBufferTask::register_variants();
+  XLAStoreBufferActionTask::register_variants();
   XLASetScalarTask::register_variants();
+  XLAMaterializeTask::register_variants();
 }
 } // namespace
 
