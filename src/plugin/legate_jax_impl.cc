@@ -1,4 +1,5 @@
 #include <iostream>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <string>
@@ -7,6 +8,16 @@ extern "C" void RegisterImplicitTask(
     std::string matcher, std::vector<int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes);
+
+extern "C" void RegisterImplicitTaskWithFactory(
+    std::string matcher,
+    std::function<std::vector<int64_t>(const std::string &task)> device_factory,
+    std::vector<int64_t> dims, std::vector<std::string> axes,
+    std::vector<std::pair<std::string, std::string>> logical_axes);
+
+extern "C" void UnregisterImplicitTask(std::string matcher);
+
+extern "C" void ClearImplicitTasks();
 
 namespace py = pybind11;
 
@@ -37,18 +48,47 @@ template <typename T> pybind11::capsule EncapsulateFunction(T *fn) {
 
 void no_op_entrypoint() {}
 
+struct LogicalAxis {
+  std::string logical_name;
+  std::string device_name;
+};
+
 PYBIND11_MODULE(legate_jax_impl, m) {
   m.def("shutdown", []() { LegateShutdown(); });
   m.def("no_op_custom_call",
         []() { return EncapsulateFunction(no_op_entrypoint); });
-  m.def("register_axes", [](py::str task_regex, py::list py_devices,
-                            py::list py_device_dims, py::list py_device_axes,
-                            py::list py_logical_axes) {
-    RegisterImplicitTask(
-        task_regex.cast<std::string>(), py_devices.cast<std::vector<int64_t>>(),
-        py_device_dims.cast<std::vector<int64_t>>(),
-        py_device_axes.cast<std::vector<std::string>>(),
-        py_logical_axes
-            .cast<std::vector<std::pair<std::string, std::string>>>());
+  m.def(
+      "register_task",
+      [](py::str task_regex, py::list py_devices, py::list py_device_dims,
+         py::list py_device_axes, py::list py_logical_axes) {
+        RegisterImplicitTask(
+            task_regex.cast<std::string>(),
+            py_devices.cast<std::vector<int64_t>>(),
+            py_device_dims.cast<std::vector<int64_t>>(),
+            py_device_axes.cast<std::vector<std::string>>(),
+            py_logical_axes
+                .cast<std::vector<std::pair<std::string, std::string>>>());
+      },
+      py::arg("task_regex"), py::arg("devices"), py::arg("dims"),
+      py::arg("device_axes"), py::arg("logical_axes"));
+  m.def(
+      "register_task_factory",
+      [](py::str task_regex,
+         std::function<std::vector<int64_t>(const std::string &)>
+             device_callback,
+         py::list py_device_dims, py::list py_device_axes,
+         py::list py_logical_axes) {
+        RegisterImplicitTaskWithFactory(
+            task_regex.cast<std::string>(), device_callback,
+            py_device_dims.cast<std::vector<int64_t>>(),
+            py_device_axes.cast<std::vector<std::string>>(),
+            py_logical_axes
+                .cast<std::vector<std::pair<std::string, std::string>>>());
+      },
+      py::arg("task_regex"), py::arg("device_callback"), py::arg("dims"),
+      py::arg("device_axes"), py::arg("logical_axes"));
+  m.def("unregister_task", [](py::str task_regex) {
+    UnregisterImplicitTask(task_regex.cast<std::string>());
   });
+  m.def("clear_tasks", []() { ClearImplicitTasks(); });
 }

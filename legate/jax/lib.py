@@ -4,6 +4,8 @@ from typing import Any
 
 import jax
 from jax._src.pjit import flatten_axis_resources
+from jax.lax import with_sharding_constraint as lax_with_sharding_constraint
+from jax.sharding import NamedSharding, PartitionSpec
 from jax.tree_util import tree_flatten, tree_unflatten
 
 from .no_op import no_op
@@ -14,11 +16,13 @@ _ignore_transforms = 0
 @contextmanager
 def ignore_transforms(ignore: bool = True):
     global _ignore_transforms
-    if ignore:
-        _ignore_transforms += 1
-    yield
-    if ignore:
-        _ignore_transforms -= 1
+    try:
+        if ignore:
+            _ignore_transforms += 1
+        yield
+    finally:
+        if ignore:
+            _ignore_transforms -= 1
 
 
 def should_ignore_transforms() -> bool:
@@ -30,7 +34,27 @@ def should_ignore_transforms() -> bool:
     return backend.platform != "legate"
 
 
-def with_sharding_constraint_wrapper(x: Any, axis_resources: Any):
+def _canonicalize_axes(ndim: int, pspec: PartitionSpec):
+    if isinstance(pspec, NamedSharding):
+        pspec = pspec.spec
+    axes = []
+    # make sure there is an entry for every dimension in the tensor
+    # and that each entry is a tuple
+    for entry in pspec:
+        if entry is None:
+            axes.append(())
+        elif isinstance(entry, str):
+            axes.append((entry,))
+        else:
+            axes.append(pspec)
+    for _ in range(len(axes), ndim):
+        axes.append(())
+    return axes
+
+
+def with_sharding_constraint(x: Any, axis_resources: Any):
+    if _ignore_transforms:
+        return lax_with_sharding_constraint(x, axis_resources)
     flat_args, arg_treedef = tree_flatten(x)
     axis_flat = flatten_axis_resources(
         "legate-jax", arg_treedef, axis_resources, tupled_args=True
@@ -44,7 +68,7 @@ def with_sharding_constraint_wrapper(x: Any, axis_resources: Any):
     def _mark_arg(pspec, arg):
         json_str = json.dumps(
             {
-                "axes": list(pspec.spec),
+                "axes": _canonicalize_axes(len(arg.shape), pspec),
             }
         )
         mark_sharding = no_op(
@@ -60,4 +84,4 @@ def with_sharding_constraint_wrapper(x: Any, axis_resources: Any):
 
 def init(auto_shard: bool = False) -> None:
     if auto_shard:
-        jax.lax.with_sharding_constraint = with_sharding_constraint_wrapper
+        jax.lax.with_sharding_constraint = with_sharding_constraint
