@@ -5,19 +5,21 @@ import legate.jax
 
 
 class LegateJaxTestCase(jtu.JaxTestCase):
-    def _test_against_cuda(self, f, arg_maker, arg_shardings=None):
+    def _test_against_native(self, f, arg_maker, arg_shardings=None):
+        device_kind = jax.devices()[0].device_kind
+        native_backend = "cpu" if device_kind == "cpu" else "cuda"
         jax.clear_caches()
         with legate.jax.ignore_transforms():
             if arg_shardings is not None:
                 kwargs = dict(out_shardings=arg_shardings)
             else:
-                kwargs = dict(backend="cuda")
+                kwargs = dict(backend=native_backend)
             args = jax.jit(arg_maker, **kwargs)()
 
             if arg_shardings is not None:
                 kwargs = dict(in_shardings=arg_shardings)
             else:
-                kwargs = dict(backend="cuda")
+                kwargs = dict(backend=native_backend)
             cuda_res = jax.jit(f, backend="cuda")(*args)
 
         # jax unfortunately caches the cuda jit compilation
