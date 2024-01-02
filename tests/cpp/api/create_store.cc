@@ -111,10 +111,10 @@ void test_create_store(legate_xla::Shape shape, size_t num_devices) {
   };
 }
 
-void test_all_types(std::vector<size_t> dims) {
-  size_t num_devices = legate_xla::GetLocalDevices(0).size();
-  size_t replication = 1;
-  std::vector<size_t> tile_shape;
+void test_all_types(std::vector<int64_t> dims) {
+  int64_t num_devices = legate_xla::GetLocalDevices(0).size();
+  int64_t replication = 1;
+  std::vector<int64_t> tile_shape;
   if (dims.size() > 0 && dims[0] >= num_devices &&
       (dims[0] % num_devices == 0)) {
     tile_shape = dims;
@@ -148,7 +148,7 @@ TEST(CreateStore, StandardStorages) {
 }
 
 TEST(CreateStore, ScalarStorages) {
-  std::vector<size_t> dims;
+  std::vector<int64_t> dims;
   test_all_types(dims);
 }
 

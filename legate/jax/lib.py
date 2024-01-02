@@ -8,6 +8,7 @@ from jax.lax import with_sharding_constraint as lax_with_sharding_constraint
 from jax.sharding import NamedSharding, PartitionSpec
 from jax.tree_util import tree_flatten, tree_unflatten
 
+from .legate_jax_impl import disable_implicit_tasks, enable_implicit_tasks
 from .no_op import no_op
 
 _ignore_transforms = 0
@@ -18,11 +19,15 @@ def ignore_transforms(ignore: bool = True):
     global _ignore_transforms
     try:
         if ignore:
+            if _ignore_transforms == 0:
+                disable_implicit_tasks()
             _ignore_transforms += 1
         yield
     finally:
         if ignore:
             _ignore_transforms -= 1
+            if _ignore_transforms == 0:
+                enable_implicit_tasks()
 
 
 def should_ignore_transforms() -> bool:

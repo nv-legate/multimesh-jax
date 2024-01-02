@@ -1,6 +1,7 @@
 #include "legate_xla_common.h"
 #include <optional>
 #include <set>
+#include <string>
 
 namespace legate_xla {
 
@@ -17,7 +18,8 @@ void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
 StoreHandle CreateStore(const legate_xla::Shape &shape,
                         std::optional<std::string> name = std::nullopt);
 
-StoreHandle Reshard(const StoreHandle &handle, const legate_xla::Shape &shape);
+StoreHandle Reshard(const StoreHandle &handle,
+                    const std::vector<int64_t> &tile_shape);
 
 void SliceLocalShards(const StoreHandle &handle,
                       std::vector<void *> &local_shards,
@@ -26,7 +28,7 @@ void SliceLocalShards(const StoreHandle &handle,
 struct Shard {
   const void *data;
   int64_t local_device_id;
-  std::vector<size_t> shape_index;
+  std::vector<int64_t> shape_index;
   size_t size;
 };
 

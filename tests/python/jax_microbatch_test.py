@@ -26,7 +26,7 @@ class MicrobatchTest(LegateJaxTestCase):
         def args_maker():
             return (jnp.arange(4),)
 
-        self._test_against_native(c, args_maker)
+        self._test_against_untransformed(c, args_maker)
 
     def test_multiple_microbatch(self):
         def c(x, param1, param2):
@@ -54,7 +54,7 @@ class MicrobatchTest(LegateJaxTestCase):
             p2 = jnp.arange(4)
             return x, p1, p2
 
-        self._test_against_native(c, args_maker)
+        self._test_against_untransformed(c, args_maker)
 
     def test_simple_microbatch_grad(self):
         def c(param, x):
@@ -70,7 +70,7 @@ class MicrobatchTest(LegateJaxTestCase):
             x = jnp.arange(16, dtype=np.float32).reshape(4, 4)
             return p, x
 
-        self._test_against_native(c, args_maker)
+        self._test_against_untransformed(c, args_maker)
 
     def test_multiple_microbatch_grad(self):
         def c(params, x):
@@ -101,7 +101,7 @@ class MicrobatchTest(LegateJaxTestCase):
             x = jnp.arange(16, dtype=np.float32).reshape(4, 4)
             return (p1, p2), x
 
-        self._test_against_native(c, args_maker)
+        self._test_against_untransformed(c, args_maker)
 
 
 if __name__ == "__main__":

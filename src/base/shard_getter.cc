@@ -40,7 +40,7 @@ struct get_read_only_ptr {
 };
 
 /*static*/ void ShardGetterTask::get_shard(TaskContext context) {
-  log_xla.debug() << "ShardGetterTask start";
+
   auto cfg = get_task_config(context);
   const void **shard_buffers = reinterpret_cast<const void **>(
       context.scalar(ScalarBufferPointers).value<uint64_t>());
@@ -48,13 +48,19 @@ struct get_read_only_ptr {
 
   int64_t num_shards = context.scalar(ScalarNumShards).value<int64_t>();
 
+  log_xla.debug() << "ShardGetterTask start " << cfg.local_device_id << " of "
+                  << num_shards;
+
+  // shard 0 might be on device 4
+  int32_t shard_id = std::min(cfg.task_id, cfg.local_device_id);
+
   auto *waiter = reinterpret_cast<TaskWaiter *>(
       context.scalar(ScalarTaskWaiter).value<uint64_t>());
 
-  if (cfg.local_device_id < num_shards) {
+  if (shard_id < num_shards) {
     const void *buffer = legate::double_dispatch(
         array.dim(), array.data().code(), get_read_only_ptr{}, array.data());
-    shard_buffers[cfg.local_device_id] = buffer;
+    shard_buffers[shard_id] = buffer;
     waiter->Signal();
   }
 }

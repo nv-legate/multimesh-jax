@@ -105,7 +105,8 @@ void ValidateContiguousSlice(const std::vector<int64_t> &devices) {
   }
 }
 
-std::ostream &operator<<(std::ostream &os, const std::vector<size_t> &vec) {
+template <class T>
+std::ostream &operator<<(std::ostream &os, const std::vector<T> &vec) {
   os << "[";
   for (auto v : vec) {
     os << v << ",";
@@ -432,13 +433,28 @@ void SliceLocalShards(const StoreHandle &handle,
   ValidateContiguousSlice(devices);
   LOCK;
 
+  size_t launch_size = LaunchSize(handle.impl->shape);
+
   log_xla.debug() << "SliceLocalShards: slice " << local_shards.size()
-                  << " shards on store " << handle.impl.get();
+                  << " shards on launch size " << launch_size << " on store "
+                  << handle.impl.get();
+
+  if (launch_size != local_shards.size()) {
+    std::cerr << "Shape " << handle.impl->shape << " produces launch size "
+              << launch_size << " that doesn't match no. shards "
+              << local_shards.size() << std::endl;
+    abort();
+  }
+
+  auto start = devices.front();
+  auto stop = devices.back() + 1;
 
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
-  auto task = runtime->create_task(XlaOpCode::XLA_SHARD_GETTER_TASK,
-                                   {LaunchSize(handle.impl->shape)});
+  auto machine = core_runtime->get_machine();
+  legate::MachineTracker tracker(machine.slice(start, stop));
+  auto task =
+      runtime->create_task(XlaOpCode::XLA_SHARD_GETTER_TASK, {launch_size});
 
   TaskWaiter waiter{int64_t(local_shards.size())};
   task.add_scalar_arg(reinterpret_cast<uint64_t>(local_shards.data()));
@@ -512,15 +528,19 @@ StoreHandle AssembleShards(const legate_xla::Shape &logical_shape,
 }
 
 StoreHandle Reshard(const StoreHandle &handle,
-                    const std::vector<size_t> &tile_shape) {
+                    const std::vector<int64_t> &tile_shape) {
   if (tile_shape != handle.impl->shape.tile_shape) {
     Shape new_shape = handle.impl->shape;
     new_shape.tile_shape = tile_shape;
     Shape store_shape = ComputeStoreShape(new_shape);
     auto new_impl = std::make_shared<StoreHandleImpl>(
-        StoreHandleImpl{.store = handle.impl->store, .shape = new_shape});
+        StoreHandleImpl{.store = handle.impl->store,
+                        .shape = new_shape,
+                        .name = handle.impl->name});
+
+    std::vector<size_t> legate_tile_shape{tile_shape.begin(), tile_shape.end()};
     new_impl->partition =
-        new_impl->store.partition_by_tiling(store_shape.tile_shape);
+        new_impl->store.partition_by_tiling(legate_tile_shape);
     return StoreHandle{.impl = std::move(new_impl)};
   }
   // just return back the original handle, no resharding
@@ -561,11 +581,11 @@ StoreHandle CreateStore(const legate_xla::Shape &shape,
   LOCK;
   auto core_runtime = legate::Runtime::get_runtime();
   StoreHandle result = {
-      .impl = std::make_shared<StoreHandleImpl>(
-          StoreHandleImpl{.store = core_runtime->create_store(
-                              legate::Shape(std::move(store_shape.dims)),
-                              legate::primitive_type(code), is_scalar),
-                          .shape = shape})};
+      .impl = std::make_shared<StoreHandleImpl>(StoreHandleImpl{
+          .store = core_runtime->create_store(
+              legate::Shape({store_shape.dims.begin(), store_shape.dims.end()}),
+              legate::primitive_type(code), is_scalar),
+          .shape = shape})};
 
   if (result.impl->shape.tile_shape.empty()) {
     result.impl->shape.tile_shape = shape.dims;
@@ -576,8 +596,8 @@ StoreHandle CreateStore(const legate_xla::Shape &shape,
   }
 
   if (!store_shape.tile_shape.empty()) {
-    result.impl->partition =
-        result.impl->store.partition_by_tiling(store_shape.tile_shape);
+    result.impl->partition = result.impl->store.partition_by_tiling(
+        {store_shape.tile_shape.begin(), store_shape.tile_shape.end()});
   }
 
   if (legate_xla::Runtime::synchronous_mode()) {

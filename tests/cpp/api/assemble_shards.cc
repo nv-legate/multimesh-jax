@@ -35,7 +35,7 @@ public:
     }
   }
 
-  const std::vector<size_t> &index() const { return index_; }
+  const std::vector<int64_t> &index() const { return index_; }
 
   void operator++() {
     size_t dim = 0;
@@ -56,8 +56,8 @@ public:
 
 public:
   bool done_{};
-  std::vector<size_t> index_{};
-  std::vector<size_t> shape_{};
+  std::vector<int64_t> index_{};
+  std::vector<int64_t> shape_{};
 };
 
 void test_legate_shape(legate_xla::Shape shape) {
@@ -115,10 +115,10 @@ void test_legate_shape(legate_xla::Shape shape) {
   EXPECT_THAT(slices, ElementsAreArray(input_shards));
 }
 
-void test_shape(std::vector<size_t> dims) {
-  size_t num_devices = legate_xla::GetLocalDevices(0).size();
-  size_t replication = 1;
-  std::vector<size_t> tile_shape;
+void test_shape(std::vector<int64_t> dims) {
+  int64_t num_devices = legate_xla::GetLocalDevices(0).size();
+  int64_t replication = 1;
+  std::vector<int64_t> tile_shape;
   if (dims.size() > 0 && dims[0] >= num_devices &&
       (dims[0] % num_devices == 0)) {
     tile_shape = dims;
