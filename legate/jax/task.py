@@ -190,7 +190,16 @@ def microbatch(
 
     def wrapped(*args, **kwargs):
         x = args[argnum]
-        num_microbatches = x.shape[dim] // size
+
+        flat_x, _ = jax.tree_util.tree_flatten(x)
+        microbatch_dim = flat_x[0].shape[dim]
+        for fx in flat_x:
+            if microbatch_dim != fx.shape[dim]:
+                raise ValueError(
+                    "dimensions not the same across all microbatched tensors"
+                )
+
+        num_microbatches = microbatch_dim // size
         if num_microbatches == 1:
             return fxn(*args, **kwargs)
 
@@ -218,11 +227,17 @@ def microbatch(
             config=json.dumps(json_args),
         )
 
-        sizes = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
-        offsets = [0] * len(x.shape)
-        slice = jax.lax.dynamic_slice(x, offsets, sizes)
+        def slice_microbatch(x, offset: int):
+            offsets = [0] * len(x.shape)
+            offsets[dim] = offset
+            sizes = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
+            return mark_microbatch_slice(
+                jax.lax.dynamic_slice(x, offsets, sizes)
+            )
 
-        new_args = args[:argnum] + (slice,) + args[argnum + 1 :]
+        abstract_slices = tree_map(lambda a: slice_microbatch(a, 0), x)
+
+        new_args = args[:argnum] + (abstract_slices,) + args[argnum + 1 :]
         result_shapes = jax.eval_shape(fxn, *new_args, **kwargs)
 
         initial_results = tree_map(
@@ -230,18 +245,17 @@ def microbatch(
         )
         initial_results = tree_map(mark_microbatch_init, initial_results)
 
-        x = mark_microbatch(x)
+        x = tree_map(mark_microbatch, x)
 
         def body_fun(_, loop_args):
             (offset, prev_args) = loop_args
-            offsets[dim] = offset
-            slice = mark_microbatch_slice(
-                jax.lax.dynamic_slice(x, offsets, sizes)
-            )
+
+            slices = tree_map(lambda a: slice_microbatch(a, offset), x)
+
             # prep the offsets for the next loop
             offset += size
             flat_prev, treedef = jax.tree_util.tree_flatten(prev_args)
-            new_args = args[:argnum] + (slice,) + args[argnum + 1 :]
+            new_args = args[:argnum] + (slices,) + args[argnum + 1 :]
             results = fxn(*new_args, **kwargs)
             flat_results, _ = jax.tree_util.tree_flatten(results)
             new_results = [x + y for x, y in zip(flat_prev, flat_results)]

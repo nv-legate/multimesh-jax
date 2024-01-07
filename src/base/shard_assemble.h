@@ -36,8 +36,10 @@ public:
 
   static void gpu_variant(legate::TaskContext context);
 
-public:
-  static void assemble_shard(legate::TaskContext context);
+private:
+  static void
+  assemble_shard(legate::TaskContext context,
+                 std::function<void(void *, const void *, size_t)> copy_fxn);
 };
 
 } // namespace legate_xla

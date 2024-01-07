@@ -1,3 +1,6 @@
+import os
+import tempfile
+from pathlib import Path
 from typing import List
 
 import jax
@@ -7,12 +10,28 @@ import numpy as np
 from absl.testing import absltest
 from jax import config
 from jax.experimental.pjit import AUTO
+from jax.lax import with_sharding_constraint
 from jax.sharding import GSPMDSharding, Mesh, NamedSharding, PartitionSpec as P
 
 import legate.jax
 from legate.jax.test_util import LegateJaxTestCase
 
 config.parse_flags_with_absl()
+
+_RESHARD_GIN_CONFIG = """
+
+logical_axes = [
+   ("batch", "x"),
+   ("embed", "y"),
+]
+
+ClientConfig:
+  auto_shard = True
+  tasks = [
+    ("embeddings", [0,1,2,3,4,5,6,7], [8,1], ["batch","embed"], %logical_axes),
+    ("layer0", [0,1,2,3], [2,2], ["batch","embed"], %logical_axes),
+  ]
+"""
 
 
 class TaskTest(LegateJaxTestCase):
@@ -41,12 +60,12 @@ class TaskTest(LegateJaxTestCase):
 
         def c(x):
             with jax.named_scope("task0"):
-                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                x = with_sharding_constraint(x, P("batch", "model"))
                 x = x * jnp.sin(x)
-                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                x = with_sharding_constraint(x, P("batch", "model"))
             with jax.named_scope("task1"):
                 x = x * x
-                return legate.jax.with_sharding_constraint(x, P("batch", None))
+                return with_sharding_constraint(x, P("batch", None))
 
         def test(x):
             return c(x)
@@ -192,6 +211,258 @@ class TaskTest(LegateJaxTestCase):
         for initial, final in zip(arg_shardings, post_arg_shardings):
             if isinstance(initial, GSPMDSharding):
                 self.assertEqual(initial, final)
+
+    def test_reshard_gin_config(self):
+        if jax.device_count() < 8:
+            self.skipTest("need >= 8 devices")
+
+        vocab = 2
+        batch_size = 8
+        seq = 1
+        embed_size = 2
+
+        with tempfile.TemporaryDirectory() as d:
+            f_path = Path(d) / "test.gin"
+            f = open(f_path, "w")
+            f.write(_RESHARD_GIN_CONFIG)
+            f.close()
+
+            legate.jax.init(config=f_path)
+
+        def f(params, batch):
+            embed, fc = params
+            with jax.named_scope("embeddings"):
+                batch = legate.jax.with_sharding_constraint(
+                    batch, P("batch", "seq")
+                )
+                embed = legate.jax.with_sharding_constraint(
+                    embed, P("vocab", "embed")
+                )
+                batch = jax.nn.one_hot(batch, num_classes=vocab)
+                x = jnp.einsum("bsv,ve->bse", batch, embed)
+            with jax.named_scope("layer0"):
+                fc = legate.jax.with_sharding_constraint(
+                    fc, P("embed", "hidden")
+                )
+                x = legate.jax.with_sharding_constraint(
+                    x, P("batch", "seq", "embed")
+                )
+                x = jnp.einsum("bsh,eh->bsh", x, fc)
+                return x
+
+        mesh = Mesh(
+            np.array(jax.devices()).reshape(8, 1),
+            ("batch", "model"),
+        )
+
+        with mesh:
+            f = jax.jit(
+                f,
+                in_shardings=(AUTO(mesh), AUTO(mesh)),
+                out_shardings=(AUTO(mesh)),
+            )
+            batch = jax.core.ShapedArray((batch_size, seq), np.float32)
+            fc = jax.core.ShapedArray((embed_size, embed_size), np.float32)
+            embed = jax.core.ShapedArray((vocab, embed_size), np.float32)
+            params = (embed, fc)
+            lowered = f.lower(params, batch).compile()
+
+        (
+            _,
+            fc_sharding,
+        ) = lowered.input_shardings[
+            0
+        ][0]
+        batch_sharding = lowered.input_shardings[0][1]
+
+        self.assertTrue(isinstance(fc_sharding, GSPMDSharding))
+        self.assertEqual(
+            fc_sharding._hlo_sharding.tile_assignment_devices(), [0, 1, 2, 3]
+        )
+        self.assertTrue(fc_sharding._hlo_sharding.replicate_on_last_tile_dim())
+
+        self.assertTrue(isinstance(batch_sharding, GSPMDSharding))
+        self.assertEqual(
+            batch_sharding._hlo_sharding.tile_assignment_devices(),
+            [0, 1, 2, 3, 4, 5, 6, 7],
+        )
+        self.assertFalse(
+            batch_sharding._hlo_sharding.replicate_on_last_tile_dim()
+        )
+
+    def test_reshard_gin_config_from_env(self):
+        if jax.device_count() < 8:
+            self.skipTest("need >= 8 devices")
+
+        vocab = 2
+        batch_size = 8
+        seq = 1
+        embed_size = 2
+
+        with tempfile.TemporaryDirectory() as d:
+            f_path = Path(d) / "test.gin"
+            f = open(f_path, "w")
+            f.write(_RESHARD_GIN_CONFIG)
+            f.close()
+
+            os.environ["LEGATE_GIN_CONFIG"] = str(f_path)
+            legate.jax.init()
+
+        def f(params, batch):
+            embed, fc = params
+            with jax.named_scope("embeddings"):
+                batch = legate.jax.with_sharding_constraint(
+                    batch, P("batch", "seq")
+                )
+                embed = legate.jax.with_sharding_constraint(
+                    embed, P("vocab", "embed")
+                )
+                batch = jax.nn.one_hot(batch, num_classes=vocab)
+                x = jnp.einsum("bsv,ve->bse", batch, embed)
+            with jax.named_scope("layer0"):
+                fc = legate.jax.with_sharding_constraint(
+                    fc, P("embed", "hidden")
+                )
+                x = legate.jax.with_sharding_constraint(
+                    x, P("batch", "seq", "embed")
+                )
+                x = jnp.einsum("bsh,eh->bsh", x, fc)
+                return x
+
+        mesh = Mesh(
+            np.array(jax.devices()).reshape(8, 1),
+            ("batch", "model"),
+        )
+
+        with mesh:
+            f = jax.jit(
+                f,
+                in_shardings=(AUTO(mesh), AUTO(mesh)),
+                out_shardings=(AUTO(mesh)),
+            )
+            batch = jax.core.ShapedArray((batch_size, seq), np.float32)
+            fc = jax.core.ShapedArray((embed_size, embed_size), np.float32)
+            embed = jax.core.ShapedArray((vocab, embed_size), np.float32)
+            params = (embed, fc)
+            lowered = f.lower(params, batch).compile()
+
+        _, fc_sharding = lowered.input_shardings[0][0]
+        batch_sharding = lowered.input_shardings[0][1]
+
+        self.assertTrue(isinstance(fc_sharding, GSPMDSharding))
+        self.assertEqual(
+            fc_sharding._hlo_sharding.tile_assignment_devices(), [0, 1, 2, 3]
+        )
+        self.assertTrue(fc_sharding._hlo_sharding.replicate_on_last_tile_dim())
+
+        self.assertTrue(isinstance(batch_sharding, GSPMDSharding))
+        self.assertEqual(
+            batch_sharding._hlo_sharding.tile_assignment_devices(),
+            [0, 1, 2, 3, 4, 5, 6, 7],
+        )
+        self.assertFalse(
+            batch_sharding._hlo_sharding.replicate_on_last_tile_dim()
+        )
+
+    def test_auto_shard_multiple_axes(self):
+        if jax.device_count() < 8:
+            self.skipTest("need >= 8 devices")
+
+        logical_axes = [
+            ("batch", "x"),
+            ("embed", "x"),
+            ("model", "y"),
+        ]
+
+        legate.jax.register_task(
+            "embeddings",
+            devices=[0, 1, 2, 3, 4, 5, 6, 7],
+            dims=[4, 2],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+
+        legate.jax.register_task(
+            "layer0",
+            devices=[0, 1, 2, 3],
+            dims=[2, 2],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+
+        vocab = 2
+        batch_size = 8
+        seq = 4
+        embed_size = 16
+
+        def f(params, batch):
+            embed, fc = params
+            with jax.named_scope("embeddings"):
+                batch = legate.jax.with_sharding_constraint(
+                    batch, P(("batch", "model"), "seq")
+                )
+                embed = legate.jax.with_sharding_constraint(
+                    embed, P("vocab", "embed")
+                )
+                batch = jax.nn.one_hot(batch, num_classes=vocab)
+                x = jnp.einsum("bsv,ve->bse", batch, embed)
+            with jax.named_scope("layer0"):
+                x = legate.jax.with_sharding_constraint(
+                    x, P(("batch", "model"), "seq", "embed")
+                )
+                fc = legate.jax.with_sharding_constraint(
+                    fc, P("hidden", "embed")
+                )
+                x = jnp.einsum("bsh,eh->bsh", x, fc)
+                x = legate.jax.with_sharding_constraint(
+                    x, P("batch", "seq", "embed")
+                )
+                return x
+
+        mesh = Mesh(
+            np.array(jax.devices()).reshape(8, 1, 1),
+            ("batch", "model", "embed"),
+        )
+
+        with mesh:
+            f = jax.jit(
+                f,
+                in_shardings=(AUTO(mesh), AUTO(mesh)),
+                out_shardings=(AUTO(mesh)),
+            )
+            batch = jax.core.ShapedArray((batch_size, seq), np.float32)
+            fc = jax.core.ShapedArray((embed_size, embed_size), np.float32)
+            embed = jax.core.ShapedArray((vocab, embed_size), np.float32)
+            params = (embed, fc)
+            lowered = f.lower(params, batch).compile()
+
+        _, fc_sharding = lowered.input_shardings[0][0]
+        batch_sharding = lowered.input_shardings[0][1]
+        output_sharding = lowered.output_shardings
+
+        self.assertTrue(isinstance(fc_sharding, GSPMDSharding))
+        self.assertEqual(
+            fc_sharding._hlo_sharding.tile_assignment_devices(), [0, 1, 2, 3]
+        )
+        self.assertTrue(fc_sharding._hlo_sharding.replicate_on_last_tile_dim())
+
+        self.assertTrue(isinstance(batch_sharding, GSPMDSharding))
+        self.assertEqual(
+            batch_sharding._hlo_sharding.tile_assignment_devices(),
+            [0, 1, 2, 3, 4, 5, 6, 7],
+        )
+        self.assertFalse(
+            batch_sharding._hlo_sharding.replicate_on_last_tile_dim()
+        )
+
+        self.assertTrue(isinstance(batch_sharding, GSPMDSharding))
+        self.assertEqual(
+            output_sharding._hlo_sharding.tile_assignment_devices(),
+            [0, 1, 2, 3],
+        )
+        self.assertTrue(
+            output_sharding._hlo_sharding.replicate_on_last_tile_dim()
+        )
 
     def test_reshard_initial_final(self):
         if jax.device_count() != 8:

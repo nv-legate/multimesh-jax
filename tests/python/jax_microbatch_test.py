@@ -28,6 +28,65 @@ class MicrobatchTest(LegateJaxTestCase):
 
         self._test_against_untransformed(c, args_maker)
 
+    def test_microbatch_pre_post_task(self):
+        def c(args):
+            def m(args):
+                x, y, z = args
+                return (x + y + z).sum(axis=0)
+
+            m = microbatch(m, dim=0, size=2)
+            x, y, z = args
+            x = 2 * x
+            y = 2 * y
+            z = 2 * z
+            s = m((x, y, z))
+            return s.sum()
+
+        def args_maker():
+            def make_shape(*shape):
+                size = np.prod(shape)
+                return jnp.arange(size).reshape(*shape)
+
+            return ((make_shape(4, 4), make_shape(4, 1), make_shape(4, 1)),)
+
+        self._test_against_untransformed(c, args_maker)
+
+    def test_microbatch_no_tasks(self):
+        def c(args):
+            def f(args):
+                x, y, z = args
+                return (x * y * z).sum()
+
+            f = microbatch(f, dim=0, size=2)
+            return f(args)
+
+        def args_maker():
+            def make_shape(*shape):
+                size = np.prod(shape)
+                return jnp.arange(size).reshape(*shape)
+
+            return ((make_shape(4, 4), make_shape(4, 1), make_shape(4, 1)),)
+
+        self._test_against_untransformed(c, args_maker)
+
+    def test_multiple_microbatch_slices(self):
+        def c(args):
+            def f(args):
+                x, y, z = args
+                return (x * y * z).sum()
+
+            f = microbatch(task(f), dim=0, size=2)
+            return f(args)
+
+        def args_maker():
+            def make_shape(*shape):
+                size = np.prod(shape)
+                return jnp.arange(size).reshape(*shape)
+
+            return ((make_shape(4, 4), make_shape(4, 1), make_shape(4, 1)),)
+
+        self._test_against_untransformed(c, args_maker)
+
     def test_multiple_microbatch(self):
         def c(x, param1, param2):
             def g(x, param):

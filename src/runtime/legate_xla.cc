@@ -503,6 +503,8 @@ StoreHandle AssembleShards(const legate_xla::Shape &logical_shape,
   };
 #else
   auto store = CreateStore(logical_shape, "assembled");
+  log_xla.debug() << "AssemblShards: assembling " << local_shards.size()
+                  << " local shards " << store.impl.get();
   auto task = runtime->create_task(XlaOpCode::XLA_SHARD_ASSEMBLE_TASK,
                                    {LaunchSize(store.impl->shape)});
 
@@ -522,8 +524,6 @@ StoreHandle AssembleShards(const legate_xla::Shape &logical_shape,
   runtime->submit(std::move(task));
   waiter.Wait();
 #endif
-  log_xla.debug() << "AssembleShards: assembled " << local_shards.size()
-                  << " local shards " << store.impl.get();
   return store;
 }
 

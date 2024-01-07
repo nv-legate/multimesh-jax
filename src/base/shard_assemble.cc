@@ -39,13 +39,17 @@ struct get_write_ptr {
   }
 };
 
-/*static*/ void ShardAssembleTask::assemble_shard(TaskContext context) {
-  log_xla.debug() << "ShardAssembleTask start";
+/*static*/ void ShardAssembleTask::assemble_shard(
+    TaskContext context,
+    std::function<void(void *, const void *, size_t)> copy_fxn) {
   auto cfg = get_task_config(context);
 
   const auto &array = context.output(0);
 
   int64_t num_shards = context.scalar(ScalarNumShards).value<int64_t>();
+
+  log_xla.debug() << "ShardAssembleTask " << cfg.task_id << " start for "
+                  << num_shards << "shards";
 
   auto *waiter = reinterpret_cast<TaskWaiter *>(
       context.scalar(ScalarTaskWaiter).value<uint64_t>());
@@ -55,13 +59,15 @@ struct get_write_ptr {
                       .value<void *>();
     auto [buffer, size] = legate::double_dispatch(
         array.dim(), array.data().code(), get_write_ptr{}, array.data());
-    cudaMemcpy(buffer, shard, size, cudaMemcpyDeviceToDevice);
+    copy_fxn(buffer, shard, size);
     waiter->Signal();
   }
 }
 
 /*static*/ void ShardAssembleTask::cpu_variant(TaskContext context) {
-  assemble_shard(context);
+  assemble_shard(context, [](void *buffer, const void *shard, size_t size) {
+    ::memcpy(buffer, shard, size);
+  });
 }
 
 namespace // unnamed

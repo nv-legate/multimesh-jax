@@ -1,17 +1,27 @@
 import json
+import os
 from contextlib import contextmanager
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Callable, List, Sequence, TypeAlias
 
+import gin
 import jax
 from jax._src.pjit import flatten_axis_resources
 from jax.lax import with_sharding_constraint as lax_with_sharding_constraint
 from jax.sharding import NamedSharding, PartitionSpec
 from jax.tree_util import tree_flatten, tree_unflatten
 
-from .legate_jax_impl import disable_implicit_tasks, enable_implicit_tasks
+from .legate_jax_impl import (
+    disable_implicit_tasks,
+    enable_implicit_tasks,
+    register_task,
+    register_task_factory,
+)
 from .no_op import no_op
 
 _ignore_transforms = 0
+
+_GIN_CONFIG_ENV = "LEGATE_GIN_CONFIG"
 
 
 @contextmanager
@@ -51,7 +61,7 @@ def _canonicalize_axes(ndim: int, pspec: PartitionSpec):
         elif isinstance(entry, str):
             axes.append((entry,))
         else:
-            axes.append(pspec)
+            axes.append(entry)
     for _ in range(len(axes), ndim):
         axes.append(())
     return axes
@@ -87,6 +97,50 @@ def with_sharding_constraint(x: Any, axis_resources: Any):
     return tree_unflatten(arg_treedef, flat_marked_args)
 
 
-def init(auto_shard: bool = False) -> None:
-    if auto_shard:
+_DeviceIdList: TypeAlias = Sequence[int]
+_DeviceAxisDims: TypeAlias = Sequence[int]
+_DeviceAxisNames: TypeAlias = Sequence[str]
+_DeviceFactory: TypeAlias = Callable[[str], Sequence[int]]
+_LogicalAxisPairs: TypeAlias = Sequence[tuple[str, str]]
+ImplicitTask: TypeAlias = tuple[
+    str,
+    _DeviceIdList | _DeviceFactory,
+    _DeviceAxisDims,
+    _DeviceAxisNames,
+    _LogicalAxisPairs,
+]
+
+
+@gin.configurable
+@dataclass
+class ClientConfig:
+    auto_shard: bool = False
+    tasks: List[ImplicitTask] = field(default_factory=list)
+
+
+def init(config: os.PathLike | None = None, **kwargs) -> None:
+    if config is None:
+        config = os.environ.get(_GIN_CONFIG_ENV)
+    if config is not None:
+        gin.parse_config_file(str(config), print_includes_and_imports=True)
+
+    client_config = ClientConfig(**kwargs)
+    if client_config.auto_shard:
         jax.lax.with_sharding_constraint = with_sharding_constraint
+    for name, devices, dims, device_axes, logical_axes in client_config.tasks:
+        if callable(devices):
+            register_task_factory(
+                name=name,
+                device_factory=devices,
+                dims=dims,
+                device_axes=device_axes,
+                logical_axes=logical_axes,
+            )
+        else:
+            register_task(
+                name,
+                devices=devices,
+                dims=dims,
+                device_axes=device_axes,
+                logical_axes=logical_axes,
+            )

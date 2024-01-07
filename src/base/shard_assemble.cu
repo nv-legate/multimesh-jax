@@ -15,11 +15,14 @@
  */
 
 #include "shard_assemble.h"
+#include "task_utils.h"
 
 namespace legate_xla {
 
 /*static*/ void ShardAssembleTask::gpu_variant(legate::TaskContext context) {
-  assemble_shard(context);
+  assemble_shard(context, [](void *buffer, const void *shard, size_t size) {
+    cudaMemcpy(buffer, shard, size, cudaMemcpyDeviceToDevice);
+  });
 }
 
 } // namespace legate_xla
