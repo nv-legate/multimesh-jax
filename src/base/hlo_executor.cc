@@ -166,6 +166,9 @@ struct get_write_only_buffer_fn {
     log_xla.error() << "Exception caught during 'Execute'";
   }
 
+  log_xla.debug() << "Finish task " << exe->Name() << " for device "
+                  << cfg.my_device_id;
+
   // Check that the stream ran and finished correctly
   if (!success) {
     log_xla.error() << "[HLOExecutor] HLO failed!";

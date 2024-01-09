@@ -5,7 +5,7 @@ import numpy as np
 from absl.testing import absltest
 from jax import config, value_and_grad
 
-from legate.jax import microbatch, task
+from legate.jax import microbatch, register_task, task
 from legate.jax.test_util import LegateJaxTestCase
 
 config.parse_flags_with_absl()
@@ -46,6 +46,58 @@ class MicrobatchTest(LegateJaxTestCase):
             def make_shape(*shape):
                 size = np.prod(shape)
                 return jnp.arange(size).reshape(*shape)
+
+            return ((make_shape(4, 4), make_shape(4, 1), make_shape(4, 1)),)
+
+        self._test_against_untransformed(c, args_maker)
+
+    def test_microbatch_implicit_pre_post_task(self):
+        logical_axes = [
+            ("batch", "x"),
+            ("model", "y"),
+        ]
+
+        register_task(
+            "layer0",
+            devices=[0],
+            dims=[1, 1],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+        register_task(
+            "layer1",
+            devices=[0],
+            dims=[1, 1],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+
+        def c(args):
+            @jax.jit
+            def inner_comp(x, y):
+                return x + y
+
+            def m(args):
+                x, y, z = args
+                with jax.named_scope("layer0"):
+                    s = inner_comp(x, y)
+                with jax.named_scope("layer1"):
+                    return (s + z).sum(axis=0)
+
+            m = microbatch(m, dim=0, size=2)
+            x, y, z = args
+            with jax.named_scope("layer0"):
+                x = 2 * x
+                y = 2 * y
+                z = 2 * z
+            s = m((x, y, z))
+            with jax.named_scope("layer1"):
+                return s.sum()
+
+        def args_maker():
+            def make_shape(*shape):
+                size = np.prod(shape)
+                return jnp.arange(size, dtype=np.float32).reshape(*shape)
 
             return ((make_shape(4, 4), make_shape(4, 1), make_shape(4, 1)),)
 
