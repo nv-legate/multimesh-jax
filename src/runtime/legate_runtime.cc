@@ -41,7 +41,7 @@ AutoTask Runtime::create_task(XlaOpCode task_id) {
 
 ManualTask Runtime::create_task(XlaOpCode task_id,
                                 const legate::Shape &launch_shape) {
-  return core_runtime_->create_task(context_, task_id, launch_shape);
+  return core_runtime_->create_task(context_, task_id, launch_shape.extents());
 }
 
 void Runtime::submit(legate::AutoTask task) {

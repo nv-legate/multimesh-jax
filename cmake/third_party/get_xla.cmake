@@ -40,6 +40,7 @@ function(find_or_configure_xla)
     hlo_partition_test
     legate_buffer_action_test
     legate_sharding_test
+    legate_pjrt_client_test
   )
 
 

@@ -11,7 +11,13 @@ from absl.testing import absltest
 from jax import config
 from jax.experimental.pjit import AUTO
 from jax.lax import with_sharding_constraint
-from jax.sharding import GSPMDSharding, Mesh, NamedSharding, PartitionSpec as P
+from jax.sharding import (
+    GSPMDSharding,
+    Mesh,
+    NamedSharding,
+    PartitionSpec as P,
+    PositionalSharding,
+)
 
 import legate.jax
 from legate.jax.test_util import LegateJaxTestCase
@@ -32,6 +38,11 @@ ClientConfig:
     ("layer0", [0,1,2,3], [2,2], ["batch","embed"], %logical_axes),
   ]
 """
+
+
+def make_shape(*shape, dtype=np.float32):
+    size = np.prod(shape)
+    return jnp.arange(size, dtype=dtype).reshape(shape)
 
 
 class TaskTest(LegateJaxTestCase):
@@ -92,7 +103,7 @@ class TaskTest(LegateJaxTestCase):
             return jax.jit(f, out_shardings=(arg_shardings))()
 
         with mesh:
-            self._test_against_untransformed(
+            self._test_against_reference(
                 test, arg_maker, arg_shardings=arg_shardings
             )
 
@@ -150,7 +161,7 @@ class TaskTest(LegateJaxTestCase):
             return jax.jit(f, out_shardings=(arg_shardings))()
 
         with mesh:
-            self._test_against_untransformed(
+            self._test_against_reference(
                 c, arg_maker, arg_shardings=arg_shardings
             )
 
@@ -212,14 +223,142 @@ class TaskTest(LegateJaxTestCase):
             if isinstance(initial, GSPMDSharding):
                 self.assertEqual(initial, final)
 
+    def test_reshard_argument(self):
+        if jax.device_count() != 4:
+            self.skipTest("need 4 devices")
+
+        mesh = Mesh(
+            np.array(jax.devices()).reshape(4, 1, 1),
+            ("batch", "cxn", "ext"),
+        )
+
+        logical_axes = [
+            ("batch", "x"),
+            ("embed", "x"),
+            ("model", "y"),
+        ]
+
+        legate.jax.register_task(
+            "layer0",
+            devices=[0, 1, 2, 3],
+            dims=[4, 1],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+
+        legate.jax.register_task(
+            "layer1",
+            devices=[0, 1],
+            dims=[2, 1],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+
+        def c(batch, params):
+            def f(batch, params):
+                (batch0, batch1) = batch
+                (fc0, fc1) = params
+                with jax.named_scope("layer0"):
+                    batch = legate.jax.with_sharding_constraint(
+                        batch0, P("batch", "cxn")
+                    )
+                    fc0 = legate.jax.with_sharding_constraint(
+                        fc0, P("cxn", "ext")
+                    )
+                    x = jnp.einsum("bc,ce->be", batch, fc0)
+                with jax.named_scope("layer1"):
+                    x = legate.jax.with_sharding_constraint(
+                        x, P("batch", "cxn")
+                    )
+                    batch = legate.jax.with_sharding_constraint(
+                        batch1, P("batch", "cxn")
+                    )
+                    fc1 = legate.jax.with_sharding_constraint(
+                        fc1, P("cxn", "ext")
+                    )
+                    scaled_batch = x * batch
+                    return jnp.einsum("bc,ce->be", scaled_batch, fc1)
+
+            return f(batch, params)
+
+        batch_size = 8
+        model_dim = 4
+        with mesh:
+            f = jax.jit(
+                c,
+                in_shardings=(
+                    (AUTO(mesh), AUTO(mesh)),
+                    (AUTO(mesh), AUTO(mesh)),
+                ),
+                out_shardings=(AUTO(mesh)),
+            )
+            batch0 = jax.core.ShapedArray((batch_size, model_dim), np.float32)
+            batch1 = jax.core.ShapedArray((batch_size, model_dim), np.float32)
+            fc0 = jax.core.ShapedArray((model_dim, model_dim), np.float32)
+            fc1 = jax.core.ShapedArray((model_dim, model_dim), np.float32)
+            lowered = f.lower((batch0, batch1), (fc0, fc1)).compile()
+
+            (batch0_sharding, batch1_sharding), (
+                fc0_sharding,
+                fc1_sharding,
+            ) = lowered.input_shardings[0]
+
+            self.assertTrue(isinstance(batch0_sharding, GSPMDSharding))
+            self.assertEqual(
+                batch0_sharding._hlo_sharding.tile_assignment_devices(),
+                [0, 1, 2, 3],
+            )
+            self.assertTrue(
+                batch0_sharding._hlo_sharding.tile_assignment_dimensions(),
+                [4, 1],
+            )
+            self.assertEqual(
+                batch1_sharding._hlo_sharding.tile_assignment_devices(), [0, 1]
+            )
+            self.assertTrue(
+                batch1_sharding._hlo_sharding.tile_assignment_dimensions(),
+                [2, 1],
+            )
+
+            replicated = NamedSharding(mesh, spec=P())
+            self.assertEqual(fc0_sharding, replicated)
+
+            self.assertTrue(isinstance(fc1_sharding, GSPMDSharding))
+            self.assertTrue(fc1_sharding._hlo_sharding.is_replicated())
+
+        def arg_maker():
+            batch0 = make_shape(batch_size, model_dim)
+            batch1 = make_shape(batch_size, model_dim)
+            fc0 = make_shape(model_dim, model_dim)
+            fc1 = make_shape(model_dim, model_dim)
+            return (batch0, batch1), (fc0, fc1)
+
+        full_mesh_sharding = PositionalSharding(jax.devices()[:4]).reshape(
+            4, 1
+        )
+
+        legate_shardings = (
+            (full_mesh_sharding, full_mesh_sharding),
+            (None, None),
+        )
+        reference_shardings = (
+            (full_mesh_sharding, full_mesh_sharding),
+            (None, None),
+        )
+
+        with mesh:
+            self._test_against_reference(
+                c, arg_maker, legate_shardings, reference_shardings
+            )
+
     def test_reshard_gin_config(self):
-        if jax.device_count() < 8:
-            self.skipTest("need >= 8 devices")
+        if jax.device_count() != 8:
+            self.skipTest("need 8 devices")
 
         vocab = 2
         batch_size = 8
         seq = 1
-        embed_size = 2
+        embed_size = 8
 
         with tempfile.TemporaryDirectory() as d:
             f_path = Path(d) / "test.gin"
@@ -297,7 +436,7 @@ class TaskTest(LegateJaxTestCase):
         vocab = 2
         batch_size = 8
         seq = 1
-        embed_size = 2
+        embed_size = 8
 
         with tempfile.TemporaryDirectory() as d:
             f_path = Path(d) / "test.gin"
@@ -658,23 +797,19 @@ class TaskTest(LegateJaxTestCase):
         )
 
         def arg_maker():
-            def make_shape(shape, dtype=np.float32):
-                size = np.prod(shape)
-                return jnp.arange(size, dtype=dtype).reshape(shape)
-
             def f():
-                batch = make_shape((batch_size, seq)) % vocab
-                fc0 = make_shape((embed_size, embed_size))
-                fc1 = make_shape((embed_size, embed_size))
-                scale = make_shape((batch_size, seq, embed_size))
-                embed = make_shape((vocab, embed_size))
+                batch = make_shape(batch_size, seq) % vocab
+                fc0 = make_shape(embed_size, embed_size)
+                fc1 = make_shape(embed_size, embed_size)
+                scale = make_shape(batch_size, seq, embed_size)
+                embed = make_shape(vocab, embed_size)
                 params = (embed, fc0, fc1, scale)
                 return (params, batch)
 
             return f()
 
         with mesh:
-            self._test_against_untransformed(
+            self._test_against_reference(
                 c,
                 arg_maker,
                 arg_shardings=arg_shardings,

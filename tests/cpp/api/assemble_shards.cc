@@ -29,9 +29,14 @@ MATCHER_P(ShardIsVector, values, "") { return arg == values; }
 class IndexIterator {
 public:
   IndexIterator(const legate_xla::Shape &shape) : index_(shape.dims.size(), 0) {
-    shape_.resize(shape.dims.size());
-    for (size_t dim = 0; dim < shape.dims.size(); ++dim) {
-      shape_[dim] = shape.dims[dim] / shape.tile_shape[dim];
+    if (shape.tile_shape.has_value()) {
+      shape_.resize(shape.dims.size());
+      for (size_t dim = 0; dim < shape.dims.size(); ++dim) {
+        shape_[dim] = shape.dims[dim] / (*shape.tile_shape)[dim];
+      }
+    } else {
+      // no tiling, color shape is all ones
+      shape_ = std::vector<int64_t>(shape.dims.size(), 1);
     }
   }
 
@@ -62,7 +67,9 @@ public:
 
 void test_legate_shape(legate_xla::Shape shape) {
   size_t shard_num_elements = 1;
-  for (size_t dim : shape.tile_shape) {
+  const auto &tile =
+      shape.tile_shape.has_value() ? *shape.tile_shape : shape.dims;
+  for (size_t dim : tile) {
     shard_num_elements *= dim;
   }
   size_t shard_size = shard_num_elements * sizeof(int32_t);

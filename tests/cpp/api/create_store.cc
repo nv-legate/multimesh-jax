@@ -125,10 +125,15 @@ void test_all_types(std::vector<int64_t> dims) {
     num_devices = 1;
   }
 
+  std::optional<std::vector<int64_t>> tile;
+  if (num_devices > 1) {
+    tile = std::move(tile_shape);
+  }
+
   for (auto type : all_types) {
     legate_xla::Shape shape = {.type = type,
                                .dims = dims,
-                               .tile_shape = tile_shape,
+                               .tile_shape = tile,
                                .replicated = replication};
     test_create_store(shape, num_devices);
   }

@@ -37,7 +37,7 @@ class TaskTest(LegateJaxTestCase):
                 res = legate.jax.task(f)(res, arrs)
             return res
 
-        self._test_against_untransformed(jnp_fxn, args_maker)
+        self._test_against_reference(jnp_fxn, args_maker)
 
     def test_task_gradients(self):
         def arg_maker():
@@ -56,7 +56,7 @@ class TaskTest(LegateJaxTestCase):
 
             return g(f(x, scale), x)
 
-        self._test_against_untransformed(jax.value_and_grad(c), arg_maker)
+        self._test_against_reference(jax.value_and_grad(c), arg_maker)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ import legate.jax
 
 
 class LegateJaxTestCase(jtu.JaxTestCase):
-    def _test_against_untransformed(
+    def _test_against_reference(
         self, f, arg_maker, arg_shardings=None, reference_shardings=None
     ):
         device_kind = jax.devices()[0].device_kind
@@ -47,12 +47,19 @@ class LegateJaxTestCase(jtu.JaxTestCase):
         if arg_shardings is not None:
 
             def compare_assert(arg, arg_sharding, f_sharding):
-                self.assertTrue(
-                    arg.sharding.is_equivalent_to(f_sharding, len(arg.shape))
-                )
-                self.assertTrue(
-                    arg_sharding.is_equivalent_to(f_sharding, len(arg.shape))
-                )
+                if arg_sharding is None:
+                    self.assertTrue(f_sharding.is_fully_replicated)
+                else:
+                    self.assertTrue(
+                        arg.sharding.is_equivalent_to(
+                            f_sharding, len(arg.shape)
+                        )
+                    )
+                    self.assertTrue(
+                        arg_sharding.is_equivalent_to(
+                            f_sharding, len(arg.shape)
+                        )
+                    )
 
             tree_map(
                 compare_assert,
@@ -62,5 +69,4 @@ class LegateJaxTestCase(jtu.JaxTestCase):
             )
 
         legate_res = legate_f(*args)
-
         self.assertAllClose(cuda_res, legate_res)

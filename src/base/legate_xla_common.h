@@ -173,8 +173,9 @@ enum class SupportedType {
 struct Shape {
   SupportedType type;
   std::vector<int64_t> dims;
-  std::vector<int64_t> tile_shape;
-  int64_t replicated = 1;
+  std::optional<std::vector<int64_t>> tile_shape;
+  int64_t replicated{1};
+  size_t num_tiles{1};
 };
 
 struct Tile {

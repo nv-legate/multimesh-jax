@@ -117,7 +117,7 @@ struct get_write_only_buffer_fn {
   std::vector<legate_xla::BufferAllocation> inputs, outputs;
 
   for (auto &array : context.inputs()) {
-    auto store = array.data();
+    auto &&store = array.data();
     inputs.push_back(legate::double_dispatch(store.dim(), store.code(),
                                              get_read_only_buffer_fn{}, store));
   }

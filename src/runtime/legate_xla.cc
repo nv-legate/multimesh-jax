@@ -15,6 +15,7 @@
 #include <numeric>
 #include <optional>
 #include <tuple>
+#include <type_traits>
 #include <unistd.h>
 #include <utility>
 
@@ -33,17 +34,15 @@ int64_t GetRunId() {
   return counter.fetch_add(1);
 }
 
-size_t LaunchSize(const Shape &shape) {
+size_t LaunchSize(const Shape &shape, size_t default_size) {
+  if (shape.replicated) {
+    return default_size;
+  }
+
   size_t size = shape.replicated;
   for (size_t dim = 0; dim < shape.dims.size(); ++dim) {
-    if (shape.tile_shape[dim] == 0) {
-      if (shape.dims[dim] != 0) {
-        std::cerr << "Tile shape is zero, but dim is non-zero for " << shape
-                  << std::endl;
-        abort();
-      }
-    } else {
-      size_t color_shape = shape.dims[dim] / shape.tile_shape[dim];
+    if (shape.tile_shape.has_value()) {
+      size_t color_shape = shape.dims[dim] / (*shape.tile_shape)[dim];
       size *= color_shape;
     }
   }
@@ -61,34 +60,41 @@ struct get_read_only_ptr {
   }
 };
 
-Shape ComputeStoreShape(const Shape &shape) {
+Shape ComputeStoreShape(const Shape &shape, size_t global_size) {
+  int64_t dim_product = 1;
+  for (auto dim : shape.dims) {
+    dim_product *= dim;
+  }
+  bool scalar = dim_product <= 1;
+
   Shape store_shape{.type = shape.type, .replicated = 1};
+
+  if (scalar) {
+    // ignore replication on scalars
+    store_shape.dims = {1};
+    return store_shape;
+  }
+
   if (shape.replicated > 1) {
     store_shape.dims.push_back(shape.replicated);
     store_shape.dims.insert(store_shape.dims.end(), shape.dims.begin(),
                             shape.dims.end());
-    store_shape.tile_shape.push_back(1);
-  } else if (shape.dims.empty()) {
-    store_shape.dims = {1};
     store_shape.tile_shape = {1};
-    return store_shape;
+    if (shape.tile_shape.has_value()) {
+      store_shape.tile_shape->insert(store_shape.tile_shape->end(),
+                                     shape.tile_shape->begin(),
+                                     shape.tile_shape->end());
+    } else {
+      store_shape.tile_shape->insert(store_shape.tile_shape->end(),
+                                     shape.dims.begin(), shape.dims.end());
+    }
+  } else if (dim_product <= 1) {
+    store_shape.dims = {1};
   } else {
     store_shape.dims = shape.dims;
+    store_shape.tile_shape = shape.tile_shape;
   }
 
-  const auto &tile_shape =
-      shape.tile_shape.empty() ? shape.dims : shape.tile_shape;
-  store_shape.tile_shape.insert(store_shape.tile_shape.end(),
-                                tile_shape.begin(), tile_shape.end());
-
-  for (auto idx = 0; idx < store_shape.dims.size(); ++idx) {
-    if (store_shape.dims[idx] == 0) {
-      store_shape.dims[idx] = 1;
-    }
-    if (store_shape.tile_shape[idx] == 0) {
-      store_shape.tile_shape[idx] = 1;
-    }
-  }
   return store_shape;
 }
 
@@ -275,20 +281,22 @@ void CreateExecuteTask(
     legate::ProvenanceTracker provenance(compiler->Name());
     legate::MachineTracker tracker(machine.slice(start, stop));
     log_xla.debug() << "CreateExecuteTask " << compiler->Name()
-                    << " for launch shape " << flattened << " on slice ["
-                    << start << "," << stop << ")";
+                    << " for launch on slice [" << start << "," << stop << ")";
     if (log_xla.want_debug()) {
+      size_t input_idx = 0;
       for (const auto &input : inputs) {
-        log_xla.debug() << compiler->Name() << " has input " << input.impl->name
-                        << " with shape " << input.impl->shape
-                        << ", store=" << input.impl.get() << ", partitioned="
+        log_xla.debug() << compiler->Name() << " has input " << input_idx++
+                        << ", name=" << input.impl->name
+                        << " with shape=" << input.impl->shape
+                        << ", store=" << input.impl.get()
+                        << ", partitioned=" << std::boolalpha
                         << input.impl->partition.has_value();
       }
       for (const auto &output : outputs) {
         log_xla.debug() << compiler->Name() << " has output "
                         << output.impl->name << " with shape "
                         << output.impl->shape << ", store=" << output.impl.get()
-                        << ", partitioned="
+                        << ", partitioned=" << std::boolalpha
                         << output.impl->partition.has_value();
       }
     }
@@ -307,6 +315,19 @@ void CreateExecuteTask(
         legate::Scalar(reinterpret_cast<uint64_t>(std::move(on_done))));
 
     for (const auto &input : inputs) {
+      if (input.impl->partition.has_value() &&
+          input.impl->shape.replicated > 1) {
+        size_t tensor_launch_size =
+            input.impl->shape.replicated * input.impl->shape.num_tiles;
+        if (tensor_launch_size < launch_size) {
+          // if this was created with a manual replication smaller than the
+          // launch size then not all partitions will be satisfied
+          std::cerr << "replicated tensor " << input.impl->name
+                    << " cannot change replication from launch size "
+                    << tensor_launch_size << " to " << launch_size << std::endl;
+          abort();
+        }
+      }
       if (input.impl->partition.has_value()) {
         task.add_input(*input.impl->partition);
       } else {
@@ -315,6 +336,21 @@ void CreateExecuteTask(
     }
 
     for (const auto &output : outputs) {
+      if (output.impl->partition.has_value() &&
+          output.impl->shape.replicated > 1) {
+        size_t tensor_launch_size =
+            output.impl->shape.replicated * output.impl->shape.num_tiles;
+        if (tensor_launch_size > launch_size) {
+          // if this was created with a manual replication langer than the
+          // launch size then not all partitions will be written and receive
+          // valid data
+          std::cerr << "replicated tensor " << output.impl->name
+                    << " cannot change replication from launch size "
+                    << tensor_launch_size << " to " << launch_size << std::endl;
+          abort();
+        }
+      }
+
       if (output.impl->partition.has_value()) {
         task.add_output(*output.impl->partition);
       } else {
@@ -322,7 +358,9 @@ void CreateExecuteTask(
       }
       task.add_scalar_arg(legate::Scalar(false));
     }
-
+    if (launch_size > 1) {
+      task.set_concurrent(true);
+    }
     runtime->submit(std::move(task));
   }
 
@@ -335,7 +373,7 @@ void CreateExecuteTask(
 
 void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
                         size_t num_local_devices) {
-  size_t launch_size = LaunchSize(store.impl->shape);
+  size_t launch_size = LaunchSize(store.impl->shape, num_local_devices);
   log_xla.debug() << "CopyDeviceToDevice with launch size " << launch_size;
 
   LOCK;
@@ -382,7 +420,7 @@ void Synchronize(const StoreHandle &store) {
 
 void StoreBufferAction(const std::vector<BufferAction *> &actions,
                        const StoreHandle &store, BufferActionConfig config) {
-  size_t launch_size = LaunchSize(store.impl->shape);
+  size_t launch_size = LaunchSize(store.impl->shape, actions.size());
   size_t num_local_devices = actions.size();
   log_xla.debug() << "legate_xla::StoreBufferAction with launch size "
                   << launch_size << " num_local_devices=" << num_local_devices;
@@ -433,7 +471,7 @@ void SliceLocalShards(const StoreHandle &handle,
   ValidateContiguousSlice(devices);
   LOCK;
 
-  size_t launch_size = LaunchSize(handle.impl->shape);
+  size_t launch_size = LaunchSize(handle.impl->shape, local_shards.size());
 
   log_xla.debug() << "SliceLocalShards: slice " << local_shards.size()
                   << " shards on launch size " << launch_size << " on store "
@@ -461,7 +499,6 @@ void SliceLocalShards(const StoreHandle &handle,
   task.add_scalar_arg(int64_t(local_shards.size()));
   task.add_scalar_arg(reinterpret_cast<uint64_t>(&waiter));
 
-  // Treat this as an output for future synchronization purposes
   if (handle.impl->partition.has_value()) {
     task.add_input(*handle.impl->partition);
   } else {
@@ -505,8 +542,9 @@ StoreHandle AssembleShards(const legate_xla::Shape &logical_shape,
   auto store = CreateStore(logical_shape, "assembled");
   log_xla.debug() << "AssemblShards: assembling " << local_shards.size()
                   << " local shards " << store.impl.get();
-  auto task = runtime->create_task(XlaOpCode::XLA_SHARD_ASSEMBLE_TASK,
-                                   {LaunchSize(store.impl->shape)});
+  auto task = runtime->create_task(
+      XlaOpCode::XLA_SHARD_ASSEMBLE_TASK,
+      {LaunchSize(store.impl->shape, local_shards.size())});
 
   task.add_scalar_arg(int64_t(local_shards.size()));
   TaskWaiter waiter{int64_t(local_shards.size())};
@@ -529,18 +567,30 @@ StoreHandle AssembleShards(const legate_xla::Shape &logical_shape,
 
 StoreHandle Reshard(const StoreHandle &handle,
                     const std::vector<int64_t> &tile_shape) {
-  if (tile_shape != handle.impl->shape.tile_shape) {
+  if (!handle.impl->shape.tile_shape.has_value() ||
+      tile_shape != *handle.impl->shape.tile_shape) {
     Shape new_shape = handle.impl->shape;
     new_shape.tile_shape = tile_shape;
-    Shape store_shape = ComputeStoreShape(new_shape);
+    auto core_runtime = legate::Runtime::get_runtime();
+
+    const auto &range = core_runtime->get_machine().processor_range();
+    auto global_size = range.high - range.low;
+    Shape store_shape = ComputeStoreShape(new_shape, global_size);
     auto new_impl = std::make_shared<StoreHandleImpl>(
         StoreHandleImpl{.store = handle.impl->store,
                         .shape = new_shape,
                         .name = handle.impl->name});
 
+    log_xla.debug() << "Reshard " << handle.impl.get()
+                    << ", name=" << handle.impl->name
+                    << ", prev=" << handle.impl->shape
+                    << ", new=" << new_impl->shape
+                    << ", store=" << new_impl.get();
+
     std::vector<size_t> legate_tile_shape{tile_shape.begin(), tile_shape.end()};
     new_impl->partition =
         new_impl->store.partition_by_tiling(legate_tile_shape);
+
     return StoreHandle{.impl = std::move(new_impl)};
   }
   // just return back the original handle, no resharding
@@ -573,13 +623,14 @@ StoreHandle CreateStore(const legate_xla::Shape &shape,
                         std::optional<std::string> name) {
   legate::Type::Code code = SupportedTypeToLegateType(shape.type);
 
-  auto store_shape = ComputeStoreShape(shape);
+  auto core_runtime = legate::Runtime::get_runtime();
+  const auto &range = core_runtime->get_machine().processor_range();
+  auto global_size = range.high - range.low;
+
+  auto store_shape = ComputeStoreShape(shape, global_size);
   bool is_scalar = false;
 
-  log_xla.debug() << "CreateStore " << (name.has_value() ? *name : "")
-                  << ": logical=" << shape << ", actual=" << store_shape;
   LOCK;
-  auto core_runtime = legate::Runtime::get_runtime();
   StoreHandle result = {
       .impl = std::make_shared<StoreHandleImpl>(StoreHandleImpl{
           .store = core_runtime->create_store(
@@ -587,17 +638,17 @@ StoreHandle CreateStore(const legate_xla::Shape &shape,
               legate::primitive_type(code), is_scalar),
           .shape = shape})};
 
-  if (result.impl->shape.tile_shape.empty()) {
-    result.impl->shape.tile_shape = shape.dims;
-  }
+  log_xla.debug() << "CreateStore " << result.impl.get()
+                  << ", name=" << (name.has_value() ? *name : "")
+                  << ", logical=" << shape << ", actual=" << store_shape;
 
   if (name.has_value()) {
     result.impl->name = *name;
   }
 
-  if (!store_shape.tile_shape.empty()) {
+  if (store_shape.tile_shape.has_value()) {
     result.impl->partition = result.impl->store.partition_by_tiling(
-        {store_shape.tile_shape.begin(), store_shape.tile_shape.end()});
+        {store_shape.tile_shape->begin(), store_shape.tile_shape->end()});
   }
 
   if (legate_xla::Runtime::synchronous_mode()) {
@@ -647,9 +698,11 @@ void StartLegate() {
 }
 
 std::ostream &operator<<(std::ostream &os, const Shape &shape) {
+  const auto &tile =
+      shape.tile_shape.has_value() ? *shape.tile_shape : shape.dims;
   os << "Shape(type="
      << static_cast<std::underlying_type<SupportedType>::type>(shape.type)
-     << ",dim=" << shape.dims << "),tile=" << shape.tile_shape
+     << ",dim=" << shape.dims << "),tile=" << tile
      << ", replication=" << shape.replicated;
   return os;
 }
