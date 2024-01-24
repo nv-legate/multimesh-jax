@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 from absl.testing import absltest
 from jax import config
+from jax.sharding import PositionalSharding
 
 import legate.jax
 from legate.jax.test_util import LegateJaxTestCase
@@ -12,6 +13,10 @@ config.parse_flags_with_absl()
 
 
 class TaskTest(LegateJaxTestCase):
+    def make_shape(self, *shape, dtype=np.float32):
+        size = np.prod(shape)
+        return jnp.arange(size, dtype=dtype).reshape(shape)
+
     @jtu.sample_product(
         dtypes=[
             (np.float32,),
@@ -20,6 +25,9 @@ class TaskTest(LegateJaxTestCase):
         ],
     )
     def test_add_sequence(self, dtypes):
+        if jax.device_count() != 1:
+            self.skipTest("need a single device")
+
         shape = [4, 4]
 
         def args_maker():
@@ -39,7 +47,80 @@ class TaskTest(LegateJaxTestCase):
 
         self._test_against_reference(jnp_fxn, args_maker)
 
+    def test_donation_single_argument(self):
+        if jax.device_count() != 1:
+            self.skipTest("need a single device")
+
+        def c(x):
+            def f(x):
+                return x * x
+
+            f = legate.jax.task(f)
+            return f(x)
+
+        def arg_maker():
+            return (self.make_shape(4, 4),)
+
+        self._test_against_reference(c, arg_maker, donate_argnums=(0,))
+
+    def test_donation_multiple_arguments(self):
+        if jax.device_count() != 1:
+            self.skipTest("need a single device")
+
+        def c(x, y, z):
+            def f(x, y, z):
+                return x * x, x * y, z
+
+            f = legate.jax.task(f)
+
+            def g(x, y, z):
+                return x, x * y, z, x * z
+
+            g = legate.jax.task(g)
+            return g(*f(x, y, z))
+
+        def arg_maker():
+            x = self.make_shape(4, 4)
+            y = self.make_shape(4, 4)
+            z = self.make_shape(4, 4)
+            return x, y, z
+
+        self._test_against_reference(c, arg_maker, donate_argnums=(0, 2))
+
+    def test_donation_sharded_arguments(self):
+        if jax.device_count() != 2:
+            self.skipTest("need 2 devices")
+
+        def c(x, y):
+            def f(x):
+                return x * x
+
+            f = legate.jax.task(f)
+
+            def g(x, y):
+                return x * x, x * y
+
+            g = legate.jax.task(g)
+            x = f(x)
+            return g(x, y)
+
+        def arg_maker():
+            x = self.make_shape(4, 4)
+            y = self.make_shape(4, 4)
+            return x, y
+
+        sharding = PositionalSharding(jax.devices()).reshape(2, 1)
+        self._test_against_reference(
+            c,
+            arg_maker,
+            donate_argnums=(0, 1),
+            arg_shardings=(sharding, sharding),
+        )
+
     def test_task_gradients(self):
+        if jax.device_count() != 1:
+            self.skipTest("need a single device")
+
         def arg_maker():
             return jnp.arange(8, dtype=np.float32), 2
 

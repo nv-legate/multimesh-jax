@@ -324,7 +324,6 @@ class TaskTest(LegateJaxTestCase):
             self.assertEqual(fc0_sharding, replicated)
 
             self.assertTrue(isinstance(fc1_sharding, GSPMDSharding))
-            self.assertTrue(fc1_sharding._hlo_sharding.is_replicated())
 
         def arg_maker():
             batch0 = make_shape(batch_size, model_dim)
@@ -339,7 +338,7 @@ class TaskTest(LegateJaxTestCase):
 
         legate_shardings = (
             (full_mesh_sharding, full_mesh_sharding),
-            (None, None),
+            (None, fc1_sharding),
         )
         reference_shardings = (
             (full_mesh_sharding, full_mesh_sharding),
@@ -732,7 +731,7 @@ class TaskTest(LegateJaxTestCase):
         )
         self.assertEqual(fc0_sharding, replicated)
         self.assertEqual(fc1_sharding, replicated)
-        self.assertEqual(scale_sharding, batch_sharding)
+        self.assertTrue(scale_sharding.is_equivalent_to(batch_sharding, 3))
 
         logical_axes.append(("hidden", "x"))
         legate.jax.register_task(

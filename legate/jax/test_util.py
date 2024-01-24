@@ -7,7 +7,12 @@ import legate.jax
 
 class LegateJaxTestCase(jtu.JaxTestCase):
     def _test_against_reference(
-        self, f, arg_maker, arg_shardings=None, reference_shardings=None
+        self,
+        f,
+        arg_maker,
+        arg_shardings=None,
+        reference_shardings=None,
+        donate_argnums=None,
     ):
         device_kind = jax.devices()[0].device_kind
         reference_backend = "cpu" if device_kind == "cpu" else "cuda"
@@ -27,7 +32,10 @@ class LegateJaxTestCase(jtu.JaxTestCase):
                 kwargs = dict(in_shardings=reference_shardings)
             else:
                 kwargs = dict(backend=reference_backend)
-            cuda_res = jax.jit(f, **kwargs)(*args)
+
+            cuda_res = jax.jit(f, donate_argnums=donate_argnums, **kwargs)(
+                *args
+            )
 
         # jax unfortunately caches the cuda jit compilation
         # before lowering, we need to clear it
@@ -43,7 +51,11 @@ class LegateJaxTestCase(jtu.JaxTestCase):
         else:
             kwargs = dict(backend="legate")
 
-        legate_f = jax.jit(f, **kwargs).lower(*args).compile()
+        legate_f = (
+            jax.jit(f, donate_argnums=donate_argnums, **kwargs)
+            .lower(*args)
+            .compile()
+        )
         if arg_shardings is not None:
 
             def compare_assert(arg, arg_sharding, f_sharding):

@@ -1,4 +1,10 @@
 
+if (LegateXLA_ASAN)
+  add_compile_options(-fsanitize=address)
+  add_link_options(-fsanitize=address)
+  add_compile_options(-fno-common)
+endif()
+
 set(_srcs
     legate_runtime.cc
     legate_xla.cc)
