@@ -2,6 +2,12 @@
 
 using namespace legate;
 
+namespace {
+
+Legion::Logger log_xla("legate.xla_utils");
+
+}
+
 namespace legate_xla {
 
 TaskConfig get_task_config(const TaskContext &context) {
@@ -21,12 +27,15 @@ TaskConfig get_task_config(const TaskContext &context) {
 }
 
 void TaskWaiter::Wait() {
+  log_xla.debug() << "TaskWaiter::Signal: waiting on " << this;
   std::unique_lock lk(m_);
   cv_.wait(lk, [&] { return ready_; });
 }
 
 int64_t TaskWaiter::Signal() {
   int64_t remainining = num_pending_.fetch_add(int64_t(-1));
+  log_xla.debug() << "TaskWaiter::Signal: signaling " << this << " with "
+                  << remainining << " pending";
   if (remainining == 1) {
     // off by one, 1 means this was the last one to run
     {

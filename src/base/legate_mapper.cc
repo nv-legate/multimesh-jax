@@ -42,9 +42,6 @@ Mapper::store_mappings(const mapping::Task &task,
   return mappings;
 }
 
-Scalar Mapper::tunable_value(TunableID tunable_id) {
-  LEGATE_ABORT;
-  return Scalar(0);
-}
+Scalar Mapper::tunable_value(TunableID tunable_id) { return Scalar(0); }
 
 } // namespace legate_xla

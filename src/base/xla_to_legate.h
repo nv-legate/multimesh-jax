@@ -23,7 +23,7 @@ StoreHandle Reshard(const StoreHandle &handle,
 
 void SliceLocalShards(const StoreHandle &handle,
                       std::vector<void *> &local_shards,
-                      const std::vector<int64_t> &devices);
+                      std::pair<int64_t, int64_t> slice);
 
 struct Shard {
   const void *data;
@@ -33,7 +33,8 @@ struct Shard {
 };
 
 StoreHandle AssembleShards(const legate_xla::Shape &shape,
-                           const std::vector<Shard> &shards);
+                           const std::vector<Shard> &shards,
+                           std::pair<int64_t, int64_t> slice);
 
 std::set<int> GetLocalDevices(int my_node);
 
@@ -41,7 +42,7 @@ bool IsGpu();
 
 struct BufferActionConfig {
   bool blocking{false};
-  std::optional<std::pair<int, int>> machine_slice{std::nullopt};
+  std::pair<int, int> machine_slice;
 };
 
 void StoreBufferAction(const std::vector<BufferAction *> &actions,

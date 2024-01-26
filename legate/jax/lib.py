@@ -2,7 +2,7 @@ import json
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Sequence, TypeAlias
+from typing import Any, Callable, List, Optional, Sequence, TypeAlias
 
 import gin
 import jax
@@ -118,11 +118,19 @@ class ClientConfig:
     tasks: List[ImplicitTask] = field(default_factory=list)
 
 
-def init(config: os.PathLike | None = None, **kwargs) -> None:
+def init(
+    config: os.PathLike | None = None, auto_shard: Optional[bool] = None
+) -> None:
     if config is None:
         config = os.environ.get(_GIN_CONFIG_ENV)
     if config is not None:
         gin.parse_config_file(str(config), print_includes_and_imports=True)
+
+    # the indirection here is to avoid setting any parameters
+    # that are unspecificed programmatically to make them overwritable by gin
+    kwargs = {}
+    if auto_shard is not None:
+        kwargs["auto_shard"] = auto_shard
 
     client_config = ClientConfig(**kwargs)
     if client_config.auto_shard:

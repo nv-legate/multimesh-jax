@@ -88,9 +88,7 @@ void test_legate_shape(legate_xla::Shape shape) {
   }
 
   std::vector<legate_xla::Shard> shards;
-  std::vector<int64_t> devices;
   shards.reserve(num_shards);
-  devices.reserve(num_shards);
 
   IndexIterator it(shape);
   for (int shard = 0; shard < num_shards; ++shard, ++it) {
@@ -103,13 +101,12 @@ void test_legate_shape(legate_xla::Shape shape) {
                                        .local_device_id = shard,
                                        .shape_index = it.index(),
                                        .size = shard_size});
-    devices.push_back(shard);
   }
 
-  auto store = legate_xla::AssembleShards(shape, shards);
+  auto store = legate_xla::AssembleShards(shape, shards, {0, num_shards});
 
   std::vector<void *> device_slices(num_shards);
-  legate_xla::SliceLocalShards(store, device_slices, devices);
+  legate_xla::SliceLocalShards(store, device_slices, {0, num_shards});
 
   std::vector<std::vector<int32_t>> slices;
   slices.reserve(num_shards);

@@ -94,12 +94,14 @@ void XLAStoreBufferActionTask::gpu_variant(legate::TaskContext context) {
 }
 
 void XLAStoreBufferActionTask::run_task(legate::TaskContext context) {
-  log_xla.debug() << "XLAStoreBufferActionTask: running";
+
   auto output_store = context.outputs()[0].data();
   auto output_alloc =
       legate::double_dispatch(output_store.dim(), output_store.code(),
                               get_write_only_buffer_fn{}, output_store);
   auto cfg = get_task_config(context);
+  log_xla.debug() << "XLAStoreBufferActionTask: running  on "
+                  << cfg.my_device_id;
   auto *action = reinterpret_cast<BufferAction *>(
       context.scalar(ScalarAction + cfg.local_device_id).value<uint64_t>());
 
@@ -108,6 +110,8 @@ void XLAStoreBufferActionTask::run_task(legate::TaskContext context) {
   if (blocking) {
     TaskWaiter *waiter = reinterpret_cast<TaskWaiter *>(
         context.scalar(ScalarTaskWaiter).value<uint64_t>());
+    log_xla.debug() << "XLAStoreBufferActionTask: cleared on "
+                    << cfg.my_device_id;
     waiter->Signal();
   }
 }

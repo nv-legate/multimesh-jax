@@ -2,7 +2,7 @@
 jax_dir=`python -c 'import jax; from pathlib import Path; print(Path(jax.__file__).parent.parent)'`
 echo $jax_dir
 
-VALID_ARGS=$(getopt -o ac:d:f:gmn:t:x --long asan,cpus:,dump,debug:,filter:,gdb,gpus:,metadata-off,test: -- "$@")
+VALID_ARGS=$(getopt -o ac:d:f:gmn:p:t:x --long asan,cpus:,dump,debug:,filter:,gdb,gpus:,metadata-off,mpi:,test: -- "$@")
 if [[ $? -ne 0 ]]; then
     exit 1;
 fi
@@ -12,6 +12,7 @@ cpus=4
 debug=0
 launcher=""
 include_metadata=false
+network=none
 
 eval set -- "$VALID_ARGS"
 while [ : ]; do
@@ -38,6 +39,12 @@ while [ : ]; do
         launcher="gdb --args"
         shift
         ;;
+    -p | --mpi)
+        echo "Running with $2 MPI procs"
+        launcher="mpirun -n $2"
+        network=mpi
+        shift 2
+        ;;
     -n | --gpus)
         gpus=$2
         shift 2
@@ -47,7 +54,7 @@ while [ : ]; do
         export XLA_FLAGS="${XLA_FLAGS} --xla_dump_to=dump --xla_dump_hlo_as_text --xla_dump_hlo_as_dot --xla_dump_hlo_as_proto"
         shift
         ;;
-    -m | --metadata-off)
+    -o | --metadata-off)
         include_metadata=true
         export XLA_FLAGS="${XLA_FLAGS} --xla_dump_module_metadata=false --xla_dump_disable_metadata"
         shift
@@ -78,7 +85,7 @@ export LEGION_DEFAULT_ARGS="-ll:py 0 \
  -ll:csize 4000 \
  -ll:fsize 4000 \
  -ll:zsize 32 \
- -ll:networks none \
+ -ll:networks $network \
  -ll:ib_rsize 0 \
  $level \
  -lg:eager_alloc_percentage 50"
@@ -86,7 +93,7 @@ export LEGION_DEFAULT_ARGS="-ll:py 0 \
 export JAX_PLATFORMS=legate,cuda,cpu
 export TF_CPP_MIN_LOG_LEVEL=$min_level
 export TF_CPP_MAX_LOG_LEVEL=$debug
-export TF_CPP_VMODULE=legate_pjrt_buffer=$debug,legate_computation=$debug,legate_pjrt_client=$debug,hlo_partition=$debug,legate_pjrt_executable=$debug,legate_store_cache=$debug,loop_scheduler=$debug,legate_ifrt_client=$debug,pjrt_executable=$debug,loop_scheduler=$debug,legate_store_cache=$debug
+export TF_CPP_VMODULE=legate_pjrt_buffer=$debug,legate_computation=$debug,legate_pjrt_client=$debug,hlo_partition=$debug,legate_pjrt_executable=$debug,legate_store_cache=$debug,loop_scheduler=$debug,legate_ifrt_client=$debug,pjrt_executable=$debug,loop_scheduler=$debug,legate_store_cache=$debug,topology_util=$debug
 export JAX_TRACEBACK_FILTERING=off
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export JAX_COMPILER_DETAILED_LOGGING_MIN_OPS=0

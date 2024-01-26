@@ -62,12 +62,11 @@ void test_create_store_tmpl(legate_xla::Shape shape, size_t num_devices) {
     actions.push_back(&action);
   }
 
-  legate_xla::StoreBufferAction(actions, store, {.blocking = true});
+  legate_xla::StoreBufferAction(
+      actions, store, {.blocking = true, .machine_slice = {0, num_devices}});
 
   std::vector<void *> local_shards(num_devices);
-  std::vector<int64_t> local_devices(num_devices);
-  std::iota(local_devices.begin(), local_devices.end(), 0);
-  legate_xla::SliceLocalShards(store, local_shards, local_devices);
+  legate_xla::SliceLocalShards(store, local_shards, {0, num_devices});
 
   std::vector<T> final_elements(num_elements);
   size_t offset = 0;

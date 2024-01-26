@@ -188,6 +188,7 @@ struct StoreHandleImpl;
 struct StoreHandle {
   std::shared_ptr<StoreHandleImpl> impl;
   bool attached{false};
+  ~StoreHandle();
 };
 
 std::ostream &operator<<(std::ostream &os, const Shape &shape);

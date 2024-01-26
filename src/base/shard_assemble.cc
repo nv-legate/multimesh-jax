@@ -49,7 +49,7 @@ struct get_write_ptr {
   int64_t num_shards = context.scalar(ScalarNumShards).value<int64_t>();
 
   log_xla.debug() << "ShardAssembleTask " << cfg.task_id << " start for "
-                  << num_shards << "shards";
+                  << num_shards << " shards";
 
   auto *waiter = reinterpret_cast<TaskWaiter *>(
       context.scalar(ScalarTaskWaiter).value<uint64_t>());
