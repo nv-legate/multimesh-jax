@@ -3,6 +3,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <stdint.h>
 #include <utility>
 #include <vector>

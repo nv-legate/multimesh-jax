@@ -1,8 +1,9 @@
+import gc
 import json
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional, Sequence, TypeAlias
+from typing import Any, Callable, List, Optional, Sequence, TypeAlias, Type
 
 import gin
 import jax
@@ -115,11 +116,24 @@ ImplicitTask: TypeAlias = tuple[
 @dataclass
 class ClientConfig:
     auto_shard: bool = False
+    disable_gc: bool = True
+    configurable: Optional[Type] = None
     tasks: List[ImplicitTask] = field(default_factory=list)
 
 
+def optional_kwargs(**kwargs):
+    subset_kwargs = {}
+    for key, value in kwargs.items():
+        if value is not None:
+            subset_kwargs[key] = value
+    return subset_kwargs
+
+
 def init(
-    config: os.PathLike | None = None, auto_shard: Optional[bool] = None
+    config: os.PathLike | None = None,
+    auto_shard: Optional[bool] = None,
+    disable_gc: Optional[bool] = None,
+    configurable: Optional[type] = None,
 ) -> None:
     if config is None:
         config = os.environ.get(_GIN_CONFIG_ENV)
@@ -128,13 +142,21 @@ def init(
 
     # the indirection here is to avoid setting any parameters
     # that are unspecificed programmatically to make them overwritable by gin
-    kwargs = {}
-    if auto_shard is not None:
-        kwargs["auto_shard"] = auto_shard
+    kwargs = optional_kwargs(
+        auto_shard=auto_shard, disable_gc=disable_gc, configurable=configurable
+    )
 
     client_config = ClientConfig(**kwargs)
     if client_config.auto_shard:
         jax.lax.with_sharding_constraint = with_sharding_constraint
+
+    if client_config.disable_gc:
+        gc.disable()
+
+    if client_config.configurable:
+        task_configure = client_config.configurable()
+        task_configure.configure()
+
     for name, devices, dims, device_axes, logical_axes in client_config.tasks:
         if callable(devices):
             register_task_factory(

@@ -1417,6 +1417,10 @@ def git_pieces_from_vcs(
 
     # commit date: see ISO-8601 comment in git_versions_from_keywords()
     date = runner(GITS, ["show", "-s", "--format=%ci", "HEAD"], cwd=root)[0].strip()
+    if date is None:
+      date = "none"
+    else:
+      date = date.strip()
     # Use only the last line.  Previous lines may contain GPG signature
     # information.
     date = date.splitlines()[-1]
