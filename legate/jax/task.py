@@ -1,10 +1,14 @@
 import json
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from jax._src.ad_checkpoint import _optimization_barrier
+from jax._src.lib import xla_client as xc
+from jax.experimental.pjit import AUTO
 from jax.lax import with_sharding_constraint
+from jax.sharding import Mesh
 from jax.tree_util import tree_map
 
 from .lib import should_ignore_transforms
@@ -15,13 +19,68 @@ _next_color = 1
 _task_depth = 0
 
 
+class AutoParallelConcreteFxn:
+    def __init__(self, compiled, in_shardings, out_shardings, init: Callable):
+        self.compiled = compiled
+        self.in_shardings = in_shardings
+        self.out_shardings = out_shardings
+        self.init = jax.jit(init, out_shardings=in_shardings)
+
+    def init(self):
+        return self.init()
+
+    def __call__(self, args):
+        return self.compiled(*args)
+
+
+class AutoParallelAbstractFxn:
+    def __init__(self, fxn, devices: np.ndarray):
+        self.fxn = fxn
+        self.flat_devices = np.asarray(devices).flatten()
+        self.mesh = Mesh(self.flat_devices, ["x"])
+        self.devices = devices
+
+    def compile(self, init: Callable):
+        arg_shapes = jax.eval_shape(init)
+        abstract_args = jax.tree_map(
+            lambda x: jax.core.ShapedArray(x.shape, x.dtype), arg_shapes
+        )
+
+        in_shardings = jax.tree_map(lambda x: AUTO(self.mesh), arg_shapes)
+        result_shape = jax.eval_shape(self.fxn, *abstract_args)
+        out_shardings = jax.tree_map(lambda x: AUTO(self.mesh), result_shape)
+
+        jit_f = jax.jit(
+            self.fxn, in_shardings=in_shardings, out_shardings=out_shardings
+        )
+        lowered = jit_f.lower(*abstract_args).compile()
+        return AutoParallelConcreteFxn(
+            lowered, lowered.input_shardings[0], lowered.output_shardings, init
+        )
+
+
+def parallelize(
+    fxn, devices: Optional[Sequence[xc.Device] | np.ndarray] = None
+):
+    # the mesh is arbitrary and only serves to satisfy jax that a mesh exists
+    # for the purposes of defining logical meshes that legate will remap
+    # to physical meshes
+
+    if devices is None:
+        devices = jax.devices()
+
+    return AutoParallelAbstractFxn(fxn, devices=devices)
+
+
 def task(
     fxn,
     name: Optional[str] = None,
     *,
     counter=[0],
     out_shardings: Optional[Any] = None,
-    devices: Optional[Sequence[Any]] = None,
+    devices: np.ndarray[xc.Device] | Sequence[xc.Device] | None = None,
+    device_axes: Optional[Sequence[str]] = None,
+    logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
 ):
     global _next_color
     global _task_depth
@@ -34,9 +93,26 @@ def task(
         counter[0] += 1
 
     if devices is None:
-        devices = []
+        devices = [d.id for d in jax.devices()]
+        dims = [len(devices)]
+    elif isinstance(devices, np.ndarray):
+        dims = devices.shape
+        devices = [d.id for d in devices.flatten()]
     else:
         devices = [d.id for d in devices]
+        dims = [len(devices)]
+
+    if device_axes is not None and len(device_axes) != len(dims):
+        raise ValueError(
+            f"task {name}, device mesh with {len(dims)} dims does not match "
+            f"device axies with {len(device_axes)} dims:  {device_axes}"
+        )
+
+    if device_axes is None:
+        device_axes = []
+
+    if logical_axes is None:
+        logical_axes = []
 
     def _config_str(dependency_type: str, phase: str):
         global _next_color
@@ -45,6 +121,11 @@ def task(
             name=f"{phase}.{name}",
             devices=devices,
             color=_next_color,
+            autosharding=dict(
+                dims=dims,
+                device_axes=device_axes,
+                logical_axes=logical_axes,
+            ),
         )
         return json.dumps(args)
 

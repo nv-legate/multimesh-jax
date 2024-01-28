@@ -223,6 +223,55 @@ class TaskTest(LegateJaxTestCase):
             if isinstance(initial, GSPMDSharding):
                 self.assertEqual(initial, final)
 
+    def test_autoshard_task_transform(self):
+        if jax.device_count() != 8:
+            self.skipTest("need 8 devices")
+
+        mesh0 = np.array(jax.devices()[:4]).reshape(2, 2)
+        mesh1 = np.array(jax.devices()[4:]).reshape(2, 2)
+
+        def c(x, y):
+            def f(x):
+                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                return x * x
+
+            f = legate.jax.task(
+                f,
+                devices=mesh0,
+                device_axes=["x", "y"],
+                logical_axes=[("batch", "x"), ("model", "y")],
+            )
+
+            def g(x, y):
+                y = legate.jax.with_sharding_constraint(y, P("batch", "model"))
+                return x + y
+
+            g = legate.jax.task(
+                g,
+                devices=mesh1,
+                device_axes=["x", "y"],
+                logical_axes=[("batch", "x"), ("model", "y")],
+            )
+
+            return g(f(x), y)
+
+        def init():
+            return jnp.arange(16).reshape(4, 4), jnp.arange(16).reshape(4, 4)
+
+        pc = legate.jax.parallelize(c).compile(init=init)
+
+        with legate.jax.ignore_transforms():
+            mesh = Mesh(
+                np.asarray(jax.devices()).reshape(8, 1, 1),
+                ("", "batch", "model"),
+            )
+            with mesh:
+                correct = c(*init())
+
+        args = pc.init()
+        result = pc(args)
+        self.assertAllClose(correct, result)
+
     def test_reshard_argument(self):
         if jax.device_count() != 4:
             self.skipTest("need 4 devices")
