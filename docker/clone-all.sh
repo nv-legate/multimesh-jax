@@ -1,9 +1,35 @@
 #! /usr/bin/env bash
 
-git clone -b control_replication ssh://git@gitlab.com/StanfordLegion/legion.git legion
-git clone -b cpp-branch-24.01 ssh://git@github.com/nv-legate/legate.core.internal legate
-git clone -b legate-main --filter tree:0 git@github.com:nv-legate/xla.git xla_extension
-git clone ssh://git@github.com/nv-legate/legate.jax.git legate_xla
-git clone -b legate-main git@github.com:nv-legate/jax.git jaxlib
-git clone -b legate-main git@github.com:nv-legate/jax.git jax
+function checkout {
+  folder=$1
+  branch=$2
+  repo=$3
+  commit=$4
+  patch=$5
+  echo "cloning $branch of $repo into $folder"
+  git clone -b $branch --filter tree:0 $repo $folder
+  pushd $folder
+  if [ ! -z "$commit" ]; then
+    git checkout $commit
+  fi
+  if [ ! -z "$patch" ]; then
+    git apply ../$patch
+  fi
+  popd
+}
+
+checkout legion     control_replication ssh://git@gitlab.com/StanfordLegion/legion.git
+checkout legate     cpp-branch-24.01    ssh://git@github.com/nv-legate/legate.core.internal
+checkout xla        legate-main         ssh://git@github.com/nv-legate/xla.git
+checkout legate-jax main                ssh://git@github.com/nv-legate/legate.jax.git
+checkout jaxlib     legate-main         ssh://git@github.com/nv-legate/jax.git
+checkout jax        legate-main         ssh://git@github.com/nv-legate/jax.git
+checkout paxml      main                https://github.com/google/paxml.git           cc904d3   paxml.patch
+checkout praxis     main                https://github.com/google/praxis.git          545e00a   praxis.patch
+checkout orbax      main                https://github.com/google/orbax.git           4d372c1
+checkout clu        main                https://github.com/google/CommonLoopUtils.git f30bc44
+checkout optax      main                https://github.com/google-deepmind/optax.git  a49564e
+checkout flax       main                https://github.com/google/flax.git            d58e6dde
+checkout seqio      main                https://github.com/google/seqio.git           513d1fe
+checkout chex       master              https://github.com/google-deepmind/chex.git   a3f1dd0
 

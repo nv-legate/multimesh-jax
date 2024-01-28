@@ -1,0 +1,12 @@
+diff --git a/praxis/py_utils.py b/praxis/py_utils.py
+index f1339a6..348e7c7 100644
+--- a/praxis/py_utils.py
++++ b/praxis/py_utils.py
+@@ -512,6 +512,7 @@ def maybe_pad_uneven_sharding(
+   """Pads xs to make them evenly shardable, if needed."""
+ 
+   def _maybe_pad(x, pspec, shape):
++    return x
+     if is_optax_masked_node(x):
+       return x
+     paddings = get_uneven_sharding_paddings(pspec, shape, mesh_shape,

@@ -62,8 +62,9 @@ RUN cd /opt/MLNX_OFED_LINUX-5.4-3.5.8.0-ubuntu22.04-x86_64 && \
   conda run --no-capture-out -n legere ln -s /usr/mpi/gcc/openmpi-*/bin/mpif90 /usr/bin/mpif90 && \
   conda run --no-capture-out -n legere ln -s /usr/mpi/gcc/openmpi-*/bin/mpirun /usr/bin/mpirun
 
+# Python 3.10.6 is a requirement to make lingvo happy with all the other dependencies
 RUN conda run --no-capture-out -n legere conda install -c conda-forge -y cmake cython ninja openblas \
-python==3.11 rust
+python==3.10.6 rust
 
 RUN cd /opt && \
   conda run --no-capture-out -n legere git clone -b master https://github.com/openucx/ucx.git ucx
@@ -81,29 +82,9 @@ RUN cd /opt/ucx && \
 RUN conda run --no-capture-out -n legere python -m pip install build cffi gin-config numpy pyarrow \
 pybind11 pybind11-global scikit-build tensorflow typing_extensions
 
-COPY legion /opt/legion
+COPY xla /opt/xla
 
-RUN cd /opt/legion && \
-  conda run --no-capture-out -n legere cmake -S . -B build -DCMAKE_GENERATOR:STRING=Ninja \
--DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++ -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc \
--DCMAKE_LIBRARY_PATH:STRING=/usr/lib/x86_64-linux-gnu -DCMAKE_CXX_STANDARD:STRING=17 \
--DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Release -DLegion_USE_CUDA:BOOL=ON \
--DLegion_MAX_DIM:STRING=4 -DLegion_USE_OpenMP:BOOL=ON -DLegion_USE_GASNet:BOOL=OFF \
--DLegion_USE_Python:BOOL=ON -DLegion_VERSION:STRING=24.01.0 -DLegion_BUILD_BINDINGS:BOOL=ON \
--DLegion_REDOP_COMPLEX:BOOL=ON -DLegion_HIJACK_CUDART:BOOL=OFF -DLegion_GPU_REDUCTIONS:BOOL=OFF \
--DLegion_REDOP_HALF:BOOL=ON -DCUDA_NVCC_FLAGS:STRING=-std=c++17 \
--DLegion_DEFAULT_LOCAL_FIELDS:STRING=0 -DLegion_NETWORKS:STRING=ucx \
--DCMAKE_INSTALL_RPATH:PATH=/opt/install/miniconda/envs/legere/lib \
--DCMAKE_INSTALL_PREFIX:PATH=/opt/install/miniconda/envs/legere && \
-  conda run --no-capture-out -n legere cmake --build build && \
-  conda run --no-capture-out -n legere cmake --install build --prefix \
-/opt/install/miniconda/envs/legere && \
-  conda run --no-capture-out -n legere cmake --install build --prefix \
-/opt/install/miniconda/envs/legere
-
-COPY xla_extension /opt/xla_extension
-
-RUN cd /opt/xla_extension && \
+RUN cd /opt/xla && \
   export PYTHON_BIN_PATH=/opt/install/miniconda/envs/legere/bin/python && \
   export USE_DEFAULT_PYTHON_LIB_PATH=1 && \
   export TF_NEED_ROCM=0 && \
@@ -114,8 +95,9 @@ RUN cd /opt/xla_extension && \
   export GCC_HOST_COMPILER_PATH=/usr/bin/gcc && \
   export CC_OPT_FLAGS=--Wno-sign-compare && \
   export TF_SET_ANDROID_WORKSPACE=0 && \
-  export TF_NCCL_VERSION=2.17.1 && \
   conda run --no-capture-out -n legere python configure.py
+
+#  export TF_NCCL_VERSION=2.17.1 && \
 
 COPY jaxlib /opt/jaxlib
 
@@ -130,11 +112,38 @@ RUN cd /opt/jaxlib && \
   export GCC_HOST_COMPILER_PATH=/usr/bin/gcc && \
   export CC_OPT_FLAGS=--Wno-sign-compare && \
   export TF_SET_ANDROID_WORKSPACE=0 && \
-  export TF_NCCL_VERSION=2.17.1 && \
   conda run --no-capture-out -n legere python build/build.py \
---bazel_options=--override_repository=xla=/opt/xla_extension --bazel_startup_options=--batch \
+--bazel_options=--override_repository=xla=/opt/xla --bazel_startup_options=--batch \
 --enable_cuda && \
   conda run --no-capture-out -n legere python -m pip install dist/*.whl
+
+#  export TF_NCCL_VERSION=2.17.1 && \
+
+COPY jax /opt/jax
+
+RUN cd /opt/jax && \
+  conda run --no-capture-out -n legere python -m pip install -e .
+
+
+COPY legion /opt/legion
+
+RUN cd /opt/legion && \
+  conda run --no-capture-out -n legere cmake -S . -B build -DCMAKE_GENERATOR:STRING=Ninja \
+-DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++ -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc \
+-DCMAKE_LIBRARY_PATH:STRING=/usr/lib/x86_64-linux-gnu -DCMAKE_CXX_STANDARD:STRING=17 \
+-DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Release -DLegion_USE_CUDA:BOOL=ON \
+-DLegion_MAX_DIM:STRING=5 -DLegion_USE_OpenMP:BOOL=ON -DLegion_USE_GASNet:BOOL=OFF \
+-DLegion_USE_Python:BOOL=ON -DLegion_VERSION:STRING=24.01.0 -DLegion_BUILD_BINDINGS:BOOL=ON \
+-DLegion_REDOP_COMPLEX:BOOL=ON -DLegion_HIJACK_CUDART:BOOL=OFF -DLegion_GPU_REDUCTIONS:BOOL=OFF \
+-DLegion_REDOP_HALF:BOOL=ON -DCUDA_NVCC_FLAGS:STRING=-std=c++17 \
+-DLegion_DEFAULT_LOCAL_FIELDS:STRING=0 -DLegion_NETWORKS:STRING=ucx \
+-DCMAKE_INSTALL_RPATH:PATH=/opt/install/miniconda/envs/legere/lib \
+-DCMAKE_INSTALL_PREFIX:PATH=/opt/install/miniconda/envs/legere && \
+  conda run --no-capture-out -n legere cmake --build build && \
+  conda run --no-capture-out -n legere cmake --install build --prefix \
+/opt/install/miniconda/envs/legere && \
+  conda run --no-capture-out -n legere cmake --install build --prefix \
+/opt/install/miniconda/envs/legere
 
 COPY legate /opt/legate
 
@@ -154,30 +163,52 @@ RUN cd /opt/legate && \
 /opt/install/miniconda/envs/legere && \
   conda run --no-capture-out -n legere python -m pip install .
 
-COPY jax /opt/jax
+COPY legate-jax /opt/legate-jax
 
-RUN cd /opt/jax && \
-  conda run --no-capture-out -n legere python -m pip install -e .
-
-COPY legate_xla /opt/legate_xla
-
-RUN cd /opt/legate_xla && \
+RUN cd /opt/legate-jax && \
   conda run --no-capture-out -n legere cmake -S . -B build -DCMAKE_GENERATOR:STRING="Unix Makefiles" \
 -DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++ -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc \
 -DCMAKE_LIBRARY_PATH:STRING=/usr/lib/x86_64-linux-gnu -DCMAKE_CXX_STANDARD:STRING=17 \
 -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Release \
--DCPM_xla_SOURCE:PATH=/opt/xla_extension -Dlegate_core_ROOT:PATH=/opt/install/miniconda/envs/legere \
+-DCPM_xla_SOURCE:PATH=/opt/xla -Dlegate_core_ROOT:PATH=/opt/legate/build \
 -DLegateXLA_HLO_RUNNER:BOOL=OFF -DLegateXLA_ASAN:BOOL=OFF \
 -DCMAKE_INSTALL_RPATH:PATH=/opt/install/miniconda/envs/legere/lib \
--DCMAKE_INSTALL_PREFIX:PATH=/opt/install/miniconda/envs/legere && \
-  conda run --no-capture-out -n legere cmake --build build
+-DCMAKE_INSTALL_PREFIX:PATH=/opt/install/miniconda/envs/legere && \ 
+conda run --no-capture-out -n legere cmake --build build --parallel
 
-RUN cd /opt/legate_xla && \
-  export CMAKE_ARGS="-DCPM_xla_SOURCE:PATH=/opt/xla_extension -DLegateXLA_ROOT:PATH=/opt/legate_xla/build" && \
+RUN cd /opt/legate-jax && \
+  export CMAKE_ARGS="-DCPM_xla_SOURCE:PATH=/opt/xla -DLegateXLA_ROOT:PATH=/opt/legate-jax/build" && \
   export SETUPTOOLS_ENABLE_FEATURES=legacy-editable && \
   conda run --no-capture-out -n legere cmake --install build --prefix \
 /opt/install/miniconda/envs/legere && \
   conda run --no-capture-out -n legere python -m pip install -e .
+
+COPY requirements.txt /opt/requirements.txt
+RUN conda run --no-capture-out -n legere python -m pip install -r /opt/requirements.txt
+
+COPY chex /opt/chex
+RUN cd /opt/chex    && conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
+
+COPY flax /opt/flax
+RUN cd /opt/flax    && conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
+
+COPY clu /opt/clu
+RUN cd /opt/clu     && conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
+
+COPY optax opt/optax
+RUN cd /opt/optax   && conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
+
+COPY seqio /opt/seqio
+RUN cd /opt/seqio   && conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
+
+COPY orbax /opt/orbax
+RUN cd /opt/orbax/checkpoint && conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
+
+COPY praxis /opt/praxis
+RUN cd /opt/praxis  && conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
+
+COPY paxml /opt/paxml
+RUN cd /opt/paxml   && conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
 
 COPY entrypoint.sh /opt/entrypoint.sh
 
