@@ -78,7 +78,7 @@ def task(
     *,
     counter=[0],
     out_shardings: Optional[Any] = None,
-    devices: np.ndarray[xc.Device] | Sequence[xc.Device] | None = None,
+    devices: np.ndarray | Sequence[xc.Device] | None = None,
     device_axes: Optional[Sequence[str]] = None,
     logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
 ):
