@@ -101,6 +101,8 @@ RUN cd /opt/xla && \
 
 COPY jaxlib /opt/jaxlib
 
+ARG BAZEL_CACHE=grpc://host.docker.internal:9092
+
 RUN cd /opt/jaxlib && \
   export PYTHON_BIN_PATH=/opt/install/miniconda/envs/legere/bin/python && \
   export USE_DEFAULT_PYTHON_LIB_PATH=1 && \
@@ -114,6 +116,7 @@ RUN cd /opt/jaxlib && \
   export TF_SET_ANDROID_WORKSPACE=0 && \
   conda run --no-capture-out -n legere python build/build.py \
 --bazel_options=--override_repository=xla=/opt/xla --bazel_startup_options=--batch \
+--bazel_options=--remote_cache=${BAZEL_CACHE} \
 --enable_cuda && \
   conda run --no-capture-out -n legere python -m pip install dist/*.whl
 
@@ -169,6 +172,7 @@ RUN cd /opt/legate-jax && \
   conda run --no-capture-out -n legere cmake -S . -B build -DCMAKE_GENERATOR:STRING="Unix Makefiles" \
 -DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++ -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc \
 -DCMAKE_LIBRARY_PATH:STRING=/usr/lib/x86_64-linux-gnu -DCMAKE_CXX_STANDARD:STRING=17 \
+-DLegateXLA_BAZEL_REMOTE_CACHE:STRING="${BAZEL_CACHE}" \
 -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Release \
 -DCPM_xla_SOURCE:PATH=/opt/xla -Dlegate_core_ROOT:PATH=/opt/legate/build \
 -DLegateXLA_HLO_RUNNER:BOOL=OFF -DLegateXLA_ASAN:BOOL=OFF \

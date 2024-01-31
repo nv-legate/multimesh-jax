@@ -6,16 +6,24 @@ function checkout {
   repo=$3
   commit=$4
   patch=$5
-  echo "cloning $branch of $repo into $folder"
-  git clone -b $branch --filter tree:0 $repo $folder
-  pushd $folder
-  if [ ! -z "$commit" ]; then
-    git checkout $commit
+  if [[ -d "$folder" && -z "$commit" ]]; then
+    echo "updating $branch of $repo to top-of-tree for $folder"
+    pushd $folder
+    git fetch origin
+    git checkout origin/$branch
+    popd
+  else
+    echo "cloning $branch of $repo into $folder"
+    git clone -b $branch --filter tree:0 $repo $folder
+    pushd $folder
+    if [ ! -z "$commit" ]; then
+      git checkout $commit
+    fi
+    if [ ! -z "$patch" ]; then
+      git apply ../$patch
+    fi
+    popd
   fi
-  if [ ! -z "$patch" ]; then
-    git apply ../$patch
-  fi
-  popd
 }
 
 checkout legion     control_replication ssh://git@gitlab.com/StanfordLegion/legion.git

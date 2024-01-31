@@ -178,7 +178,7 @@ index e7cbe99..ddddb2e 100644
      # Wrap it with a pipeline layer.
      model_p.lm_tpl.stacked_transformer_tpl = pax_fiddle.Config(
 diff --git a/paxml/trainer_lib.py b/paxml/trainer_lib.py
-index 933784a..f0ed2dc 100644
+index 933784a..8868006 100644
 --- a/paxml/trainer_lib.py
 +++ b/paxml/trainer_lib.py
 @@ -920,6 +920,12 @@ class GradFnProtocol(Protocol):
@@ -216,7 +216,7 @@ index 933784a..f0ed2dc 100644
 +    microbatch_config = MicrobatchConfig()
 +    if microbatch_config.size > 1:
 +      from legate.jax import microbatch
-+      g = microbatch(g, dim=0, argnum=2, size=1)
++      g = microbatch(g, dim=0, argnum=2, size=microbatch_config.size)
 +    values, grads = g(with_grad, no_grad, inputs, prng_key)
      grads = jax.tree_map(
          lambda eo, eg, m, g: jnp.zeros_like(m) if eg and not eo else g,
