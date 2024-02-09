@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04
+FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
 
 SHELL [ "/bin/bash", "-eo", "pipefail", "-c" ]
 
@@ -90,14 +90,14 @@ RUN cd /opt/xla && \
   export TF_NEED_ROCM=0 && \
   export TF_NEED_CUDA=1 && \
   export TF_NEED_TENSORRT=0 && \
+  export TF_NCCL_VERSION=2.19.3 && \
   export TF_CUDA_CLANG=0 && \
-  export TF_CUDA_COMPUTE_CAPABILITIES=8.0 && \
+  export TF_CUDA_COMPUTE_CAPABILITIES=sm_80,sm_90a && \
   export GCC_HOST_COMPILER_PATH=/usr/bin/gcc && \
   export CC_OPT_FLAGS=--Wno-sign-compare && \
   export TF_SET_ANDROID_WORKSPACE=0 && \
   conda run --no-capture-out -n legere python configure.py
 
-#  export TF_NCCL_VERSION=2.17.1 && \
 
 COPY jaxlib /opt/jaxlib
 
@@ -108,9 +108,10 @@ RUN cd /opt/jaxlib && \
   export USE_DEFAULT_PYTHON_LIB_PATH=1 && \
   export TF_NEED_ROCM=0 && \
   export TF_NEED_CUDA=1 && \
+  export TF_NCCL_VERSION=2.19.3 && \
   export TF_NEED_TENSORRT=0 && \
   export TF_CUDA_CLANG=0 && \
-  export TF_CUDA_COMPUTE_CAPABILITIES=8.0 && \
+  export TF_CUDA_COMPUTE_CAPABILITIES=sm_80,sm_90a && \
   export GCC_HOST_COMPILER_PATH=/usr/bin/gcc && \
   export CC_OPT_FLAGS=--Wno-sign-compare && \
   export TF_SET_ANDROID_WORKSPACE=0 && \
@@ -119,8 +120,6 @@ RUN cd /opt/jaxlib && \
 --bazel_options=--remote_cache=${BAZEL_CACHE} \
 --enable_cuda && \
   conda run --no-capture-out -n legere python -m pip install dist/*.whl
-
-#  export TF_NCCL_VERSION=2.17.1 && \
 
 COPY jax /opt/jax
 

@@ -1,3 +1,29 @@
+diff --git a/paxml/contrib/gpu/scripts_gpu/configs.py b/paxml/contrib/gpu/scripts_gpu/configs.py
+index 71542ad..4389d31 100644
+--- a/paxml/contrib/gpu/scripts_gpu/configs.py
++++ b/paxml/contrib/gpu/scripts_gpu/configs.py
+@@ -181,15 +181,20 @@ class Pile126M(GPT126M, PileUnsupervisedDataset):
+     return task_p
+
+
++from paxml.tasks.lm.params.lm_cloud import SyntheticDataset
+ @experiment_registry.register
+-class Lambada126M(GPT126M, LambadaDataset):
++class Lambada126M(GPT126M, SyntheticDataset):
+
+   ICI_MESH_SHAPE = [8,1,1]
++  MAX_STEPS = 100
++  EVAL_INTERVAL_STEPS = 10
+
+   def task(self) -> pax_fiddle.Config[tasks_lib.SingleTask]:
+     task_p = super().task()
+     task_p.train.always_use_train_for_model_init=False
+     task_p.model.report_strict_acc=True
++    task_p.train.num_train_steps = self.MAX_STEPS
++    task_p.train.eval_interval_steps = self.EVAL_INTERVAL_STEPS
+     return task_p
+
+
 diff --git a/paxml/contrib/gpu/scripts_gpu/tasks.py b/paxml/contrib/gpu/scripts_gpu/tasks.py
 index b4de373..1ae1dad 100644
 --- a/paxml/contrib/gpu/scripts_gpu/tasks.py
@@ -17,7 +43,7 @@ index b4de373..1ae1dad 100644
 -    return [self._dataset_common(is_training=False)]
 +    return [self._dataset_common(is_training=self.LAMBADA_TRAIN)]
 diff --git a/paxml/executors.py b/paxml/executors.py
-index f711e9b..7b1e9f3 100644
+index f711e9b..6fb8db3 100644
 --- a/paxml/executors.py
 +++ b/paxml/executors.py
 @@ -386,13 +386,13 @@ def _train_and_evaluate_common(
@@ -41,6 +67,28 @@ index f711e9b..7b1e9f3 100644
      if exit_after_ondemand_checkpoint and checkpointer.reached_preemption(
          step_i
      ):
+@@ -533,13 +533,12 @@ def _train_and_evaluate_common(
+   gc.unfreeze()
+
+   logging.info('[PAX STATUS]: Saving checkpoint for final step.')
+-  checkpointer.save_final(
+-      step_i,
+-      partitioned_train_state=partitioned_train_state,
+-      train_state_unpadded_shape_dtype_struct=train_state_metadata.unpadded_global_shapes,
+-      train_state_pspecs=train_state_metadata.partition_specs,
+-      train_input_pipeline=train_input_for_checkpoint,
+-  )
+-
+-  checkpointer.wait_until_finished()
++  #checkpointer.save_final(
++  #    step_i,
++  #    partitioned_train_state=partitioned_train_state,
++  #    train_state_unpadded_shape_dtype_struct=train_state_metadata.unpadded_global_shapes,
++  #    train_state_pspecs=train_state_metadata.partition_specs,
++  #    train_input_pipeline=train_input_for_checkpoint,
++  #)
++  #checkpointer.wait_until_finished()
+   logging.info('[PAX STATUS]: Final checkpoint saved.')
 diff --git a/paxml/main.py b/paxml/main.py
 index 41b1a9c..b931c96 100644
 --- a/paxml/main.py
@@ -64,7 +112,7 @@ index 41b1a9c..b931c96 100644
        experiment_config.__class__, job_log_dir,
        '' if FLAGS.mode == 'train' else f'{FLAGS.mode}_')
 diff --git a/paxml/partitioning.py b/paxml/partitioning.py
-index 96b81d8..4a6d03b 100644
+index 96b81d8..ebad1d6 100644
 --- a/paxml/partitioning.py
 +++ b/paxml/partitioning.py
 @@ -892,9 +892,17 @@ class PjitPartitioner(Partitioner):
@@ -115,7 +163,22 @@ index 96b81d8..4a6d03b 100644
      extra_kwargs = dict(in_shardings=fn_in_shardings)
      if not use_pspec_on_array_inputs:
        extra_kwargs = {}
-@@ -1322,8 +1327,8 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1294,8 +1299,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+         else pjit.AUTO(self.global_mesh)
+     )
+
++    from jax.lax import with_sharding_constraint
++    def autoshard_step_fn(train_state, *args):
++      sharded_train_state = jax.tree_map(lambda x, y: with_sharding_constraint(x, y), train_state, metadata.partition_specs)
++      return step_fn(sharded_train_state, *args)
++
+     partitioned_step_fn = self._pjit(
+-        step_fn,
++        autoshard_step_fn,
+         is_eval,
+         fn_in_partition_specs,
+         fn_out_partition_specs,
+@@ -1322,8 +1332,8 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          inputs_shape_dtype,
          static_args,
      )
@@ -126,7 +189,7 @@ index 96b81d8..4a6d03b 100644
      return auto_sharded_step_fn, new_input_pspec, new_train_state_pspec
  
    def get_train_state_metadata(
-@@ -1438,6 +1443,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1438,6 +1448,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
      if not self._auto_sharding_result:
        self.get_train_state_metadata(discard_opt_states=is_eval)
      if step_fn is self._auto_sharding_info.step_fn:
@@ -178,9 +241,18 @@ index e7cbe99..ddddb2e 100644
      # Wrap it with a pipeline layer.
      model_p.lm_tpl.stacked_transformer_tpl = pax_fiddle.Config(
 diff --git a/paxml/trainer_lib.py b/paxml/trainer_lib.py
-index 933784a..8868006 100644
+index 933784a..be9c8f8 100644
 --- a/paxml/trainer_lib.py
 +++ b/paxml/trainer_lib.py
+@@ -19,7 +19,7 @@ import dataclasses
+ import enum
+ import functools
+ import pprint
+-from typing import Any, Protocol, Sequence
++from typing import Any, Protocol, Optional, Sequence
+
+ from absl import logging
+ import clu.metrics
 @@ -920,6 +920,12 @@ class GradFnProtocol(Protocol):
        A tuple of (values, grads).
      """
@@ -190,7 +262,7 @@ index 933784a..8868006 100644
 +@gin.configurable
 +@dataclasses.dataclass
 +class MicrobatchConfig:
-+  size: int = 1
++  size: Optional[int] = None
  
  def _get_default_grad_fn(
      excluded_for_grad: NestedMap, excluded_for_opt: NestedMap
@@ -214,7 +286,7 @@ index 933784a..8868006 100644
 -    values, grads = g(with_grad, (no_grad, inputs), prng_key)
 +
 +    microbatch_config = MicrobatchConfig()
-+    if microbatch_config.size > 1:
++    if microbatch_config.size is not None:
 +      from legate.jax import microbatch
 +      g = microbatch(g, dim=0, argnum=2, size=microbatch_config.size)
 +    values, grads = g(with_grad, no_grad, inputs, prng_key)
