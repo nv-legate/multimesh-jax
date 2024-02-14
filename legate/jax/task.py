@@ -10,8 +10,10 @@ from jax.experimental.pjit import AUTO
 from jax.lax import with_sharding_constraint
 from jax.sharding import Mesh
 from jax.tree_util import tree_map
+from dataclasses import dataclass
+from functools import partial
 
-from .lib import should_ignore_transforms
+from .lib import should_ignore_transforms, optional_kwargs
 from .no_op import no_op
 
 # colors 0 and 1 are reserved values
@@ -71,26 +73,20 @@ def parallelize(
 
     return AutoParallelAbstractFxn(fxn, devices=devices)
 
+mark_output = no_op(name="TaskEnd")
+mark_input = no_op(name="TaskStart")
+@dataclass
+class Task:
+    devices: np.ndarray | Sequence[xc.Device] | None = None
+    device_axes: Optional[Sequence[str]] = None
+    logical_axes: Optional[Sequence[Tuple[str, str]]] = None    
 
-def task(
-    fxn,
-    name: Optional[str] = None,
-    *,
-    counter=[0],
+def _get_wrapped_task(fxn, 
+                      name: str,
     out_shardings: Optional[Any] = None,
     devices: np.ndarray | Sequence[xc.Device] | None = None,
     device_axes: Optional[Sequence[str]] = None,
-    logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
-):
-    global _next_color
-    global _task_depth
-
-    if should_ignore_transforms():
-        return fxn
-
-    if name is None:
-        name = f"{fxn.__name__}.{counter[0]}"
-        counter[0] += 1
+    logical_axes: Optional[Sequence[Tuple[str, str]]] = None):
 
     if devices is None:
         devices = [d.id for d in jax.devices()]
@@ -139,11 +135,9 @@ def task(
             return inp
 
         _next_color += 1
-        mark_input_fwd = no_op(
-            name="TaskStart",
-            config=_config_str("input", "fwd"),
-            abstract=lambda x: x,
-        )
+
+
+        mark_input_fwd = partial(mark_input, config=_config_str("input", "fwd"))
         result = _optimization_barrier(tree_map(mark_input_fwd, inp))
         if out_shardings is not None:
             result = with_sharding_constraint(result, out_shardings)
@@ -157,11 +151,7 @@ def task(
             # task is actually carved out
             return inp
 
-        mark_output_fwd = no_op(
-            name="TaskEnd",
-            config=_config_str("output", "fwd"),
-            abstract=lambda x: x,
-        )
+        mark_output_fwd = partial(mark_output, config=_config_str("output", "fwd"))
         return _optimization_barrier(tree_map(mark_output_fwd, inp))
 
     start = jax.custom_vjp(start_task)
@@ -177,11 +167,7 @@ def task(
             return inp, None
 
         _next_color += 1
-        mark_input_fwd = no_op(
-            name="TaskStart",
-            config=_config_str("input", "fwd"),
-            abstract=lambda x: x,
-        )
+        mark_input_fwd = partial(mark_input, config=_config_str("input", "fwd"))
         with jax.named_scope(f"args_{name}_forward"):
             result = _optimization_barrier(tree_map(mark_input_fwd, inp))
             if out_shardings is not None:
@@ -196,11 +182,7 @@ def task(
             # task is actually carved out
             return (g,)
 
-        mark_output_bwd = no_op(
-            name="TaskEnd",
-            config=_config_str("output", "bwd"),
-            abstract=lambda x: x,
-        )
+        mark_output_bwd = partial(mark_output, config=_config_str("output", "bwd"))
         with jax.named_scope(f"args_{name}_backward"):
             return (_optimization_barrier(tree_map(mark_output_bwd, g)),)
 
@@ -212,11 +194,7 @@ def task(
         if _task_depth > 1:
             return inp, None
 
-        mark_output_fwd = no_op(
-            name="TaskEnd",
-            config=_config_str("output", "fwd"),
-            abstract=lambda x: x,
-        )
+        mark_output_fwd = partial(mark_output, config=_config_str("output", "fwd"))
         with jax.named_scope(f"result_{name}_forward"):
             return (
                 _optimization_barrier(tree_map(mark_output_fwd, inp)),
@@ -234,24 +212,77 @@ def task(
 
         _next_color += 1
 
-        mark_input_bwd = no_op(
-            name="TaskStart",
-            config=_config_str("input", "bwd"),
-            abstract=lambda x: x,
-        )
+        mark_input_bwd = partial(mark_input, config=_config_str("input", "bwd"))
         with jax.named_scope(f"result_{name}_backward"):
             return (_optimization_barrier(tree_map(mark_input_bwd, g)),)
 
     start.defvjp(args_task_barrier_fwd, args_task_barrier_bwd)
     finish.defvjp(result_task_barrier_fwd, result_task_barrier_bwd)
 
-    def wrapped(*args):
+    def wrapped(*args, **kwargs):
         with jax.named_scope(f"task:{name}"):
             new_args = start(args)
-            res = fxn(*new_args)
+            res = fxn(*new_args, **kwargs)
             return finish(res)
 
     return wrapped
+
+def task(
+    fxn,
+    name: Optional[str] = None,
+    *,
+    counter=[0],
+    out_shardings: Optional[Any] = None,
+    devices: np.ndarray | Sequence[xc.Device] | None = None,
+    device_axes: Optional[Sequence[str]] = None,
+    logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
+    configure: Optional[Callable[...,Task]] = None,
+    configure_args: Optional[Sequence[str]] = None,
+):
+    global _next_color
+    global _task_depth
+
+    if should_ignore_transforms():
+        return fxn
+
+    if name is None:
+        name = f"{fxn.__name__}.{counter[0]}"
+        counter[0] += 1
+
+    if configure is not None:
+        if devices is not None or device_axes is not None or logical_axes is not None:
+            raise ValueError("cannot give both a configure type and devices/device_axes/logical_axees to legate.jax.task")
+        
+        if out_shardings is not None:
+            raise ValueError("cannot give both a configure type and out_shardings to legate.jax.task")
+
+        if configure_args:
+            # we can't know all the arguments until the function is invoked
+            # so we have to defer creating the actual wrapped task until the
+            # function is called
+            def wrapped(*args, **kwargs):
+                configure_kwargs = {}
+                if configure_args is not None:
+                    for arg in configure_args:
+                        configure_kwargs[arg] = kwargs[arg]
+
+                task_config: Task = configure(**configure_kwargs)
+                devices = task_config.devices
+                device_axes = task_config.device_axes
+                logical_axes = task_config.logical_axes
+
+                return _get_wrapped_task(fxn, name, out_shardings, 
+                                         devices, device_axes, logical_axes)(*args, **kwargs)
+            return wrapped
+
+        task_config: Task = configure()
+        devices = task_config.devices
+        device_axes = task_config.device_axes
+        logical_axes = task_config.logical_axes
+
+    return _get_wrapped_task(
+        fxn, name, out_shardings, devices, device_axes, logical_axes)
+
 
 
 def abstract_microbatch(x):
@@ -263,8 +294,12 @@ def microbatch(
     dim: int,
     size: int,
     argnum: int = 0,
-    num_stages: Optional[int] = None,
-    max_breadth: Optional[int] = None,
+    interleave: int = 1,
+    unrolling: Optional[int] = None,
+    num_pipeline_stages: Optional[int] = None,
+    distribute_first_layer: Optional[bool] = None,
+    distribute_last_layer: Optional[bool] = None,
+
 ):
     if should_ignore_transforms():
         return fxn
@@ -284,27 +319,27 @@ def microbatch(
         if num_microbatches == 1:
             return fxn(*args, **kwargs)
 
-        json_args = dict(
-            num_stages=num_stages,
-            max_breadth=max_breadth,
+        json_args = optional_kwargs(
             num_microbatches=num_microbatches,
             slice_dim=dim,
             size=size,
+            interleave=interleave,
+            unrolling=unrolling,
+            num_pipeline_stages=num_pipeline_stages,
+            distribute_first_layer=distribute_first_layer,
+            distribute_last_layer=distribute_last_layer
         )
 
         mark_microbatch = no_op(
             name="Microbatch",
-            abstract=abstract_microbatch,
             config=json.dumps(json_args),
         )
         mark_microbatch_slice = no_op(
             name="MicrobatchSlice",
-            abstract=abstract_microbatch,
             config=json.dumps(json_args),
         )
         mark_microbatch_init = no_op(
             name="MicrobatchInit",
-            abstract=abstract_microbatch,
             config=json.dumps(json_args),
         )
 

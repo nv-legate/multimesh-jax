@@ -13,7 +13,7 @@ from .lib import (
     ClientConfig,
     context,
 )
-from .task import task, microbatch, parallelize
+from .task import task, microbatch, parallelize, Task
 
 from . import _version
 

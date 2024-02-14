@@ -93,9 +93,7 @@ def with_sharding_constraint(x: Any, axis_resources: Any):
                 "axes": _canonicalize_axes(len(arg.shape), pspec),
             }
         )
-        mark_sharding = no_op(
-            name="AutoSharding", config=json_str, abstract=lambda x: x
-        )
+        mark_sharding = no_op(name="AutoSharding", config=json_str)
         return mark_sharding(arg)
 
     flat_marked_args = [

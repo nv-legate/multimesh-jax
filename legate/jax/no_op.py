@@ -41,20 +41,40 @@ def no_op_lowering(
     return op.results
 
 
-def no_op(name: str, abstract, config: Optional[str] = None):
+def no_op(name: str, config: Optional[str] = None):
     no_op_p = Primitive(name)
     no_op_p.def_impl(_no_op_impl)
+    if config is None:
+        def abstract(x, config=None):
+            return x
+    else:
+        def abstract(x):
+            return x
+
     no_op_p.def_abstract_eval(abstract)
-    mlir.register_lowering(
-        no_op_p,
-        partial(no_op_lowering, abstract=abstract, target=name, config=config),
-    )
+    if config is None:
+        mlir.register_lowering(
+            no_op_p,
+            partial(no_op_lowering, abstract=abstract, target=name),
+        )
+    else:        
+        mlir.register_lowering(
+            no_op_p,
+            partial(no_op_lowering, abstract=abstract, target=name, config=config),
+        )
 
     def no_op_p_linear(ct, _, **kwargs):
         return (no_op_p.bind(ct, **kwargs),)
 
     ad.deflinear2(no_op_p, no_op_p_linear)
 
+    if config is None:
+        def wrapped(*args, config=None, **kwargs):
+            with jax.named_scope(name):
+                return no_op_p.bind(*args, **kwargs, config=config)
+
+        return wrapped
+        
     def wrapped(*args, **kwargs):
         with jax.named_scope(name):
             return no_op_p.bind(*args, **kwargs)
@@ -62,5 +82,5 @@ def no_op(name: str, abstract, config: Optional[str] = None):
     return wrapped
 
 
-mark_gradient = no_op(name="Marking", config="gradient", abstract=lambda x: x)
-mark_loss = no_op(name="Marking", config="loss", abstract=lambda x: x)
+mark_gradient = no_op(name="Marking", config="gradient")
+mark_loss = no_op(name="Marking", config="loss")

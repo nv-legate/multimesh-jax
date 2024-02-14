@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 from absl.testing import absltest
 from jax import config
-from jax.sharding import PositionalSharding
+from jax.sharding import Mesh, PositionalSharding, PartitionSpec as P
 
 import legate.jax
 from legate.jax.test_util import LegateJaxTestCase
@@ -116,6 +116,45 @@ class TaskTest(LegateJaxTestCase):
             donate_argnums=(0, 1),
             arg_shardings=(sharding, sharding),
         )
+    
+    def test_task_configure(self):
+        if jax.device_count() != 4:
+            self.skipTest("need 4 devices")        
+
+        class Configurable:
+            def __call__(self, *, iter: int):
+                offset = iter * 2
+                devices = np.array(jax.devices()[offset:offset+2]).reshape(2,1)
+                return legate.jax.Task(
+                    devices=devices,
+                    device_axes=("x", "y"),
+                    logical_axes=[("batch", "x")]
+                )
+
+
+        def c(x):
+            def f(x, *, iter: int):
+                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                return x*x
+            f = legate.jax.task(f, configure=Configurable(), configure_args=("iter",))
+
+            for i in range(2):
+                x = f(x, iter=i)
+            loss = x.sum()
+            return loss
+    
+        def arg_maker():
+            return jnp.arange(8).reshape(4,2),
+
+        sharding = PositionalSharding(jax.devices()).reshape(4, 1)
+        mesh = Mesh(np.array(jax.devices()).reshape(4, 1), ("batch", "model"))
+        with mesh:
+            self._test_against_reference(
+                c,
+                arg_maker,
+                arg_shardings=(sharding,)
+            ) 
+
 
     def test_task_gradients(self):
         if jax.device_count() != 1:
