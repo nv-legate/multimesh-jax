@@ -48,14 +48,16 @@ struct get_read_only_ptr {
 
   int64_t num_shards = context.scalar(ScalarNumShards).value<int64_t>();
 
-  log_xla.debug() << "ShardGetterTask start " << cfg.local_device_id << " of "
-                  << num_shards;
-
   // shard 0 might be on device 4
   int32_t shard_id = std::min(cfg.task_id, cfg.local_device_id);
 
   auto *waiter = reinterpret_cast<TaskWaiter *>(
       context.scalar(ScalarTaskWaiter).value<uint64_t>());
+
+  int64_t store_id = context.scalar(ScalarStoreId).value<uint64_t>();
+
+  log_xla.debug() << "ShardGetterTask start " << shard_id << " of "
+                  << num_shards << " for store " << store_id;
 
   if (shard_id < num_shards) {
     const void *buffer = legate::double_dispatch(

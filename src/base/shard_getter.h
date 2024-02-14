@@ -29,7 +29,12 @@ class ShardGetterTask : public XlaTask<ShardGetterTask> {
 public:
   static constexpr int32_t TASK_ID = XLA_SHARD_GETTER_TASK;
 
-  enum ScalarArgs { ScalarBufferPointers, ScalarNumShards, ScalarTaskWaiter };
+  enum ScalarArgs {
+    ScalarBufferPointers,
+    ScalarNumShards,
+    ScalarTaskWaiter,
+    ScalarStoreId
+  };
 
 public:
   static void cpu_variant(legate::TaskContext context);

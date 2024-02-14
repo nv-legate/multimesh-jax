@@ -501,8 +501,8 @@ void SliceLocalShards(const StoreHandle &handle,
 
   log_xla.debug() << "SliceLocalShards: slice " << local_shards.size()
                   << " shards on launch size " << launch_size << " on store "
-                  << handle.impl.get() << " on machine slice [" << start << ","
-                  << stop << ")";
+                  << handle.impl.get() << " " << handle.impl->name()
+                  << " on machine slice [" << start << "," << stop << ")";
 
   auto task =
       runtime->create_task(XlaOpCode::XLA_SHARD_GETTER_TASK, {launch_size});
@@ -511,6 +511,8 @@ void SliceLocalShards(const StoreHandle &handle,
   task.add_scalar_arg(reinterpret_cast<uint64_t>(local_shards.data()));
   task.add_scalar_arg(int64_t(local_shards.size()));
   task.add_scalar_arg(reinterpret_cast<uint64_t>(&waiter));
+  // Adds a debugging argument for tracking which store the task belongs to
+  task.add_scalar_arg(reinterpret_cast<uint64_t>(handle.impl.get()));
 
   if (handle.impl->HasPartition()) {
     task.add_input(handle.impl->partition());
