@@ -57,10 +57,8 @@ while [ : ]; do
 done
 
 if [ $debug -eq "0" ]; then
-  min_level=3
   level=""
 else
-  min_level=0
   level="-level legate.xla=1"
 fi
 
@@ -91,7 +89,7 @@ export LEGION_DEFAULT_ARGS="-ll:py 0 \
  -lg:eager_alloc_percentage 50"
 export JAX_TRACEBACK_FILTERING=off
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
-export TF_CPP_MIN_LOG_LEVEL=$min_level
+export TF_CPP_MIN_LOG_LEVEL=0   # always print LOG(INFO)
 export TF_CPP_MAX_LOG_LEVEL=$debug
 export TF_CPP_VMODULE=legate_pjrt_buffer=$debug,legate_computation=$debug,legate_pjrt_client=$debug,hlo_partition=$debug,legate_pjrt_executable=$debug,legate_store_cache=$debug
 

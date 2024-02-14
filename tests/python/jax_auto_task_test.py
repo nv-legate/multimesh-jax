@@ -46,29 +46,7 @@ def make_shape(*shape, dtype=np.float32):
 
 
 class TaskTest(LegateJaxTestCase):
-    def test_register_task(self):
-        if jax.device_count() != 2:
-            self.skipTest("need 2 devices")
-
-        logical_axes = [
-            ("batch", "x"),
-            ("model", "y"),
-        ]
-        legate.jax.register_task(
-            "task0",
-            devices=[0, 1],
-            dims=[2, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
-        )
-        legate.jax.register_task(
-            "task1",
-            devices=[0, 1],
-            dims=[2, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
-        )
-
+    def _test_register_task(self):
         def c(x):
             with jax.named_scope("task0"):
                 x = with_sharding_constraint(x, P("batch", "model"))
@@ -106,6 +84,61 @@ class TaskTest(LegateJaxTestCase):
             self._test_against_reference(
                 test, arg_maker, arg_shardings=arg_shardings
             )
+
+    def test_register_task(self):
+        if jax.device_count() != 2:
+            self.skipTest("need 2 devices")
+
+        logical_axes = [
+            ("batch", "x"),
+            ("model", "y"),
+        ]
+        legate.jax.register_task(
+            "task0",
+            devices=[0, 1],
+            dims=[2, 1],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+        legate.jax.register_task(
+            "task1",
+            devices=[0, 1],
+            dims=[2, 1],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+        self._test_register_task()
+
+    def test_register_task_context(self):
+        if jax.device_count() != 2:
+            self.skipTest("need 2 devices")
+
+        class TaskConfigure:
+            def __call__(self):
+                logical_axes = [
+                    ("batch", "x"),
+                    ("model", "y"),
+                ]
+                legate.jax.register_task(
+                    "task0",
+                    devices=[0, 1],
+                    dims=[2, 1],
+                    device_axes=["x", "y"],
+                    logical_axes=logical_axes,
+                )
+                legate.jax.register_task(
+                    "task1",
+                    devices=[0, 1],
+                    dims=[2, 1],
+                    device_axes=["x", "y"],
+                    logical_axes=logical_axes,
+                )
+
+        config = legate.jax.ClientConfig(
+            auto_shard=True, configurable=TaskConfigure
+        )
+        with legate.jax.context(config):
+            self._test_register_task()
 
     def tearDown(self):
         legate.jax.clear_tasks()
@@ -259,6 +292,8 @@ class TaskTest(LegateJaxTestCase):
             return jnp.arange(16).reshape(4, 4), jnp.arange(16).reshape(4, 4)
 
         pc = legate.jax.parallelize(c).compile(init=init)
+        args = pc.init()
+        result = pc(args)
 
         with legate.jax.ignore_transforms():
             mesh = Mesh(

@@ -3,7 +3,7 @@ import json
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional, Sequence, TypeAlias, Type
+from typing import Any, Callable, List, Optional, Sequence, Type, TypeAlias
 
 import gin
 import jax
@@ -13,16 +13,22 @@ from jax.sharding import NamedSharding, PartitionSpec
 from jax.tree_util import tree_flatten, tree_unflatten
 
 from .legate_jax_impl import (
+    clear_tasks,
     disable_implicit_tasks,
     enable_implicit_tasks,
     register_task,
     register_task_factory,
+    unregister_task,
 )
 from .no_op import no_op
 
 _ignore_transforms = 0
 
 _GIN_CONFIG_ENV = "LEGATE_GIN_CONFIG"
+
+_auto_shard_enabled = False
+
+_gc_disabled = False
 
 
 @contextmanager
@@ -112,6 +118,14 @@ ImplicitTask: TypeAlias = tuple[
 ]
 
 
+def optional_kwargs(**kwargs):
+    subset_kwargs = {}
+    for key, value in kwargs.items():
+        if value is not None:
+            subset_kwargs[key] = value
+    return subset_kwargs
+
+
 @gin.configurable
 @dataclass
 class ClientConfig:
@@ -121,12 +135,63 @@ class ClientConfig:
     tasks: List[ImplicitTask] = field(default_factory=list)
 
 
-def optional_kwargs(**kwargs):
-    subset_kwargs = {}
-    for key, value in kwargs.items():
-        if value is not None:
-            subset_kwargs[key] = value
-    return subset_kwargs
+def _init_config(client_config: ClientConfig):
+    global _gc_disabled
+    global _auto_shard_enabled
+
+    if client_config.auto_shard:
+        _auto_shard_enabled = True
+        jax.lax.with_sharding_constraint = with_sharding_constraint
+
+    if client_config.disable_gc:
+        _gc_disabled = True
+        gc.disable()
+
+    if client_config.configurable:
+        task_configure = client_config.configurable()
+        task_configure()
+
+    for name, devices, dims, device_axes, logical_axes in client_config.tasks:
+        if callable(devices):
+            register_task_factory(
+                name=name,
+                device_factory=devices,
+                dims=dims,
+                device_axes=device_axes,
+                logical_axes=logical_axes,
+            )
+        else:
+            register_task(
+                name,
+                devices=devices,
+                dims=dims,
+                device_axes=device_axes,
+                logical_axes=logical_axes,
+            )
+
+
+@contextmanager
+def context(client_config: ClientConfig):
+    global _gc_disabled
+    global _auto_shard_enabled
+    current_gc_disabled = _gc_disabled
+    current_auto_shard_enabled = _auto_shard_enabled
+
+    _init_config(client_config)
+
+    yield
+
+    if _gc_disabled and not current_gc_disabled:
+        gc.enable()
+
+    if _auto_shard_enabled and not current_auto_shard_enabled:
+        jax.lax.with_sharding_constraint = lax_with_sharding_constraint
+
+    for name, devices, dims, device_axes, logical_axes in client_config.tasks:
+        unregister_task(name)
+
+    if client_config.configurable:
+        clear_tasks()
 
 
 def init(
@@ -147,30 +212,4 @@ def init(
     )
 
     client_config = ClientConfig(**kwargs)
-    if client_config.auto_shard:
-        jax.lax.with_sharding_constraint = with_sharding_constraint
-
-    if client_config.disable_gc:
-        gc.disable()
-
-    if client_config.configurable:
-        task_configure = client_config.configurable()
-        task_configure.configure()
-
-    for name, devices, dims, device_axes, logical_axes in client_config.tasks:
-        if callable(devices):
-            register_task_factory(
-                name=name,
-                device_factory=devices,
-                dims=dims,
-                device_axes=device_axes,
-                logical_axes=logical_axes,
-            )
-        else:
-            register_task(
-                name,
-                devices=devices,
-                dims=dims,
-                device_axes=device_axes,
-                logical_axes=logical_axes,
-            )
+    _init_config(client_config)

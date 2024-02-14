@@ -6,7 +6,13 @@ from .legate_jax_impl import (
     unregister_task,
     clear_tasks,
 )
-from .lib import init, ignore_transforms, with_sharding_constraint
+from .lib import (
+    init,
+    ignore_transforms,
+    with_sharding_constraint,
+    ClientConfig,
+    context,
+)
 from .task import task, microbatch, parallelize
 
 from . import _version
