@@ -187,6 +187,7 @@ namespace // unnamed
 static void __attribute__((constructor)) register_tasks(void) {
   legate::VariantOptions options;
   options.return_size = 16384;
+  options.concurrent = true;
 
   HLOExecutorTask::register_variants(
       {{LEGATE_CPU_VARIANT, options}, {LEGATE_GPU_VARIANT, options}});
