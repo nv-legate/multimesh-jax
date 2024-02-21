@@ -49,6 +49,12 @@ size_t LaunchSize(const Shape &shape, size_t default_size) {
   return size;
 }
 
+template <class... Ts> struct scalar_types : Ts... {
+  using Ts::operator()...;
+};
+
+template <class... Ts> scalar_types(Ts...) -> scalar_types<Ts...>;
+
 struct get_read_only_ptr {
   template <legate::Type::Code TYPE_CODE, int32_t DIM>
   const void *operator()(legate::PhysicalStore &store) {
@@ -274,11 +280,11 @@ void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler_hold) {
   runtime->submit(std::move(task));
 }
 
-void CreateExecuteTask(
-    TaskArgHold<LegateCompiler> *compiler_hold, // *executable,
-    const std::vector<StoreHandle> &inputs,
-    const std::vector<StoreHandle> &outputs,
-    std::vector<std::function<void()>> *on_done) {
+void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
+                       const std::vector<ScalarArgument> &scalars,
+                       const std::vector<StoreHandle> &inputs,
+                       const std::vector<StoreHandle> &outputs,
+                       std::vector<std::function<void()>> *on_done) {
   {
     auto *compiler = compiler_hold->get();
     auto [start, stop] = compiler->MachineSlice();
@@ -329,6 +335,14 @@ void CreateExecuteTask(
     task.add_scalar_arg(
         legate::Scalar(reinterpret_cast<uint64_t>(std::move(on_done))));
 
+    task.add_scalar_arg(uint64_t(scalars.size()));
+    for (const auto &scalar : scalars) {
+      task.add_scalar_arg(scalar.parameter_number);
+      task.add_scalar_arg((int64_t)scalar.value.index());
+      std::visit(scalar_types{[&](auto value) { task.add_scalar_arg(value); }},
+                 scalar.value);
+    }
+
     auto check_replication_error = [=](const StoreHandle &store) {
       if (store.impl->HasPartition() && store.impl->shape().replicated > 1) {
         size_t tensor_launch_size =
@@ -363,7 +377,6 @@ void CreateExecuteTask(
       } else {
         task.add_output(output.impl->store());
       }
-      task.add_scalar_arg(legate::Scalar(false));
     }
     if (launch_size > 1) {
       task.set_concurrent(true);

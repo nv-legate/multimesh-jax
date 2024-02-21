@@ -39,6 +39,7 @@ file(GLOB main_SRC ${PROJECT_SOURCE_DIR}/main.cc)
 set(unit_SRC
  api/create_store.cc
  api/assemble_shards.cc
+ api/hlo_executor.cc
 )
 
 add_executable(cpp_tests ${main_SRC} ${unit_SRC})

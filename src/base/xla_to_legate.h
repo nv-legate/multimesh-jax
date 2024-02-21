@@ -8,6 +8,7 @@ namespace legate_xla {
 void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler);
 
 void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler,
+                       const std::vector<ScalarArgument> &scalar,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
                        std::vector<std::function<void()>> *on_done);

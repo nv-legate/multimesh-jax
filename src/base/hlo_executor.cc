@@ -23,6 +23,8 @@
 #include "task_utils.h"
 #include "xla_task.h"
 #include <chrono>
+#include <core/data/scalar.h>
+#include <type_traits>
 
 namespace legate_xla {
 
@@ -48,17 +50,12 @@ struct get_read_only_buffer_fn {
 
 struct get_write_only_buffer_fn {
   template <legate::Type::Code TYPE_CODE, int32_t DIM>
-  BufferAllocation operator()(legate::PhysicalStore &store, bool is_red) {
+  BufferAllocation operator()(legate::PhysicalStore &store) {
     using VAL = legate::type_of<TYPE_CODE>;
     auto shape = store.shape<DIM>();
     void *buffer = nullptr;
-    if (is_red) {
-      auto acc = store.reduce_accessor<Legion::SumReduction<VAL>, true, DIM>();
-      buffer = static_cast<void *>(acc.ptr(shape));
-    } else {
-      auto acc = store.write_accessor<VAL, DIM>();
-      buffer = static_cast<void *>(acc.ptr(shape));
-    }
+    auto acc = store.write_accessor<VAL, DIM>();
+    buffer = static_cast<void *>(acc.ptr(shape));
     size_t size =
         sizeof(legate::type_of<TYPE_CODE>) * store.domain().get_volume();
     return BufferAllocation{.buffer = buffer, .size = size};
@@ -80,7 +77,7 @@ struct get_write_only_buffer_fn {
   auto *callbacks = context.scalars()[ScalarCallbacks]
                         .value<std::vector<std::function<void()>> *>();
 
-  run_executable(context, exe.get(), run_id, NumScalarArgs, cpu);
+  run_executable(context, exe.get(), run_id, ScalarNumScalarArgs, cpu);
   log_xla.debug() << "HLOExecutorTask run_executable done";
 
   if (false) { // callbacks->size() > 0) {
@@ -103,6 +100,24 @@ struct get_write_only_buffer_fn {
   log_xla.debug() << "HLOExecutorTask callbacks done";
 }
 
+template <class Variant, int Index = 0>
+BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
+                                  uint64_t variant_index) {
+  if constexpr (Index == std::variant_size_v<Variant>) {
+    throw std::runtime_error(
+        "received bad variant index to HloExecutorTask::run_executable");
+  } else {
+    if (variant_index == Index) {
+      // using Value = int32_t;
+      using Value = std::decay_t<decltype(std::get<Index>(Variant{}))>;
+      auto *sbuffer = static_cast<Value *>(buffer);
+      *static_cast<Value *>(buffer) = scalar.value<Value>();
+      return {buffer, sizeof(Value)};
+    }
+    return GetScalarVariant<Variant, Index + 1>(buffer, scalar, variant_index);
+  }
+}
+
 /*static*/ void HLOExecutorTask::run_executable(legate::TaskContext context,
                                                 LegateExecutable *exe,
                                                 int64_t run_id,
@@ -116,24 +131,54 @@ struct get_write_only_buffer_fn {
                   << "  and partitions=" << exe->NumPartitions();
   std::vector<legate_xla::BufferAllocation> inputs, outputs;
 
-  for (auto &array : context.inputs()) {
-    auto &&store = array.data();
-    inputs.push_back(legate::double_dispatch(store.dim(), store.code(),
-                                             get_read_only_buffer_fn{}, store));
+  int64_t num_scalar_arguments =
+      context.scalar(ScalarNumScalarArgs).value<int64_t>();
+  if (num_scalar_arguments > kMaxScalarArguments) {
+    throw std::runtime_error(
+        "too many scalar arguments passed to HLOExecutorTask");
   }
 
-  size_t total_outputs = context.outputs().size() + context.reductions().size();
-  int output_idx = 0;
-  int red_idx = 0;
+  using max_size_scalar_t = int64_t;
 
-  // first 2 scalars are exe and ID values
-  for (size_t idx = scalar_offset; idx < total_outputs + scalar_offset; ++idx) {
-    bool is_red = context.scalars()[idx].value<bool>();
-    auto store = is_red ? context.reductions()[red_idx++].data()
-                        : context.outputs()[output_idx++].data();
+  std::unordered_map<int64_t, BufferAllocation> scalars;
+  DeferredBufferAllocator allocator;
+  max_size_scalar_t host_scalar_arguments[kMaxScalarArguments];
+  max_size_scalar_t *device_scalar_buffer = host_scalar_arguments;
+  if (!cpu && num_scalar_arguments > 0) {
+    device_scalar_buffer = static_cast<max_size_scalar_t *>(
+        allocator.Allocate(num_scalar_arguments * sizeof(max_size_scalar_t)));
+  }
 
+  int64_t arg_offset = ScalarNumScalarArgs + 1;
+  for (auto i = 0; i < num_scalar_arguments; ++i) {
+    uint64_t param_number = context.scalar(arg_offset++).value<uint64_t>();
+    uint64_t variant_index = context.scalar(arg_offset++).value<uint64_t>();
+    BufferAllocation alloc = GetScalarVariant<ScalarArgument::ValueVariant>(
+        &host_scalar_arguments[i], context.scalar(arg_offset++), variant_index);
+    alloc.buffer = &device_scalar_buffer[i];
+    scalars[param_number] = alloc;
+  }
+
+  int input_store_index = 0;
+  inputs.reserve(num_scalar_arguments + context.num_inputs());
+  for (int param_number = 0;
+       param_number < context.num_inputs() + num_scalar_arguments;
+       ++param_number) {
+    auto iter = scalars.find(param_number);
+    if (iter == scalars.end()) {
+      auto &&store = context.input(input_store_index++).data();
+      inputs.push_back(legate::double_dispatch(
+          store.dim(), store.code(), get_read_only_buffer_fn{}, store));
+    } else {
+      inputs.push_back(iter->second);
+    }
+  }
+
+  outputs.reserve(context.num_outputs());
+  for (const auto &output : context.outputs()) {
+    auto &&store = output.data();
     outputs.push_back(legate::double_dispatch(
-        store.dim(), store.code(), get_write_only_buffer_fn{}, store, is_red));
+        store.dim(), store.code(), get_write_only_buffer_fn{}, store));
   }
 
   if (cfg.num_tasks != (exe->ReplicaCount() * exe->NumPartitions())) {
@@ -144,7 +189,12 @@ struct get_write_only_buffer_fn {
     abort();
   }
 
-  DeferredBufferAllocator allocator;
+  if (!cpu && num_scalar_arguments > 0) {
+    cudaMemcpy(device_scalar_buffer, host_scalar_arguments,
+               num_scalar_arguments * sizeof(max_size_scalar_t),
+               cudaMemcpyHostToDevice);
+  }
+
   DeviceAssignment device_assignment({.local_device_id = cfg.local_device_id,
                                       .replica_count = exe->ReplicaCount(),
                                       .num_partitions = exe->NumPartitions()});
@@ -155,7 +205,7 @@ struct get_write_only_buffer_fn {
     }
   }
 
-  bool success;
+  bool success = false;
   try {
     success = exe->Execute(run_id, inputs, outputs, &allocator,
                            device_assignment, cpu);
@@ -164,6 +214,11 @@ struct get_write_only_buffer_fn {
                     << e.what() << "'";
   } catch (...) {
     log_xla.error() << "Exception caught during 'Execute'";
+  }
+
+  if (!cpu && num_scalar_arguments > 0) {
+    allocator.Free(device_scalar_buffer,
+                   sizeof(max_size_scalar_t) * num_scalar_arguments);
   }
 
   log_xla.debug() << "Finish task " << exe->Name() << " for device "

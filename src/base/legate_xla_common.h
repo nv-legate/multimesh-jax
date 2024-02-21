@@ -6,6 +6,7 @@
 #include <optional>
 #include <stdint.h>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace legate_xla {
@@ -169,6 +170,15 @@ enum class SupportedType {
   U64,
   C64,
   C128,
+};
+
+inline constexpr int64_t kMaxScalarArguments = 64;
+
+struct ScalarArgument {
+  using ValueVariant =
+      std::variant<float, double, int32_t, int64_t, uint32_t, uint64_t>;
+  ValueVariant value;
+  int64_t parameter_number;
 };
 
 struct Shape {

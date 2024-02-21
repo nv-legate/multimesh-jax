@@ -29,7 +29,7 @@ public:
     ScalarCompilerPointer = 0,
     ScalarRunId,
     ScalarCallbacks,
-    NumScalarArgs,
+    ScalarNumScalarArgs,
   };
 
 public:
