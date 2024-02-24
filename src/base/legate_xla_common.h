@@ -30,6 +30,7 @@ struct CompileConfig {
   int stream_executor_index = 0;
   TaskMemoryAllocator *allocator = nullptr;
   bool print_stats = false;
+  bool erase_sharding = false;
 };
 
 struct DeviceConfig {

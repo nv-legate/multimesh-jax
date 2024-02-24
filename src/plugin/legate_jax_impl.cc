@@ -4,6 +4,8 @@
 #include <pybind11/stl.h>
 #include <string>
 
+#include "legate_to_xla.h"
+
 extern "C" void RegisterImplicitTask(
     std::string matcher, std::vector<int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
@@ -95,4 +97,19 @@ PYBIND11_MODULE(legate_jax_impl, m) {
     UnregisterImplicitTask(task_regex.cast<std::string>());
   });
   m.def("clear_tasks", []() { ClearImplicitTasks(); });
+  m.def(
+      "compile_hlo_module",
+      [](std::string path, std::string platform, int replica_count,
+         int num_partitions, bool erase_sharding) {
+        legate_xla::CompileConfig config{.replica_count = replica_count,
+                                         .num_partitions = num_partitions,
+                                         .print_stats = true,
+                                         .erase_sharding = erase_sharding};
+
+        CompileHloModuleFromFile(path, platform, replica_count, num_partitions,
+                                 erase_sharding);
+      },
+      py::arg("path"), py::arg("platform") = "gpu",
+      py::arg("replica_count") = 1, py::arg("num_partitions") = 1,
+      py::arg("erase_sharding") = false);
 }

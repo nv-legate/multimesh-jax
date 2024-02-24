@@ -5,6 +5,7 @@ from .legate_jax_impl import (
     shutdown,
     unregister_task,
     clear_tasks,
+    compile_hlo_module,
 )
 from .lib import (
     init,

@@ -66,7 +66,10 @@ HLOLoaderTask::load_and_compile(TaskContext context,
   auto *compiler_hold = reinterpret_cast<TaskArgHold<LegateCompiler> *>(
       context.scalar(ScalarCompilerPointer).value<uint64_t>());
   uint64_t run_id = context.scalar(ScalarRunId).value<uint64_t>();
-  log_xla.debug() << "HLOLoaderTask start on " << compiler_hold->get()->Name();
+  log_xla.debug() << "HLOLoaderTask start on " << compiler_hold->get()->Name()
+                  << " with "
+                  << context.machine().processor_range().per_node_count
+                  << " workers";
   load_and_compile(context, compiler_hold->get(), run_id, platform_name);
   Release(compiler_hold, context.machine().processor_range().per_node_count);
   log_xla.debug() << "HLOLoaderTask done";

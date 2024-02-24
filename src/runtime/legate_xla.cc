@@ -259,10 +259,11 @@ void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler_hold) {
   auto core_runtime = legate::Runtime::get_runtime();
   auto machine = core_runtime->get_machine();
   auto [start, stop] = compiler->MachineSlice();
-  legate::MachineTracker tracker(machine.slice(start, stop));
   log_xla.debug() << "CreateCompileTask " << compiler->Name()
                   << " scheduling on slice [" << start << "," << stop << ")";
   size_t launch_size = compiler->LaunchSize();
+
+  legate::MachineTracker tracker(machine.slice(start, stop));
   if ((stop - start) < launch_size) {
     std::stringstream sstr;
     sstr << "Not enough devices to run launch size " << launch_size
