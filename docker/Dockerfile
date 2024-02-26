@@ -64,7 +64,7 @@ RUN cd /opt/MLNX_OFED_LINUX-5.4-3.5.8.0-ubuntu22.04-x86_64 && \
 
 # Python 3.10.6 is a requirement to make lingvo happy with all the other dependencies
 RUN conda run --no-capture-out -n legere conda install -c conda-forge -y cmake cython ninja openblas \
-python==3.10.6 rust
+  python==3.10.6 rust openssh
 
 RUN cd /opt && \
   conda run --no-capture-out -n legere git clone -b master https://github.com/openucx/ucx.git ucx
@@ -212,6 +212,8 @@ RUN cd /opt/praxis  && conda run -n legere python -m pip install -e . --no-deps 
 
 COPY paxml /opt/paxml
 RUN cd /opt/paxml   && conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
+
+RUN apt-get update && apt-get install -y nsight-systems
 
 COPY entrypoint.sh /opt/entrypoint.sh
 

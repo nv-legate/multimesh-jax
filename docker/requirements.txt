@@ -14,6 +14,7 @@ optax-shampoo
 tensorflow-datasets==4.8.3
 typeguard
 protobuf==3.19.6
+sentencepiece==0.1.99
 tensorflow~=2.9.2
 tensorflow-metadata==1.12.0
 tensorflow-text~=2.9.0

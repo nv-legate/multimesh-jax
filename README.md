@@ -40,7 +40,7 @@ python -m pip install . -vv
 The XLA build can take a very long time to finish so we recommend building with `-vv` so
 that the progress is printed to the screen.
 
-The [XLA fork](https://gitlab-master.nvidia.com/legate/xla) has extra files
+The [XLA fork](https://github.com/nv-legate/xla) has extra files
 for building a Legate plugin client in `/xla/pjrt/legate/`.
 The files there provide the necessary Legate-specific implementations of:
 

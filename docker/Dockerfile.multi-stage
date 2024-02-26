@@ -66,7 +66,7 @@ RUN conda run --no-capture-out -n legere conda install -c conda-forge -y cython 
 python==3.10.6 rust
 
 RUN conda run --no-capture-out -n legere python -m pip install build cffi gin-config numpy pyarrow \
-pybind11 pybind11-global scikit-build tensorflow typing_extensions
+  pybind11 pybind11-global scikit-build tensorflow typing_extensions openssh
 
 
 FROM conda_base AS mellanox_download

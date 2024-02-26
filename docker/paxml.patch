@@ -1,20 +1,30 @@
 diff --git a/paxml/contrib/gpu/scripts_gpu/configs.py b/paxml/contrib/gpu/scripts_gpu/configs.py
-index 71542ad..4389d31 100644
+index 71542ad..055e020 100644
 --- a/paxml/contrib/gpu/scripts_gpu/configs.py
 +++ b/paxml/contrib/gpu/scripts_gpu/configs.py
-@@ -181,15 +181,20 @@ class Pile126M(GPT126M, PileUnsupervisedDataset):
+@@ -105,6 +105,9 @@ class GPT126M(TransformerLmSpmdAdam):
+   FPROP_DTYPE = jnp.bfloat16
+   MAX_STEPS = 600000
+ 
++  USE_ADAFACTOR = True
++  USE_SGD = False
++
+   MAX_SEQ_LEN = 2048
+   VOCAB_SIZE = 50304
+   PACKED_INPUT = True
+@@ -181,15 +184,20 @@ class Pile126M(GPT126M, PileUnsupervisedDataset):
      return task_p
-
-
+ 
+ 
 +from paxml.tasks.lm.params.lm_cloud import SyntheticDataset
  @experiment_registry.register
 -class Lambada126M(GPT126M, LambadaDataset):
 +class Lambada126M(GPT126M, SyntheticDataset):
-
+ 
    ICI_MESH_SHAPE = [8,1,1]
 +  MAX_STEPS = 100
 +  EVAL_INTERVAL_STEPS = 10
-
+ 
    def task(self) -> pax_fiddle.Config[tasks_lib.SingleTask]:
      task_p = super().task()
      task_p.train.always_use_train_for_model_init=False
@@ -22,8 +32,8 @@ index 71542ad..4389d31 100644
 +    task_p.train.num_train_steps = self.MAX_STEPS
 +    task_p.train.eval_interval_steps = self.EVAL_INTERVAL_STEPS
      return task_p
-
-
+ 
+ 
 diff --git a/paxml/contrib/gpu/scripts_gpu/tasks.py b/paxml/contrib/gpu/scripts_gpu/tasks.py
 index b4de373..1ae1dad 100644
 --- a/paxml/contrib/gpu/scripts_gpu/tasks.py
@@ -69,7 +79,7 @@ index f711e9b..6fb8db3 100644
      ):
 @@ -533,13 +533,12 @@ def _train_and_evaluate_common(
    gc.unfreeze()
-
+ 
    logging.info('[PAX STATUS]: Saving checkpoint for final step.')
 -  checkpointer.save_final(
 -      step_i,
@@ -112,10 +122,32 @@ index 41b1a9c..b931c96 100644
        experiment_config.__class__, job_log_dir,
        '' if FLAGS.mode == 'train' else f'{FLAGS.mode}_')
 diff --git a/paxml/partitioning.py b/paxml/partitioning.py
-index 96b81d8..ebad1d6 100644
+index 96b81d8..1538e2e 100644
 --- a/paxml/partitioning.py
 +++ b/paxml/partitioning.py
-@@ -892,9 +892,17 @@ class PjitPartitioner(Partitioner):
+@@ -42,6 +42,7 @@ from praxis import pax_fiddle
+ from praxis import py_utils
+ from praxis import pytypes
+ from praxis import trees
++import legate.jax
+ 
+ # tf_data_service_lib is slow to import, so we do it lazily.
+ tf_data_service_lib = lazy_loader.LazyLoader(
+@@ -125,6 +126,13 @@ def compile_for_auto_sharding(
+   compiled = step_fn.lower(
+       train_state, step_key, inputs_shape_dtype, static_args
+   ).compile()
++
++  def check(inp, inp_sharding, out):
++    print(inp.shape, inp_sharding, out)
++    if not inp_sharding.is_equivalent_to(out, len(inp.shape)):
++      raise Exception("mismatch")
++
++  jax.tree_map(check, train_state, compiled.input_shardings[0][0], compiled.output_shardings[0])
+   return compiled, compiled.input_shardings[0]
+ 
+ 
+@@ -892,9 +900,17 @@ class PjitPartitioner(Partitioner):
    ) -> NestedJTensor:
      """Preprocess the input batch before using it."""
      if self._reshard_inputs:
@@ -135,7 +167,7 @@ index 96b81d8..ebad1d6 100644
      return padded_inputs
  
    def get_train_state_metadata(
-@@ -1041,18 +1049,15 @@ class PjitPartitioner(Partitioner):
+@@ -1041,18 +1057,15 @@ class PjitPartitioner(Partitioner):
      logging.info('step_fn fn_in_partition_specs=%s', fn_in_partition_specs)
      logging.info('step_fn fn_out_partition_specs=%s', fn_out_partition_specs)
  
@@ -163,10 +195,10 @@ index 96b81d8..ebad1d6 100644
      extra_kwargs = dict(in_shardings=fn_in_shardings)
      if not use_pspec_on_array_inputs:
        extra_kwargs = {}
-@@ -1294,8 +1299,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1294,8 +1307,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          else pjit.AUTO(self.global_mesh)
      )
-
+ 
 +    from jax.lax import with_sharding_constraint
 +    def autoshard_step_fn(train_state, *args):
 +      sharded_train_state = jax.tree_map(lambda x, y: with_sharding_constraint(x, y), train_state, metadata.partition_specs)
@@ -178,18 +210,42 @@ index 96b81d8..ebad1d6 100644
          is_eval,
          fn_in_partition_specs,
          fn_out_partition_specs,
-@@ -1322,8 +1332,8 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
-         inputs_shape_dtype,
+@@ -1312,18 +1330,22 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+         jax.tree_map(jnp.shape, inputs_shape_dtype),
          static_args,
      )
+-    (
+-        auto_sharded_step_fn,
+-        input_shardings,
+-    ) = compile_for_auto_sharding(
+-        partitioned_step_fn,
+-        metadata.unpadded_global_shapes,
+-        self._init_key,
+-        inputs_shape_dtype,
+-        static_args,
+-    )
 -    new_train_state_pspec = jax.tree_map(lambda x: x.spec, input_shardings[0])
 -    new_input_pspec = jax.tree_map(lambda x: x.spec, input_shardings[2])
++
++    config = trainer_lib.AutoShardingClientConfig()
++    with legate.jax.context(config):
++      (
++          auto_sharded_step_fn,
++          input_shardings,
++      ) = compile_for_auto_sharding(
++          partitioned_step_fn,
++          metadata.unpadded_global_shapes,
++          self._init_key,
++          inputs_shape_dtype,
++          static_args,
++      )
++
 +    new_train_state_pspec = input_shardings[0]
 +    new_input_pspec = input_shardings[2]
      return auto_sharded_step_fn, new_input_pspec, new_train_state_pspec
  
    def get_train_state_metadata(
-@@ -1438,6 +1448,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1438,6 +1460,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
      if not self._auto_sharding_result:
        self.get_train_state_metadata(discard_opt_states=is_eval)
      if step_fn is self._auto_sharding_info.step_fn:
@@ -240,8 +296,62 @@ index e7cbe99..ddddb2e 100644
  
      # Wrap it with a pipeline layer.
      model_p.lm_tpl.stacked_transformer_tpl = pax_fiddle.Config(
+diff --git a/paxml/tasks/lm/params/c4.py b/paxml/tasks/lm/params/c4.py
+index 09d6f1e..35e525a 100644
+--- a/paxml/tasks/lm/params/c4.py
++++ b/paxml/tasks/lm/params/c4.py
+@@ -244,20 +244,35 @@ def set_adam_and_learning_rate_schedule(
+   """Sets the Adam optimizer and the learning rate schedule."""
+   lp = task_p.train.learner
+   lp.loss_name = 'total_loss'
+-  lp.optimizer = pax_fiddle.Config(
+-      optimizers.Adam,
+-      beta1=cls.ADAM_BETA1 if cls.ADAM_BETA1 else 0.9,
+-      beta2=cls.ADAM_BETA2 if cls.ADAM_BETA2 else 0.999,
+-      weight_decay=cls.WEIGHT_DECAY if cls.WEIGHT_DECAY else 0.0,
+-      epsilon=cls.ADAM_EPSILON if cls.ADAM_EPSILON else 1e-6,
+-      epsilon_root=cls.ADAM_EPSILON_ROOT if cls.ADAM_EPSILON_ROOT else 0.0,
+-      clip_gradient_norm_to_value=cls.CLIP_GRADIENT_NORM_TO_VALUE
+-      if cls.CLIP_GRADIENT_NORM_TO_VALUE
+-      else 5.0,
+-      clip_threshold=cls.ADAM_CLIP_THRESHOLD
+-      if cls.ADAM_CLIP_THRESHOLD
+-      else 1.0,
+-  )
++
++  if cls.USE_ADAFACTOR:
++    lp.optimizer = pax_fiddle.Config(
++        optimizers.ShardedAdafactor,
++        decay_method='adam',
++        beta1=cls.ADAM_BETA1,
++        decay_adam=0.99,
++        weight_decay=cls.WEIGHT_DECAY,
++        clip_gradient_norm_to_value=cls.CLIP_GRADIENT_NORM_TO_VALUE,
++    )
++  elif cls.USE_SGD:
++    lp.optimizer = pax_fiddle.Config(
++      optimizers.Sgd,
++    )
++  else:
++    lp.optimizer = pax_fiddle.Config(
++        optimizers.Adam,
++        beta1=cls.ADAM_BETA1 if cls.ADAM_BETA1 else 0.9,
++        beta2=cls.ADAM_BETA2 if cls.ADAM_BETA2 else 0.999,
++        weight_decay=cls.WEIGHT_DECAY if cls.WEIGHT_DECAY else 0.0,
++        epsilon=cls.ADAM_EPSILON if cls.ADAM_EPSILON else 1e-6,
++        epsilon_root=cls.ADAM_EPSILON_ROOT if cls.ADAM_EPSILON_ROOT else 0.0,
++        clip_gradient_norm_to_value=cls.CLIP_GRADIENT_NORM_TO_VALUE
++        if cls.CLIP_GRADIENT_NORM_TO_VALUE
++        else 5.0,
++        clip_threshold=cls.ADAM_CLIP_THRESHOLD
++        if cls.ADAM_CLIP_THRESHOLD
++        else 1.0,
++    )
+ 
+   if hasattr(cls, 'PERCORE_BATCH_SIZE'):
+     global_batch_size = int(cls.PERCORE_BATCH_SIZE * jax.device_count() + 1e-6)
 diff --git a/paxml/trainer_lib.py b/paxml/trainer_lib.py
-index 933784a..be9c8f8 100644
+index 933784a..508ad6d 100644
 --- a/paxml/trainer_lib.py
 +++ b/paxml/trainer_lib.py
 @@ -19,7 +19,7 @@ import dataclasses
@@ -250,10 +360,25 @@ index 933784a..be9c8f8 100644
  import pprint
 -from typing import Any, Protocol, Sequence
 +from typing import Any, Protocol, Optional, Sequence
-
+ 
  from absl import logging
  import clu.metrics
-@@ -920,6 +920,12 @@ class GradFnProtocol(Protocol):
+@@ -90,6 +90,14 @@ PMAP_PARALLEL_AXIS_NAME = base_layer.PMAP_PARALLEL_AXIS_NAME
+ instantiate = base_hyperparams.instantiate
+ 
+ 
++import gin
++import legate.jax
++
++@gin.configurable
++@dataclasses.dataclass
++class AutoShardingClientConfig(legate.jax.ClientConfig):
++  pass
++
+ class RunningMode(enum.Flag):
+   """Running mode."""
+ 
+@@ -920,6 +928,12 @@ class GradFnProtocol(Protocol):
        A tuple of (values, grads).
      """
  
@@ -266,7 +391,7 @@ index 933784a..be9c8f8 100644
  
  def _get_default_grad_fn(
      excluded_for_grad: NestedMap, excluded_for_opt: NestedMap
-@@ -942,10 +948,10 @@ def _get_default_grad_fn(
+@@ -942,10 +956,10 @@ def _get_default_grad_fn(
  
      def _loss(
          mdl_vars_grad: NestedJTensor,
@@ -279,7 +404,7 @@ index 933784a..be9c8f8 100644
        merged_vars = jax.tree_map(
            lambda e, x, y: y if e else x,
            excluded_for_grad,
-@@ -958,7 +964,12 @@ def _get_default_grad_fn(
+@@ -958,7 +972,12 @@ def _get_default_grad_fn(
        g = jax.value_and_grad(_loss, has_aux=True, allow_int=True)
      else:
        g = functools.partial(learner.stochastic_gradient.grad_fn, _loss)
@@ -293,7 +418,7 @@ index 933784a..be9c8f8 100644
      grads = jax.tree_map(
          lambda eo, eg, m, g: jnp.zeros_like(m) if eg and not eo else g,
          excluded_for_opt,
-@@ -1601,10 +1612,7 @@ def initialize_partitioned_model_states(
+@@ -1601,19 +1620,18 @@ def initialize_partitioned_model_states(
        lambda p: jax.sharding.NamedSharding(global_mesh, p),
        prng_key_partition_spec,
    )
@@ -301,7 +426,26 @@ index 933784a..be9c8f8 100644
 -      lambda p: jax.sharding.NamedSharding(global_mesh, p),
 -      train_state_partition_specs,
 -  )
+-
+-  init_fn = pjit.pjit(
+-      init_model_from_seed,
+-      in_shardings=prng_key_shardings,
+-      out_shardings=train_state_shardings,
+-  )
+-  init_fn = bind_mesh(init_fn, global_mesh)
 +  train_state_shardings = train_state_partition_specs
++
++  config = AutoShardingClientConfig()
++  with legate.jax.context(config):
++    init_fn = pjit.pjit(
++        init_model_from_seed,
++        in_shardings=prng_key_shardings,
++        out_shardings=train_state_shardings,
++    )
++    init_fn = bind_mesh(init_fn, global_mesh)
++    partitioned_vars = init_fn(prng_key)
  
-   init_fn = pjit.pjit(
-       init_model_from_seed,
+-  partitioned_vars = init_fn(prng_key)
+   train_state_provenance = train_states.build_train_state_provenance(
+       partitioned_vars
+   )
