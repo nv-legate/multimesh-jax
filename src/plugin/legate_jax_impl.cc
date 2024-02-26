@@ -100,16 +100,20 @@ PYBIND11_MODULE(legate_jax_impl, m) {
   m.def(
       "compile_hlo_module",
       [](std::string path, std::string platform, int replica_count,
-         int num_partitions, bool erase_sharding) {
+         int num_partitions, bool erase_sharding, int device_mem_gb) {
         legate_xla::CompileConfig config{.replica_count = replica_count,
                                          .num_partitions = num_partitions,
                                          .print_stats = true,
                                          .erase_sharding = erase_sharding};
 
+        std::optional<int64_t> device_mem;
+        if (device_mem_gb != 0) {
+          device_mem = int64_t(device_mem_gb) * 1000000000ULL;
+        }
         CompileHloModuleFromFile(path, platform, replica_count, num_partitions,
-                                 erase_sharding);
+                                 erase_sharding, device_mem);
       },
       py::arg("path"), py::arg("platform") = "gpu",
       py::arg("replica_count") = 1, py::arg("num_partitions") = 1,
-      py::arg("erase_sharding") = false);
+      py::arg("erase_sharding") = false, py::arg("device_mem_gb") = 0);
 }

@@ -1,5 +1,6 @@
 #include "legate_xla_common.h"
 #include <memory>
+#include <optional>
 #include <string>
 
 extern "C" std::unique_ptr<legate_xla::LegateCompiler>
@@ -15,7 +16,8 @@ GetLegateCompilerFromHloProtoFile(const std::string &hlo_file,
 extern "C" void CompileHloModuleFromFile(const std::string &hlo_file,
                                          const std::string &platform_name,
                                          int replica_count, int num_partitions,
-                                         bool erase_sharding);
+                                         bool erase_sharding,
+                                         std::optional<int64_t> device_mem);
 
 extern "C" bool InitDistributedRuntime(const std::string &coordinator_addr,
                                        int coordinator_port, int num_procs,
