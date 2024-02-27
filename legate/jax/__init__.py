@@ -7,6 +7,7 @@ from .legate_jax_impl import (
     clear_tasks,
     compile_hlo_module,
 )
+
 from .lib import (
     init,
     ignore_transforms,
@@ -14,7 +15,14 @@ from .lib import (
     ClientConfig,
     context,
 )
-from .task import task, microbatch, parallelize, Task
+from .task import (
+    task,
+    microbatch,
+    parallelize,
+    parallelize_step,
+    shard_axes,
+    Task,
+)
 
 from . import _version
 

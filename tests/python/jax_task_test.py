@@ -4,7 +4,12 @@ import jax.numpy as jnp
 import numpy as np
 from absl.testing import absltest
 from jax import config
-from jax.sharding import Mesh, PartitionSpec as P, PositionalSharding
+from jax.sharding import (
+    Mesh,
+    NamedSharding,
+    PartitionSpec as P,
+    PositionalSharding,
+)
 
 import legate.jax
 from legate.jax.test_util import LegateJaxTestCase
@@ -174,6 +179,105 @@ class TaskTest(LegateJaxTestCase):
             donate_argnums=(0, 1),
             arg_shardings=(sharding, sharding),
         )
+
+    def test_mesh_class_transform(self):
+        if jax.device_count() != 8:
+            self.skipTest("need 4 devices")
+
+        def c(x):
+            class Layer:
+                def __call__(self, x):
+                    x = legate.jax.with_sharding_constraint(
+                        x, P("batch", "model")
+                    )
+                    return x * jnp.sin(x)
+
+            mesh = Mesh(
+                np.array(jax.devices()[0:4]).reshape(2, 2), ("batch", "model")
+            )
+            first_layer = legate.jax.task(Layer, mesh=mesh)()
+            x = first_layer(x)
+
+            mesh = Mesh(
+                np.array(jax.devices()[4:8]).reshape(2, 2), ("batch", "model")
+            )
+            second_layer = legate.jax.task(Layer, mesh=mesh)()
+            x = second_layer(x)
+
+            return (x * x).sum()
+
+        def arg_maker():
+            # return self.make_shape(4,4)
+            return (
+                legate.jax.with_sharding_constraint(
+                    self.make_shape(4, 4), P("batch", "model")
+                ),
+            )
+
+        c = jax.value_and_grad(c)
+
+        mesh = Mesh(np.array(jax.devices()).reshape(4, 2), ("batch", "model"))
+        with mesh:  # keep reference happy
+            self._test_against_reference(
+                c,
+                arg_maker,
+                reference_shardings=(
+                    NamedSharding(mesh, P("batch", "model")),
+                ),
+                arg_shardings=(
+                    PositionalSharding(jax.devices()[0:4]).reshape(2, 2),
+                ),
+            )
+
+    def test_mesh_task_argument(self):
+        if jax.device_count() != 8:
+            self.skipTest("need 4 devices")
+
+        def c(x):
+            def f(x):
+                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                return x * jnp.sin(x)
+
+            mesh = Mesh(
+                np.array(jax.devices()[0:4]).reshape(2, 2), ("batch", "model")
+            )
+            f = legate.jax.task(f, mesh=mesh)
+
+            def g(x):
+                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                return x * jnp.cos(x)
+
+            mesh = Mesh(
+                np.array(jax.devices()[4:8]).reshape(2, 2), ("batch", "model")
+            )
+            g = legate.jax.task(g, mesh=mesh)
+
+            x = f(x)
+            x = g(x)
+            return (x * x).sum()
+
+        def arg_maker():
+            # return self.make_shape(4,4)
+            return (
+                legate.jax.with_sharding_constraint(
+                    self.make_shape(4, 4), P("batch", "model")
+                ),
+            )
+
+        c = jax.value_and_grad(c)
+
+        mesh = Mesh(np.array(jax.devices()).reshape(4, 2), ("batch", "model"))
+        with mesh:  # keep reference happy
+            self._test_against_reference(
+                c,
+                arg_maker,
+                reference_shardings=(
+                    NamedSharding(mesh, P("batch", "model")),
+                ),
+                arg_shardings=(
+                    PositionalSharding(jax.devices()[0:4]).reshape(2, 2),
+                ),
+            )
 
     def test_task_configure(self):
         if jax.device_count() != 4:

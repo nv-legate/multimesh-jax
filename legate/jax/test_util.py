@@ -28,6 +28,7 @@ class LegateJaxTestCase(jtu.JaxTestCase):
                 kwargs = dict(backend=reference_backend)
 
             args = jax.jit(arg_maker, **kwargs)()
+
             if reference_shardings is not None:
                 kwargs = dict(in_shardings=reference_shardings)
             else:

@@ -1,23 +1,24 @@
 import json
-from typing import Any, Callable, Optional, Sequence, Tuple
-
-import jax
-import jax.numpy as jnp
-import numpy as np
-from jax._src.ad_checkpoint import _optimization_barrier
-from jax._src.lib import xla_client as xc
-from jax.experimental.pjit import AUTO
-from jax.lax import with_sharding_constraint
-from jax.sharding import Mesh
-from jax.tree_util import tree_map
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
+from typing import Any, Callable, Optional, Sequence, Tuple, Type
 
-from .lib import should_ignore_transforms, optional_kwargs
+import jax
+import jax.lax
+import jax.numpy as jnp
+import numpy as np
+from jax import random
+from jax._src.ad_checkpoint import _optimization_barrier
+from jax._src.lib import xla_client as xc
+from jax.experimental.pjit import AUTO, pjit
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from jax.tree_util import tree_map
+
+from .lib import optional_kwargs, should_ignore_transforms
 from .no_op import no_op
 
-# colors 0 and 1 are reserved values
-_next_color = 1
+_next_color = 0
 _task_depth = 0
 
 
@@ -64,29 +65,154 @@ class AutoParallelAbstractFxn:
 def parallelize(
     fxn, devices: Optional[Sequence[xc.Device] | np.ndarray] = None
 ):
-    # the mesh is arbitrary and only serves to satisfy jax that a mesh exists
-    # for the purposes of defining logical meshes that legate will remap
-    # to physical meshes
-
     if devices is None:
         devices = jax.devices()
 
     return AutoParallelAbstractFxn(fxn, devices=devices)
 
+
+def put_to_devices(host_array: np.ndarray, devices) -> list[Any]:
+    num_devices = len(devices)
+    per_device_arrays = np.split(host_array, num_devices, axis=0)
+    return jax.device_put(per_device_arrays, devices)
+
+
+def parallelize_step(
+    model,
+    optimizer,
+    batch: Any,
+    mesh: Optional[Mesh] = None,
+    fully_shard_first_batch_dim: bool = True,
+):
+    import flax.linen as nn
+    from flax.training.train_state import TrainState
+
+    if mesh is None:
+        mesh = Mesh(jax.devices(), ("x",))
+
+    def init_fn(k, x, model, optimizer):
+        params = model.init(k, x)
+        state = TrainState.create(
+            apply_fn=model.apply, params=params, tx=optimizer
+        )
+        return state
+
+    init_fn = partial(init_fn, model=model, optimizer=optimizer)
+
+    variable_avals = jax.eval_shape(init_fn, random.key(42), batch)
+    variable_spec = nn.get_partition_spec(variable_avals)
+    grad_fn = jax.value_and_grad(model.apply)
+
+    def label_sharding(x, s):
+        return jax.lax.with_sharding_constraint(x, s)
+
+    def step_fn(variables, inputs):
+        flat_vars, treedef = jax.tree_util.tree_flatten(variables)
+        flat_spec, _ = jax.tree_util.tree_flatten(variable_spec)
+        flat_vars = [
+            label_sharding(v, s) for v, s in zip(flat_vars, flat_spec)
+        ]
+        variables = jax.tree_util.tree_unflatten(treedef, flat_vars)
+        params = variables.params
+        loss, grads = grad_fn(params, inputs)
+        variables = variables.apply_gradients(grads=grads)
+        return loss, variables
+
+    variable_shardings = jax.tree_map(lambda x: AUTO(mesh), variable_avals)
+
+    result_shape = jax.eval_shape(step_fn, variable_avals, batch)
+    out_shardings = jax.tree_map(lambda x: AUTO(mesh), result_shape)
+
+    if fully_shard_first_batch_dim:
+        first_axis_name = mesh.axis_names[0]
+        batch_shardings = jax.tree_map(
+            lambda x: NamedSharding(mesh, P(first_axis_name)), batch
+        )
+    else:
+        batch_shardings = jax.tree_map(lambda x: AUTO(mesh), batch)
+    batch_avals = jax.tree_map(
+        lambda x: jax.ShapeDtypeStruct(x.shape, dtype=x.dtype), batch
+    )
+
+    # pjit is required here so we get the global mesh context
+    compiled_step = (
+        pjit(
+            step_fn,
+            in_shardings=(variable_shardings, batch_shardings),
+            out_shardings=out_shardings,
+        )
+        .lower(variable_avals, batch_avals)
+        .compile()
+    )
+    variable_shardings, batch_shardings = compiled_step.input_shardings[0]
+
+    def make_sharded_array(host_array, sharding):
+        device_buffers = put_to_devices(host_array, mesh.local_devices)
+        return jax.make_array_from_single_device_arrays(
+            host_array.shape, sharding, device_buffers
+        )
+
+    def prepare_batch(replicated_batch_arrays):
+        return jax.tree_map(
+            make_sharded_array, replicated_batch_arrays, batch_shardings
+        )
+
+    init_fn = pjit(init_fn, out_shardings=variable_shardings)
+    init_variables = init_fn(random.key(42), batch)
+
+    return compiled_step, init_variables, prepare_batch, mesh
+
+
 mark_output = no_op(name="TaskEnd")
 mark_input = no_op(name="TaskStart")
+
+
+def shard_axes(*args):
+    import flax.linen as nn
+
+    return nn.with_partitioning(nn.initializers.xavier_normal(), args)
+
+
+@contextmanager
+def check_nested_task():
+    global _task_depth
+    current_depth = _task_depth
+    _task_depth += 1
+
+    yield current_depth
+
+    _task_depth -= 1
+
+
 @dataclass
 class Task:
+    mesh: Optional[Mesh] = None
     devices: np.ndarray | Sequence[xc.Device] | None = None
     device_axes: Optional[Sequence[str]] = None
-    logical_axes: Optional[Sequence[Tuple[str, str]]] = None    
+    logical_axes: Optional[Sequence[Tuple[str, str]]] = None
 
-def _get_wrapped_task(fxn, 
-                      name: str,
+
+def _get_wrapped_task(
+    fxn,
+    name: str,
+    *,
     out_shardings: Optional[Any] = None,
     devices: np.ndarray | Sequence[xc.Device] | None = None,
+    mesh: Optional[Mesh] = None,
     device_axes: Optional[Sequence[str]] = None,
-    logical_axes: Optional[Sequence[Tuple[str, str]]] = None):
+    logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
+):
+    if mesh is not None:
+        if devices is not None or device_axes is not None:
+            raise ValueError(
+                "cannot give both mesh and "
+                "devices/device_axes arguments to Legate task"
+            )
+        dims = mesh.shape
+        devices = mesh.devices
+        device_axes = mesh.axis_names
+        if logical_axes is None:
+            logical_axes = [(ax, ax) for ax in device_axes]
 
     if devices is None:
         devices = [d.id for d in jax.devices()]
@@ -126,75 +252,53 @@ def _get_wrapped_task(fxn,
         return json.dumps(args)
 
     def start_task(inp):
-        global _task_depth
         global _next_color
-        _task_depth += 1
-        # no nesting of tasks, only the outermost
-        # task is actually carved out
-        if _task_depth > 1:
-            return inp
 
         _next_color += 1
 
-
-        mark_input_fwd = partial(mark_input, config=_config_str("input", "fwd"))
+        mark_input_fwd = partial(
+            mark_input, config=_config_str("input", "fwd")
+        )
         result = _optimization_barrier(tree_map(mark_input_fwd, inp))
         if out_shardings is not None:
-            result = with_sharding_constraint(result, out_shardings)
+            result = jax.lax.with_sharding_constraint(result, out_shardings)
         return result
 
     def finish_task(inp):
-        global _task_depth
-        _task_depth -= 1
-        if _task_depth > 0:
-            # no nesting of tasks, only the outermost
-            # task is actually carved out
-            return inp
-
-        mark_output_fwd = partial(mark_output, config=_config_str("output", "fwd"))
+        mark_output_fwd = partial(
+            mark_output, config=_config_str("output", "fwd")
+        )
         return _optimization_barrier(tree_map(mark_output_fwd, inp))
 
     start = jax.custom_vjp(start_task)
     finish = jax.custom_vjp(finish_task)
 
     def args_task_barrier_fwd(inp):
-        global _task_depth
         global _next_color
-        _task_depth += 1
-        # no nesting of tasks, only the outermost
-        # task is actually carved out
-        if _task_depth > 1:
-            return inp, None
 
         _next_color += 1
-        mark_input_fwd = partial(mark_input, config=_config_str("input", "fwd"))
+        mark_input_fwd = partial(
+            mark_input, config=_config_str("input", "fwd")
+        )
         with jax.named_scope(f"args_{name}_forward"):
             result = _optimization_barrier(tree_map(mark_input_fwd, inp))
             if out_shardings is not None:
-                result = with_sharding_constraint(result, out_shardings)
+                result = jax.lax.with_sharding_constraint(
+                    result, out_shardings
+                )
             return result, None
 
     def args_task_barrier_bwd(_, g):
-        global _task_depth
-        _task_depth -= 1
-        if _task_depth > 0:
-            # no nesting of tasks, only the outermost
-            # task is actually carved out
-            return (g,)
-
-        mark_output_bwd = partial(mark_output, config=_config_str("output", "bwd"))
+        mark_output_bwd = partial(
+            mark_output, config=_config_str("output", "bwd")
+        )
         with jax.named_scope(f"args_{name}_backward"):
             return (_optimization_barrier(tree_map(mark_output_bwd, g)),)
 
     def result_task_barrier_fwd(inp):
-        global _task_depth
-        _task_depth -= 1
-        # no nesting of tasks, only the outermost
-        # task is actually carved out
-        if _task_depth > 1:
-            return inp, None
-
-        mark_output_fwd = partial(mark_output, config=_config_str("output", "fwd"))
+        mark_output_fwd = partial(
+            mark_output, config=_config_str("output", "fwd")
+        )
         with jax.named_scope(f"result_{name}_forward"):
             return (
                 _optimization_barrier(tree_map(mark_output_fwd, inp)),
@@ -202,17 +306,13 @@ def _get_wrapped_task(fxn,
             )
 
     def result_task_barrier_bwd(_, g):
-        global _task_depth
         global _next_color
-        _task_depth += 1
-        # no nesting of tasks, only the outermost
-        # task is actually carved out
-        if _task_depth > 1:
-            return (g,)
 
         _next_color += 1
 
-        mark_input_bwd = partial(mark_input, config=_config_str("input", "bwd"))
+        mark_input_bwd = partial(
+            mark_input, config=_config_str("input", "bwd")
+        )
         with jax.named_scope(f"result_{name}_backward"):
             return (_optimization_barrier(tree_map(mark_input_bwd, g)),)
 
@@ -221,22 +321,29 @@ def _get_wrapped_task(fxn,
 
     def wrapped(*args, **kwargs):
         with jax.named_scope(f"task:{name}"):
-            new_args = start(args)
-            res = fxn(*new_args, **kwargs)
-            return finish(res)
+            with check_nested_task() as depth:
+                if depth > 0:
+                    # for now only the outermost task matters
+                    return fxn(*args, **kwargs)
+
+                new_args = start(args)
+                res = fxn(*new_args, **kwargs)
+                return finish(res)
 
     return wrapped
 
+
 def task(
-    fxn,
+    fxn: Callable | Type,
     name: Optional[str] = None,
     *,
     counter=[0],
     out_shardings: Optional[Any] = None,
+    mesh: Optional[Mesh] = None,
     devices: np.ndarray | Sequence[xc.Device] | None = None,
     device_axes: Optional[Sequence[str]] = None,
     logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
-    configure: Optional[Callable[...,Task]] = None,
+    configure: Optional[Callable[..., Task]] = None,
     configure_args: Optional[Sequence[str]] = None,
 ):
     global _next_color
@@ -245,16 +352,50 @@ def task(
     if should_ignore_transforms():
         return fxn
 
+    if isinstance(fxn, type):
+        # we need to transform functions, not types, which means
+        # we neee to "defer" the transformation until this class is
+        # instantiated
+        class WrappedTask(fxn):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+
+            def __call__(self, *args, **kwargs):
+                parent_call = super().__call__
+                wrapped_call = task(
+                    parent_call,
+                    name,
+                    out_shardings=out_shardings,
+                    mesh=mesh,
+                    devices=devices,
+                    device_axes=device_axes,
+                    logical_axes=logical_axes,
+                    configure=configure,
+                    configure_args=configure_args,
+                )
+                return wrapped_call(*args, **kwargs)
+
+        return WrappedTask
+
     if name is None:
         name = f"{fxn.__name__}.{counter[0]}"
         counter[0] += 1
 
     if configure is not None:
-        if devices is not None or device_axes is not None or logical_axes is not None:
-            raise ValueError("cannot give both a configure type and devices/device_axes/logical_axees to legate.jax.task")
-        
+        if (
+            devices is not None
+            or device_axes is not None
+            or logical_axes is not None
+        ):
+            raise ValueError(
+                "cannot give both a configure type and devices/device_axes"
+                "/logical_axees to legate.jax.task"
+            )
+
         if out_shardings is not None:
-            raise ValueError("cannot give both a configure type and out_shardings to legate.jax.task")
+            raise ValueError(
+                "cannot give both configure and out_shardings to task"
+            )
 
         if configure_args:
             # we can't know all the arguments until the function is invoked
@@ -267,12 +408,17 @@ def task(
                         configure_kwargs[arg] = kwargs[arg]
 
                 task_config: Task = configure(**configure_kwargs)
-                devices = task_config.devices
-                device_axes = task_config.device_axes
-                logical_axes = task_config.logical_axes
 
-                return _get_wrapped_task(fxn, name, out_shardings, 
-                                         devices, device_axes, logical_axes)(*args, **kwargs)
+                return _get_wrapped_task(
+                    fxn,
+                    name,
+                    out_shardings=out_shardings,
+                    mesh=task_config.mesh,
+                    devices=task_config.devices,
+                    device_axes=task_config.device_axes,
+                    logical_axes=task_config.logical_axes,
+                )(*args, **kwargs)
+
             return wrapped
 
         task_config: Task = configure()
@@ -281,8 +427,14 @@ def task(
         logical_axes = task_config.logical_axes
 
     return _get_wrapped_task(
-        fxn, name, out_shardings, devices, device_axes, logical_axes)
-
+        fxn,
+        name,
+        mesh=mesh,
+        out_shardings=out_shardings,
+        devices=devices,
+        device_axes=device_axes,
+        logical_axes=logical_axes,
+    )
 
 
 def abstract_microbatch(x):
@@ -299,7 +451,6 @@ def microbatch(
     num_pipeline_stages: Optional[int] = None,
     distribute_first_layer: Optional[bool] = None,
     distribute_last_layer: Optional[bool] = None,
-
 ):
     if should_ignore_transforms():
         return fxn
@@ -327,7 +478,7 @@ def microbatch(
             unrolling=unrolling,
             num_pipeline_stages=num_pipeline_stages,
             distribute_first_layer=distribute_first_layer,
-            distribute_last_layer=distribute_last_layer
+            distribute_last_layer=distribute_last_layer,
         )
 
         mark_microbatch = no_op(

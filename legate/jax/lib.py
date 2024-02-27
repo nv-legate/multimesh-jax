@@ -197,6 +197,13 @@ def init(
     auto_shard: Optional[bool] = None,
     disable_gc: Optional[bool] = None,
     configurable: Optional[type] = None,
+    cpus: int = 4,
+    gpus: int = 0,
+    fbmem: int = 8000,
+    sysmem: int = 4000,
+    eager_alloc_percentage: int = 50,
+    debug: Optional[int] = None,
+    network: str = "none",
 ) -> None:
     if config is None:
         config = os.environ.get(_GIN_CONFIG_ENV)
@@ -208,6 +215,40 @@ def init(
     kwargs = optional_kwargs(
         auto_shard=auto_shard, disable_gc=disable_gc, configurable=configurable
     )
+
+    cpus = cpus or 4
+    gpus = gpus or 0
+
+    legion_args = [
+        "-lg:local",
+        0,
+        "-ll:cpu",
+        cpus,
+        "-ll:gpu",
+        gpus,
+        "-cuda:skipbusy",
+        "-ll:util",
+        2,
+        "-ll:csize",
+        sysmem,
+        "-ll:fsize",
+        fbmem,
+        "-ll:zsize",
+        32,
+        "-ll:networks",
+        network,
+        "-lg:eager_alloc_percentage",
+        eager_alloc_percentage,
+    ]
+    if debug is not None:
+        legion_args.append(f"-level legate.xla={debug}")
+    if network != "ucx":
+        legion_args.extend(["-ll:ib_rsize", "0"])
+    os.environ["LEGION_DEFAULT_ARGS"] = " ".join(map(str, legion_args))
+
+    xla_flags = os.environ.get("XLA_FLAGS", "")
+    xla_flags += f"  --xla_force_host_platform_device_count={cpus}"
+    os.environ["XLA_FLAGS"] = xla_flags
 
     client_config = ClientConfig(**kwargs)
     _init_config(client_config)
