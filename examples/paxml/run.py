@@ -40,6 +40,20 @@ legion.add_argument(
 )
 
 legion.add_argument(
+    "--sysmem",
+    type=int,
+    default=4,
+    help="The amount in GB of host memory to use",
+)
+
+legion.add_argument(
+    "--eager-sysmem",
+    type=int,
+    default=50,
+    help="The amount in GB of host memory to reserve for eager allocations",  # noqa: E501
+)
+
+legion.add_argument(
     "--eager-fbmem",
     type=int,
     default=50,
@@ -285,49 +299,10 @@ if args.dump:
 env["XLA_FLAGS"] = " ".join(xla_flags)
 
 
-eager_alloc_percentage = math.ceil(args.eager_fbmem / args.fbmem)
-
-legion_args = [
-    "-lg:local",
-    0,
-    "-ll:py",
-    0,
-    "-ll:cpu",
-    args.cpus,
-    "-ll:gpu",
-    args.gpus,
-    "-ll:util",
-    2,
-    "-ll:csize",
-    4000,
-    "-ll:fsize",
-    args.fbmem,
-    "-ll:zsize",
-    32,
-    "-ll:networks",
-    args.network,
-    "-ll:ib_rsize",
-    0,
-    "-lg:eager_alloc_percentage",
-    eager_alloc_percentage,
-    "-cuda:skipbusy",
-]
-
-
-if args.profile:
-    legion_args = legion_args + [
-        "-lg:prof",
-        1,
-        "-lg:prof_logfile",
-        f"{args.profile}_%s.gz",
-    ]
-
-if args.debug > 0:
-    legion_args.append("-level")
-    legion_args.append(f"-legate.xla={args.debug}")
-
-env["LEGION_DEFAULT_ARGS"] = " ".join(map(str, legion_args))
-print(env["LEGION_DEFAULT_ARGS"])
+if args.gpus == 0:
+    eager_alloc_percentage = math.ceil(args.eager_fbmem * 100 / args.fbmem)
+else:
+    eager_alloc_percentage = math.ceil(args.eager_sysmem * 100 / args.sysmem)
 
 num_nodes = args.nodes or 1
 total_parallelism = args.tp * args.pp * args.dp * args.fsdp
@@ -503,7 +478,17 @@ if args.hlo:
     configurable = LambadaConfig
 else:
     configurable = None
-legate.jax.init(configurable=configurable)
+legate.jax.init(
+    configurable=configurable,
+    cpus=args.cpus,
+    gpus=args.gpus,
+    sysmem=args.sysmem * 1000,
+    fbmem=args.fbmem * 1000,
+    eager_alloc_percentage=eager_alloc_percentage,
+    network=args.network,
+    debug=args.debug,
+    profile=args.profile,
+)
 
 argv = [
     "this",

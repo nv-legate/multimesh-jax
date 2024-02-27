@@ -204,6 +204,7 @@ def init(
     eager_alloc_percentage: int = 50,
     debug: Optional[int] = None,
     network: str = "none",
+    profile: Optional[str] = None,
 ) -> None:
     if config is None:
         config = os.environ.get(_GIN_CONFIG_ENV)
@@ -242,8 +243,17 @@ def init(
     ]
     if debug is not None:
         legion_args.append(f"-level legate.xla={debug}")
+    if profile is not None:
+        legion_args.extend[
+            "-lg:prof",
+            1,
+            "-lg:prof_logfile",
+            f"{profile}_%s.gz",
+        ]
+
     if network != "ucx":
         legion_args.extend(["-ll:ib_rsize", "0"])
+
     os.environ["LEGION_DEFAULT_ARGS"] = " ".join(map(str, legion_args))
 
     xla_flags = os.environ.get("XLA_FLAGS", "")

@@ -31,6 +31,7 @@ struct CompileConfig {
   TaskMemoryAllocator *allocator = nullptr;
   bool print_stats = false;
   bool erase_sharding = false;
+  std::optional<int64_t> device_mem;
 };
 
 struct DeviceConfig {
