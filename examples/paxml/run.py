@@ -523,6 +523,9 @@ argv = [
     "--alsologtostderr",
 ]
 
+if args.nodes > 1:
+    argv.append("--multiprocess_gpu")
+
 if args.optimizer == "adafactor":
     argv.append("--fdl.USE_ADAFACTOR=True")
 elif args.optimizer == "sgd":
