@@ -241,8 +241,10 @@ def init(
         "-lg:eager_alloc_percentage",
         eager_alloc_percentage,
     ]
-    if debug is not None:
-        legion_args.append(f"-level legate.xla={debug}")
+    if debug is not None and debug > 0:
+        # lower means more output from legate
+        # if any debug is active, set to active
+        legion_args.append("-level legate.xla=1")
     if profile is not None:
         legion_args.extend(
             [

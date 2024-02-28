@@ -523,7 +523,7 @@ argv = [
     "--alsologtostderr",
 ]
 
-if args.nodes > 1:
+if num_nodes > 1:
     argv.append("--multiprocess_gpu")
 
 if args.optimizer == "adafactor":
