@@ -244,12 +244,14 @@ def init(
     if debug is not None:
         legion_args.append(f"-level legate.xla={debug}")
     if profile is not None:
-        legion_args.extend[
-            "-lg:prof",
-            1,
-            "-lg:prof_logfile",
-            f"{profile}_%s.gz",
-        ]
+        legion_args.extend(
+            [
+                "-lg:prof",
+                1,
+                "-lg:prof_logfile",
+                f"{profile}_%s.gz",
+            ]
+        )
 
     if network != "ucx":
         legion_args.extend(["-ll:ib_rsize", "0"])

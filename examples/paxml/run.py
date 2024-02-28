@@ -49,14 +49,14 @@ legion.add_argument(
 legion.add_argument(
     "--eager-sysmem",
     type=int,
-    default=50,
+    default=None,
     help="The amount in GB of host memory to reserve for eager allocations",  # noqa: E501
 )
 
 legion.add_argument(
     "--eager-fbmem",
     type=int,
-    default=50,
+    default=None,
     help="The amount in GB of frame-buffer memory to reserve for eager allocations",  # noqa: E501
 )
 
@@ -300,9 +300,17 @@ env["XLA_FLAGS"] = " ".join(xla_flags)
 
 
 if args.gpus == 0:
-    eager_alloc_percentage = math.ceil(args.eager_fbmem * 100 / args.fbmem)
+    if args.eager_sysmem is None:
+        eager_alloc_percentage = 50
+    else:
+        eager_alloc_percentage = math.ceil(
+            args.eager_sysmem * 100 / args.sysmem
+        )
 else:
-    eager_alloc_percentage = math.ceil(args.eager_sysmem * 100 / args.sysmem)
+    if args.eager_fbmem is None:
+        eager_alloc_percentage = 50
+    else:
+        eager_alloc_percentage = math.ceil(args.eager_fbmem * 100 / args.fbmem)
 
 num_nodes = args.nodes or 1
 total_parallelism = args.tp * args.pp * args.dp * args.fsdp
@@ -316,7 +324,7 @@ if total_parallelism != total_devices:
         f"PP={args.pp} DP={args.dp} TP={args.tp} FSDP={args.fsdp} does not multiply to total no. of GPUS {total_devices}"  # noqa: E501
     )
 
-batch_size = args.microbatch_size or total_devices * 4
+batch_size = args.batch_size or total_devices * 4
 mb_size = args.microbatch_size or batch_size
 per_core_batch_size = batch_size // total_devices
 devices_per_stage = total_devices // args.pp
