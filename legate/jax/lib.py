@@ -258,7 +258,12 @@ def init(
     if network != "ucx":
         legion_args.extend(["-ll:ib_rsize", "0"])
 
-    os.environ["LEGION_DEFAULT_ARGS"] = " ".join(map(str, legion_args))
+    legion_args_str = (
+        os.environ.get("LEGION_DEFAULT_ARGS", "")
+        + " "
+        + " ".join(map(str, legion_args))
+    )
+    os.environ["LEGION_DEFAULT_ARGS"] = legion_args_str
 
     xla_flags = os.environ.get("XLA_FLAGS", "")
     xla_flags += f"  --xla_force_host_platform_device_count={cpus}"
