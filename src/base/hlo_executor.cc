@@ -196,6 +196,7 @@ BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
   }
 
   DeviceAssignment device_assignment({.local_device_id = cfg.local_device_id,
+                                      .global_device_id = cfg.my_device_id,
                                       .replica_count = exe->ReplicaCount(),
                                       .num_partitions = exe->NumPartitions()});
   uint32_t device_id = cfg.device_id_range.low;

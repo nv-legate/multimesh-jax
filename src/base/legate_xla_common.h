@@ -36,6 +36,7 @@ struct CompileConfig {
 
 struct DeviceConfig {
   int local_device_id = 0;
+  int global_device_id = 0;
   int replica_count = 1;
   int num_partitions = 1;
 };
@@ -44,6 +45,7 @@ class DeviceAssignment {
 public:
   explicit DeviceAssignment(const DeviceConfig &config)
       : local_device_id_(config.local_device_id),
+        global_device_id_(config.global_device_id),
         replica_count_(config.replica_count),
         num_partitions_(config.num_partitions),
         global_device_ids_(config.replica_count * config.num_partitions,
@@ -52,6 +54,8 @@ public:
   int &operator()(int replica, int partition) {
     return global_device_ids_[partition * replica_count_ + replica];
   }
+
+  int GlobalDeviceId() const { return global_device_id_; }
 
   int LocalDeviceId() const { return local_device_id_; }
 
@@ -65,6 +69,7 @@ public:
 
 private:
   int local_device_id_;
+  int global_device_id_;
   int replica_count_;
   int num_partitions_;
   std::vector<int> global_device_ids_;
