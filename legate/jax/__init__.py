@@ -9,6 +9,7 @@ from .legate_jax_impl import (
 )
 
 from .lib import (
+    enable_fast_path,
     init,
     ignore_transforms,
     with_sharding_constraint,

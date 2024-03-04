@@ -15,6 +15,7 @@ from jax.tree_util import tree_flatten, tree_unflatten
 from .legate_jax_impl import (
     clear_tasks,
     disable_implicit_tasks,
+    enable_fast_path as _enable_fast_path,
     enable_implicit_tasks,
     register_task,
     register_task_factory,
@@ -23,6 +24,8 @@ from .legate_jax_impl import (
 from .no_op import no_op
 
 _ignore_transforms = 0
+
+_fast_path_enabled = True
 
 _GIN_CONFIG_ENV = "LEGATE_GIN_CONFIG"
 
@@ -45,6 +48,22 @@ def ignore_transforms(ignore: bool = True):
             _ignore_transforms -= 1
             if _ignore_transforms == 0:
                 enable_implicit_tasks()
+
+
+@contextmanager
+def enable_fast_path(enable: bool = True):
+    global _fast_path_enabled
+
+    current = _fast_path_enabled
+    try:
+        if current != enable:
+            _enable_fast_path(enable)
+        _fast_path_enabled = enable
+        yield
+    finally:
+        if current != enable:
+            _enable_fast_path(not enable)
+        _fast_path_enabled = current
 
 
 def should_ignore_transforms() -> bool:
@@ -259,9 +278,9 @@ def init(
         legion_args.extend(["-ll:ib_rsize", "0"])
 
     legion_args_str = (
-        os.environ.get("LEGION_DEFAULT_ARGS", "")
+        " ".join(map(str, legion_args))
         + " "
-        + " ".join(map(str, legion_args))
+        + os.environ.get("LEGION_DEFAULT_ARGS", "")
     )
     os.environ["LEGION_DEFAULT_ARGS"] = legion_args_str
 

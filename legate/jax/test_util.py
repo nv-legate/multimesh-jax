@@ -13,6 +13,7 @@ class LegateJaxTestCase(jtu.JaxTestCase):
         arg_shardings=None,
         reference_shardings=None,
         donate_argnums=None,
+        enable_fast_path=False,
     ):
         device_kind = jax.devices()[0].device_kind
         reference_backend = "cpu" if device_kind == "cpu" else "cuda"
@@ -46,40 +47,41 @@ class LegateJaxTestCase(jtu.JaxTestCase):
         else:
             kwargs = dict(backend="legate")
 
-        args = jax.jit(arg_maker, **kwargs)()
-        if arg_shardings is not None:
-            kwargs = dict(in_shardings=arg_shardings)
-        else:
-            kwargs = dict(backend="legate")
+        with legate.jax.enable_fast_path(enable_fast_path):
+            args = jax.jit(arg_maker, **kwargs)()
+            if arg_shardings is not None:
+                kwargs = dict(in_shardings=arg_shardings)
+            else:
+                kwargs = dict(backend="legate")
 
-        legate_f = (
-            jax.jit(f, donate_argnums=donate_argnums, **kwargs)
-            .lower(*args)
-            .compile()
-        )
-        if arg_shardings is not None:
-
-            def compare_assert(arg, arg_sharding, f_sharding):
-                if arg_sharding is None:
-                    self.assertTrue(f_sharding.is_fully_replicated)
-                else:
-                    self.assertTrue(
-                        arg.sharding.is_equivalent_to(
-                            f_sharding, len(arg.shape)
-                        )
-                    )
-                    self.assertTrue(
-                        arg_sharding.is_equivalent_to(
-                            f_sharding, len(arg.shape)
-                        )
-                    )
-
-            tree_map(
-                compare_assert,
-                args,
-                arg_shardings,
-                legate_f.input_shardings[0],
+            legate_f = (
+                jax.jit(f, donate_argnums=donate_argnums, **kwargs)
+                .lower(*args)
+                .compile()
             )
+            if arg_shardings is not None:
 
-        legate_res = legate_f(*args)
+                def compare_assert(arg, arg_sharding, f_sharding):
+                    if arg_sharding is None:
+                        self.assertTrue(f_sharding.is_fully_replicated)
+                    else:
+                        self.assertTrue(
+                            arg.sharding.is_equivalent_to(
+                                f_sharding, len(arg.shape)
+                            )
+                        )
+                        self.assertTrue(
+                            arg_sharding.is_equivalent_to(
+                                f_sharding, len(arg.shape)
+                            )
+                        )
+
+                tree_map(
+                    compare_assert,
+                    args,
+                    arg_shardings,
+                    legate_f.input_shardings[0],
+                )
+
+            legate_res = legate_f(*args)
         self.assertAllClose(cuda_res, legate_res)

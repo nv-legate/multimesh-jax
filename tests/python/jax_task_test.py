@@ -50,7 +50,11 @@ class TaskTest(LegateJaxTestCase):
                 res = legate.jax.task(f)(res, arrs)
             return res
 
-        self._test_against_reference(jnp_fxn, args_maker)
+        # allow the fast path to be chosen as a test that it is NOT taken
+        # when a small module has Legate custom calls
+        self._test_against_reference(
+            jnp_fxn, args_maker, enable_fast_path=True
+        )
 
     def test_rematerialization(self):
         if jax.device_count() != 1:

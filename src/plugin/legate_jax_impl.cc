@@ -21,6 +21,10 @@ extern "C" void RegisterImplicitTaskWithFactory(
 
 extern "C" void UnregisterImplicitTask(std::string matcher);
 
+extern "C" void EnableFastPath();
+
+extern "C" void DisableFastPath();
+
 extern "C" void ClearImplicitTasks();
 
 namespace py = pybind11;
@@ -116,4 +120,14 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       py::arg("path"), py::arg("platform") = "gpu",
       py::arg("replica_count") = 1, py::arg("num_partitions") = 1,
       py::arg("erase_sharding") = false, py::arg("device_mem_gb") = 0);
+  m.def(
+      "enable_fast_path",
+      [](bool enable) {
+        if (enable) {
+          EnableFastPath();
+        } else {
+          DisableFastPath();
+        }
+      },
+      py::arg("enable"));
 }
