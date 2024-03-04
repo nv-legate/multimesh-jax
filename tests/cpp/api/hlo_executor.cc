@@ -36,13 +36,13 @@ public:
           fxn)
       : fxn_(fxn) {}
 
-  bool Execute(uint64_t run_id, const std::vector<BufferAllocation> &inputs,
-               const std::vector<BufferAllocation> &outputs,
-               TaskMemoryAllocator *allocator,
-               const DeviceAssignment &device_assignment,
-               bool cpu) const override {
+  std::optional<std::string>
+  Execute(uint64_t run_id, const std::vector<BufferAllocation> &inputs,
+          const std::vector<BufferAllocation> &outputs,
+          TaskMemoryAllocator *allocator,
+          const DeviceAssignment &device_assignment, bool cpu) const override {
     fxn_(inputs, outputs);
-    return true;
+    return std::nullopt;
   }
 
   std::pair<int, int> MachineSlice() const override { return {0, 1}; }

@@ -206,15 +206,11 @@ BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
     }
   }
 
-  bool success = false;
-  try {
-    success = exe->Execute(run_id, inputs, outputs, &allocator,
-                           device_assignment, cpu);
-  } catch (const std::exception &e) {
-    log_xla.error() << "Standard exception caught during 'Execute', message '"
-                    << e.what() << "'";
-  } catch (...) {
-    log_xla.error() << "Exception caught during 'Execute'";
+  auto error_message =
+      exe->Execute(run_id, inputs, outputs, &allocator, device_assignment, cpu);
+  if (error_message.has_value()) {
+    std::cerr << *error_message << std::endl;
+    throw std::runtime_error(*error_message);
   }
 
   if (!cpu && num_scalar_arguments > 0) {
@@ -224,14 +220,6 @@ BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
 
   log_xla.debug() << "Finish task " << exe->Name() << " for device "
                   << cfg.my_device_id;
-
-  // Check that the stream ran and finished correctly
-  if (!success) {
-    log_xla.error() << "[HLOExecutor] HLO failed!";
-#ifdef LEGATE_XLA_PYTHON_PROTOTYPE
-    LEGATE_ABORT;
-#endif
-  }
 }
 
 /*static*/ void HLOExecutorTask::cpu_variant(TaskContext context) {
