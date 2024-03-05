@@ -63,8 +63,6 @@ rapids_cpm_init(OVERRIDE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json)
 
 enable_testing()
 
-option(LegateXLA_HLO_RUNNER OFF
-       "Whether to build the HLO runner instead of the plugin client")
 option(LegateXLA_ENABLE_CUDA ON "Whether to build with CUDA")
 
 option(LegateXLA_ASAN OFF "Whether to build with address saniziter")
@@ -88,7 +86,7 @@ rapids_cmake_install_lib_dir(lib_dir)
 
 if (SKBUILD)
   include(legate_xla_python.cmake)
-elseif(NOT LegateXLA_HLO_RUNNER AND LegateXLA_ENABLE_TESTS)
+elseif(LegateXLA_ENABLE_TESTS)
   add_subdirectory(tests/cpp)
 endif()
 

@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-from setuptools import find_namespace_packages, find_packages
+from setuptools import find_namespace_packages
 from skbuild import setup
 
 import versioneer
@@ -23,7 +23,7 @@ import versioneer
 setup(
     name="Legate JAX",
     version=versioneer.get_version(),
-    description="Legate Prototype for Large Language Models",
+    description="Legate-Jax MPMD execution plugin",
     url="TBD",
     author="NVIDIA Corporation",
     license="Closed source",
@@ -33,11 +33,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
     ],
-    packages=find_packages(
-        where=".",
-        include=["lllm*"],
-    )
-    + find_namespace_packages(include=["jax_plugins.*", "legate.*"]),
+    packages=find_namespace_packages(include=["jax_plugins.*", "legate.*"]),
     include_package_data=True,
     package_data={
         "legate.jax": ["*.so"],

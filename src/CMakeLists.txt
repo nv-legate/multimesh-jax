@@ -1,9 +1,5 @@
 
 add_subdirectory(base)
+add_subdirectory(runtime)
+add_subdirectory(plugin)
 
-if (LegateXLA_HLO_RUNNER)
-  add_subdirectory(hlo_runner)
-else()
-  add_subdirectory(runtime)
-  add_subdirectory(plugin)
-endif()

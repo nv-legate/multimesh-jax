@@ -27,10 +27,6 @@ target_include_directories(legate_xla_base PUBLIC $<BUILD_INTERFACE:${CMAKE_CURR
 target_link_libraries(legate_xla_base PUBLIC legate::core)
 add_library(legate::xla_base ALIAS legate_xla_base)
 
-if (LegateXLA_HLO_RUNNER)
-  target_compile_definitions(legate_xla_base PRIVATE LegateXLA_HLO_RUNNER)
-endif()
-
 include(CPack)
 include(GNUInstallDirs)
 rapids_cmake_install_lib_dir(lib_dir)

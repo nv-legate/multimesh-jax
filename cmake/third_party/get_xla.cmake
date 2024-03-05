@@ -22,11 +22,7 @@ function(find_or_configure_xla)
         DOWNLOAD_ONLY
   )
 
-  if (LegateXLA_HLO_RUNNER)
-    set(xla_library_name liblegate_hlo_prototype.so)
-  else()
-    set(xla_library_name liblegate_xla_client.so)
-  endif()
+  set(xla_library_name liblegate_xla_client.so)
 
   set(xla_library "${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${xla_library_name}")
 

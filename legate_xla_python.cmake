@@ -30,13 +30,8 @@ execute_process(
 
 set(libpath "")
 
-if (LegateXLA_HLO_RUNNER)
-  set(pyroot lllm)
-  set(libname liblegate_hlo_runner)
-else()
-  set(pyroot jax_plugins/legate)
-  set(libname liblegate_plugin)
-endif()
+set(pyroot jax_plugins/legate)
+set(libname liblegate_plugin)
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/install_info.py.in"
@@ -70,15 +65,12 @@ Imported Targets:
 
 ]=])
 
-set(code_string "set(LegateXLA_HLO_RUNNER ${LegateXLA_HLO_RUNNER})")
-
 rapids_export(
   INSTALL xla_python
   EXPORT_SET legate-xla-python-exports
   GLOBAL_TARGETS xla_python
   NAMESPACE legate::
-  DOCUMENTATION doc_string
-  FINAL_CODE_BLOCK code_string)
+  DOCUMENTATION doc_string)
 
 # build export targets
 rapids_export(
@@ -86,5 +78,4 @@ rapids_export(
   EXPORT_SET legate-xla-python-exports
   GLOBAL_TARGETS xla_python
   NAMESPACE legate::
-  DOCUMENTATION doc_string
-  FINAL_CODE_BLOCK code_string)
+  DOCUMENTATION doc_string)

@@ -50,7 +50,7 @@ void StoreBufferAction(const std::vector<BufferAction *> &actions,
                        const StoreHandle &store,
                        BufferActionConfig config = {});
 
-void SetScalar(legate_xla::StoreHandle handle, size_t launch_size,
+void SetScalar(legate_xla::StoreHandle store, size_t launch_size,
                int32_t scalar);
 
 void Synchronize(const StoreHandle &store);
