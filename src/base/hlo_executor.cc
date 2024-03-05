@@ -72,13 +72,13 @@ struct get_write_only_buffer_fn {
   auto exe = compiler->MakeExecutable();
   uint64_t run_id = context.scalars()[ScalarRunId].value<int64_t>();
 
-  log_xla.debug() << "HLOExecutorTask start " << exe->Name();
+  log_xla.info() << "HLOExecutorTask: start " << exe->Name();
 
   auto *callbacks = context.scalars()[ScalarCallbacks]
                         .value<std::vector<std::function<void()>> *>();
 
   run_executable(context, exe.get(), run_id, ScalarNumScalarArgs, cpu);
-  log_xla.debug() << "HLOExecutorTask run_executable done";
+  log_xla.info() << "HLOExecutorTask: finish " << exe->Name();
 
   if (false) { // callbacks->size() > 0) {
     log_xla.debug() << "Running total of " << callbacks->size() << " callbacks";
@@ -96,8 +96,6 @@ struct get_write_only_buffer_fn {
   }
   // delete callbacks;
   Release(compiler_hold, context.machine().processor_range().per_node_count);
-
-  log_xla.debug() << "HLOExecutorTask callbacks done";
 }
 
 template <class Variant, int Index = 0>

@@ -221,7 +221,7 @@ def init(
     fbmem: int = 8000,
     sysmem: int = 4000,
     eager_alloc_percentage: int = 50,
-    debug: Optional[int] = None,
+    debug: Optional[str] = None,
     network: str = "none",
     profile: Optional[str] = None,
 ) -> None:
@@ -260,10 +260,18 @@ def init(
         "-lg:eager_alloc_percentage",
         eager_alloc_percentage,
     ]
-    if debug is not None and debug > 0:
+    if debug is not None:
+        debug_levels = {
+            "info": 2,
+            "debug": 1,
+            "spew": 0,
+        }
+        level = debug_levels[debug]
+
         # lower means more output from legate
         # if any debug is active, set to active
-        legion_args.append("-level legate.xla=1")
+        legion_args.append(f"-level legate.xla={level}")
+
     if profile is not None:
         legion_args.extend(
             [

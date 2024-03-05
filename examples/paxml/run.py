@@ -85,10 +85,18 @@ legate_jax = parser.add_argument_group("Legate-Jax")
 
 legate_jax.add_argument(
     "--debug",
-    type=int,
-    default=0,
-    help="The debug level. Higher is more verbose output",
+    type=str,
+    default=None,
+    choices=["info", "debug", "spew"],
+    help="The debug level",
 )
+
+xla_debug_levels = {
+    None: 0,
+    "info": 1,
+    "debug": 3,
+    "spew": 5,
+}
 
 legate_jax.add_argument(
     "--pp",
@@ -254,13 +262,15 @@ if args.dump_only:
     args.fsdp = 1
     args.nodes = 1
 
-vmodule_str = ",".join([f"{root}={args.debug}" for root in vmodule])
+xla_debug = xla_debug_levels[args.debug]
+
+vmodule_str = ",".join([f"{root}={xla_debug}" for root in vmodule])
 LD_LIBRARY_PATH = os.environ.get("LD_LIBRARY_PATH", "")
 env = dict(
     VOCAB_PATH=args.vocab_path,
     JAX_PLATFORMS="legate",
     TF_CPP_MIN_LOG_LEVEL=0,
-    TF_CPP_MAX_LOG_LEVEL=args.debug,
+    TF_CPP_MAX_LOG_LEVEL=xla_debug,
     TF_CPP_VMODULE=vmodule_str,
     JAX_TRACEBACK_FILTERING="off",
     XLA_PYTHON_CLIENT_PREALLOCATE="false",
