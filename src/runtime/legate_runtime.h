@@ -42,12 +42,10 @@ public:
   static Runtime *get_runtime();
   static void initialize(legate::Runtime *core_runtime,
                          legate::Library library);
-  static bool synchronous_mode();
   static std::mutex &get_mutex();
 
 private:
   static Runtime *runtime_;
-  static bool synchronous_mode_;
   static std::mutex mutex_;
 
 private:

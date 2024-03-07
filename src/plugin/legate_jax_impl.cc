@@ -27,6 +27,10 @@ extern "C" void DisableFastPath();
 
 extern "C" void ClearImplicitTasks();
 
+extern "C" void EnableLegateTracing();
+
+extern "C" void DisableLegateTracing();
+
 namespace py = pybind11;
 
 extern "C" void LegateShutdown();
@@ -127,6 +131,16 @@ PYBIND11_MODULE(legate_jax_impl, m) {
           EnableFastPath();
         } else {
           DisableFastPath();
+        }
+      },
+      py::arg("enable"));
+  m.def(
+      "enable_tracing",
+      [](bool enable) {
+        if (enable) {
+          EnableLegateTracing();
+        } else {
+          DisableLegateTracing();
         }
       },
       py::arg("enable"));

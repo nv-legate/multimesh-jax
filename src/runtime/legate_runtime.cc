@@ -24,8 +24,6 @@ namespace legate_xla {
 
 /*static*/ Runtime *Runtime::runtime_ = nullptr;
 
-/*static*/ bool Runtime::synchronous_mode_ = false;
-
 /*static*/ std::mutex Runtime::mutex_ = std::mutex();
 
 Runtime::Runtime(legate::Runtime *core_runtime, legate::Library context)
@@ -58,22 +56,12 @@ void Runtime::issue_execution_fence(bool block) {
 
 /*static*/ Runtime *Runtime::get_runtime() { return runtime_; }
 
-/*static*/ bool Runtime::synchronous_mode() { return synchronous_mode_; }
-
 /*static*/ std::mutex &Runtime::get_mutex() { return mutex_; }
 
 /*static*/ void Runtime::initialize(legate::Runtime *core_runtime,
                                     legate::Library library) {
   if (nullptr == runtime_)
     runtime_ = new Runtime(core_runtime, library);
-
-  char *env_str = getenv("LEGATE_XLA_SYNCHRONOUS_MODE");
-  if (env_str && std::atoi(env_str) > 0) {
-    log_xla.warning()
-        << "Task synchronization is enabled via 'LEGATE_XLA_SYNCHRONOUS_MODE'. "
-           "This should not be a production run.";
-    synchronous_mode_ = true;
-  }
 }
 
 } // namespace legate_xla

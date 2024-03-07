@@ -204,6 +204,7 @@ struct StoreHandleImpl;
 
 struct StoreHandle {
   std::shared_ptr<StoreHandleImpl> impl;
+  int64_t unique_id{-1};
   bool attached{false};
   ~StoreHandle();
 };

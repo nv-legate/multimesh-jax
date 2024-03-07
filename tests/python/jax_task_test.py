@@ -184,6 +184,63 @@ class TaskTest(LegateJaxTestCase):
             arg_shardings=(sharding, sharding),
         )
 
+    def test_traced_tasks(self):
+        if jax.device_count() != 2:
+            self.skipTest("need 2 devices")
+
+        sharding = PositionalSharding(jax.devices()).reshape(2, 1)
+
+        def step(params):
+            def c(params):
+                x, y = params
+
+                def f(x):
+                    return x * x
+
+                f = legate.jax.task(f)
+
+                def g(x, y):
+                    return (x + (y * y)).sum()
+
+                g = legate.jax.task(g)
+
+                x = f(x)
+                return g(x, y)
+
+            c = jax.value_and_grad(c)
+            loss, grads = c(params)
+            params = jax.tree_map(
+                lambda x, grad: x - 0.1 * grad, params, grads
+            )
+            return loss, params
+
+        step = jax.jit(
+            step,
+            in_shardings=((sharding, sharding),),
+            out_shardings=(None, (sharding, sharding)),
+            donate_argnums=(0,),
+        )
+
+        def arg_maker():
+            x = self.make_shape(4, 4)
+            y = self.make_shape(4, 4)
+            return x, y
+
+        params = jax.jit(arg_maker, out_shardings=(sharding, sharding))()
+
+        # run multiple iterations to cause tracing
+        # iteration 0: establish stores
+        # iteration 1: create trace
+        # iteration 2: replay trace
+        for i in range(3):
+            expected_params = jax.tree_map(lambda x: x - 0.2 * x, params)
+            x = params[0]
+            expected_loss = 2 * (x * x).sum()
+            with legate.jax.enable_tracing(True):
+                loss, params = step(params)
+            self.assertAllClose(expected_loss, loss)
+            self.assertAllClose(expected_params, params)
+
     def test_mesh_class_transform(self):
         if jax.device_count() != 8:
             self.skipTest("need 4 devices")

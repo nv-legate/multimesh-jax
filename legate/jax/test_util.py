@@ -1,3 +1,5 @@
+from typing import Any, Optional, Sequence
+
 import jax
 import jax._src.test_util as jtu
 from jax.tree_util import tree_map
@@ -10,10 +12,10 @@ class LegateJaxTestCase(jtu.JaxTestCase):
         self,
         f,
         arg_maker,
-        arg_shardings=None,
-        reference_shardings=None,
-        donate_argnums=None,
-        enable_fast_path=False,
+        arg_shardings: Optional[Sequence[Any]] = None,
+        reference_shardings: Optional[Sequence[Any]] = None,
+        donate_argnums: Optional[Sequence[int]] = None,
+        enable_fast_path: bool = False,
     ):
         device_kind = jax.devices()[0].device_kind
         reference_backend = "cpu" if device_kind == "cpu" else "cuda"

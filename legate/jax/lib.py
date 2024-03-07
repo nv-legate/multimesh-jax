@@ -17,6 +17,7 @@ from .legate_jax_impl import (
     disable_implicit_tasks,
     enable_fast_path as _enable_fast_path,
     enable_implicit_tasks,
+    enable_tracing as _enable_tracing,
     register_task,
     register_task_factory,
     unregister_task,
@@ -26,6 +27,8 @@ from .no_op import no_op
 _ignore_transforms = 0
 
 _fast_path_enabled = True
+
+_tracing_enabled = False
 
 _GIN_CONFIG_ENV = "LEGATE_GIN_CONFIG"
 
@@ -64,6 +67,22 @@ def enable_fast_path(enable: bool = True):
         if current != enable:
             _enable_fast_path(not enable)
         _fast_path_enabled = current
+
+
+@contextmanager
+def enable_tracing(enable: bool = True):
+    global _tracing_enabled
+
+    current = _tracing_enabled
+    try:
+        if current != enable:
+            _enable_tracing(enable)
+        _tracing_enabled = enable
+        yield
+    finally:
+        if current != enable:
+            _enable_tracing(not enable)
+        _tracing_enabled = current
 
 
 def should_ignore_transforms() -> bool:

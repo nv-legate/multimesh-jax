@@ -120,6 +120,13 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
+    "--enable-tracing",
+    action="store_true",
+    default=False,
+    help="Whether to enable Legion tracing for the training step",
+)
+
+legate_jax.add_argument(
     "--dp",
     type=int,
     default=1,
@@ -245,6 +252,7 @@ vmodule = [
     "legate_computation",
     "legate_pjrt_client",
     "legate_pjrt_executable",
+    "mpmd_input_output_buffer_alias",
     "loop_schedule",
     "legate_ifrt_client",
 ]
@@ -474,8 +482,9 @@ ClientConfig:
   auto_shard = True
   disable_gc = True
 
-AutoShardingClientConfig:
+PaxLegateConfig:
   configurable = @LambadaConfig
+  enable_tracing = {args.enable_tracing}
 
 LambadaConfig:
   num_devices = {total_devices}

@@ -9,6 +9,7 @@
 #include <core/data/external_allocation.h>
 #include <core/data/logical_store.h>
 #include <core/data/scalar.h>
+#include <core/experimental/trace.h>
 #include <core/mapping/mapping.h>
 #include <core/task/task.h>
 #include <core/type/type_info.h>
@@ -47,6 +48,13 @@ size_t LaunchSize(const Shape &shape, size_t default_size) {
     }
   }
   return size;
+}
+
+static bool _enable_discard{true};
+
+static int64_t NextStoreId() {
+  static std::atomic<int64_t> next_id{0};
+  return next_id.fetch_add(int64_t(1));
 }
 
 template <class... Ts> struct scalar_types : Ts... {
@@ -254,7 +262,7 @@ size_t ShapeNumElements(Shape shape) {
 void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler_hold) {
   auto *compiler = compiler_hold->get();
   LOCK;
-  legate::ProvenanceTracker provenance(compiler->Name());
+
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
   auto machine = core_runtime->get_machine();
@@ -263,7 +271,8 @@ void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler_hold) {
                   << " scheduling on slice [" << start << "," << stop << ")";
   size_t launch_size = compiler->LaunchSize();
 
-  legate::MachineTracker tracker(machine.slice(start, stop));
+  auto scope =
+      legate::Scope(compiler->Name()).with_machine(machine.slice(start, stop));
   if ((stop - start) < launch_size) {
     std::stringstream sstr;
     sstr << "Not enough devices to run launch size " << launch_size
@@ -286,110 +295,101 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
                        std::vector<std::function<void()>> *on_done) {
-  {
-    auto *compiler = compiler_hold->get();
-    auto [start, stop] = compiler->MachineSlice();
+  auto *compiler = compiler_hold->get();
+  auto [start, stop] = compiler->MachineSlice();
 
-    size_t launch_size = compiler->LaunchSize();
-    legate::Shape flattened({launch_size});
+  size_t launch_size = compiler->LaunchSize();
+  legate::Shape flattened({launch_size});
 
-    LOCK;
-    auto runtime = legate_xla::Runtime::get_runtime();
-    auto core_runtime = legate::Runtime::get_runtime();
-    auto machine = core_runtime->get_machine();
+  LOCK;
+  auto runtime = legate_xla::Runtime::get_runtime();
+  auto core_runtime = legate::Runtime::get_runtime();
+  auto machine = core_runtime->get_machine();
 
-    legate::ProvenanceTracker provenance(compiler->Name());
-    legate::MachineTracker tracker(machine.slice(start, stop));
-    log_xla.debug() << "CreateExecuteTask " << compiler->Name()
-                    << " for launch on slice [" << start << "," << stop << ")";
-    if (log_xla.want_debug()) {
-      size_t input_idx = 0;
-      for (const auto &input : inputs) {
-        log_xla.debug() << compiler->Name() << " has input " << input_idx++
-                        << ", name=" << input.impl->name()
-                        << " with shape=" << input.impl->shape()
-                        << ", store=" << input.impl.get()
-                        << ", partitioned=" << std::boolalpha
-                        << input.impl->HasPartition();
-      }
-      for (const auto &output : outputs) {
-        log_xla.debug() << compiler->Name() << " has output "
-                        << output.impl->name() << " with shape "
-                        << output.impl->shape()
-                        << ", store=" << output.impl.get()
-                        << ", partitioned=" << std::boolalpha
-                        << output.impl->HasPartition();
-      }
-    }
-    if ((stop - start) < launch_size) {
-      std::stringstream sstr;
-      sstr << "Not enough devices to run launch shape " << launch_size
-           << " on task " << compiler->Name() << std::endl;
-      throw std::runtime_error(sstr.str());
-    }
-    auto task = runtime->create_task(XlaOpCode::XLA_EXECUTE_TASK, flattened);
-
-    task.add_scalar_arg(
-        legate::Scalar(reinterpret_cast<uint64_t>(compiler_hold)));
-    task.add_scalar_arg(legate::Scalar(GetRunId()));
-
-    task.add_scalar_arg(
-        legate::Scalar(reinterpret_cast<uint64_t>(std::move(on_done))));
-
-    task.add_scalar_arg(uint64_t(scalars.size()));
-    for (const auto &scalar : scalars) {
-      task.add_scalar_arg(scalar.parameter_number);
-      task.add_scalar_arg((int64_t)scalar.value.index());
-      std::visit(scalar_types{[&](auto value) { task.add_scalar_arg(value); }},
-                 scalar.value);
-    }
-
-    auto check_replication_error = [=](const StoreHandle &store) {
-      if (store.impl->HasPartition() && store.impl->shape().replicated > 1) {
-        size_t tensor_launch_size =
-            store.impl->shape().replicated * store.impl->shape().num_tiles;
-        if (tensor_launch_size < launch_size) {
-          // if this was created with a manual replication smaller than the
-          // launch size then not all partitions will be satisfied
-          std::stringstream sstr;
-          sstr << "replicated tensor " << store.impl->name()
-               << " cannot change replication from launch size "
-               << tensor_launch_size << " to " << launch_size;
-          throw std::runtime_error(sstr.str());
-        }
-      }
-    };
-
+  auto scope =
+      legate::Scope(compiler->Name()).with_machine(machine.slice(start, stop));
+  log_xla.debug() << "CreateExecuteTask " << compiler->Name()
+                  << " for launch on slice [" << start << "," << stop << ")";
+  if (log_xla.want_debug()) {
+    size_t input_idx = 0;
     for (const auto &input : inputs) {
-      check_replication_error(input);
-
-      if (input.impl->HasPartition()) {
-        task.add_input(input.impl->partition());
-      } else {
-        task.add_input(input.impl->store());
-      }
+      log_xla.debug() << compiler->Name() << " has input " << input_idx++
+                      << ", name=" << input.impl->name()
+                      << " with shape=" << input.impl->shape()
+                      << ", store=" << input.impl.get()
+                      << ", partitioned=" << std::boolalpha
+                      << input.impl->HasPartition();
     }
-
     for (const auto &output : outputs) {
-      check_replication_error(output);
-
-      if (output.impl->HasPartition()) {
-        task.add_output(output.impl->partition());
-      } else {
-        task.add_output(output.impl->store());
-      }
-    }
-    if (launch_size > 1) {
-      task.set_concurrent(true);
-    }
-    runtime->submit(std::move(task));
-  }
-
-  if (legate_xla::Runtime::synchronous_mode()) {
-    for (const auto &output : outputs) {
-      Synchronize(output);
+      log_xla.debug() << compiler->Name() << " has output "
+                      << output.impl->name() << " with shape "
+                      << output.impl->shape() << ", store=" << output.impl.get()
+                      << ", partitioned=" << std::boolalpha
+                      << output.impl->HasPartition();
     }
   }
+  if ((stop - start) < launch_size) {
+    std::stringstream sstr;
+    sstr << "Not enough devices to run launch shape " << launch_size
+         << " on task " << compiler->Name() << std::endl;
+    throw std::runtime_error(sstr.str());
+  }
+  auto task = runtime->create_task(XlaOpCode::XLA_EXECUTE_TASK, flattened);
+
+  task.add_scalar_arg(
+      legate::Scalar(reinterpret_cast<uint64_t>(compiler_hold)));
+  task.add_scalar_arg(legate::Scalar(GetRunId()));
+
+  task.add_scalar_arg(
+      legate::Scalar(reinterpret_cast<uint64_t>(std::move(on_done))));
+
+  task.add_scalar_arg(uint64_t(scalars.size()));
+  for (const auto &scalar : scalars) {
+    task.add_scalar_arg(scalar.parameter_number);
+    task.add_scalar_arg((int64_t)scalar.value.index());
+    std::visit(scalar_types{[&](auto value) { task.add_scalar_arg(value); }},
+               scalar.value);
+  }
+
+  auto check_replication_error = [=](const StoreHandle &store) {
+    if (store.impl->HasPartition() && store.impl->shape().replicated > 1) {
+      size_t tensor_launch_size =
+          store.impl->shape().replicated * store.impl->shape().num_tiles;
+      if (tensor_launch_size < launch_size) {
+        // if this was created with a manual replication smaller than the
+        // launch size then not all partitions will be satisfied
+        std::stringstream sstr;
+        sstr << "replicated tensor " << store.impl->name()
+             << " cannot change replication from launch size "
+             << tensor_launch_size << " to " << launch_size;
+        throw std::runtime_error(sstr.str());
+      }
+    }
+  };
+
+  for (const auto &input : inputs) {
+    check_replication_error(input);
+
+    if (input.impl->HasPartition()) {
+      task.add_input(input.impl->partition());
+    } else {
+      task.add_input(input.impl->store());
+    }
+  }
+
+  for (const auto &output : outputs) {
+    check_replication_error(output);
+
+    if (output.impl->HasPartition()) {
+      task.add_output(output.impl->partition());
+    } else {
+      task.add_output(output.impl->store());
+    }
+  }
+  if (launch_size > 1) {
+    task.set_concurrent(true);
+  }
+  runtime->submit(std::move(task));
 }
 
 void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
@@ -460,7 +460,7 @@ void StoreBufferAction(const std::vector<BufferAction *> &actions,
 
   log_xla.debug() << "legate_xla::StoreBufferAction: sliced onto [" << start
                   << "," << stop << ")";
-  legate::MachineTracker tracker{machine.slice(start, stop)};
+  legate::Scope tracker{machine.slice(start, stop)};
 
   TaskWaiter waiter(num_local_devices);
   task.add_scalar_arg(config.blocking);
@@ -498,7 +498,7 @@ void SliceLocalShards(const StoreHandle &handle,
   auto core_runtime = legate::Runtime::get_runtime();
   auto machine = core_runtime->get_machine();
 
-  std::optional<legate::MachineTracker> tracker;
+  std::optional<legate::Scope> tracker;
   size_t launch_size = local_shards.size();
   if (IsMultiProcess(machine)) {
     launch_size =
@@ -540,7 +540,8 @@ void SliceLocalShards(const StoreHandle &handle,
 
 StoreHandle AssembleShards(const legate_xla::Shape &logical_shape,
                            const std::vector<legate_xla::Shard> &local_shards,
-                           std::pair<int64_t, int64_t> slice) {
+                           std::pair<int64_t, int64_t> slice,
+                           std::optional<StoreHandle> existing_store) {
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
 #if 0
@@ -569,14 +570,19 @@ StoreHandle AssembleShards(const legate_xla::Shape &logical_shape,
       .attached = true,
   };
 #else
-  auto store = CreateStore(logical_shape, "assembled");
+  auto store = [&] {
+    if (existing_store.has_value()) {
+      return *std::move(existing_store);
+    }
+    return CreateStore(logical_shape, "assembled");
+  }();
   auto [start, stop] = slice;
   log_xla.debug() << "AssembleShards: assembling " << local_shards.size()
                   << " local shards " << store.impl.get() << " on slice=["
                   << start << "," << stop << ")";
   uint64_t launch_size = stop - start;
   auto machine = core_runtime->get_machine();
-  legate::MachineTracker tracker(machine.slice(start, stop));
+  legate::Scope scope(machine.slice(start, stop));
   auto task =
       runtime->create_task(XlaOpCode::XLA_SHARD_ASSEMBLE_TASK, {launch_size});
 
@@ -623,7 +629,7 @@ StoreHandle Reshard(const StoreHandle &handle,
     new_impl->SetPartition(
         new_impl->store().partition_by_tiling(legate_tile_shape));
 
-    return StoreHandle{.impl = std::move(new_impl)};
+    return StoreHandle{.impl = std::move(new_impl), .unique_id = NextStoreId()};
   }
   // just return back the original handle, no resharding
   return handle;
@@ -651,6 +657,18 @@ std::set<int> GetLocalDevices(int my_node) {
   return gpus;
 }
 
+void BeginTrace(uint32_t trace_id) {
+  log_xla.debug() << "Starting trace " << trace_id;
+  legate::experimental::begin_trace(trace_id);
+  _enable_discard = false;
+}
+
+void EndTrace(uint32_t trace_id) {
+  log_xla.debug() << "Finishing trace " << trace_id;
+  legate::experimental::end_trace(trace_id);
+  _enable_discard = true;
+}
+
 StoreHandle CreateStore(const legate_xla::Shape &shape,
                         std::optional<std::string> name) {
   legate::Type::Code code = SupportedTypeToLegateType(shape.type);
@@ -660,7 +678,7 @@ StoreHandle CreateStore(const legate_xla::Shape &shape,
   auto global_size = range.high - range.low;
 
   auto store_shape = ComputeStoreShape(shape, global_size);
-  bool is_scalar = false;
+  bool is_scalar = store_shape.dims.size() == 1 && store_shape.dims[0] == 1;
 
   LOCK;
   std::string store_name = name.has_value() ? *name : "anonymous";
@@ -668,8 +686,9 @@ StoreHandle CreateStore(const legate_xla::Shape &shape,
       .impl = std::make_shared<StoreHandleImpl>(
           core_runtime->create_store(
               legate::Shape({store_shape.dims.begin(), store_shape.dims.end()}),
-              legate::primitive_type(code), is_scalar),
-          shape, std::move(store_name))};
+              legate::primitive_type(code), /*optimize_scalar=*/false),
+          shape, std::move(store_name)),
+      .unique_id = NextStoreId()};
 
   log_xla.debug() << "CreateStore " << result.impl.get()
                   << ", name=" << result.impl->name() << ", logical=" << shape
@@ -678,10 +697,6 @@ StoreHandle CreateStore(const legate_xla::Shape &shape,
   if (store_shape.tile_shape.has_value()) {
     result.impl->SetPartition(result.impl->store().partition_by_tiling(
         {store_shape.tile_shape->begin(), store_shape.tile_shape->end()}));
-  }
-
-  if (legate_xla::Runtime::synchronous_mode()) {
-    Synchronize(result);
   }
 
   return result;

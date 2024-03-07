@@ -33,9 +33,10 @@ struct Shard {
   size_t size;
 };
 
-StoreHandle AssembleShards(const legate_xla::Shape &shape,
-                           const std::vector<Shard> &shards,
-                           std::pair<int64_t, int64_t> slice);
+StoreHandle
+AssembleShards(const legate_xla::Shape &shape, const std::vector<Shard> &shards,
+               std::pair<int64_t, int64_t> slice,
+               std::optional<StoreHandle> existing_store = std::nullopt);
 
 std::set<int> GetLocalDevices(int my_node);
 
@@ -49,6 +50,10 @@ struct BufferActionConfig {
 void StoreBufferAction(const std::vector<BufferAction *> &actions,
                        const StoreHandle &store,
                        BufferActionConfig config = {});
+
+void BeginTrace(uint32_t id);
+
+void EndTrace(uint32_t id);
 
 void SetScalar(legate_xla::StoreHandle store, size_t launch_size,
                int32_t scalar);
