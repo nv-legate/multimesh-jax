@@ -659,13 +659,13 @@ std::set<int> GetLocalDevices(int my_node) {
 
 void BeginTrace(uint32_t trace_id) {
   log_xla.debug() << "Starting trace " << trace_id;
-  legate::experimental::begin_trace(trace_id);
+  legate::experimental::Trace::begin_trace(trace_id);
   _enable_discard = false;
 }
 
 void EndTrace(uint32_t trace_id) {
   log_xla.debug() << "Finishing trace " << trace_id;
-  legate::experimental::end_trace(trace_id);
+  legate::experimental::Trace::end_trace(trace_id);
   _enable_discard = true;
 }
 
