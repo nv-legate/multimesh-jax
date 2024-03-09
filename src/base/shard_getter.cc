@@ -18,6 +18,7 @@
 #include "allocator.h"
 #include "executable_cache.h"
 #include "legate_to_xla.h"
+#include "legate_xla_common.h"
 #include "task_utils.h"
 #include <condition_variable>
 #include <core/data/logical_store.h>
@@ -51,7 +52,7 @@ struct get_read_only_ptr {
   // shard 0 might be on device 4
   int32_t shard_id = std::min(cfg.task_id, cfg.local_device_id);
 
-  auto *waiter = reinterpret_cast<TaskWaiter *>(
+  auto *waiter = reinterpret_cast<TaskFuture *>(
       context.scalar(ScalarTaskWaiter).value<uint64_t>());
 
   int64_t store_id = context.scalar(ScalarStoreId).value<uint64_t>();

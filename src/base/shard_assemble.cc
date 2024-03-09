@@ -51,7 +51,7 @@ struct get_write_ptr {
   log_xla.debug() << "ShardAssembleTask " << cfg.task_id << " start for "
                   << num_shards << " shards";
 
-  auto *waiter = reinterpret_cast<TaskWaiter *>(
+  auto *waiter = reinterpret_cast<TaskFuture *>(
       context.scalar(ScalarTaskWaiter).value<uint64_t>());
 
   if (cfg.local_device_id < num_shards) {

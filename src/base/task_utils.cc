@@ -1,4 +1,5 @@
 #include "task_utils.h"
+#include "legate_xla_common.h"
 
 using namespace legate;
 
@@ -24,27 +25,6 @@ TaskConfig get_task_config(const TaskContext &context) {
       .my_node =
           (device_id_range.low + task_id) / device_id_range.per_node_count,
   };
-}
-
-void TaskWaiter::Wait() {
-  log_xla.debug() << "TaskWaiter::Signal: waiting on " << this;
-  std::unique_lock lk(m_);
-  cv_.wait(lk, [&] { return ready_; });
-}
-
-int64_t TaskWaiter::Signal() {
-  int64_t remainining = num_pending_.fetch_add(int64_t(-1));
-  log_xla.debug() << "TaskWaiter::Signal: signaling " << this << " with "
-                  << remainining << " pending";
-  if (remainining == 1) {
-    // off by one, 1 means this was the last one to run
-    {
-      std::lock_guard lk(m_);
-      ready_ = true;
-    }
-    cv_.notify_one();
-  }
-  return remainining - 1;
 }
 
 } // namespace legate_xla

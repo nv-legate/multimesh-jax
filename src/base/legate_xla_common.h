@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -77,7 +78,7 @@ private:
 
 class LegateExecutable {
 public:
-  virtual ~LegateExecutable() {}
+  virtual ~LegateExecutable() = default;
   /**
   * @brief
   *
@@ -205,8 +206,28 @@ struct StoreHandleImpl;
 struct StoreHandle {
   std::shared_ptr<StoreHandleImpl> impl;
   int64_t unique_id{-1};
-  bool attached{false};
   ~StoreHandle();
+};
+
+class TaskFuture {
+public:
+  explicit TaskFuture(int64_t num_tasks)
+      : ready_(false), num_pending_{num_tasks} {}
+
+  void Wait();
+
+  int64_t Signal();
+
+private:
+  bool ready_;
+  std::atomic<int64_t> num_pending_;
+  std::condition_variable cv_;
+  std::mutex m_;
+};
+
+struct StoreFuture {
+  std::unique_ptr<TaskFuture> future{nullptr};
+  legate_xla::StoreHandle store;
 };
 
 std::ostream &operator<<(std::ostream &os, const Shape &shape);

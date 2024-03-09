@@ -74,7 +74,7 @@ struct get_read_only_ptr {
   }
 };
 
-Shape ComputeStoreShape(const Shape &shape, size_t global_size) {
+Shape ComputeStoreShape(const Shape &shape) {
   int64_t dim_product = 1;
   for (auto dim : shape.dims) {
     dim_product *= dim;
@@ -249,6 +249,31 @@ size_t SupportedTypeSizeOf(SupportedType type) {
   return bytesize;
 }
 
+void TaskFuture::Wait() {
+  int64_t num_pending = num_pending_.load();
+  if (num_pending == 0) {
+    return;
+  }
+  log_xla.debug() << "TaskWaiter::Signal: waiting on " << this;
+  std::unique_lock lk(m_);
+  cv_.wait(lk, [&] { return ready_; });
+}
+
+int64_t TaskFuture::Signal() {
+  int64_t remainining = num_pending_.fetch_add(int64_t(-1));
+  log_xla.debug() << "TaskWaiter::Signal: signaling " << this << " with "
+                  << remainining << " pending";
+  if (remainining == 1) {
+    // off by one, 1 means this was the last one to run
+    {
+      std::lock_guard lk(m_);
+      ready_ = true;
+    }
+    cv_.notify_one();
+  }
+  return remainining - 1;
+}
+
 size_t ShapeNumElements(Shape shape) {
   if (shape.dims.empty()) {
     // this is a scalar
@@ -411,7 +436,7 @@ void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
   task.add_scalar_arg(reinterpret_cast<uint64_t>(src));
   task.add_scalar_arg(static_cast<uint64_t>(size));
 
-  TaskWaiter waiter(num_local_devices);
+  TaskFuture waiter(num_local_devices);
   task.add_scalar_arg(reinterpret_cast<uint64_t>(&waiter));
 
   runtime->submit(std::move(task));
@@ -420,11 +445,7 @@ void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
 
 void Destroy(StoreHandle &store) {
   LOCK;
-  if (store.attached) {
-    log_xla.debug() << "Detaching " << store.impl->name()
-                    << ", store=" << store.impl.get();
-    store.impl->store().detach();
-  }
+
   log_xla.debug() << "Destroy array " << store.impl->name()
                   << ", store=" << store.impl.get();
   // no need to synchronize -- just removing the reference
@@ -462,7 +483,7 @@ void StoreBufferAction(const std::vector<BufferAction *> &actions,
                   << "," << stop << ")";
   legate::Scope tracker{machine.slice(start, stop)};
 
-  TaskWaiter waiter(num_local_devices);
+  TaskFuture waiter(num_local_devices);
   task.add_scalar_arg(config.blocking);
   task.add_scalar_arg(reinterpret_cast<uint64_t>(&waiter));
   task.add_scalar_arg(num_local_devices);
@@ -521,7 +542,7 @@ void SliceLocalShards(const StoreHandle &handle,
   auto task =
       runtime->create_task(XlaOpCode::XLA_SHARD_GETTER_TASK, {launch_size});
 
-  TaskWaiter waiter{int64_t(local_shards.size())};
+  TaskFuture waiter{int64_t(local_shards.size())};
   task.add_scalar_arg(reinterpret_cast<uint64_t>(local_shards.data()));
   task.add_scalar_arg(int64_t(local_shards.size()));
   task.add_scalar_arg(reinterpret_cast<uint64_t>(&waiter));
@@ -538,7 +559,7 @@ void SliceLocalShards(const StoreHandle &handle,
   waiter.Wait();
 }
 
-StoreHandle AssembleShards(const legate_xla::Shape &logical_shape,
+StoreFuture AssembleShards(const legate_xla::Shape &logical_shape,
                            const std::vector<legate_xla::Shard> &local_shards,
                            std::pair<int64_t, int64_t> slice,
                            std::optional<StoreHandle> existing_store) {
@@ -548,34 +569,35 @@ StoreHandle AssembleShards(const legate_xla::Shape &logical_shape,
   LOCK;
   auto shape = ComputeStoreShape(logical_shape);
 
-  std::vector<std::pair<legate::ExternalAllocation, legate::Shape>> allocs;
+
+  std::vector<std::pair<legate::ExternalAllocation, legate::tuple<uint64_t>>> allocs;
   allocs.reserve(local_shards.size());
   for (const auto &shard : local_shards) {
+    legate::tuple<uint64_t> shape_index({shard.shape_index.begin(), shard.shape_index.end()});
     auto alloc = legate::ExternalAllocation::create_fbmem(
-        shard.local_device_id, uintptr_t(shard.data), shard.size);
-    allocs.emplace_back(std::move(alloc), legate::Shape(shard.shape_index));
+        shard.local_device_id, shard.data, shard.size);
+    allocs.emplace_back(std::move(alloc), std::move(shape_index));
   }
 
-  auto legate_shape = legate::Shape{shape.dims};
+  auto legate_shape = legate::Shape{{shape.dims.begin(), shape.dims.end()}};
   auto type = legate::primitive_type(SupportedTypeToLegateType(shape.type));
+  legate::tuple<uint64_t> tile_shape{ {shape.tile_shape->begin(), shape.tile_shape->end()} };
   auto legate_store = core_runtime->create_store(
-      legate_shape, legate::Shape(shape.tile_shape), type, allocs);
+      legate_shape, std::move(tile_shape), type, allocs);
 
   StoreHandle store{
       .impl = std::make_shared<StoreHandleImpl>(
-          StoreHandleImpl{.store = std::move(legate_store.first),
-                          .shape = shape,
-                          .partition = std::move(legate_store.second),
-                          .name = "dev_assembled"}),
-      .attached = true,
-  };
+          StoreHandleImpl{std::move(legate_store.first), std::move(shape), "dev_assemble"})};
+                
+  store.impl->AttachPartition(std::move(legate_store.second));
 #else
   auto store = [&] {
     if (existing_store.has_value()) {
       return *std::move(existing_store);
     }
-    return CreateStore(logical_shape, "assembled");
+    return CreateStore(logical_shape);
   }();
+
   auto [start, stop] = slice;
   log_xla.debug() << "AssembleShards: assembling " << local_shards.size()
                   << " local shards " << store.impl.get() << " on slice=["
@@ -587,8 +609,8 @@ StoreHandle AssembleShards(const legate_xla::Shape &logical_shape,
       runtime->create_task(XlaOpCode::XLA_SHARD_ASSEMBLE_TASK, {launch_size});
 
   task.add_scalar_arg(int64_t(local_shards.size()));
-  TaskWaiter waiter{int64_t(local_shards.size())};
-  task.add_scalar_arg(reinterpret_cast<uint64_t>(&waiter));
+  auto future = std::make_unique<TaskFuture>(int64_t(local_shards.size()));
+  task.add_scalar_arg(reinterpret_cast<uint64_t>(future.get()));
   for (const auto &shard : local_shards) {
     task.add_scalar_arg(reinterpret_cast<int64_t>(shard.data));
   }
@@ -600,9 +622,8 @@ StoreHandle AssembleShards(const legate_xla::Shape &logical_shape,
     task.add_output(store.impl->store());
   }
   runtime->submit(std::move(task));
-  waiter.Wait();
+  return StoreFuture{.future = std::move(future), .store = std::move(store)};
 #endif
-  return store;
 }
 
 StoreHandle Reshard(const StoreHandle &handle,
@@ -615,7 +636,7 @@ StoreHandle Reshard(const StoreHandle &handle,
 
     const auto &range = core_runtime->get_machine().processor_range();
     auto global_size = range.high - range.low;
-    Shape store_shape = ComputeStoreShape(new_shape, global_size);
+    Shape store_shape = ComputeStoreShape(new_shape);
     auto new_impl = std::make_shared<StoreHandleImpl>(
         handle.impl->store(), std::move(new_shape), handle.impl->name());
 
@@ -677,7 +698,7 @@ StoreHandle CreateStore(const legate_xla::Shape &shape,
   const auto &range = core_runtime->get_machine().processor_range();
   auto global_size = range.high - range.low;
 
-  auto store_shape = ComputeStoreShape(shape, global_size);
+  auto store_shape = ComputeStoreShape(shape);
   bool is_scalar = store_shape.dims.size() == 1 && store_shape.dims[0] == 1;
 
   LOCK;

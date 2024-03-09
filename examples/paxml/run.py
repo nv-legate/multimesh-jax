@@ -253,6 +253,7 @@ vmodule = [
     "legate_pjrt_client",
     "legate_pjrt_executable",
     "mpmd_input_output_buffer_alias",
+    "legate_store_cache",
     "loop_schedule",
     "legate_ifrt_client",
 ]

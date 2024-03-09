@@ -103,10 +103,11 @@ void test_legate_shape(legate_xla::Shape shape) {
                                        .size = shard_size});
   }
 
-  auto store = legate_xla::AssembleShards(shape, shards, {0, num_shards});
+  auto future = legate_xla::AssembleShards(shape, shards, {0, num_shards});
+  future.future->Wait();
 
   std::vector<void *> device_slices(num_shards);
-  legate_xla::SliceLocalShards(store, device_slices, {0, num_shards});
+  legate_xla::SliceLocalShards(future.store, device_slices, {0, num_shards});
 
   std::vector<std::vector<int32_t>> slices;
   slices.reserve(num_shards);

@@ -57,7 +57,7 @@ XLACopyDeviceToDevice::gpu_variant(legate::TaskContext context) {
   log_xla.debug() << "CopyDeviceToDevice from " << src << " -> "
                   << output_buffer.buffer << " of size " << src_size;
 
-  TaskWaiter *waiter = reinterpret_cast<TaskWaiter *>(
+  TaskFuture *waiter = reinterpret_cast<TaskFuture *>(
       context.scalar(ScalarTaskWaiter).value<uint64_t>());
 
   if (src_size != 0) {
@@ -108,7 +108,7 @@ void XLAStoreBufferActionTask::run_task(legate::TaskContext context) {
   action->Act(output_alloc.buffer, cfg.local_device_id);
   bool blocking = context.scalar(ScalarIsBlocking).value<bool>();
   if (blocking) {
-    TaskWaiter *waiter = reinterpret_cast<TaskWaiter *>(
+    TaskFuture *waiter = reinterpret_cast<TaskFuture *>(
         context.scalar(ScalarTaskWaiter).value<uint64_t>());
     log_xla.debug() << "XLAStoreBufferActionTask: cleared on "
                     << cfg.my_device_id;

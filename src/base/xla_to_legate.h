@@ -33,8 +33,9 @@ struct Shard {
   size_t size;
 };
 
-StoreHandle
-AssembleShards(const legate_xla::Shape &shape, const std::vector<Shard> &shards,
+StoreFuture
+AssembleShards(const legate_xla::Shape &logical_shape,
+               const std::vector<legate_xla::Shard> &local_shards,
                std::pair<int64_t, int64_t> slice,
                std::optional<StoreHandle> existing_store = std::nullopt);
 
