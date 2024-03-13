@@ -196,6 +196,8 @@ struct Shape {
   size_t num_tiles{1};
 };
 
+bool operator==(const Shape &lhs, const Shape &rhs);
+
 struct Tile {
   std::vector<int64_t> origin;
   std::vector<int64_t> dims;

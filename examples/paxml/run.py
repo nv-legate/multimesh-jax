@@ -84,6 +84,14 @@ legion.add_argument(
 legate_jax = parser.add_argument_group("Legate-Jax")
 
 legate_jax.add_argument(
+    "--backend",
+    type=str,
+    choices=["cuda", "legate", "cpu"],
+    help="The JAX backend to use",
+    default="legate",
+)
+
+legate_jax.add_argument(
     "--debug",
     type=str,
     default=None,
@@ -137,12 +145,12 @@ legate_jax.add_argument(
     "--interleave",
     type=int,
     default=1,
-    help="The debug level. Higher is more verbose output",
+    help="The amount of interleaving (circular scheduling)",
 )
 
 legate_jax.add_argument(
     "--distribute-embeddings",
-    type=bool,
+    action="store_true",
     default=False,
     help="Whether to distribute embeddings computation across all GPUs or include in Layer 0",  # noqa: E501
 )
@@ -221,6 +229,18 @@ paxml.add_argument(
 )
 
 paxml.add_argument(
+    "--remat",
+    type=str,
+    default="save_transformer_layer_output",
+    choices=[
+        "save_transformer_layer_output",
+        "save_dot_with_no_batch_dims",
+        "save_qkv_out_proj",
+        "save_dot_only",
+    ],
+)
+
+paxml.add_argument(
     "--num-layers",
     type=int,
     default=8,
@@ -270,6 +290,10 @@ if args.dump_only:
     args.dp = 1
     args.fsdp = 1
     args.nodes = 1
+    if args.batch_size is None:
+        raise ValueError(
+            "must give explicit --batch-size when using --dump-only"
+        )
 
 xla_debug = xla_debug_levels[args.debug]
 
@@ -277,15 +301,16 @@ vmodule_str = ",".join([f"{root}={xla_debug}" for root in vmodule])
 LD_LIBRARY_PATH = os.environ.get("LD_LIBRARY_PATH", "")
 env = dict(
     VOCAB_PATH=args.vocab_path,
-    JAX_PLATFORMS="legate",
+    JAX_PLATFORMS=args.backend,
     TF_CPP_MIN_LOG_LEVEL=0,
     TF_CPP_MAX_LOG_LEVEL=xla_debug,
     TF_CPP_VMODULE=vmodule_str,
     JAX_TRACEBACK_FILTERING="off",
-    XLA_PYTHON_CLIENT_PREALLOCATE="false",
     JAX_COMPILER_DETAILED_LOGGING_MIN_OPS=0,
     LD_LIBRARY_PATH=f"{LD_LIBRARY_PATH}:/usr/local/cuda/lib64",
 )
+if args.backend == "legate":
+    env["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
 xla_flags = [
     "--xla_gpu_enable_latency_hiding_scheduler=true",
@@ -356,9 +381,11 @@ layers_per_interleave = args.num_layers // args.interleave
 if args.distribute_embeddings:
     logits_num_devices = total_devices
     embeddings_num_devices = total_devices
+    emb_seq_axis = "y"
 else:
     logits_num_devices = transformer_num_devices
     embeddings_num_devices = transformer_num_devices
+    emb_seq_axis = None
 
 if batch_size % total_devices:
     raise ValueError(
@@ -391,6 +418,28 @@ class LambadaConfig:
 
         layer_regex = re.compile(r"layers_(\d+)")
 
+        transformer_axes = [
+            ("replica", "x"),
+            ("mdl", "x"),
+            ("data", "y"),
+        ]
+
+        embeddings_axes = [
+            ("replica", "x"),
+            ("mdl", "x"),
+            ("mdl", "y"),
+        ]
+        if emb_seq_axis is not None:
+            embeddings_axes.append(("seq", emb_seq_axis))
+            replica_num_devices = self.transformer_num_devices
+            seq_num_devices = (
+                self.embeddings_num_devices // self.transformer_num_devices
+            )
+        else:
+            seq_num_devices = 1
+            replica_num_devices = self.embeddings_num_devices
+        embeddings_axes.append(("data", "y"))
+
         def compute_devices(name: str):
             layer = int(layer_regex.search(name).groups()[0])
             if self.layers_per_interleave is not None:
@@ -406,71 +455,47 @@ class LambadaConfig:
             device_callback=compute_devices,
             dims=[self.transformer_num_devices, 1],
             device_axes=["x", "y"],
-            logical_axes=[
-                ("replica", "x"),
-                ("mdl", "x"),
-                ("data", "y"),
-            ],
+            logical_axes=transformer_axes,
         )
 
         register_task(
             "(emb_lookup).*",
             devices=devices[: self.embeddings_num_devices],
-            dims=[self.embeddings_num_devices, 1],
+            dims=[replica_num_devices, seq_num_devices],
             device_axes=["x", "y"],
-            logical_axes=[
-                ("replica", "x"),
-                ("mdl", "x"),
-                ("data", "y"),
-            ],
+            logical_axes=embeddings_axes,
         )
 
         register_task(
             "(position_emb).*",
             devices=devices[: self.embeddings_num_devices],
-            dims=[self.embeddings_num_devices, 1],
+            dims=[replica_num_devices, seq_num_devices],
             device_axes=["x", "y"],
-            logical_axes=[
-                ("replica", "x"),
-                ("mdl", "x"),
-                ("data", "y"),
-            ],
+            logical_axes=embeddings_axes,
         )
 
         register_task(
             "(final_ln).*",
             devices=devices[-self.logits_num_devices :],
-            dims=[self.logits_num_devices, 1],
+            dims=[replica_num_devices, seq_num_devices],
             device_axes=["x", "y"],
-            logical_axes=[
-                ("replica", "x"),
-                ("mdl", "x"),
-                ("data", "y"),
-            ],
+            logical_axes=embeddings_axes,
         )
 
         register_task(
             "(compute_loss).*",
             devices=devices[-self.logits_num_devices :],
-            dims=[self.logits_num_devices, 1],
+            dims=[replica_num_devices, seq_num_devices],
             device_axes=["x", "y"],
-            logical_axes=[
-                ("replica", "x"),
-                ("mdl", "x"),
-                ("data", "y"),
-            ],
+            logical_axes=embeddings_axes,
         )
 
         register_task(
             "default",
             devices=devices[: self.embeddings_num_devices],
-            dims=[self.embeddings_num_devices, 1],
+            dims=[replica_num_devices, seq_num_devices],
             device_axes=["x", "y"],
-            logical_axes=[
-                ("replica", "x"),
-                ("mdl", "x"),
-                ("data", "y"),
-            ],
+            logical_axes=embeddings_axes,
         )
 
 
@@ -506,21 +531,22 @@ if args.hlo:
     configurable = LambadaConfig
 else:
     configurable = None
-legate.jax.init(
-    configurable=configurable,
-    cpus=args.cpus,
-    gpus=args.gpus,
-    sysmem=args.sysmem * 1000,
-    fbmem=args.fbmem * 1000,
-    eager_alloc_percentage=eager_alloc_percentage,
-    network=args.network,
-    debug=args.debug,
-    profile=args.profile,
-)
+
+if args.backend == "legate":
+    legate.jax.init(
+        configurable=configurable,
+        cpus=args.cpus,
+        gpus=args.gpus,
+        sysmem=args.sysmem * 1000,
+        fbmem=args.fbmem * 1000,
+        eager_alloc_percentage=eager_alloc_percentage,
+        network=args.network,
+        debug=args.debug,
+        profile=args.profile,
+    )
 
 argv = [
     "this",
-    "--enable_auto_sharding",
     "--job_log_dir=logs",
     f"--fdl.NUM_LAYERS={args.num_layers}",
     f"--fdl.NUM_HEADS={args.num_heads}",
@@ -531,17 +557,26 @@ argv = [
     f"--fdl.FPROP_DTYPE='{args.precision}'",
     "--fdl.LAMBADA_TRAIN=True",
     "--fdl.REMAT=True",
-    '--fdl.CHECKPOINT_POLICY="save_transformer_layer_output"',
+    f'--fdl.CHECKPOINT_POLICY="{args.remat}"',
     f"--fdl.SUMMARY_INTERVAL_STEPS={args.num_steps}",
     f"--fdl.MAX_STEPS={args.num_steps}",
     "--fdl.EVAL_INTERVAL_STEPS=0",
-    f"--fdl.ICI_MESH_SHAPE=[1,{total_devices},1]",
-    "--fdl.DCN_MESH_SHAPE=[1,1,1]",
     f"--fdl.PERCORE_BATCH_SIZE={per_core_batch_size}",
     "--tfds_data_dir=datasets",
     "--mode=train",
     "--alsologtostderr",
 ]
+if args.backend == "legate":
+    argv.append("-enable_auto_sharding")
+    argv.append(f"--fdl.ICI_MESH_SHAPE=[1,{total_devices},1]")
+    argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1]")
+else:
+    if args.pp > 1:
+        raise ValueError(
+            "cannot configure pipeline parallelism through native CUDA backend"
+        )
+    argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1]")
+    argv.append(f"--fdl.ICI_MESH_SHAPE=[{args.dp},{args.fsdp},{args.tp}]")
 
 if num_nodes > 1:
     argv.append("--multiprocess_gpu")
@@ -563,7 +598,7 @@ if args.hlo is None:
             path = Path(args.dump)
             if path.exists():
                 globber = (
-                    path / "*pjit_autoshard_step*before_optimizations.txt"
+                    path / "*pjit_autoshard_step*before_optimizations.hlo.pb"
                 )
                 matches = glob.glob(str(globber))
                 if matches:

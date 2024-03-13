@@ -15,7 +15,11 @@ from jax.experimental.pjit import AUTO, pjit
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from jax.tree_util import tree_map
 
-from .lib import optional_kwargs, should_ignore_transforms
+from .lib import (
+    optional_kwargs,
+    should_ignore_transforms,
+    with_sharding_constraint,
+)
 from .no_op import no_op
 
 _next_color = 0
@@ -447,6 +451,8 @@ def microbatch(
     size: int,
     argnum: int = 0,
     interleave: int = 1,
+    arg_shardings: Optional[Any] = None,
+    microbatch_shardings: Optional[Any] = None,
     unrolling: Optional[int] = None,
     num_pipeline_stages: Optional[int] = None,
     distribute_first_layer: Optional[bool] = None,
@@ -494,15 +500,32 @@ def microbatch(
             config=json.dumps(json_args),
         )
 
-        def slice_microbatch(x, offset: int):
+        if arg_shardings is None or isinstance(arg_shardings, P):
+            pre_slice_shardings = jax.tree_map(lambda a: arg_shardings, x)
+        else:
+            pre_slice_shardings = arg_shardings
+
+        if microbatch_shardings is None or isinstance(microbatch_shardings, P):
+            post_slice_shardings = jax.tree_map(
+                lambda a: microbatch_shardings, x
+            )
+        else:
+            post_slice_shardings = microbatch_shardings
+
+        def slice_microbatch(x, offset: int, arg_pspec: P, slice_pspec: P):
             offsets = [0] * len(x.shape)
             offsets[dim] = offset
             sizes = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
-            return mark_microbatch_slice(
-                jax.lax.dynamic_slice(x, offsets, sizes)
-            )
+            if arg_pspec is not None:
+                x = with_sharding_constraint(x, arg_pspec)
+            x = jax.lax.dynamic_slice(x, offsets, sizes)
+            if slice_pspec is not None:
+                x = with_sharding_constraint(x, slice_pspec)
+            return mark_microbatch_slice(x)
 
-        abstract_slices = tree_map(lambda a: slice_microbatch(a, 0), x)
+        abstract_slices = tree_map(
+            lambda a: slice_microbatch(a, 0, None, None), x
+        )
 
         new_args = args[:argnum] + (abstract_slices,) + args[argnum + 1 :]
         result_shapes = jax.eval_shape(fxn, *new_args, **kwargs)
@@ -517,7 +540,14 @@ def microbatch(
         def body_fun(_, loop_args):
             (offset, prev_args) = loop_args
 
-            slices = tree_map(lambda a: slice_microbatch(a, offset), x)
+            slices = tree_map(
+                lambda a, arg_pspec, slice_pspec: slice_microbatch(
+                    a, offset, arg_pspec, slice_pspec
+                ),
+                x,
+                pre_slice_shardings,
+                post_slice_shardings,
+            )
 
             # prep the offsets for the next loop
             offset += size

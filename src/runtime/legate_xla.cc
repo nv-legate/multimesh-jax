@@ -124,6 +124,17 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &vec) {
 
 } // namespace
 
+bool operator==(const Shape &lhs, const Shape &rhs) {
+  bool global_match = lhs.type == rhs.type && lhs.dims == rhs.dims &&
+                      lhs.replicated == rhs.replicated &&
+                      lhs.tile_shape.has_value() == rhs.tile_shape.has_value();
+  if (!global_match) {
+    return false;
+  }
+
+  return *lhs.tile_shape == *rhs.tile_shape;
+}
+
 struct StoreHandleImpl {
 
   StoreHandleImpl(legate::LogicalStore store, Shape shape, std::string name)
@@ -147,10 +158,27 @@ struct StoreHandleImpl {
 
   std::string name() const { return name_; }
 
+  std::shared_ptr<StoreHandleImpl>
+  FindResharding(const Shape &resharded_shape) {
+    for (auto &&resharding : reshardings_) {
+      if (resharding->shape() == resharded_shape) {
+        return resharding;
+      }
+    }
+    return nullptr;
+  }
+
+  void AddResharding(std::shared_ptr<StoreHandleImpl> impl) {
+    log_xla.debug() << "store " << name_ << ", shape=" << shape_
+                    << " adding reshard " << impl->shape();
+    reshardings_.push_back(std::move(impl));
+  }
+
 private:
   legate::LogicalStore store_;
   Shape shape_;
   std::optional<legate::LogicalStorePartition> partition_;
+  std::vector<std::shared_ptr<StoreHandleImpl>> reshardings_;
   std::string name_;
 };
 
@@ -630,8 +658,20 @@ StoreHandle Reshard(const StoreHandle &handle,
                     const std::vector<int64_t> &tile_shape) {
   if (!handle.impl->shape().tile_shape.has_value() ||
       tile_shape != *handle.impl->shape().tile_shape) {
+
     Shape new_shape = handle.impl->shape();
     new_shape.tile_shape = tile_shape;
+    auto resharding = handle.impl->FindResharding(new_shape);
+    if (resharding) {
+      log_xla.debug() << "Reshard reusing " << handle.impl.get()
+                      << ", name=" << handle.impl->name()
+                      << ", prev=" << handle.impl->shape()
+                      << ", new=" << resharding->shape()
+                      << ", store=" << resharding.get();
+      return StoreHandle{.impl = std::move(resharding),
+                         .unique_id = handle.unique_id};
+    }
+
     auto core_runtime = legate::Runtime::get_runtime();
 
     const auto &range = core_runtime->get_machine().processor_range();
@@ -650,7 +690,10 @@ StoreHandle Reshard(const StoreHandle &handle,
     new_impl->SetPartition(
         new_impl->store().partition_by_tiling(legate_tile_shape));
 
-    return StoreHandle{.impl = std::move(new_impl), .unique_id = NextStoreId()};
+    handle.impl->AddResharding(new_impl);
+
+    return StoreHandle{.impl = std::move(new_impl),
+                       .unique_id = handle.unique_id};
   }
   // just return back the original handle, no resharding
   return handle;
