@@ -11,13 +11,17 @@
 #include <core/data/scalar.h>
 #include <core/experimental/trace.h>
 #include <core/mapping/mapping.h>
+#include <core/runtime/runtime.h>
 #include <core/task/task.h>
 #include <core/type/type_info.h>
 #include <numeric>
 #include <optional>
+#include <stdexcept>
+#include <timing/timing.h>
 #include <tuple>
 #include <type_traits>
 #include <unistd.h>
+#include <unordered_map>
 #include <utility>
 
 #include "legate_runtime.h"
@@ -51,6 +55,20 @@ size_t LaunchSize(const Shape &shape, size_t default_size) {
 }
 
 static bool _enable_discard{true};
+
+static std::unordered_map<std::string, legate::timing::Time> started_timers;
+static std::unordered_map<std::string,
+                          std::pair<legate::timing::Time, legate::timing::Time>>
+    timers_to_flush;
+
+void PrintTimer(
+    const std::string &name,
+    const std::pair<legate::timing::Time, legate::timing::Time> &timer_pair) {
+  auto &&[start, stop] = timer_pair;
+  auto delta_micros = stop.value() - start.value();
+  double delta_s = delta_micros / 1e6;
+  log_xla.info() << name << " finished in " << delta_s;
+}
 
 static int64_t NextStoreId() {
   static std::atomic<int64_t> next_id{0};
@@ -733,6 +751,39 @@ void EndTrace(uint32_t trace_id) {
   _enable_discard = true;
 }
 
+void StartTimer(const std::string &name) {
+  auto iter = started_timers.find(name);
+
+  // behavior of this call is that a timer already
+  // started is a no-op, keep the original timer
+  if (iter != started_timers.end()) {
+    return;
+  }
+
+  legate::Runtime::get_runtime()->issue_execution_fence();
+  started_timers[name] = legate::timing::measure_microseconds();
+}
+
+void StopTimer(const std::string &name) {
+  auto iter = started_timers.find(name);
+  if (iter == started_timers.end()) {
+    throw std::runtime_error("cannot stop timer " + name +
+                             ", timer was never started");
+  }
+
+  auto to_flush = timers_to_flush.find(name);
+  if (to_flush != timers_to_flush.end()) {
+    PrintTimer(name, to_flush->second);
+    timers_to_flush.erase(to_flush);
+  }
+
+  legate::Runtime::get_runtime()->issue_execution_fence();
+  auto stop = legate::timing::measure_microseconds();
+
+  timers_to_flush[name] = {std::move(iter->second), std::move(stop)};
+  started_timers.erase(name);
+}
+
 StoreHandle CreateStore(const legate_xla::Shape &shape,
                         std::optional<std::string> name) {
   legate::Type::Code code = SupportedTypeToLegateType(shape.type);
@@ -788,6 +839,11 @@ static std::atomic<int> legate_state{UNINITIALIZED};
 void StopLegate() {
   int started = STARTED;
   if (legate_state.compare_exchange_strong(started, int(STOPPING))) {
+    for (auto &&[name, timer_pair] : timers_to_flush) {
+      PrintTimer(name, timer_pair);
+    }
+    timers_to_flush.clear();
+
     log_xla.info() << "Stopping Legate";
     auto rc = legate::finish();
     legate_state = STOPPED;

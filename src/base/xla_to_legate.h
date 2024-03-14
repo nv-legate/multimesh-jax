@@ -26,6 +26,10 @@ void SliceLocalShards(const StoreHandle &handle,
                       std::vector<void *> &local_shards,
                       std::pair<int64_t, int64_t> slice);
 
+void StartTimer(const std::string &name);
+
+void StopTimer(const std::string &name);
+
 struct Shard {
   const void *data;
   int64_t local_device_id;

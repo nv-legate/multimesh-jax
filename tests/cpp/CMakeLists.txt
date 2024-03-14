@@ -40,6 +40,7 @@ set(unit_SRC
  api/create_store.cc
  api/assemble_shards.cc
  api/hlo_executor.cc
+ api/timer.cc
 )
 
 add_executable(cpp_tests ${main_SRC} ${unit_SRC})

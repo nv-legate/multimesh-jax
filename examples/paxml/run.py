@@ -420,25 +420,34 @@ class LambadaConfig:
 
         transformer_axes = [
             ("replica", "x"),
-            ("mdl", "x"),
+            ("mdl", "y"),
             ("data", "y"),
+            ("mdl", "x"),
         ]
+        if emb_seq_axis is not None:
+            transformer_axes.extend(
+                [
+                    ("seq", "x"),
+                    ("seq", "y"),
+                ]
+            )
 
         embeddings_axes = [
             ("replica", "x"),
-            ("mdl", "x"),
-            ("mdl", "y"),
         ]
         if emb_seq_axis is not None:
             embeddings_axes.append(("seq", emb_seq_axis))
-            replica_num_devices = self.transformer_num_devices
-            seq_num_devices = (
+        embeddings_axes.append(("mdl", "y"))
+        embeddings_axes.append(("data", "y"))
+
+        if emb_seq_axis is not None:
+            seq_num_devices = self.transformer_num_devices
+            replica_num_devices = (
                 self.embeddings_num_devices // self.transformer_num_devices
             )
         else:
             seq_num_devices = 1
             replica_num_devices = self.embeddings_num_devices
-        embeddings_axes.append(("data", "y"))
 
         def compute_devices(name: str):
             layer = int(layer_regex.search(name).groups()[0])
@@ -453,7 +462,7 @@ class LambadaConfig:
         register_task_factory(
             r"(layers_\d+)",
             device_callback=compute_devices,
-            dims=[self.transformer_num_devices, 1],
+            dims=[1, self.transformer_num_devices],
             device_axes=["x", "y"],
             logical_axes=transformer_axes,
         )

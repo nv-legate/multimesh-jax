@@ -7,13 +7,9 @@ class SingleGpuEnvironment : public ::testing::Environment {
 public:
   SingleGpuEnvironment(int argc, char **argv) {}
 
-  void SetUp() override {
-    ASSERT_EQ(legate::start(0, nullptr), 0);
+  void SetUp() override { legate_xla::StartLegate(); }
 
-    legate_xla_perform_registration();
-  }
-
-  void TearDown() override { EXPECT_EQ(legate::finish(), 0); }
+  void TearDown() override { legate_xla::StopLegate(); }
 };
 
 int main(int argc, char **argv) {
