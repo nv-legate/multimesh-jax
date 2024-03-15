@@ -91,6 +91,13 @@ legate_jax.add_argument(
     default="legate",
 )
 
+
+legate_jax.add_argument(
+    "--no-autoshard", dest="autoshard", action="store_false"
+)
+legate_jax.add_argument("--autoshard", dest="autoshard", action="store_true")
+
+
 legate_jax.add_argument(
     "--debug",
     type=str,
@@ -420,9 +427,9 @@ class LambadaConfig:
 
         transformer_axes = [
             ("replica", "x"),
-            ("mdl", "y"),
-            ("data", "y"),
             ("mdl", "x"),
+            ("data", "y"),
+            ("mdl", "y"),
         ]
         if emb_seq_axis is not None:
             transformer_axes.extend(
@@ -437,8 +444,9 @@ class LambadaConfig:
         ]
         if emb_seq_axis is not None:
             embeddings_axes.append(("seq", emb_seq_axis))
-        embeddings_axes.append(("mdl", "y"))
+        embeddings_axes.append(("mdl", "x"))
         embeddings_axes.append(("data", "y"))
+        embeddings_axes.append(("mdl", "y"))
 
         if emb_seq_axis is not None:
             seq_num_devices = self.transformer_num_devices
@@ -462,7 +470,7 @@ class LambadaConfig:
         register_task_factory(
             r"(layers_\d+)",
             device_callback=compute_devices,
-            dims=[1, self.transformer_num_devices],
+            dims=[self.transformer_num_devices, 1],
             device_axes=["x", "y"],
             logical_axes=transformer_axes,
         )
@@ -514,7 +522,7 @@ gin_config = f"""
 import paxml.trainer_lib
 
 ClientConfig:
-  auto_shard = True
+  auto_shard = {args.autoshard}
   disable_gc = True
 
 PaxLegateConfig:
@@ -575,17 +583,18 @@ argv = [
     "--mode=train",
     "--alsologtostderr",
 ]
-if args.backend == "legate":
-    argv.append("-enable_auto_sharding")
-    argv.append(f"--fdl.ICI_MESH_SHAPE=[1,{total_devices},1]")
-    argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1]")
-else:
+if not args.autoshard or args.backend != "legate":
     if args.pp > 1:
         raise ValueError(
             "cannot configure pipeline parallelism through native CUDA backend"
         )
     argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1]")
     argv.append(f"--fdl.ICI_MESH_SHAPE=[{args.dp},{args.fsdp},{args.tp}]")
+else:
+    argv.append("-enable_auto_sharding")
+    argv.append(f"--fdl.ICI_MESH_SHAPE=[1,{total_devices},1]")
+    argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1]")
+
 
 if num_nodes > 1:
     argv.append("--multiprocess_gpu")
