@@ -107,6 +107,27 @@ public:
   virtual int NumPartitions() const = 0;
 
   virtual std::string Name() const = 0;
+
+  virtual std::optional<std::string>
+  MemcpyHtoDAsync(void *dst, const void *src, size_t size,
+                  int64_t local_device_id) const = 0;
+
+  virtual std::optional<std::string>
+  MemcpyDtoDAsync(void *dst, const void *src, size_t size, bool cpu,
+                  int64_t local_device_id) const = 0;
+};
+
+class LegateStream {
+public:
+  virtual ~LegateStream() = default;
+
+  virtual std::optional<std::string>
+  MemcpyHtoDAsync(void *dst, const void *src, size_t size,
+                  int64_t local_device_id) const = 0;
+
+  virtual std::optional<std::string>
+  MemcpyDtoDAsync(void *dst, const void *src, size_t size, bool cpu,
+                  int64_t local_device_id) const = 0;
 };
 
 class LegateCompiler {

@@ -77,7 +77,8 @@ struct get_write_only_buffer_fn {
   auto *callbacks = context.scalars()[ScalarCallbacks]
                         .value<std::vector<std::function<void()>> *>();
 
-  run_executable(context, exe.get(), run_id, ScalarNumScalarArgs, cpu);
+  run_executable(context, exe.get(), compiler, run_id, ScalarNumScalarArgs,
+                 cpu);
   log_xla.info() << "HLOExecutorTask: finish " << exe->Name();
 
   if (false) { // callbacks->size() > 0) {
@@ -118,6 +119,7 @@ BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
 
 /*static*/ void HLOExecutorTask::run_executable(legate::TaskContext context,
                                                 LegateExecutable *exe,
+                                                LegateCompiler *compiler,
                                                 int64_t run_id,
                                                 int scalar_offset, bool cpu) {
   auto cfg = get_task_config(context);
@@ -188,9 +190,9 @@ BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
   }
 
   if (!cpu && num_scalar_arguments > 0) {
-    cudaMemcpy(device_scalar_buffer, host_scalar_arguments,
-               num_scalar_arguments * sizeof(max_size_scalar_t),
-               cudaMemcpyHostToDevice);
+    exe->MemcpyHtoDAsync(device_scalar_buffer, host_scalar_arguments,
+                         num_scalar_arguments * sizeof(max_size_scalar_t),
+                         cfg.local_device_id);
   }
 
   DeviceAssignment device_assignment({.local_device_id = cfg.local_device_id,

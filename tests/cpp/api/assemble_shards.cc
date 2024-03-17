@@ -26,6 +26,27 @@ using ::testing::ElementsAreArray;
 
 MATCHER_P(ShardIsVector, values, "") { return arg == values; }
 
+class TestStream : public legate_xla::LegateStream {
+public:
+  std::optional<std::string>
+  MemcpyHtoDAsync(void *dst, const void *src, size_t size,
+                  int64_t local_device_id) const override {
+    cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice);
+    return std::nullopt;
+  }
+
+  std::optional<std::string>
+  MemcpyDtoDAsync(void *dst, const void *src, size_t size, bool cpu,
+                  int64_t local_device_id) const override {
+    if (cpu) {
+      ::memcpy(dst, src, size);
+    } else {
+      cudaMemcpy(dst, src, size, cudaMemcpyDeviceToDevice);
+    }
+    return std::nullopt;
+  }
+};
+
 class IndexIterator {
 public:
   IndexIterator(const legate_xla::Shape &shape) : index_(shape.dims.size(), 0) {
@@ -103,7 +124,10 @@ void test_legate_shape(legate_xla::Shape shape) {
                                        .size = shard_size});
   }
 
-  auto future = legate_xla::AssembleShards(shape, shards, {0, num_shards});
+  auto stream = std::make_shared<TestStream>();
+  auto future = legate_xla::AssembleShards(
+      shape, shards, {0, num_shards},
+      new legate_xla::TaskArgHold<legate_xla::LegateStream>(stream));
   future.future->Wait();
 
   std::vector<void *> device_slices(num_shards);

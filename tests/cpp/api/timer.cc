@@ -40,6 +40,18 @@ public:
     return std::nullopt;
   }
 
+  std::optional<std::string>
+  MemcpyHtoDAsync(void *dst, const void *src, size_t size,
+                  int64_t local_device_id) const override {
+    return std::nullopt;
+  }
+
+  std::optional<std::string>
+  MemcpyDtoDAsync(void *dst, const void *src, size_t size, bool cpu,
+                  int64_t local_device_id) const override {
+    return std::nullopt;
+  }
+
   std::pair<int, int> MachineSlice() const override { return {0, 1}; }
 
   size_t LaunchSize() const override { return 1; }

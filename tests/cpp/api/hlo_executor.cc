@@ -55,6 +55,24 @@ public:
 
   std::string Name() const override { return "test-executable"; }
 
+  std::optional<std::string>
+  MemcpyHtoDAsync(void *dst, const void *src, size_t size,
+                  int64_t local_device_id) const override {
+    cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice);
+    return std::nullopt;
+  }
+
+  std::optional<std::string>
+  MemcpyDtoDAsync(void *dst, const void *src, size_t size, bool cpu,
+                  int64_t local_device_id) const override {
+    if (cpu) {
+      ::memcpy(dst, src, size);
+    } else {
+      cudaMemcpy(dst, src, size, cudaMemcpyDeviceToDevice);
+    }
+    return std::nullopt;
+  }
+
 private:
   std::function<void(const std::vector<BufferAllocation> &inputs,
                      const std::vector<BufferAllocation> &outputs)>

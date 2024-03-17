@@ -39,9 +39,8 @@ struct get_write_ptr {
   }
 };
 
-/*static*/ void ShardAssembleTask::assemble_shard(
-    TaskContext context,
-    std::function<void(void *, const void *, size_t)> copy_fxn) {
+/*static*/ void ShardAssembleTask::assemble_shard(TaskContext context,
+                                                  bool cpu) {
   auto cfg = get_task_config(context);
 
   const auto &array = context.output(0);
@@ -51,6 +50,10 @@ struct get_write_ptr {
   log_xla.debug() << "ShardAssembleTask " << cfg.task_id << " start for "
                   << num_shards << " shards";
 
+  auto *stream_hold = reinterpret_cast<TaskArgHold<LegateStream> *>(
+      context.scalars()[ScalarCompilerPointer].value<uint64_t>());
+  auto *stream = stream_hold->get();
+
   auto *waiter = reinterpret_cast<TaskFuture *>(
       context.scalar(ScalarTaskWaiter).value<uint64_t>());
 
@@ -59,15 +62,15 @@ struct get_write_ptr {
                       .value<void *>();
     auto [buffer, size] = legate::double_dispatch(
         array.dim(), array.data().code(), get_write_ptr{}, array.data());
-    copy_fxn(buffer, shard, size);
+    stream->MemcpyDtoDAsync(buffer, shard, size, cpu, cfg.local_device_id);
     waiter->Signal();
   }
+
+  Release(stream_hold, context.machine().processor_range().per_node_count);
 }
 
 /*static*/ void ShardAssembleTask::cpu_variant(TaskContext context) {
-  assemble_shard(context, [](void *buffer, const void *shard, size_t size) {
-    ::memcpy(buffer, shard, size);
-  });
+  assemble_shard(context, /*cpu=*/true);
 }
 
 namespace // unnamed

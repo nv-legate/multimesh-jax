@@ -29,7 +29,12 @@ class ShardAssembleTask : public XlaTask<ShardAssembleTask> {
 public:
   static constexpr int32_t TASK_ID = XLA_SHARD_ASSEMBLE_TASK;
 
-  enum ScalarArgs { ScalarNumShards, ScalarTaskWaiter, ScalarBufferPointers };
+  enum ScalarArgs {
+    ScalarCompilerPointer,
+    ScalarNumShards,
+    ScalarTaskWaiter,
+    ScalarBufferPointers
+  };
 
 public:
   static void cpu_variant(legate::TaskContext context);
@@ -37,9 +42,7 @@ public:
   static void gpu_variant(legate::TaskContext context);
 
 private:
-  static void
-  assemble_shard(legate::TaskContext context,
-                 std::function<void(void *, const void *, size_t)> copy_fxn);
+  static void assemble_shard(legate::TaskContext context, bool cpu);
 };
 
 } // namespace legate_xla

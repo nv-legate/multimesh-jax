@@ -608,6 +608,7 @@ void SliceLocalShards(const StoreHandle &handle,
 StoreFuture AssembleShards(const legate_xla::Shape &logical_shape,
                            const std::vector<legate_xla::Shard> &local_shards,
                            std::pair<int64_t, int64_t> slice,
+                           TaskArgHold<LegateStream> *stream_hold,
                            std::optional<StoreHandle> existing_store) {
   auto runtime = legate_xla::Runtime::get_runtime();
   auto core_runtime = legate::Runtime::get_runtime();
@@ -654,6 +655,7 @@ StoreFuture AssembleShards(const legate_xla::Shape &logical_shape,
   auto task =
       runtime->create_task(XlaOpCode::XLA_SHARD_ASSEMBLE_TASK, {launch_size});
 
+  task.add_scalar_arg(reinterpret_cast<uint64_t>(stream_hold));
   task.add_scalar_arg(int64_t(local_shards.size()));
   auto future = std::make_unique<TaskFuture>(int64_t(local_shards.size()));
   task.add_scalar_arg(reinterpret_cast<uint64_t>(future.get()));

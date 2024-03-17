@@ -36,7 +36,8 @@ public:
   static void run_executable(legate::TaskContext context, bool cpu);
 
   static void run_executable(legate::TaskContext context, LegateExecutable *exe,
-                             int64_t run_id, int scalar_offset, bool cpu);
+                             LegateCompiler *compiler, int64_t run_id,
+                             int scalar_offset, bool cpu);
 
 public:
   static void cpu_variant(legate::TaskContext context);

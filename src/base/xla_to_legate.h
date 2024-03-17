@@ -41,6 +41,7 @@ StoreFuture
 AssembleShards(const legate_xla::Shape &logical_shape,
                const std::vector<legate_xla::Shard> &local_shards,
                std::pair<int64_t, int64_t> slice,
+               TaskArgHold<LegateStream> *stream_hold,
                std::optional<StoreHandle> existing_store = std::nullopt);
 
 std::set<int> GetLocalDevices(int my_node);
