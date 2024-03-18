@@ -65,10 +65,8 @@ struct PendingTimer {
 static std::vector<PendingTimer> pending_timers;
 static std::unordered_map<std::string, legate::timing::Time> started_timers;
 
-void PrintTimer(
-    const std::string &name,
-    const legate::timing::Time& start,
-    const legate::timing::Time& stop) {
+void PrintTimer(const std::string &name, const legate::timing::Time &start,
+                const legate::timing::Time &stop) {
   auto delta_micros = stop.value() - start.value();
   double delta_s = delta_micros / 1e6;
   log_xla.info() << name << " finished in " << delta_s;
@@ -664,8 +662,8 @@ StoreFuture AssembleShards(const legate_xla::Shape &logical_shape,
 
   // GPU execution can enqueue on a stream, which means we don't neeed
   // to explicitly manage synchronization
-  auto future = [&]{
-    if (IsGpu()){
+  auto future = [&] {
+    if (IsGpu()) {
       return std::unique_ptr<TaskFuture>{};
     }
     return std::make_unique<TaskFuture>(int64_t(local_shards.size()));
@@ -779,7 +777,7 @@ void StartTimer(const std::string &name) {
 }
 
 void StopTimer(const std::string &name) {
-  auto start_clock =  std::chrono::steady_clock::now();
+  auto start_clock = std::chrono::steady_clock::now();
   legate::Runtime::get_runtime()->issue_execution_fence();
 
   auto iter = started_timers.find(name);
@@ -788,7 +786,9 @@ void StopTimer(const std::string &name) {
                              ", timer was never started");
   }
 
-  pending_timers.push_back({ .name = name, .start = std::move(iter->second), .stop = legate::timing::measure_microseconds() });
+  pending_timers.push_back({.name = name,
+                            .start = std::move(iter->second),
+                            .stop = legate::timing::measure_microseconds()});
   started_timers.erase(iter);
 }
 
@@ -847,9 +847,11 @@ static std::atomic<int> legate_state{UNINITIALIZED};
 void StopLegate() {
   int started = STARTED;
   if (legate_state.compare_exchange_strong(started, int(STOPPING))) {
-    for (auto&& timer : pending_timers){
+    for (auto &&timer : pending_timers) {
       PrintTimer(timer.name, timer.start, timer.stop);
     }
+    pending_timers.clear();
+    started_timers.clear();
 
     log_xla.info() << "Stopping Legate";
     auto rc = legate::finish();
