@@ -63,7 +63,9 @@ struct get_write_ptr {
     auto [buffer, size] = legate::double_dispatch(
         array.dim(), array.data().code(), get_write_ptr{}, array.data());
     stream->MemcpyDtoDAsync(buffer, shard, size, cpu, cfg.local_device_id);
-    waiter->Signal();
+    if (waiter){
+      waiter->Signal();
+    }
   }
 
   Release(stream_hold, context.machine().processor_range().per_node_count);

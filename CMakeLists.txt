@@ -16,7 +16,7 @@
 
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 project(LegateXLA LANGUAGES C CXX CUDA)
-set(LegateXLA_VERSION 24.01.00)
+set(LegateXLA_VERSION 24.05.00)
 
 set(CMAKE_CXX_STANDARD 17)
 

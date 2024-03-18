@@ -56,15 +56,19 @@ size_t LaunchSize(const Shape &shape, size_t default_size) {
 
 static bool _enable_discard{true};
 
+struct PendingTimer {
+  std::string name;
+  legate::timing::Time start;
+  legate::timing::Time stop;
+};
+
+static std::vector<PendingTimer> pending_timers;
 static std::unordered_map<std::string, legate::timing::Time> started_timers;
-static std::unordered_map<std::string,
-                          std::pair<legate::timing::Time, legate::timing::Time>>
-    timers_to_flush;
 
 void PrintTimer(
     const std::string &name,
-    const std::pair<legate::timing::Time, legate::timing::Time> &timer_pair) {
-  auto &&[start, stop] = timer_pair;
+    const legate::timing::Time& start,
+    const legate::timing::Time& stop) {
   auto delta_micros = stop.value() - start.value();
   double delta_s = delta_micros / 1e6;
   log_xla.info() << name << " finished in " << delta_s;
@@ -657,7 +661,15 @@ StoreFuture AssembleShards(const legate_xla::Shape &logical_shape,
 
   task.add_scalar_arg(reinterpret_cast<uint64_t>(stream_hold));
   task.add_scalar_arg(int64_t(local_shards.size()));
-  auto future = std::make_unique<TaskFuture>(int64_t(local_shards.size()));
+
+  // GPU execution can enqueue on a stream, which means we don't neeed
+  // to explicitly manage synchronization
+  auto future = [&]{
+    if (IsGpu()){
+      return std::unique_ptr<TaskFuture>{};
+    }
+    return std::make_unique<TaskFuture>(int64_t(local_shards.size()));
+  }();
   task.add_scalar_arg(reinterpret_cast<uint64_t>(future.get()));
   for (const auto &shard : local_shards) {
     task.add_scalar_arg(reinterpret_cast<int64_t>(shard.data));
@@ -767,23 +779,17 @@ void StartTimer(const std::string &name) {
 }
 
 void StopTimer(const std::string &name) {
+  auto start_clock =  std::chrono::steady_clock::now();
+  legate::Runtime::get_runtime()->issue_execution_fence();
+
   auto iter = started_timers.find(name);
   if (iter == started_timers.end()) {
     throw std::runtime_error("cannot stop timer " + name +
                              ", timer was never started");
   }
 
-  auto to_flush = timers_to_flush.find(name);
-  if (to_flush != timers_to_flush.end()) {
-    PrintTimer(name, to_flush->second);
-    timers_to_flush.erase(to_flush);
-  }
-
-  legate::Runtime::get_runtime()->issue_execution_fence();
-  auto stop = legate::timing::measure_microseconds();
-
-  timers_to_flush[name] = {std::move(iter->second), std::move(stop)};
-  started_timers.erase(name);
+  pending_timers.push_back({ .name = name, .start = std::move(iter->second), .stop = legate::timing::measure_microseconds() });
+  started_timers.erase(iter);
 }
 
 StoreHandle CreateStore(const legate_xla::Shape &shape,
@@ -841,10 +847,9 @@ static std::atomic<int> legate_state{UNINITIALIZED};
 void StopLegate() {
   int started = STARTED;
   if (legate_state.compare_exchange_strong(started, int(STOPPING))) {
-    for (auto &&[name, timer_pair] : timers_to_flush) {
-      PrintTimer(name, timer_pair);
+    for (auto&& timer : pending_timers){
+      PrintTimer(timer.name, timer.start, timer.stop);
     }
-    timers_to_flush.clear();
 
     log_xla.info() << "Stopping Legate";
     auto rc = legate::finish();

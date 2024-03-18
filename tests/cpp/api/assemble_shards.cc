@@ -128,7 +128,10 @@ void test_legate_shape(legate_xla::Shape shape) {
   auto future = legate_xla::AssembleShards(
       shape, shards, {0, num_shards},
       new legate_xla::TaskArgHold<legate_xla::LegateStream>(stream));
-  future.future->Wait();
+  if (future.future){
+    future.future->Wait();
+  }
+
 
   std::vector<void *> device_slices(num_shards);
   legate_xla::SliceLocalShards(future.store, device_slices, {0, num_shards});
