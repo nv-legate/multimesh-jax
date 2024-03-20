@@ -144,9 +144,16 @@ BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
   DeferredBufferAllocator allocator;
   max_size_scalar_t host_scalar_arguments[kMaxScalarArguments];
   max_size_scalar_t *device_scalar_buffer = host_scalar_arguments;
+  static constexpr int kAlignedSegmentSize = 4096;
+  size_t num_scalar_segments =
+      (num_scalar_arguments * sizeof(max_size_scalar_t) + kAlignedSegmentSize -
+       1) /
+      kAlignedSegmentSize;
+  size_t scalars_size = num_scalar_segments * kAlignedSegmentSize;
+
   if (!cpu && num_scalar_arguments > 0) {
-    device_scalar_buffer = static_cast<max_size_scalar_t *>(
-        allocator.Allocate(num_scalar_arguments * sizeof(max_size_scalar_t)));
+    device_scalar_buffer =
+        static_cast<max_size_scalar_t *>(allocator.Allocate(scalars_size));
   }
 
   int64_t arg_offset = ScalarNumScalarArgs + 1;
@@ -214,8 +221,7 @@ BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
   }
 
   if (!cpu && num_scalar_arguments > 0) {
-    allocator.Free(device_scalar_buffer,
-                   sizeof(max_size_scalar_t) * num_scalar_arguments);
+    allocator.Free(device_scalar_buffer, scalars_size);
   }
 
   log_xla.debug() << "Finish task " << exe->Name() << " for device "
