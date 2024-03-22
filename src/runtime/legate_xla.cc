@@ -777,7 +777,6 @@ void StartTimer(const std::string &name) {
 }
 
 void StopTimer(const std::string &name) {
-  auto start_clock = std::chrono::steady_clock::now();
   legate::Runtime::get_runtime()->issue_execution_fence();
 
   auto iter = started_timers.find(name);

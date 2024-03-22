@@ -163,6 +163,19 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
+    "--sequence-parallel",
+    action="store_true",
+    dest="sequence_parallel",
+    help="Whether to use sequence parallelism",  # noqa: E501
+)
+legate_jax.add_argument(
+    "--no-sequence-parallel",
+    action="store_false",
+    dest="sequence_parallel",
+    help="Whether to use sequence parallelism",  # noqa: E501
+)
+
+legate_jax.add_argument(
     "--schedule",
     type=str,
     choices=["fill-drain", "gpipe", "1f1b"],
@@ -388,11 +401,10 @@ layers_per_interleave = args.num_layers // args.interleave
 if args.distribute_embeddings:
     logits_num_devices = total_devices
     embeddings_num_devices = total_devices
-    emb_seq_axis = "y"
+
 else:
     logits_num_devices = transformer_num_devices
     embeddings_num_devices = transformer_num_devices
-    emb_seq_axis = None
 
 if batch_size % total_devices:
     raise ValueError(
@@ -425,37 +437,84 @@ class LambadaConfig:
 
         layer_regex = re.compile(r"layers_(\d+)")
 
-        transformer_axes = [
-            ("replica", "x"),
-            ("mdl", "x"),
-            ("data", "y"),
-            ("mdl", "y"),
-        ]
-        if emb_seq_axis is not None:
-            transformer_axes.extend(
-                [
-                    ("seq", "x"),
-                    ("seq", "y"),
-                ]
+        if args.microbatch_size < args.fsdp:
+            raise Exception(
+                "FSDP parallelism cannot exceed the microbatch size"
             )
+
+        transformer_x_dim = args.fsdp * args.dp
+        transformer_y_dim = args.tp
+        if transformer_x_dim * transformer_y_dim != transformer_num_devices:
+            raise Exception(
+                "DP * FSDP * TP does not match no. devices in pipeline stage: "
+                f"{transformer_num_devices}"
+            )
+
+        if args.fsdp == 1 and args.microbatch_size < transformer_num_devices:
+            # split the tensor parallelism to shard as much as possible
+            # over the replica dim
+            transformer_x_dim = args.microbatch_size
+            transformer_y_dim = transformer_num_devices // transformer_x_dim
+
+        if args.microbatch_size >= transformer_num_devices:
+            # shard activations across the replica dim only,
+            # no need to shard on seq/model dimensions
+            transformer_axes = [
+                ("replica", "x"),
+                ("replica", "y"),
+                ("data", "x"),
+                ("mdl", "y"),
+                ("data", "y"),
+                ("mdl", "x"),
+            ]
+        elif args.sequence_parallel:
+            # favor sharding activations on the seq dim
+            transformer_axes = [
+                ("replica", "x"),
+                ("seq", "y"),
+                ("data", "x"),
+                ("mdl", "y"),
+                ("data", "y"),
+                ("mdl", "x"),
+                ("replica", "y"),
+            ]
+        else:
+            # favor sharding activations on the mdl dim
+            transformer_axes = [
+                ("replica", "x"),
+                ("data", "x"),
+                ("mdl", "y"),
+                ("mdl", "x"),
+                ("seq", "y"),
+                ("data", "y"),
+                ("replica", "y"),
+            ]
+
+        embedding_x_dim = min(
+            args.microbatch_size, self.embeddings_num_devices
+        )
+        embedding_y_dim = self.embeddings_num_devices // embedding_x_dim
 
         embeddings_axes = [
             ("replica", "x"),
+            ("data", "x"),
         ]
-        if emb_seq_axis is not None:
-            embeddings_axes.append(("seq", emb_seq_axis))
-        embeddings_axes.append(("mdl", "x"))
-        embeddings_axes.append(("data", "y"))
-        embeddings_axes.append(("mdl", "y"))
-
-        if emb_seq_axis is not None:
-            seq_num_devices = self.transformer_num_devices
-            replica_num_devices = (
-                self.embeddings_num_devices // self.transformer_num_devices
-            )
+        if args.sequence_parallel:
+            # favor the seq dimension when sharding activations
+            embeddings_axes.append(("seq", "y"))
+            embeddings_axes.append(("mdl", "y"))
         else:
-            seq_num_devices = 1
-            replica_num_devices = self.embeddings_num_devices
+            # favor the mdl dimension when sharding activations
+            embeddings_axes.append(("mdl", "y"))
+            embeddings_axes.append(("seq", "y"))
+
+        embeddings_axes.extend(
+            [
+                ("data", "y"),
+                ("replica", "y"),
+                ("mdl", "x"),
+            ]
+        )
 
         def compute_devices(name: str):
             layer = int(layer_regex.search(name).groups()[0])
@@ -470,7 +529,7 @@ class LambadaConfig:
         register_task_factory(
             r"(layers_\d+)",
             device_callback=compute_devices,
-            dims=[self.transformer_num_devices, 1],
+            dims=[transformer_x_dim, transformer_y_dim],
             device_axes=["x", "y"],
             logical_axes=transformer_axes,
         )
@@ -478,7 +537,7 @@ class LambadaConfig:
         register_task(
             "(emb_lookup).*",
             devices=devices[: self.embeddings_num_devices],
-            dims=[replica_num_devices, seq_num_devices],
+            dims=[embedding_x_dim, embedding_y_dim],
             device_axes=["x", "y"],
             logical_axes=embeddings_axes,
         )
@@ -486,7 +545,7 @@ class LambadaConfig:
         register_task(
             "(position_emb).*",
             devices=devices[: self.embeddings_num_devices],
-            dims=[replica_num_devices, seq_num_devices],
+            dims=[embedding_x_dim, embedding_y_dim],
             device_axes=["x", "y"],
             logical_axes=embeddings_axes,
         )
@@ -494,7 +553,7 @@ class LambadaConfig:
         register_task(
             "(final_ln).*",
             devices=devices[-self.logits_num_devices :],
-            dims=[replica_num_devices, seq_num_devices],
+            dims=[embedding_x_dim, embedding_y_dim],
             device_axes=["x", "y"],
             logical_axes=embeddings_axes,
         )
@@ -502,7 +561,7 @@ class LambadaConfig:
         register_task(
             "(compute_loss).*",
             devices=devices[-self.logits_num_devices :],
-            dims=[replica_num_devices, seq_num_devices],
+            dims=[embedding_x_dim, embedding_y_dim],
             device_axes=["x", "y"],
             logical_axes=embeddings_axes,
         )
@@ -510,7 +569,7 @@ class LambadaConfig:
         register_task(
             "default",
             devices=devices[: self.embeddings_num_devices],
-            dims=[replica_num_devices, seq_num_devices],
+            dims=[embedding_x_dim, embedding_y_dim],
             device_axes=["x", "y"],
             logical_axes=embeddings_axes,
         )
