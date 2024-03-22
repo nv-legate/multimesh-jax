@@ -176,6 +176,19 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
+    "--shard-vocab",
+    action="store_true",
+    dest="shard_vocab",
+    help="Whether to shard along the vocabulary axis",  # noqa: E501
+)
+legate_jax.add_argument(
+    "--no-shard-vocab",
+    action="store_false",
+    dest="shard_vocab",
+    help="Whether to shard along the vocabulary axis",  # noqa: E501
+)
+
+legate_jax.add_argument(
     "--schedule",
     type=str,
     choices=["fill-drain", "gpipe", "1f1b"],
@@ -497,8 +510,10 @@ class LambadaConfig:
 
         embeddings_axes = [
             ("replica", "x"),
-            ("data", "x"),
         ]
+        if args.shard_vocab:
+            embeddings_axes.append(("data", "x"))
+
         if args.sequence_parallel:
             # favor the seq dimension when sharding activations
             embeddings_axes.append(("seq", "y"))
@@ -512,7 +527,6 @@ class LambadaConfig:
             [
                 ("data", "y"),
                 ("replica", "y"),
-                ("mdl", "x"),
             ]
         )
 
