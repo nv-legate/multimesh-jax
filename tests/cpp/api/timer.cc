@@ -27,15 +27,14 @@
 namespace legate_xla {
 namespace {
 
-using ::testing::ElementsAre;
-
 class TestExecutable : public LegateExecutable {
 public:
   std::optional<std::string>
   Execute(uint64_t run_id, const std::vector<BufferAllocation> &inputs,
           const std::vector<BufferAllocation> &outputs,
           TaskMemoryAllocator *allocator,
-          const DeviceAssignment &device_assignment, bool cpu) const override {
+          const DeviceAssignment &device_assignment, Platform platform,
+          bool blocking) const override {
     sleep(2);
     return std::nullopt;
   }

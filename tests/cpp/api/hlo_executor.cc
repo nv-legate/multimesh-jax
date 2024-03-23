@@ -40,7 +40,8 @@ public:
   Execute(uint64_t run_id, const std::vector<BufferAllocation> &inputs,
           const std::vector<BufferAllocation> &outputs,
           TaskMemoryAllocator *allocator,
-          const DeviceAssignment &device_assignment, bool cpu) const override {
+          const DeviceAssignment &device_assignment, Platform platform,
+          bool blocking) const override {
     fxn_(inputs, outputs);
     return std::nullopt;
   }
