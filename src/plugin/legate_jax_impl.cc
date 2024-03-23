@@ -9,7 +9,8 @@
 extern "C" void RegisterImplicitTask(
     std::string matcher, std::vector<int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes);
+    std::vector<std::pair<std::string, std::string>> logical_axes,
+    int64_t fusion_color);
 
 extern "C" void SetEnableImplicitTasks(bool flag);
 
@@ -17,7 +18,8 @@ extern "C" void RegisterImplicitTaskWithFactory(
     std::string matcher,
     std::function<std::vector<int64_t>(const std::string &task)> device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes);
+    std::vector<std::pair<std::string, std::string>> logical_axes,
+    int64_t fusion_color);
 
 extern "C" void UnregisterImplicitTask(std::string matcher);
 
@@ -74,33 +76,38 @@ PYBIND11_MODULE(legate_jax_impl, m) {
   m.def(
       "register_task",
       [](py::str task_regex, py::list py_devices, py::list py_device_dims,
-         py::list py_device_axes, py::list py_logical_axes) {
+         py::list py_device_axes, py::list py_logical_axes,
+         int64_t fusion_color) {
         RegisterImplicitTask(
             task_regex.cast<std::string>(),
             py_devices.cast<std::vector<int64_t>>(),
             py_device_dims.cast<std::vector<int64_t>>(),
             py_device_axes.cast<std::vector<std::string>>(),
             py_logical_axes
-                .cast<std::vector<std::pair<std::string, std::string>>>());
+                .cast<std::vector<std::pair<std::string, std::string>>>(),
+            fusion_color);
       },
       py::arg("task_regex"), py::arg("devices"), py::arg("dims"),
-      py::arg("device_axes"), py::arg("logical_axes"));
+      py::arg("device_axes"), py::arg("logical_axes"),
+      py::arg("fusion_color") = 0);
   m.def(
       "register_task_factory",
       [](py::str task_regex,
          std::function<std::vector<int64_t>(const std::string &)>
              device_callback,
          py::list py_device_dims, py::list py_device_axes,
-         py::list py_logical_axes) {
+         py::list py_logical_axes, int64_t fusion_color) {
         RegisterImplicitTaskWithFactory(
             task_regex.cast<std::string>(), device_callback,
             py_device_dims.cast<std::vector<int64_t>>(),
             py_device_axes.cast<std::vector<std::string>>(),
             py_logical_axes
-                .cast<std::vector<std::pair<std::string, std::string>>>());
+                .cast<std::vector<std::pair<std::string, std::string>>>(),
+            fusion_color);
       },
       py::arg("task_regex"), py::arg("device_callback"), py::arg("dims"),
-      py::arg("device_axes"), py::arg("logical_axes"));
+      py::arg("device_axes"), py::arg("logical_axes"),
+      py::arg("fusion_color") = 0);
   m.def("unregister_task", [](py::str task_regex) {
     UnregisterImplicitTask(task_regex.cast<std::string>());
   });
