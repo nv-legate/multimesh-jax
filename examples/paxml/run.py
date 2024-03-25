@@ -242,7 +242,14 @@ paxml.add_argument(
 paxml.add_argument(
     "--no-fuse-embeddings",
     action="store_true",
-    help="Whether to prevent the embeddings/logits layers from fusing with transformer layers",
+    help="Whether to prevent the embeddings/logits layers from fusing with transformer layers",  # noqa: E501
+)
+
+paxml.add_argument(
+    "--common-autosharding",
+    action="store_true",
+    default=False,
+    help="Whether all layers should share a common autosharding scheme mapping logical->device axes",  # noqa: E501
 )
 
 paxml.add_argument(
@@ -537,6 +544,9 @@ class LambadaConfig:
             ]
         )
 
+        if args.common_autosharding:
+            embeddings_axes = transformer_axes
+
         def compute_devices(name: str):
             layer = int(layer_regex.search(name).groups()[0])
             if self.layers_per_interleave is not None:
@@ -558,7 +568,7 @@ class LambadaConfig:
             dims=[transformer_x_dim, transformer_y_dim],
             device_axes=["x", "y"],
             logical_axes=transformer_axes,
-            fusion_color=fusion_color
+            fusion_color=fusion_color,
         )
 
         register_task(
