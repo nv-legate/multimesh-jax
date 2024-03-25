@@ -240,6 +240,12 @@ paxml.add_argument(
 )
 
 paxml.add_argument(
+    "--no-fuse-embeddings",
+    action="store_true",
+    help="Whether to prevent the embeddings/logits layers from fusing with transformer layers",
+)
+
+paxml.add_argument(
     "--vocab-path",
     type=str,
     default="model/model/c4_en_301_5Mexp2_spm.model",
@@ -527,6 +533,7 @@ class LambadaConfig:
             [
                 ("data", "y"),
                 ("replica", "y"),
+                ("mdl", "x"),
             ]
         )
 
@@ -540,12 +547,18 @@ class LambadaConfig:
             stop = offset + self.transformer_num_devices
             return list(range(offset, stop))
 
+        if args.no_fuse_embeddings:
+            fusion_color = 42
+        else:
+            fusion_color = 0
+
         register_task_factory(
             r"(layers_\d+)",
             device_callback=compute_devices,
             dims=[transformer_x_dim, transformer_y_dim],
             device_axes=["x", "y"],
             logical_axes=transformer_axes,
+            fusion_color=fusion_color
         )
 
         register_task(
