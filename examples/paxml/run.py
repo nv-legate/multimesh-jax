@@ -322,6 +322,8 @@ vmodule = [
     "legate_store_cache",
     "loop_schedule",
     "legate_ifrt_client",
+    "nccl_utils",
+    "gemm_algorithm_picker",
 ]
 
 args = parser.parse_args()

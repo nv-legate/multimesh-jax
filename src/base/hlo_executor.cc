@@ -135,7 +135,9 @@ BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
                   << cfg.device_id_range.low << "," << cfg.device_id_range.high
                   << ")"
                   << " with replicas=" << exe->ReplicaCount()
-                  << "  and partitions=" << exe->NumPartitions();
+                  << "  and partitions=" << exe->NumPartitions()
+                  << ", run_id=" << run_id;
+
   std::vector<legate_xla::BufferAllocation> inputs, outputs;
 
   int64_t num_scalar_arguments =
