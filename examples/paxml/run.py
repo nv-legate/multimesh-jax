@@ -546,6 +546,8 @@ class LambadaConfig:
 
         if args.common_autosharding:
             embeddings_axes = transformer_axes
+            embedding_x_dim = transformer_x_dim
+            embedding_y_dim = transformer_y_dim
 
         def compute_devices(name: str):
             layer = int(layer_regex.search(name).groups()[0])
