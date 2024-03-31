@@ -33,13 +33,6 @@ using namespace legate;
 
 namespace {
 
-bool IsBlocking() {
-  if (const char *blocking = getenv("LEGATE_XLA_BLOCKING")) {
-    return std::atoi(blocking);
-  }
-  return false;
-}
-
 struct get_read_only_buffer_fn {
   template <legate::Type::Code TYPE_CODE, int32_t DIM>
 
@@ -225,7 +218,7 @@ BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
   LegateExecutable::Platform platform =
       cpu ? LegateExecutable::CPU : LegateExecutable::GPU;
 
-  static bool blocking = IsBlocking();
+  static bool blocking = BlockingExecution();
 
   auto start_clock = std::chrono::steady_clock::now();
   auto error_message = exe->Execute(run_id, inputs, outputs, &allocator,

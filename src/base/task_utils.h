@@ -14,4 +14,6 @@ struct TaskConfig {
 
 TaskConfig get_task_config(const legate::TaskContext &context);
 
+bool BlockingExecution();
+
 } // namespace legate_xla

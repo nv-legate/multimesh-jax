@@ -27,4 +27,11 @@ TaskConfig get_task_config(const TaskContext &context) {
   };
 }
 
+bool BlockingExecution() {
+  if (const char *blocking = getenv("LEGATE_XLA_BLOCKING")) {
+    return std::atoi(blocking);
+  }
+  return false;
+}
+
 } // namespace legate_xla

@@ -846,6 +846,10 @@ static std::atomic<int> legate_state{UNINITIALIZED};
 void StopLegate() {
   int started = STARTED;
   if (legate_state.compare_exchange_strong(started, int(STOPPING))) {
+    if (BlockingExecution()) {
+      auto runtime = legate::Runtime::get_runtime();
+      runtime->issue_execution_fence(/*block=*/true);
+    }
     for (auto &&timer : pending_timers) {
       PrintTimer(timer.name, timer.start, timer.stop);
     }
