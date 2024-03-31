@@ -777,17 +777,22 @@ void StartTimer(const std::string &name) {
 }
 
 void StopTimer(const std::string &name) {
-  legate::Runtime::get_runtime()->issue_execution_fence();
-
   auto iter = started_timers.find(name);
   if (iter == started_timers.end()) {
     throw std::runtime_error("cannot stop timer " + name +
                              ", timer was never started");
   }
 
-  pending_timers.push_back({.name = name,
-                            .start = std::move(iter->second),
-                            .stop = legate::timing::measure_microseconds()});
+  if (BlockingExecution()) {
+    legate::Runtime::get_runtime()->issue_execution_fence(/*block=*/true);
+    auto stop = legate::timing::measure_microseconds();
+    PrintTimer(name, iter->second, stop);
+  } else {
+    legate::Runtime::get_runtime()->issue_execution_fence();
+    pending_timers.push_back({.name = name,
+                              .start = std::move(iter->second),
+                              .stop = legate::timing::measure_microseconds()});
+  }
   started_timers.erase(iter);
 }
 
