@@ -58,3 +58,9 @@ $ ./build-multi-stage.sh
 
 The same guidelines about the Bazel cache apply to the multi-stage Dockerfile.
 
+## Tags for reproducibility
+
+The Dockerfile copies a `tags` file into the image for reproducibility.
+This is generated from the `tags.sh` script. The standard build scripts
+will run this script to generate them automatically.
+

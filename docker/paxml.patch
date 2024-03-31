@@ -100,29 +100,31 @@ index f711e9b..6fb8db3 100644
 +  #checkpointer.wait_until_finished()
    logging.info('[PAX STATUS]: Final checkpoint saved.')
 diff --git a/paxml/main.py b/paxml/main.py
-index 41b1a9c..b931c96 100644
+index 41b1a9c..7c6c73e 100644
 --- a/paxml/main.py
 +++ b/paxml/main.py
-@@ -58,6 +58,8 @@ from praxis import py_utils
+@@ -22,6 +22,11 @@ python paxml/main.py \
+ """
+ # Internal import for aiding module import speed
+ 
++import tensorflow as tf
++tf.config.threading.set_intra_op_parallelism_threads(1)
++tf.config.threading.set_inter_op_parallelism_threads(1)
++tf.config.set_soft_device_placement(True)
++
+ import contextlib
+ import importlib
+ import os
+@@ -57,7 +62,6 @@ from praxis import py_utils
+ # internal experiment module import
  # internal import for g3_multiprocessing
  
- 
-+from legate.jax import init as legate_init
-+
+-
  FLAGS = flags.FLAGS
  
  flags.DEFINE_string(
-@@ -283,6 +285,8 @@ def run_experiment(
-       and decoding. If None, the training will train to requested steps.
-     enable_checkpoint_saving: Whether to perform checkpoint saving or not.
-   """
-+  legate_init()
-+
-   train.write_experiment_class_vars_file(
-       experiment_config.__class__, job_log_dir,
-       '' if FLAGS.mode == 'train' else f'{FLAGS.mode}_')
 diff --git a/paxml/partitioning.py b/paxml/partitioning.py
-index 96b81d8..1538e2e 100644
+index 96b81d8..17030b8 100644
 --- a/paxml/partitioning.py
 +++ b/paxml/partitioning.py
 @@ -42,6 +42,7 @@ from praxis import pax_fiddle
@@ -133,21 +135,38 @@ index 96b81d8..1538e2e 100644
  
  # tf_data_service_lib is slow to import, so we do it lazily.
  tf_data_service_lib = lazy_loader.LazyLoader(
-@@ -125,6 +126,13 @@ def compile_for_auto_sharding(
+@@ -125,6 +126,19 @@ def compile_for_auto_sharding(
    compiled = step_fn.lower(
        train_state, step_key, inputs_shape_dtype, static_args
    ).compile()
 +
++  sharding_str_arr = []
 +  def check(inp, inp_sharding, out):
-+    print(inp.shape, inp_sharding, out)
++    sharding_str_arr.append(f"{inp.shape} {inp.sharding} {out}")
 +    if not inp_sharding.is_equivalent_to(out, len(inp.shape)):
-+      raise Exception("mismatch")
++      raise Exception("\n".join(sharding_str_arr) + " mismatch")
 +
 +  jax.tree_map(check, train_state, compiled.input_shardings[0][0], compiled.output_shardings[0])
++
++  import os
++  if os.getenv("PAXML_PRINT_SHARDINGS", False):
++    jax.tree_map(lambda x, x_sharding: print("Input sharding: ", x.shape, x_sharding), train_state, compiled.input_shardings[0][0])
++
    return compiled, compiled.input_shardings[0]
  
  
-@@ -892,9 +900,17 @@ class PjitPartitioner(Partitioner):
+@@ -735,7 +749,9 @@ class PmapPartitioner(Partitioner):
+     ):
+       if static_args:
+         static_args = static_args.replace(unpadded_global_batch_size=None)
+-      return partitioned_step_fn(state, prng_key, inputs, static_args)
++      config = trainer_lib.PaxLegateConfig()
++      with legate.jax.enable_tracing(config.enable_tracing):
++        return partitioned_step_fn(state, prng_key, inputs, static_args)
+ 
+     return _wrapped_partitioned_step, None  # Input partition spec.
+ 
+@@ -892,9 +908,17 @@ class PjitPartitioner(Partitioner):
    ) -> NestedJTensor:
      """Preprocess the input batch before using it."""
      if self._reshard_inputs:
@@ -167,7 +186,7 @@ index 96b81d8..1538e2e 100644
      return padded_inputs
  
    def get_train_state_metadata(
-@@ -1041,18 +1057,15 @@ class PjitPartitioner(Partitioner):
+@@ -1041,18 +1065,15 @@ class PjitPartitioner(Partitioner):
      logging.info('step_fn fn_in_partition_specs=%s', fn_in_partition_specs)
      logging.info('step_fn fn_out_partition_specs=%s', fn_out_partition_specs)
  
@@ -195,7 +214,26 @@ index 96b81d8..1538e2e 100644
      extra_kwargs = dict(in_shardings=fn_in_shardings)
      if not use_pspec_on_array_inputs:
        extra_kwargs = {}
-@@ -1294,8 +1307,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1170,7 +1191,17 @@ class PjitPartitioner(Partitioner):
+         fn_out_partition_specs,
+         use_pspec_on_array_inputs=use_pspec_on_array_inputs,
+     )
+-    return partitioned_step_fn
++    def _wrapped_partitioned_step(
++      state,
++      prng_key,
++      inputs,
++      static_args: BaseStepFnStaticArgs | None = None,
++    ):
++      config = trainer_lib.PaxLegateConfig()
++      with legate.jax.enable_tracing(config.enable_tracing):
++        return partitioned_step_fn(state, prng_key, inputs, static_args)
++
++    return _wrapped_partitioned_step
+ 
+ 
+ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1294,8 +1325,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          else pjit.AUTO(self.global_mesh)
      )
  
@@ -210,7 +248,7 @@ index 96b81d8..1538e2e 100644
          is_eval,
          fn_in_partition_specs,
          fn_out_partition_specs,
-@@ -1312,18 +1330,22 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1312,18 +1348,22 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          jax.tree_map(jnp.shape, inputs_shape_dtype),
          static_args,
      )
@@ -227,7 +265,7 @@ index 96b81d8..1538e2e 100644
 -    new_train_state_pspec = jax.tree_map(lambda x: x.spec, input_shardings[0])
 -    new_input_pspec = jax.tree_map(lambda x: x.spec, input_shardings[2])
 +
-+    config = trainer_lib.AutoShardingClientConfig()
++    config = trainer_lib.PaxLegateConfig()
 +    with legate.jax.context(config):
 +      (
 +          auto_sharded_step_fn,
@@ -245,7 +283,19 @@ index 96b81d8..1538e2e 100644
      return auto_sharded_step_fn, new_input_pspec, new_train_state_pspec
  
    def get_train_state_metadata(
-@@ -1438,6 +1460,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1406,7 +1446,10 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+               subset=self._auto_sharding_input_spec, superset=inputs
+           )
+       )
+-      return partitioned_step_fn(state, prng_key, subset_extracted_inputs)
++
++      config = trainer_lib.PaxLegateConfig()
++      with legate.jax.enable_tracing(config.enable_tracing):
++        return partitioned_step_fn(state, prng_key, subset_extracted_inputs)
+ 
+     self._auto_sharding_result = (
+         AutoShardingPjitPartitioner._AutoShardingResult(
+@@ -1438,6 +1481,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
      if not self._auto_sharding_result:
        self.get_train_state_metadata(discard_opt_states=is_eval)
      if step_fn is self._auto_sharding_info.step_fn:
@@ -258,11 +308,44 @@ index 96b81d8..1538e2e 100644
        if trees.is_subset(
            self._auto_sharding_result.inputs_shape_dtype, inputs_shape_dtype
        ):
+diff --git a/paxml/summary_utils.py b/paxml/summary_utils.py
+index 711693c..b77be16 100644
+--- a/paxml/summary_utils.py
++++ b/paxml/summary_utils.py
+@@ -793,9 +793,9 @@ class SummaryHandler:
+     Returns:
+       True if the summaries were written, False otherwise.
+     """
+-    should_accumulate = self.should_accumulate(step)
+-    should_write_summary = self.should_write(step)
+-    should_log = self.should_log(step)
++    should_accumulate = False # self.should_accumulate(step)
++    should_write_summary = False # self.should_write(step)
++    should_log = False # self.should_log(step)
+     if not (should_log or should_accumulate or should_write_summary):
+       # Nothing to do, return immediately to avoid unnecessary work.
+       return False
 diff --git a/paxml/tasks/lm/model_params.py b/paxml/tasks/lm/model_params.py
-index e7cbe99..ddddb2e 100644
+index e7cbe99..bfa1e52 100644
 --- a/paxml/tasks/lm/model_params.py
 +++ b/paxml/tasks/lm/model_params.py
-@@ -536,6 +536,7 @@ class TransformerLmSpmdAdafactor(base_experiment.BaseExperiment):
+@@ -65,6 +65,7 @@ def set_sharding_annotations_v1(
+   replica_axis = 'replica'
+   data_axis = 'data'
+   mdl_axis = 'mdl'
++  seq_axis = 'seq'
+   mesh_axis_names = [replica_axis, data_axis, mdl_axis]
+   task_p.train.inputs_split_mapping = NestedMap(
+       map_1d=((replica_axis, data_axis),),
+@@ -79,6 +80,7 @@ def set_sharding_annotations_v1(
+         replica_axis=replica_axis,
+         data_axis=data_axis,
+         mdl_axis=mdl_axis,
++        seq_axis=seq_axis,
+         ici_mesh_shape=model_p.ici_mesh_shape,
+         dcn_mesh_shape=model_p.dcn_mesh_shape,
+         mesh_axis_names=mesh_axis_names,
+@@ -536,6 +538,7 @@ class TransformerLmSpmdAdafactor(base_experiment.BaseExperiment):
    USE_GATED_ACTIVATION = False
    DECAY_END = 100000
    USE_FP8 = False
@@ -270,7 +353,7 @@ index e7cbe99..ddddb2e 100644
  
    # optimizer related
    DROPOUT_PROB = 0.0
-@@ -622,6 +623,9 @@ class TransformerLmSpmdAdafactor(base_experiment.BaseExperiment):
+@@ -622,6 +625,9 @@ class TransformerLmSpmdAdafactor(base_experiment.BaseExperiment):
      transformer_layer_p.tr_atten_tpl.use_bias = False
      transformer_layer_p.tr_atten_tpl.combine_qkv = self.COMBINE_QKV
  
@@ -280,7 +363,7 @@ index e7cbe99..ddddb2e 100644
      if self.USE_FP8:
        transformer_layer_p.tr_atten_tpl.proj_tpl.einsum_tpl = pax_fiddle.Config(
            fp8_ops.Fp8EinsumOp
-@@ -661,6 +665,7 @@ class TransformerLmSpmdAdafactor(base_experiment.BaseExperiment):
+@@ -661,6 +667,7 @@ class TransformerLmSpmdAdafactor(base_experiment.BaseExperiment):
            self.CHECKPOINT_POLICY)
      else:
        model_p.lm_tpl.stacked_transformer_tpl = stacked_transformer_tpl
@@ -288,7 +371,7 @@ index e7cbe99..ddddb2e 100644
  
      # Enable bf16.
      model_p.fprop_dtype = self.FPROP_DTYPE
-@@ -844,6 +849,7 @@ class TransformerLmSpmdPipelineAdafactor(TransformerLmSpmdAdafactor):
+@@ -844,6 +851,7 @@ class TransformerLmSpmdPipelineAdafactor(TransformerLmSpmdAdafactor):
        stacked_transformer_tpl.x_times = self.NUM_LAYERS // (
            self.NUM_STAGES * self.CIRCULAR_REPEAT)
        stacked_transformer_tpl.checkpoint_policy = self.CHECKPOINT_POLICY
@@ -351,7 +434,7 @@ index 09d6f1e..35e525a 100644
    if hasattr(cls, 'PERCORE_BATCH_SIZE'):
      global_batch_size = int(cls.PERCORE_BATCH_SIZE * jax.device_count() + 1e-6)
 diff --git a/paxml/trainer_lib.py b/paxml/trainer_lib.py
-index 933784a..508ad6d 100644
+index 933784a..e6bdcb1 100644
 --- a/paxml/trainer_lib.py
 +++ b/paxml/trainer_lib.py
 @@ -19,7 +19,7 @@ import dataclasses
@@ -363,7 +446,15 @@ index 933784a..508ad6d 100644
  
  from absl import logging
  import clu.metrics
-@@ -90,6 +90,14 @@ PMAP_PARALLEL_AXIS_NAME = base_layer.PMAP_PARALLEL_AXIS_NAME
+@@ -29,6 +29,7 @@ from flax import struct as flax_struct
+ import jax
+ from jax import numpy as jnp
+ from jax.experimental import pjit
++from jax.sharding import PartitionSpec as P
+ from paxml import base_metrics
+ from paxml import checkpoint_types
+ from paxml import learners as learners_lib
+@@ -90,6 +91,14 @@ PMAP_PARALLEL_AXIS_NAME = base_layer.PMAP_PARALLEL_AXIS_NAME
  instantiate = base_hyperparams.instantiate
  
  
@@ -372,13 +463,13 @@ index 933784a..508ad6d 100644
 +
 +@gin.configurable
 +@dataclasses.dataclass
-+class AutoShardingClientConfig(legate.jax.ClientConfig):
-+  pass
++class PaxLegateConfig(legate.jax.ClientConfig):
++  enable_tracing: bool = False
 +
  class RunningMode(enum.Flag):
    """Running mode."""
  
-@@ -920,6 +928,12 @@ class GradFnProtocol(Protocol):
+@@ -920,6 +929,12 @@ class GradFnProtocol(Protocol):
        A tuple of (values, grads).
      """
  
@@ -391,7 +482,7 @@ index 933784a..508ad6d 100644
  
  def _get_default_grad_fn(
      excluded_for_grad: NestedMap, excluded_for_opt: NestedMap
-@@ -942,10 +956,10 @@ def _get_default_grad_fn(
+@@ -942,10 +957,10 @@ def _get_default_grad_fn(
  
      def _loss(
          mdl_vars_grad: NestedJTensor,
@@ -404,7 +495,7 @@ index 933784a..508ad6d 100644
        merged_vars = jax.tree_map(
            lambda e, x, y: y if e else x,
            excluded_for_grad,
-@@ -958,7 +972,12 @@ def _get_default_grad_fn(
+@@ -958,7 +973,23 @@ def _get_default_grad_fn(
        g = jax.value_and_grad(_loss, has_aux=True, allow_int=True)
      else:
        g = functools.partial(learner.stochastic_gradient.grad_fn, _loss)
@@ -413,12 +504,23 @@ index 933784a..508ad6d 100644
 +    microbatch_config = MicrobatchConfig()
 +    if microbatch_config.size is not None:
 +      from legate.jax import microbatch
-+      g = microbatch(g, dim=0, argnum=2, size=microbatch_config.size)
++      def microbatch_input_sharding(x):
++        if len(x.shape) == 2:
++          return P("replica", "seq")
++        return None
++      def microbatch_slice_sharding(x):
++        if len(x.shape) == 2:
++          return None
++        return P()
++      arg_shardings = jax.tree_map(microbatch_input_sharding, inputs)
++      slice_shardings = jax.tree_map(microbatch_slice_sharding, inputs)
++
++      g = microbatch(g, dim=0, argnum=2, size=microbatch_config.size, arg_shardings=arg_shardings, microbatch_shardings=slice_shardings)
 +    values, grads = g(with_grad, no_grad, inputs, prng_key)
      grads = jax.tree_map(
          lambda eo, eg, m, g: jnp.zeros_like(m) if eg and not eo else g,
          excluded_for_opt,
-@@ -1601,19 +1620,18 @@ def initialize_partitioned_model_states(
+@@ -1601,19 +1632,18 @@ def initialize_partitioned_model_states(
        lambda p: jax.sharding.NamedSharding(global_mesh, p),
        prng_key_partition_spec,
    )
@@ -435,7 +537,7 @@ index 933784a..508ad6d 100644
 -  init_fn = bind_mesh(init_fn, global_mesh)
 +  train_state_shardings = train_state_partition_specs
 +
-+  config = AutoShardingClientConfig()
++  config = PaxLegateConfig()
 +  with legate.jax.context(config):
 +    init_fn = pjit.pjit(
 +        init_model_from_seed,

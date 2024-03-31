@@ -1,3 +1,32 @@
+diff --git a/praxis/base_layer.py b/praxis/base_layer.py
+index 4d392d3..6bd37ce 100644
+--- a/praxis/base_layer.py
++++ b/praxis/base_layer.py
+@@ -246,7 +246,7 @@ def to_partition_spec(
+               f's_i: {s_i}, mesh_axis_names: {mesh_axis_names}')
+           split_dims.append(mesh_axis_names[s_i])
+       elif isinstance(s_i, str):
+-        assert s_i in mesh_axis_names
++        #assert s_i in mesh_axis_names
+         split_dims.append(s_i)
+       elif isinstance(s_i, (tuple, list)):
+         split_dims.append(_parse_split_dims(s_i))
+diff --git a/praxis/layers/transformer_models.py b/praxis/layers/transformer_models.py
+index d58ac66..ef68127 100644
+--- a/praxis/layers/transformer_models.py
++++ b/praxis/layers/transformer_models.py
+@@ -331,10 +331,7 @@ class TransformerLm(base_layer.BaseLayer):
+         else [batch_axes, None, None, None]
+     )
+ 
+-    if seq_axis is None:
+-      w_data_axes = data_axis
+-    else:
+-      w_data_axes = (data_axis, seq_axis)
++    w_data_axes = data_axis
+ 
+     # w_df: sharding for weight of ffn0, shape (d, f). ff1 weights will be
+     # inferred from it.
 diff --git a/praxis/py_utils.py b/praxis/py_utils.py
 index f1339a6..348e7c7 100644
 --- a/praxis/py_utils.py

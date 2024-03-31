@@ -296,6 +296,8 @@ RUN  --mount=type=cache,from=download_paxml_repos,source=/opt/paxml,target=/opt/
 
 FROM install_paxml_repos AS paxml_image
 
+COPY tags /opt/tags
+
 COPY entrypoint.sh /opt/entrypoint.sh
 
 ENTRYPOINT [ "/opt/entrypoint.sh" ]
