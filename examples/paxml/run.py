@@ -683,7 +683,7 @@ argv = [
     "--mode=train",
     "--alsologtostderr",
 ]
-if not args.autoshard or args.backend != "legate":
+if (not args.autoshard and not args.hlo) or args.backend != "legate":
     if args.pp > 1:
         raise ValueError(
             "cannot configure pipeline parallelism through native CUDA backend"
@@ -734,7 +734,8 @@ else:
     legate.jax.compile_hlo_module(
         args.hlo,
         num_partitions=total_devices,
-        erase_sharding=True,
+        erase_sharding=args.autoshard,
+        autoshard=args.autoshard,
         platform=platform,
         device_mem_gb=args.fbmem,
     )
