@@ -28,8 +28,8 @@ function checkout {
 
 checkout legion     control_replication ssh://git@gitlab.com/StanfordLegion/legion.git 9d0c95fe2a080
 checkout legate     cpp-branch-24.01    ssh://git@github.com/nv-legate/legate.core.internal 97037d54864
-checkout xla        legate-main         ssh://git@github.com/nv-legate/xla.git        ef7eda76596
-checkout legate-jax main                ssh://git@github.com/nv-legate/legate.jax.git ac26817496b
+checkout xla        legate-main         ssh://git@github.com/nv-legate/xla.git        590d67f2fc1
+checkout legate-jax main                ssh://git@github.com/nv-legate/legate.jax.git 755946ed25
 checkout jaxlib     legate-main         ssh://git@github.com/nv-legate/jax.git        dfe51d3f105
 checkout jax        legate-main         ssh://git@github.com/nv-legate/jax.git        dfe51d3f105
 checkout paxml      main                https://github.com/google/paxml.git           cc904d3   paxml.patch
