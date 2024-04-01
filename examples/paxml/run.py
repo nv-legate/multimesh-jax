@@ -81,6 +81,15 @@ legion.add_argument(
     help="The root of the profile file, if Legion profiling should be activated",  # noqa: E501
 )
 
+xla = parser.add_argument_group("XLA")
+
+xla.add_argument(
+    "--debug-nccl",
+    action="store_true",
+    default=False,
+    help="Whether to print NCCL debug information",
+)
+
 legate_jax = parser.add_argument_group("Legate-Jax")
 
 legate_jax.add_argument(
@@ -90,7 +99,6 @@ legate_jax.add_argument(
     help="The JAX backend to use",
     default="legate",
 )
-
 
 legate_jax.add_argument(
     "--no-autoshard", dest="autoshard", action="store_false"
@@ -311,6 +319,7 @@ paxml.add_argument(
     help="A folder for dumping the HLO modules",
 )
 
+args = parser.parse_args()
 
 vmodule = [
     "legate_pjrt_buffer",
@@ -326,7 +335,9 @@ vmodule = [
     "gemm_algorithm_picker",
 ]
 
-args = parser.parse_args()
+if args.debug_nccl:
+    vmodule.append("nccl_utls")
+    vmodule.append("nccl_collective_thunk")
 
 if args.dump_only:
     # forces a debug mode on the run where the HLO module
