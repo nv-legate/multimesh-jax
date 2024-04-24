@@ -124,7 +124,7 @@ index 41b1a9c..7c6c73e 100644
  
  flags.DEFINE_string(
 diff --git a/paxml/partitioning.py b/paxml/partitioning.py
-index 96b81d8..17030b8 100644
+index 96b81d8..0d67f40 100644
 --- a/paxml/partitioning.py
 +++ b/paxml/partitioning.py
 @@ -42,6 +42,7 @@ from praxis import pax_fiddle
@@ -186,6 +186,15 @@ index 96b81d8..17030b8 100644
      return padded_inputs
  
    def get_train_state_metadata(
+@@ -1007,7 +1031,7 @@ class PjitPartitioner(Partitioner):
+       # need to keep this resharding, because the resharding is related to the
+       # locations of the real data (inputs_split_mapping) and is not visible
+       # from HLOs.
+-      inputs = jax.tree_map(reshard_inputs_fn, inputs)
++      #inputs = jax.tree_map(reshard_inputs_fn, inputs)
+ 
+       fn_out = step_fn(
+           self._jax_task,
 @@ -1041,18 +1065,15 @@ class PjitPartitioner(Partitioner):
      logging.info('step_fn fn_in_partition_specs=%s', fn_in_partition_specs)
      logging.info('step_fn fn_out_partition_specs=%s', fn_out_partition_specs)
@@ -326,17 +335,29 @@ index 711693c..b77be16 100644
        # Nothing to do, return immediately to avoid unnecessary work.
        return False
 diff --git a/paxml/tasks/lm/model_params.py b/paxml/tasks/lm/model_params.py
-index e7cbe99..bfa1e52 100644
+index e7cbe99..df80679 100644
 --- a/paxml/tasks/lm/model_params.py
 +++ b/paxml/tasks/lm/model_params.py
-@@ -65,6 +65,7 @@ def set_sharding_annotations_v1(
+@@ -57,15 +57,16 @@ def set_sharding_annotations_v1(
+     dcn_mesh_shape: a 3D sequence representing the mesh across slices, or None.
+   """
+   model_p = task_p.model
+-  asserts.eq(len(ici_mesh_shape), 3)
++  #asserts.eq(len(ici_mesh_shape), 3)
+   model_p.ici_mesh_shape = ici_mesh_shape
+   if dcn_mesh_shape is not None:
+-    asserts.eq(len(dcn_mesh_shape), 3)
++    #asserts.eq(len(dcn_mesh_shape), 3)
+     model_p.dcn_mesh_shape = dcn_mesh_shape
    replica_axis = 'replica'
    data_axis = 'data'
    mdl_axis = 'mdl'
+-  mesh_axis_names = [replica_axis, data_axis, mdl_axis]
 +  seq_axis = 'seq'
-   mesh_axis_names = [replica_axis, data_axis, mdl_axis]
++  mesh_axis_names = [replica_axis, data_axis, mdl_axis, seq_axis]
    task_p.train.inputs_split_mapping = NestedMap(
        map_1d=((replica_axis, data_axis),),
+       map_2d=((replica_axis, data_axis), None))
 @@ -79,6 +80,7 @@ def set_sharding_annotations_v1(
          replica_axis=replica_axis,
          data_axis=data_axis,
@@ -434,7 +455,7 @@ index 09d6f1e..35e525a 100644
    if hasattr(cls, 'PERCORE_BATCH_SIZE'):
      global_batch_size = int(cls.PERCORE_BATCH_SIZE * jax.device_count() + 1e-6)
 diff --git a/paxml/trainer_lib.py b/paxml/trainer_lib.py
-index 933784a..e6bdcb1 100644
+index 933784a..87aece5 100644
 --- a/paxml/trainer_lib.py
 +++ b/paxml/trainer_lib.py
 @@ -19,7 +19,7 @@ import dataclasses
@@ -469,7 +490,7 @@ index 933784a..e6bdcb1 100644
  class RunningMode(enum.Flag):
    """Running mode."""
  
-@@ -920,6 +929,12 @@ class GradFnProtocol(Protocol):
+@@ -920,6 +929,13 @@ class GradFnProtocol(Protocol):
        A tuple of (values, grads).
      """
  
@@ -479,10 +500,11 @@ index 933784a..e6bdcb1 100644
 +@dataclasses.dataclass
 +class MicrobatchConfig:
 +  size: Optional[int] = None
++  batch_reshape: Optional[int] = None
  
  def _get_default_grad_fn(
      excluded_for_grad: NestedMap, excluded_for_opt: NestedMap
-@@ -942,10 +957,10 @@ def _get_default_grad_fn(
+@@ -942,10 +958,10 @@ def _get_default_grad_fn(
  
      def _loss(
          mdl_vars_grad: NestedJTensor,
@@ -495,7 +517,7 @@ index 933784a..e6bdcb1 100644
        merged_vars = jax.tree_map(
            lambda e, x, y: y if e else x,
            excluded_for_grad,
-@@ -958,7 +973,23 @@ def _get_default_grad_fn(
+@@ -958,7 +974,24 @@ def _get_default_grad_fn(
        g = jax.value_and_grad(_loss, has_aux=True, allow_int=True)
      else:
        g = functools.partial(learner.stochastic_gradient.grad_fn, _loss)
@@ -515,12 +537,13 @@ index 933784a..e6bdcb1 100644
 +      arg_shardings = jax.tree_map(microbatch_input_sharding, inputs)
 +      slice_shardings = jax.tree_map(microbatch_slice_sharding, inputs)
 +
-+      g = microbatch(g, dim=0, argnum=2, size=microbatch_config.size, arg_shardings=arg_shardings, microbatch_shardings=slice_shardings)
++      g = microbatch(g, dim=0, argnum=2, batch_reshape=microbatch_config.batch_reshape, 
++                     size=microbatch_config.size, arg_shardings=arg_shardings, microbatch_shardings=slice_shardings)
 +    values, grads = g(with_grad, no_grad, inputs, prng_key)
      grads = jax.tree_map(
          lambda eo, eg, m, g: jnp.zeros_like(m) if eg and not eo else g,
          excluded_for_opt,
-@@ -1601,19 +1632,18 @@ def initialize_partitioned_model_states(
+@@ -1601,19 +1634,18 @@ def initialize_partitioned_model_states(
        lambda p: jax.sharding.NamedSharding(global_mesh, p),
        prng_key_partition_spec,
    )
@@ -551,3 +574,14 @@ index 933784a..e6bdcb1 100644
    train_state_provenance = train_states.build_train_state_provenance(
        partitioned_vars
    )
+@@ -1647,7 +1679,9 @@ def shard_on_batch_dim_partition_spec(
+   sharding = [-1] * x_dim
+   # Assume the first dim is batch, and fully shard the batch dim over the entire
+   # mesh.
+-  sharding[0] = tuple(mesh_names)
++  sharding[0] = tuple([x for x in mesh_names if x != "seq"])
++  if x_dim > 1:
++    sharding[1] = "seq"
+   return base_layer.to_partition_spec(sharding, mesh_names)
+ 
+ 

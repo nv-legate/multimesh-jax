@@ -84,41 +84,12 @@ pybind11 pybind11-global scikit-build tensorflow typing_extensions
 
 COPY xla /opt/xla
 
-RUN cd /opt/xla && \
-  export PYTHON_BIN_PATH=/opt/install/miniconda/envs/legere/bin/python && \
-  export USE_DEFAULT_PYTHON_LIB_PATH=1 && \
-  export TF_NEED_ROCM=0 && \
-  export TF_NEED_CUDA=1 && \
-  export TF_NEED_TENSORRT=0 && \
-  export TF_NCCL_VERSION=2.19.3 && \
-  export TF_CUDA_CLANG=0 && \
-  export TF_CUDA_COMPUTE_CAPABILITIES=sm_80,sm_90a && \
-  export GCC_HOST_COMPILER_PATH=/usr/bin/gcc && \
-  export CC_OPT_FLAGS=--Wno-sign-compare && \
-  export TF_SET_ANDROID_WORKSPACE=0 && \
-  conda run --no-capture-out -n legere python configure.py
-
-
-COPY jaxlib /opt/jaxlib
+COPY jax /opt/jaxlib
+COPY build-jaxlib.sh /opt/jaxlib
 
 ARG BAZEL_CACHE=grpc://host.docker.internal:9092
 
-RUN cd /opt/jaxlib && \
-  export PYTHON_BIN_PATH=/opt/install/miniconda/envs/legere/bin/python && \
-  export USE_DEFAULT_PYTHON_LIB_PATH=1 && \
-  export TF_NEED_ROCM=0 && \
-  export TF_NEED_CUDA=1 && \
-  export TF_NCCL_VERSION=2.19.3 && \
-  export TF_NEED_TENSORRT=0 && \
-  export TF_CUDA_CLANG=0 && \
-  export TF_CUDA_COMPUTE_CAPABILITIES=sm_80,sm_90a && \
-  export GCC_HOST_COMPILER_PATH=/usr/bin/gcc && \
-  export CC_OPT_FLAGS=--Wno-sign-compare && \
-  export TF_SET_ANDROID_WORKSPACE=0 && \
-  conda run --no-capture-out -n legere python build/build.py \
---bazel_options=--override_repository=xla=/opt/xla --bazel_startup_options=--batch \
---bazel_options=--remote_cache=${BAZEL_CACHE} \
---enable_cuda && \
+RUN cd /opt/jaxlib && ./build-jaxlib.sh  ${BAZEL_CACHE} && \
   conda run --no-capture-out -n legere python -m pip install dist/*.whl
 
 COPY jax /opt/jax
@@ -167,6 +138,10 @@ RUN cd /opt/legate && \
   conda run --no-capture-out -n legere cmake --install build --prefix \
 /opt/install/miniconda/envs/legere && \
   conda run --no-capture-out -n legere python -m pip install .
+
+COPY configure-xla.sh /opt/xla
+
+RUN cd /opt/xla && ./configure-xla.sh
 
 COPY legate-jax /opt/legate-jax
 
