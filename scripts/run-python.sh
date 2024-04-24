@@ -51,7 +51,7 @@ while [ : ]; do
         ;;
     -x | --dump)
         echo "Dumping XLA output"
-        export XLA_FLAGS="${XLA_FLAGS} --xla_dump_to=dump --xla_dump_hlo_as_text --xla_dump_hlo_as_dot --xla_dump_hlo_as_proto"
+        export XLA_FLAGS="${XLA_FLAGS} --xla_dump_to=dump --xla_dump_hlo_as_text --xla_dump_hlo_as_proto --xla_dump_hlo_pass_re=.*"
         shift
         ;;
     -o | --metadata-off)

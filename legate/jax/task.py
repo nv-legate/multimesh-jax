@@ -451,12 +451,11 @@ def microbatch(
     size: int,
     argnum: int = 0,
     interleave: int = 1,
+    batch_reshape: Optional[int] = None,
     arg_shardings: Optional[Any] = None,
     microbatch_shardings: Optional[Any] = None,
     unrolling: Optional[int] = None,
     num_pipeline_stages: Optional[int] = None,
-    distribute_first_layer: Optional[bool] = None,
-    distribute_last_layer: Optional[bool] = None,
 ):
     if should_ignore_transforms():
         return fxn
@@ -476,15 +475,20 @@ def microbatch(
         if num_microbatches == 1:
             return fxn(*args, **kwargs)
 
+        if batch_reshape is not None:
+            slice_dim = dim + 1
+            slice_size = size // batch_reshape
+        else:
+            slice_dim = dim
+            slice_size = size
+
         json_args = optional_kwargs(
             num_microbatches=num_microbatches,
-            slice_dim=dim,
-            size=size,
+            slice_dim=slice_dim,
+            size=slice_size,
             interleave=interleave,
             unrolling=unrolling,
             num_pipeline_stages=num_pipeline_stages,
-            distribute_first_layer=distribute_first_layer,
-            distribute_last_layer=distribute_last_layer,
         )
 
         mark_microbatch = no_op(
@@ -513,12 +517,32 @@ def microbatch(
             post_slice_shardings = microbatch_shardings
 
         def slice_microbatch(x, offset: int, arg_pspec: P, slice_pspec: P):
-            offsets = [0] * len(x.shape)
-            offsets[dim] = offset
-            sizes = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
             if arg_pspec is not None:
                 x = with_sharding_constraint(x, arg_pspec)
-            x = jax.lax.dynamic_slice(x, offsets, sizes)
+
+            if batch_reshape is None:
+                offsets = [0] * len(x.shape)
+                offsets[dim] = offset
+                sizes = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
+                x = jax.lax.dynamic_slice(x, offsets, sizes)
+            else:
+                reshaped = (
+                    x.shape[:dim]
+                    + (batch_reshape, x.shape[dim] // batch_reshape)
+                    + x.shape[dim + 1 :]
+                )
+                final_shape = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
+                sizes = (
+                    x.shape[:dim]
+                    + (batch_reshape, size // batch_reshape)
+                    + x.shape[dim + 1 :]
+                )
+                offsets = [0] * (len(x.shape) + 1)
+                offsets[dim + 1] = offset // batch_reshape
+                x = x.reshape(reshaped)
+                x = jax.lax.dynamic_slice(x, offsets, sizes)
+                x = x.reshape(final_shape)
+
             if slice_pspec is not None:
                 x = with_sharding_constraint(x, slice_pspec)
             return mark_microbatch_slice(x)

@@ -143,6 +143,13 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
+    "--microbatch-reshape",
+    type=int,
+    default=None,
+    help="Reshape microbatches to take strided slices",
+)
+
+legate_jax.add_argument(
     "--enable-tracing",
     action="store_true",
     default=False,
@@ -181,19 +188,6 @@ legate_jax.add_argument(
     action="store_false",
     dest="sequence_parallel",
     help="Whether to use sequence parallelism",  # noqa: E501
-)
-
-legate_jax.add_argument(
-    "--shard-vocab",
-    action="store_true",
-    dest="shard_vocab",
-    help="Whether to shard along the vocabulary axis",  # noqa: E501
-)
-legate_jax.add_argument(
-    "--no-shard-vocab",
-    action="store_false",
-    dest="shard_vocab",
-    help="Whether to shard along the vocabulary axis",  # noqa: E501
 )
 
 legate_jax.add_argument(
@@ -319,6 +313,13 @@ paxml.add_argument(
     help="A folder for dumping the HLO modules",
 )
 
+paxml.add_argument(
+    "--dump-all-passes",
+    action="store_true",
+    default=False,
+    help="Whether to dump all intermediate HLO modules",
+)
+
 args = parser.parse_args()
 
 vmodule = [
@@ -331,8 +332,6 @@ vmodule = [
     "legate_store_cache",
     "loop_schedule",
     "legate_ifrt_client",
-    "nccl_utils",
-    "gemm_algorithm_picker",
 ]
 
 if args.debug_nccl:
@@ -382,6 +381,7 @@ xla_flags = [
     "--xla_gpu_all_reduce_combine_threshold_bytes=51200",
     "--xla_gpu_graph_level=0",
     "--xla_gpu_enable_async_all_reduce=true",
+    "--xla_gpu_enable_nccl_comm_splitting=true",
     f"--xla_force_host_platform_device_count={args.cpus}",
 ]
 
@@ -395,7 +395,11 @@ if args.dump:
         f"--xla_dump_to={args.dump}",
         "--xla_dump_hlo_as_text",
         "--xla_dump_hlo_as_proto",
-        "--xla_dump_hlo_as_dot",
+        "--xla_dump_hlo_pass_re=.*",
+    ]
+if args.dump_all_passes:
+    xla_flags = xla_flags + [
+        "--xla_dump_hlo_pass_re=.*",
     ]
 
 
@@ -440,7 +444,6 @@ layers_per_interleave = args.num_layers // args.interleave
 if args.distribute_embeddings:
     logits_num_devices = total_devices
     embeddings_num_devices = total_devices
-
 else:
     logits_num_devices = transformer_num_devices
     embeddings_num_devices = transformer_num_devices
@@ -481,86 +484,95 @@ class LambadaConfig:
                 "FSDP parallelism cannot exceed the microbatch size"
             )
 
-        transformer_x_dim = args.fsdp * args.dp
-        transformer_y_dim = args.tp
-        if transformer_x_dim * transformer_y_dim != transformer_num_devices:
+        transformer_x_dim = args.dp
+        transformer_y_dim = args.fsdp
+        transformer_z_dim = args.tp
+        if (
+            transformer_x_dim * transformer_y_dim * transformer_z_dim
+            != transformer_num_devices
+        ):
             raise Exception(
                 "DP * FSDP * TP does not match no. devices in pipeline stage: "
                 f"{transformer_num_devices}"
             )
 
-        if args.fsdp == 1 and args.microbatch_size < transformer_num_devices:
-            # split the tensor parallelism to shard as much as possible
-            # over the replica dim
-            transformer_x_dim = args.microbatch_size
-            transformer_y_dim = transformer_num_devices // transformer_x_dim
-
-        if args.microbatch_size >= transformer_num_devices:
-            # shard activations across the replica dim only,
-            # no need to shard on seq/model dimensions
-            transformer_axes = [
-                ("replica", "x"),
-                ("replica", "y"),
-                ("data", "x"),
-                ("mdl", "y"),
-                ("data", "y"),
-                ("mdl", "x"),
-            ]
-        elif args.sequence_parallel:
-            # favor sharding activations on the seq dim
-            transformer_axes = [
-                ("replica", "x"),
-                ("seq", "y"),
-                ("data", "x"),
-                ("mdl", "y"),
-                ("data", "y"),
-                ("mdl", "x"),
-                ("replica", "y"),
-            ]
-        else:
-            # favor sharding activations on the mdl dim
-            transformer_axes = [
-                ("replica", "x"),
-                ("data", "x"),
-                ("mdl", "y"),
-                ("mdl", "x"),
-                ("seq", "y"),
-                ("data", "y"),
-                ("replica", "y"),
-            ]
-
-        embedding_x_dim = min(
-            args.microbatch_size, self.embeddings_num_devices
-        )
-        embedding_y_dim = self.embeddings_num_devices // embedding_x_dim
-
-        embeddings_axes = [
+        transformer_axes = [
             ("replica", "x"),
+            ("data", "y"),
+            ("mdl", "z"),
+            # there may be things like the sequence mask
+            # that get used everywhere and they need to be
+            # fully sharded
+            ("seq", "y"),
+            ("seq", "z"),
         ]
-        if args.shard_vocab:
-            embeddings_axes.append(("data", "x"))
+
+        # try to shard as much as possible over the batch dimension
+        if transformer_x_dim < args.microbatch_size and transformer_y_dim == 1:
+            rescale = min(
+                transformer_z_dim, args.microbatch_size // transformer_x_dim
+            )
+            transformer_x_dim *= rescale
+            transformer_z_dim //= rescale
+            transformer_axes.append(("mdl", "x"))
+
+        max_embedding_x_dim = self.embeddings_num_devices // args.tp
+        embedding_x_dim = min(
+            args.microbatch_size,
+            self.embeddings_num_devices,
+            max_embedding_x_dim,
+        )
 
         if args.sequence_parallel:
+            embedding_y_dim = (
+                self.embeddings_num_devices // embedding_x_dim // args.tp
+            )
+            embedding_z_dim = args.tp
             # favor the seq dimension when sharding activations
-            embeddings_axes.append(("seq", "y"))
-            embeddings_axes.append(("mdl", "y"))
-        else:
-            # favor the mdl dimension when sharding activations
-            embeddings_axes.append(("mdl", "y"))
-            embeddings_axes.append(("seq", "y"))
-
-        embeddings_axes.extend(
-            [
-                ("data", "y"),
+            # shard batch dimension on x-axis
+            # shard sequence dimension on y-axis and z-axis
+            # shard vocab dimension on z-axis
+            embeddings_axes = [
+                ("replica", "x"),
+                ("seq", "y"),
+                ("seq", "z"),
+                ("mdl", "z"),
                 ("replica", "y"),
-                ("mdl", "x"),
+                ("replica", "z"),
             ]
-        )
+        else:
+            embedding_y_dim = 1
+            embedding_z_dim = self.embeddings_num_devices // embedding_x_dim
+            # shard batch and hidden dimensions on x-axis
+            # shard vocab dimension on z-axis
+            embeddings_axes = [
+                ("replica", "x"),
+                ("data", "x"),
+                ("mdl", "z"),
+                ("seq", "y"),
+                ("seq", "z"),
+                ("replica", "y"),
+                ("replica", "z"),
+            ]
 
         if args.common_autosharding:
             embeddings_axes = transformer_axes
-            embedding_x_dim = transformer_x_dim
-            embedding_y_dim = transformer_y_dim
+            embeddings_mesh = [
+                transformer_x_dim,
+                transformer_y_dim,
+                transformer_z_dim,
+            ]
+            embeddings_device_axes = ["x", "y", "z"]
+            # the embeddings have a few extra things, make sure arrays
+            # are fully shared over the replica/data dimension
+            embeddings_axes.append(("data", "z"))
+        else:
+            embeddings_mesh = [
+                embedding_x_dim,
+                embedding_y_dim,
+                embedding_z_dim,
+            ]
+            embeddings_device_axes = ["x", "y", "z"]
 
         def compute_devices(name: str):
             layer = int(layer_regex.search(name).groups()[0])
@@ -580,8 +592,8 @@ class LambadaConfig:
         register_task_factory(
             r"(layers_\d+)",
             device_callback=compute_devices,
-            dims=[transformer_x_dim, transformer_y_dim],
-            device_axes=["x", "y"],
+            dims=[transformer_x_dim, transformer_y_dim, transformer_z_dim],
+            device_axes=["x", "y", "z"],
             logical_axes=transformer_axes,
             fusion_color=fusion_color,
         )
@@ -589,40 +601,40 @@ class LambadaConfig:
         register_task(
             "(emb_lookup).*",
             devices=devices[: self.embeddings_num_devices],
-            dims=[embedding_x_dim, embedding_y_dim],
-            device_axes=["x", "y"],
+            dims=embeddings_mesh,
+            device_axes=embeddings_device_axes,
             logical_axes=embeddings_axes,
         )
 
         register_task(
             "(position_emb).*",
             devices=devices[: self.embeddings_num_devices],
-            dims=[embedding_x_dim, embedding_y_dim],
-            device_axes=["x", "y"],
+            dims=embeddings_mesh,
+            device_axes=embeddings_device_axes,
             logical_axes=embeddings_axes,
         )
 
         register_task(
             "(final_ln).*",
             devices=devices[-self.logits_num_devices :],
-            dims=[embedding_x_dim, embedding_y_dim],
-            device_axes=["x", "y"],
+            dims=embeddings_mesh,
+            device_axes=embeddings_device_axes,
             logical_axes=embeddings_axes,
         )
 
         register_task(
             "(compute_loss).*",
             devices=devices[-self.logits_num_devices :],
-            dims=[embedding_x_dim, embedding_y_dim],
-            device_axes=["x", "y"],
+            dims=embeddings_mesh,
+            device_axes=embeddings_device_axes,
             logical_axes=embeddings_axes,
         )
 
         register_task(
             "default",
             devices=devices[: self.embeddings_num_devices],
-            dims=[embedding_x_dim, embedding_y_dim],
-            device_axes=["x", "y"],
+            dims=embeddings_mesh,
+            device_axes=embeddings_device_axes,
             logical_axes=embeddings_axes,
         )
 
@@ -650,6 +662,7 @@ LambadaConfig:
 
 MicrobatchConfig:
   size = {mb_size}
+  batch_reshape = {args.microbatch_reshape}
 """
 
 gin.parse_config(gin_config)
@@ -699,12 +712,12 @@ if (not args.autoshard and not args.hlo) or args.backend != "legate":
         raise ValueError(
             "cannot configure pipeline parallelism through native CUDA backend"
         )
-    argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1]")
-    argv.append(f"--fdl.ICI_MESH_SHAPE=[{args.dp},{args.fsdp},{args.tp}]")
+    argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1,1]")
+    argv.append(f"--fdl.ICI_MESH_SHAPE=[{args.dp},{args.fsdp},{args.tp},1]")
 else:
     argv.append("-enable_auto_sharding")
-    argv.append(f"--fdl.ICI_MESH_SHAPE=[1,{total_devices},1]")
-    argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1]")
+    argv.append(f"--fdl.ICI_MESH_SHAPE=[1,{total_devices},1,1]")
+    argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1,1]")
 
 
 if num_nodes > 1:
