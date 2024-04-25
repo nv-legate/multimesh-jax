@@ -395,7 +395,6 @@ if args.dump:
         f"--xla_dump_to={args.dump}",
         "--xla_dump_hlo_as_text",
         "--xla_dump_hlo_as_proto",
-        "--xla_dump_hlo_pass_re=.*",
     ]
 if args.dump_all_passes:
     xla_flags = xla_flags + [
