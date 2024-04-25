@@ -37,6 +37,7 @@ function(find_or_configure_xla)
     legate_buffer_action_test
     legate_sharding_test
     legate_pjrt_client_test
+    batch_dim_propagation_test
   )
 
 

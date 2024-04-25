@@ -486,6 +486,7 @@ def microbatch(
             num_microbatches=num_microbatches,
             slice_dim=slice_dim,
             size=slice_size,
+            batch_dim=dim,
             interleave=interleave,
             unrolling=unrolling,
             num_pipeline_stages=num_pipeline_stages,
