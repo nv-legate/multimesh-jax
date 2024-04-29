@@ -1,4 +1,6 @@
-FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
+ARG CUDA_VERSION
+ARG CUDNN_VERSION
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel-ubuntu22.04
 
 SHELL [ "/bin/bash", "-eo", "pipefail", "-c" ]
 

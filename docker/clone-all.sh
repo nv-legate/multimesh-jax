@@ -26,12 +26,12 @@ function checkout {
   fi
 }
 
-checkout legion     control_replication ssh://git@gitlab.com/StanfordLegion/legion.git 9d0c95fe2a080
+checkout legion     master              ssh://git@gitlab.com/StanfordLegion/legion.git 0ec7d4c368
 checkout legate     cpp-branch-24.01    ssh://git@github.com/nv-legate/legate.core.internal 97037d54864
-checkout xla        legate-main         ssh://git@github.com/nv-legate/xla.git        590d67f2fc1
-checkout legate-jax main                ssh://git@github.com/nv-legate/legate.jax.git 755946ed25
-checkout jaxlib     legate-main         ssh://git@github.com/nv-legate/jax.git        dfe51d3f105
-checkout jax        legate-main         ssh://git@github.com/nv-legate/jax.git        dfe51d3f105
+checkout xla        legate-main         ssh://git@github.com/nv-legate/xla.git        c8e053af
+checkout legate-jax main                ssh://git@github.com/nv-legate/legate.jax.git e9965dfe
+checkout jaxlib     legate-main         ssh://git@github.com/nv-legate/jax.git        6be1d53d77d475
+checkout jax        legate-main         ssh://git@github.com/nv-legate/jax.git        6be1d53d77d475
 checkout paxml      main                https://github.com/google/paxml.git           cc904d3   paxml.patch
 checkout praxis     main                https://github.com/google/praxis.git          545e00a   praxis.patch
 checkout orbax      main                https://github.com/google/orbax.git           4d372c1

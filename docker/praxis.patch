@@ -12,10 +12,17 @@ index 4d392d3..6bd37ce 100644
        elif isinstance(s_i, (tuple, list)):
          split_dims.append(_parse_split_dims(s_i))
 diff --git a/praxis/layers/transformer_models.py b/praxis/layers/transformer_models.py
-index d58ac66..ef68127 100644
+index d58ac66..af8b2ea 100644
 --- a/praxis/layers/transformer_models.py
 +++ b/praxis/layers/transformer_models.py
-@@ -331,10 +331,7 @@ class TransformerLm(base_layer.BaseLayer):
+@@ -325,16 +325,14 @@ class TransformerLm(base_layer.BaseLayer):
+         if training_optimized
+         else [batch_axes, None, None]
+     )
++
+     egcm = (
+         [data_axis, None, None, mdl_axis]
+         if training_optimized
          else [batch_axes, None, None, None]
      )
  
@@ -27,6 +34,36 @@ index d58ac66..ef68127 100644
  
      # w_df: sharding for weight of ffn0, shape (d, f). ff1 weights will be
      # inferred from it.
+diff --git a/praxis/layers/transformers.py b/praxis/layers/transformers.py
+index 1a7c6ab..3167d2c 100644
+--- a/praxis/layers/transformers.py
++++ b/praxis/layers/transformers.py
+@@ -1333,13 +1333,15 @@ class Transformer(base_layer.BaseLayer):
+       atten_probs: A NestedMap with keys `self_atten` <float>[B, N, T, T].
+     """
+ 
++    """
+     inputs_stats = stats.compute_stats(inputs, jnp.expand_dims(paddings, -1))
+     self.add_summary('xformer_input_mean', inputs_stats.mean_v, verbosity=3)
+     self.add_summary('xformer_input_std', inputs_stats.std_v, verbosity=3)
+     self.add_summary('xformer_input_abs_max', inputs_stats.max_v, verbosity=3)
+ 
+     self.add_summary('attention_input_rms', _rms(inputs), verbosity=4)
+-
++    """
++    
+     if self.norm_policy == 'primer_hybrid':
+       inputs_normalized = self.pre_layer_norm(inputs)
+     elif self.norm_policy == 'pre':
+@@ -1350,7 +1352,7 @@ class Transformer(base_layer.BaseLayer):
+     # Compute self-attention, key/value vectors are the input itself
+     atten_output, self_atten_probs = self.self_attention(
+         inputs_normalized,
+-        inputs_normalized,
++         inputs_normalized,
+         inputs_normalized,
+         atten_mask=attention_mask,
+         query_segment_pos=segment_pos,
 diff --git a/praxis/py_utils.py b/praxis/py_utils.py
 index f1339a6..348e7c7 100644
 --- a/praxis/py_utils.py
