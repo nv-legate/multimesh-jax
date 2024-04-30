@@ -322,6 +322,7 @@ paxml.add_argument(
 
 args = parser.parse_args()
 
+
 vmodule = [
     "legate_pjrt_buffer",
     "hlo_partition",
@@ -337,6 +338,7 @@ vmodule = [
 if args.debug_nccl:
     vmodule.append("nccl_utls")
     vmodule.append("nccl_collective_thunk")
+    vmodule.append("nccl_api")
 
 if args.dump_only:
     # forces a debug mode on the run where the HLO module
@@ -356,6 +358,9 @@ if args.dump_only:
 xla_debug = xla_debug_levels[args.debug]
 
 vmodule_str = ",".join([f"{root}={xla_debug}" for root in vmodule])
+if custom_vmodule := os.environ.get("TF_CPP_VMODULE", None):
+    vmodule_str = vmodule_str + "," + custom_vmodule
+
 LD_LIBRARY_PATH = os.environ.get("LD_LIBRARY_PATH", "")
 env = dict(
     VOCAB_PATH=args.vocab_path,
