@@ -33,6 +33,10 @@ extern "C" void EnableLegateTracing();
 
 extern "C" void DisableLegateTracing();
 
+extern "C" void EnableLegateRecomputation();
+
+extern "C" void DisableLegateRecomputation();
+
 namespace py = pybind11;
 
 extern "C" void LegateShutdown();
@@ -145,6 +149,16 @@ PYBIND11_MODULE(legate_jax_impl, m) {
           EnableLegateTracing();
         } else {
           DisableLegateTracing();
+        }
+      },
+      py::arg("enable"));
+  m.def(
+      "enable_recomputation",
+      [](bool enable) {
+        if (enable) {
+          EnableLegateRecomputation();
+        } else {
+          DisableLegateRecomputation();
         }
       },
       py::arg("enable"));

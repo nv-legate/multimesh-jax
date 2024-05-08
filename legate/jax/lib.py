@@ -17,6 +17,7 @@ from .legate_jax_impl import (
     disable_implicit_tasks,
     enable_fast_path as _enable_fast_path,
     enable_implicit_tasks,
+    enable_recomputation as _enable_recomputaiton,
     enable_tracing as _enable_tracing,
     register_task,
     register_task_factory,
@@ -29,6 +30,8 @@ _ignore_transforms = 0
 _fast_path_enabled = True
 
 _tracing_enabled = False
+
+_recomputation_enabled = False
 
 _GIN_CONFIG_ENV = "LEGATE_GIN_CONFIG"
 
@@ -67,6 +70,22 @@ def enable_fast_path(enable: bool = True):
         if current != enable:
             _enable_fast_path(not enable)
         _fast_path_enabled = current
+
+
+@contextmanager
+def enable_recomputation(enable: bool = True):
+    global _recomputation_enabled
+
+    current = _recomputation_enabled
+    try:
+        if current != enable:
+            _enable_recomputaiton(enable)
+        _recomputation_enabled = enable
+        yield
+    finally:
+        if current != enable:
+            _enable_recomputaiton(not enable)
+        _recomputation_enabled = current
 
 
 @contextmanager

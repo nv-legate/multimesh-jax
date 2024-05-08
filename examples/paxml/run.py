@@ -483,7 +483,8 @@ class LambadaConfig:
 
         layer_regex = re.compile(r"layers_(\d+)")
 
-        if args.microbatch_size < args.fsdp:
+        microbatch_size = args.microbatch_size or batch_size
+        if microbatch_size < args.fsdp:
             raise Exception(
                 "FSDP parallelism cannot exceed the microbatch size"
             )
@@ -512,9 +513,9 @@ class LambadaConfig:
         ]
 
         # try to shard as much as possible over the batch dimension
-        if transformer_x_dim < args.microbatch_size and transformer_y_dim == 1:
+        if transformer_x_dim < microbatch_size and transformer_y_dim == 1:
             rescale = min(
-                transformer_z_dim, args.microbatch_size // transformer_x_dim
+                transformer_z_dim, microbatch_size // transformer_x_dim
             )
             transformer_x_dim *= rescale
             transformer_z_dim //= rescale
@@ -522,7 +523,7 @@ class LambadaConfig:
 
         max_embedding_x_dim = self.embeddings_num_devices // args.tp
         embedding_x_dim = min(
-            args.microbatch_size,
+            microbatch_size,
             self.embeddings_num_devices,
             max_embedding_x_dim,
         )
@@ -711,6 +712,7 @@ argv = [
     "--mode=train",
     "--alsologtostderr",
 ]
+
 if (not args.autoshard and not args.hlo) or args.backend != "legate":
     if args.pp > 1:
         raise ValueError(
@@ -732,38 +734,41 @@ if args.optimizer == "adafactor":
 elif args.optimizer == "sgd":
     argv.append("--fdl.USE_SGD=True")
 
-if args.hlo is None:
-    import jaxlib
+# always enable recomputation
+with legate.jax.enable_recomputation(True):
+    if args.hlo is None:
+        import jaxlib
 
-    sys.argv = argv
-    try:
-        runpy.run_module("paxml.main", run_name="__main__")
-    except jaxlib.xla_extension.XlaRuntimeError as e:
-        need_throw = True
-        if args.dump_only:
-            path = Path(args.dump)
-            if path.exists():
-                globber = (
-                    path / "*pjit_autoshard_step*before_optimizations.hlo.pb"
-                )
-                matches = glob.glob(str(globber))
-                if matches:
-                    print(
-                        "Dump seems to have succeeded in generating "
-                        f"{matches[0]}. Run finished early with error: {e}"
+        sys.argv = argv
+        try:
+            runpy.run_module("paxml.main", run_name="__main__")
+        except jaxlib.xla_extension.XlaRuntimeError as e:
+            need_throw = True
+            if args.dump_only:
+                path = Path(args.dump)
+                if path.exists():
+                    globber = (
+                        path
+                        / "*pjit_autoshard_step*before_optimizations.hlo.pb"
                     )
-                    need_throw = False
+                    matches = glob.glob(str(globber))
+                    if matches:
+                        print(
+                            "Dump seems to have succeeded in generating "
+                            f"{matches[0]}. Run finished early with error: {e}"
+                        )
+                        need_throw = False
 
-        if need_throw:
-            raise e
+            if need_throw:
+                raise e
 
-else:
-    platform = "gpu" if args.gpus else "cpu"
-    legate.jax.compile_hlo_module(
-        args.hlo,
-        num_partitions=total_devices,
-        erase_sharding=args.autoshard,
-        autoshard=args.autoshard,
-        platform=platform,
-        device_mem_gb=args.fbmem,
-    )
+    else:
+        platform = "gpu" if args.gpus else "cpu"
+        legate.jax.compile_hlo_module(
+            args.hlo,
+            num_partitions=total_devices,
+            erase_sharding=args.autoshard,
+            autoshard=args.autoshard,
+            platform=platform,
+            device_mem_gb=args.fbmem,
+        )
