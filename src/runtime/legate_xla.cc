@@ -845,6 +845,10 @@ void SetScalar(legate_xla::StoreHandle handle, size_t launch_size,
   runtime->submit(std::move(task));
 }
 
+void Fence() {
+  legate::Runtime::get_runtime()->issue_execution_fence(/*block=*/true);
+}
+
 enum LegateState { UNINITIALIZED, STARTING, STARTED, STOPPING, STOPPED };
 static std::atomic<int> legate_state{UNINITIALIZED};
 

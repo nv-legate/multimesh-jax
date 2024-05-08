@@ -72,7 +72,10 @@ struct LogicalAxis {
 };
 
 PYBIND11_MODULE(legate_jax_impl, m) {
-  m.def("shutdown", []() { LegateShutdown(); });
+  m.def("shutdown", []() {
+    py::gil_scoped_release release;
+    LegateShutdown();
+  });
   m.def("no_op_custom_call",
         []() { return EncapsulateFunction(no_op_entrypoint); });
   m.def("enable_implicit_tasks", [] { SetEnableImplicitTasks(true); });
@@ -121,6 +124,7 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       [](std::string path, std::string platform, int replica_count,
          int num_partitions, bool erase_sharding, bool autoshard,
          int device_mem_gb) {
+        py::gil_scoped_release release;
         std::optional<int64_t> device_mem;
         if (device_mem_gb != 0) {
           device_mem = int64_t(device_mem_gb) * 1000000000ULL;

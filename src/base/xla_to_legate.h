@@ -66,6 +66,8 @@ void SetScalar(legate_xla::StoreHandle store, size_t launch_size,
 
 void Synchronize(const StoreHandle &store);
 
+void Fence();
+
 void Destroy(StoreHandle &store);
 
 void StartLegate();
