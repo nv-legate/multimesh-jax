@@ -75,7 +75,6 @@ else()
   set(LegateXLA_FOUND FALSE)
 endif()
 
-
 if (NOT LegateXLA_FOUND)
   include(cmake/third_party/get_legate_core.cmake)
   add_subdirectory(src)

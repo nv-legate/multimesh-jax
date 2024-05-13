@@ -894,7 +894,6 @@ std::ostream &operator<<(std::ostream &os, const Shape &shape) {
 
 void initialize_runtime_and_context(legate::Runtime *runtime,
                                     legate::Library context) {
-
   legate_xla::Runtime::initialize(runtime, context);
 }
 

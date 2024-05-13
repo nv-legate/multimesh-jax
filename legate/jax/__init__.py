@@ -8,6 +8,8 @@ from .legate_jax_impl import (
     compile_hlo_module,
 )
 
+from .legate_xla_compiler import register_custom_call_target
+
 from .lib import (
     enable_fast_path,
     enable_tracing,

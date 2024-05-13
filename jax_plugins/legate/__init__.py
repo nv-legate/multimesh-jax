@@ -1,10 +1,12 @@
 from .install_info import libpath
 from pathlib import Path
 import atexit
+import functools
 
 
 def initialize():
     import jax._src.xla_bridge as xb
+    from legate.jax import register_custom_call_target
 
     lib = Path(libpath) / "liblegate_plugin.so"
     c_api = xb.register_plugin(
@@ -15,7 +17,8 @@ def initialize():
     from jaxlib import xla_extension as xe
 
     xla_client.register_custom_call_handler(
-        "CUDA", xe.register_custom_call_target
+        "CUDA",
+        functools.partial(register_custom_call_target, c_api)
     )
 
     import legate.jax

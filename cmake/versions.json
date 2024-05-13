@@ -2,7 +2,7 @@
   "packages" : {
     "LegateCore": {
       "version" : "23.7.0",
-      "git_url" : "https://gitlab-master.nvidia.com/legate/legate.core.internal.git",
+      "git_url" : "git@github.com:nv-legate/legate.core.internal.git",
       "git_tag" : "b86527f4a298c50d8cf57d350c31e584698eb783"
     },
     "OpenXLA" : {

@@ -37,9 +37,9 @@ extern "C" void EnableLegateRecomputation();
 
 extern "C" void DisableLegateRecomputation();
 
-namespace py = pybind11;
-
 extern "C" void LegateShutdown();
+
+namespace py = pybind11;
 
 template <class To, class From>
 typename std::enable_if<sizeof(To) == sizeof(From) &&

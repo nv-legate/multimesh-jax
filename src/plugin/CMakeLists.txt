@@ -10,10 +10,15 @@ add_library(legate_plugin ${_srcs})
 target_link_libraries(legate_plugin PRIVATE xla::xla legate::xla_runtime)
 target_include_directories(legate_plugin PRIVATE ${CMAKE_SOURCE_DIR}/src/base)
 
-
 set_target_properties(legate_plugin PROPERTIES
          LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
          ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
+
+pybind11_add_module(legate_xla_compiler SHARED dummy.cc)
+target_link_libraries(legate_xla_compiler PRIVATE xla::xla_compiler_plugin)
+set_target_properties(legate_xla_compiler PROPERTIES
+         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/legate/jax
+         ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/legate/jax)
 
 pybind11_add_module(legate_jax_impl SHARED legate_jax_impl.cc)
 set_target_properties(legate_jax_impl PROPERTIES

@@ -28,8 +28,8 @@ namespace legate_xla {
     TaskContext context, LegateCompiler *compiler, uint64_t run_id,
     const std::string &platform_name, const HloLoaderOptions &options) {
 
-  uint64_t hlo_id =
-      options.hlo_id.has_value() ? *options.hlo_id : compiler->HloId();
+  const uint64_t hlo_id = options.hlo_id.value_or(compiler->HloId());
+
   // only one GPU per node should be running the compilation
   compile_executable(hlo_id, [&] {
     auto cfg = get_task_config(context);
