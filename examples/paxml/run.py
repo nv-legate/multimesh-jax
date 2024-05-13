@@ -114,6 +114,20 @@ legate_jax.add_argument(
     help="The debug level",
 )
 
+legate_jax.add_argument(
+    "--erase-explicit-sharding",
+    action="store_true",
+    default=False,
+    help="Whether to erase explicit sharding in the module and only use autosharding",  # noqa: E501
+)
+
+legate_jax.add_argument(
+    "--max-replica-sharding",
+    action="store_true",
+    default=False,
+    help="Whether to rearrange the task mesh to shard as much as possible over the replica dimension even when pure model parallelism is requested",  # noqa: E501
+)
+
 xla_debug_levels = {
     None: 0,
     "info": 1,
@@ -149,6 +163,9 @@ legate_jax.add_argument(
     help="Reshape microbatches to take strided slices",
 )
 
+legate_jax.add_argument(
+    "--disable-tracing", dest="enable_tracing", action="store_false"
+)
 legate_jax.add_argument(
     "--enable-tracing",
     action="store_true",
@@ -513,7 +530,11 @@ class LambadaConfig:
         ]
 
         # try to shard as much as possible over the batch dimension
-        if transformer_x_dim < microbatch_size and transformer_y_dim == 1:
+        if (
+            args.max_replica_sharding
+            and transformer_x_dim < microbatch_size
+            and transformer_y_dim == 1
+        ):
             rescale = min(
                 transformer_z_dim, microbatch_size // transformer_x_dim
             )
@@ -670,7 +691,9 @@ MicrobatchConfig:
   batch_reshape = {args.microbatch_reshape}
 """
 
+
 gin.parse_config(gin_config)
+
 if args.hlo:
     # When doing a compile-only test, the config
     # needs to be passed explicitly to the init function
@@ -767,7 +790,7 @@ with legate.jax.enable_recomputation(True):
         legate.jax.compile_hlo_module(
             args.hlo,
             num_partitions=total_devices,
-            erase_sharding=args.autoshard,
+            erase_sharding=args.erase_explicit_sharding,
             autoshard=args.autoshard,
             platform=platform,
             device_mem_gb=args.fbmem,
