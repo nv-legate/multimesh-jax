@@ -90,6 +90,13 @@ xla.add_argument(
     help="Whether to print NCCL debug information",
 )
 
+xla.add_argument(
+   "--collective-matmul",
+   action="store_true",
+   default=False,
+   help="run with collective matul/windowed einsum tensor parallelism",
+)
+
 legate_jax = parser.add_argument_group("Legate-Jax")
 
 legate_jax.add_argument(
@@ -353,7 +360,7 @@ vmodule = [
 ]
 
 if args.debug_nccl:
-    vmodule.append("nccl_utls")
+    vmodule.append("nccl_utils")
     vmodule.append("nccl_collective_thunk")
     vmodule.append("nccl_api")
 
@@ -389,23 +396,28 @@ env = dict(
     JAX_COMPILER_DETAILED_LOGGING_MIN_OPS=0,
     LD_LIBRARY_PATH=f"{LD_LIBRARY_PATH}:/usr/local/cuda/lib64",
 )
+
 if args.backend == "legate":
     env["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
 xla_flags = [
     "--xla_gpu_enable_latency_hiding_scheduler=true",
     "--xla_gpu_enable_triton_gemm=false",
-    "--xla_gpu_simplify_all_fp_conversions",
-    "--xla_gpu_enable_async_all_gather=true",
-    "--xla_gpu_enable_async_reduce_scatter=true",
     "--xla_gpu_enable_highest_priority_async_stream=true",
     "--xla_gpu_enable_triton_softmax_fusion=false",
     "--xla_gpu_all_reduce_combine_threshold_bytes=51200",
     "--xla_gpu_graph_level=0",
-    "--xla_gpu_enable_async_all_reduce=true",
     "--xla_gpu_enable_nccl_comm_splitting=true",
     f"--xla_force_host_platform_device_count={args.cpus}",
 ]
+
+if args.collective_matmul:
+    xla_flags.extend([
+        "--xla_gpu_threshold_for_windowed_einsum_mib=20",
+        "--xla_gpu_multi_streamed_windowed_einsum=true",
+        "--xla_gpu_enable_nccl_user_buffers=true",
+    #    "--xla_gpu_use_memcpy_local_p2p=true",
+    ])
 
 if args.dump_only and args.dump is None:
     raise ValueError(
@@ -481,7 +493,6 @@ dims_per_head = args.model_dims // args.num_heads
 
 for key, val in env.items():
     os.environ[key] = str(val)
-
 
 @gin.configurable
 @dataclass
