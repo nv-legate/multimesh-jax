@@ -91,10 +91,17 @@ xla.add_argument(
 )
 
 xla.add_argument(
-   "--collective-matmul",
-   action="store_true",
-   default=False,
-   help="run with collective matul/windowed einsum tensor parallelism",
+    "--use-nccl-comm-split",
+    action="store_true",
+    default=False,
+    help="Whether to use comm split to create communicators",
+)
+
+xla.add_argument(
+    "--collective-matmul",
+    type=int,
+    default=None,
+    help="Specify the cutoff in MiB for activating collective matul/windowed einsum tensor parallelism",  # noqa: E501
 )
 
 legate_jax = parser.add_argument_group("Legate-Jax")
@@ -243,6 +250,13 @@ legate_jax.add_argument(
 )
 
 paxml = parser.add_argument_group("PaxML")
+
+paxml.add_argument(
+    "--paxml-config",
+    type=str,
+    default="paxml.contrib.gpu.scripts_gpu.configs.Lambada126M",
+    help="The PaxML model spec to pass to --fdl_config",
+)
 
 paxml.add_argument(
     "--num-heads",
@@ -407,17 +421,18 @@ xla_flags = [
     "--xla_gpu_enable_triton_softmax_fusion=false",
     "--xla_gpu_all_reduce_combine_threshold_bytes=51200",
     "--xla_gpu_graph_level=0",
-    "--xla_gpu_enable_nccl_comm_splitting=true",
+    f"--xla_gpu_enable_nccl_comm_splitting={str(args.use_nccl_comm_split).lower()}",  # noqa: E501
     f"--xla_force_host_platform_device_count={args.cpus}",
 ]
 
-if args.collective_matmul:
-    xla_flags.extend([
-        "--xla_gpu_threshold_for_windowed_einsum_mib=20",
-        "--xla_gpu_multi_streamed_windowed_einsum=true",
-        "--xla_gpu_enable_nccl_user_buffers=true",
-    #    "--xla_gpu_use_memcpy_local_p2p=true",
-    ])
+if args.collective_matmul is not None:
+    xla_flags.extend(
+        [
+            f"--xla_gpu_threshold_for_windowed_einsum_mib={args.collective_matmul}",  # noqa: E501
+            "--xla_gpu_multi_streamed_windowed_einsum=true",
+            "--xla_gpu_use_memcpy_local_p2p=true",
+        ]
+    )
 
 if args.dump_only and args.dump is None:
     raise ValueError(
@@ -435,9 +450,10 @@ if args.dump_all_passes:
         "--xla_dump_hlo_pass_re=.*",
     ]
 
+if existing_xla_flags := os.environ.get("XLA_FLAGS", None):
+    xla_flags.append(existing_xla_flags)
 
 env["XLA_FLAGS"] = " ".join(xla_flags)
-
 
 if args.gpus == 0:
     if args.eager_sysmem is None:
@@ -493,6 +509,7 @@ dims_per_head = args.model_dims // args.num_heads
 
 for key, val in env.items():
     os.environ[key] = str(val)
+
 
 @gin.configurable
 @dataclass
@@ -733,7 +750,7 @@ argv = [
     f"--fdl.MODEL_DIMS={args.model_dims}",
     f"--fdl.HIDDEN_DIMS={hidden_dims}",
     f"--fdl.DIMS_PER_HEAD={dims_per_head}",
-    "--fdl_config=paxml.contrib.gpu.scripts_gpu.configs.Lambada126M",
+    f"--fdl_config={args.paxml_config}",
     f"--fdl.FPROP_DTYPE='{args.precision}'",
     "--fdl.LAMBADA_TRAIN=True",
     "--fdl.REMAT=True",
