@@ -19,8 +19,7 @@ void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
 StoreHandle CreateStore(const legate_xla::Shape &shape,
                         std::optional<std::string> name = std::nullopt);
 
-StoreHandle Reshard(const StoreHandle &handle,
-                    const std::vector<int64_t> &tile_shape);
+StoreHandle Reshard(const StoreHandle &handle, const Shape &reshard_shape);
 
 void SliceLocalShards(const StoreHandle &handle,
                       std::vector<void *> &local_shards,

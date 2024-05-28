@@ -550,10 +550,8 @@ class LambadaConfig:
             ("replica", "x"),
             ("data", "y"),
             ("mdl", "z"),
-            # there may be things like the sequence mask
-            # that get used everywhere and they need to be
-            # fully sharded
-            ("seq", "y"),
+            # we minimally need to shard on z dimension here
+            # to ensure that input batches are fully sharded
             ("seq", "z"),
         ]
 
@@ -601,12 +599,11 @@ class LambadaConfig:
             # shard vocab dimension on z-axis
             embeddings_axes = [
                 ("replica", "x"),
-                ("data", "x"),
+                ("data", "y"),
                 ("mdl", "z"),
-                ("seq", "y"),
+                # we minimally need to shard on z dimension here
+                # to ensure that input batches are fully sharded
                 ("seq", "z"),
-                ("replica", "y"),
-                ("replica", "z"),
             ]
 
         if args.common_autosharding:

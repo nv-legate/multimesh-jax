@@ -155,6 +155,8 @@ bool operator==(const Shape &lhs, const Shape &rhs) {
   return *lhs.tile_shape == *rhs.tile_shape;
 }
 
+bool operator!=(const Shape &lhs, const Shape &rhs) { return !(lhs == rhs); }
+
 struct StoreHandleImpl {
 
   StoreHandleImpl(legate::LogicalStore store, Shape shape, std::string name)
@@ -684,14 +686,17 @@ StoreFuture AssembleShards(const legate_xla::Shape &logical_shape,
 #endif
 }
 
-StoreHandle Reshard(const StoreHandle &handle,
-                    const std::vector<int64_t> &tile_shape) {
+StoreHandle Reshard(const StoreHandle &handle, const Shape &reshard_shape) {
   if (!handle.impl->shape().tile_shape.has_value() ||
-      tile_shape != *handle.impl->shape().tile_shape) {
+      reshard_shape != handle.impl->shape()) {
 
-    Shape new_shape = handle.impl->shape();
-    new_shape.tile_shape = tile_shape;
-    auto resharding = handle.impl->FindResharding(new_shape);
+    if (reshard_shape.replicated > 1) {
+      std::string error_msg =
+          handle.impl->name() + " cannot reshard replicated store";
+      throw std::runtime_error(std::move(error_msg));
+    }
+
+    auto resharding = handle.impl->FindResharding(reshard_shape);
     if (resharding) {
       log_xla.debug() << "Reshard reusing " << handle.impl.get()
                       << ", name=" << handle.impl->name()
@@ -706,9 +711,8 @@ StoreHandle Reshard(const StoreHandle &handle,
 
     const auto &range = core_runtime->get_machine().processor_range();
     auto global_size = range.high - range.low;
-    Shape store_shape = ComputeStoreShape(new_shape);
     auto new_impl = std::make_shared<StoreHandleImpl>(
-        handle.impl->store(), std::move(new_shape), handle.impl->name());
+        handle.impl->store(), std::move(reshard_shape), handle.impl->name());
 
     log_xla.debug() << "Reshard " << handle.impl.get()
                     << ", name=" << handle.impl->name()
@@ -716,9 +720,8 @@ StoreHandle Reshard(const StoreHandle &handle,
                     << ", new=" << new_impl->shape()
                     << ", store=" << new_impl.get();
 
-    std::vector<size_t> legate_tile_shape{tile_shape.begin(), tile_shape.end()};
-    new_impl->SetPartition(
-        new_impl->store().partition_by_tiling(legate_tile_shape));
+    new_impl->SetPartition(new_impl->store().partition_by_tiling(
+        {reshard_shape.tile_shape->begin(), reshard_shape.tile_shape->end()}));
 
     handle.impl->AddResharding(new_impl);
 
