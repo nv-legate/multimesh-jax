@@ -28,7 +28,6 @@ set_target_properties(legate_jax_impl PROPERTIES
 target_link_libraries(legate_jax_impl PRIVATE legate::xla_runtime xla::xla)
 set_target_properties(legate_jax_impl PROPERTIES INSTALL_RPATH "$ORIGIN/../../../..:$ORIGIN/../../build/lib")
 set_target_properties(legate_jax_impl PROPERTIES SKIP_BUILD_RPATH FALSE)
-set_target_properties(legate_jax_impl PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
 
 set_target_properties(legate_plugin PROPERTIES
          LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
