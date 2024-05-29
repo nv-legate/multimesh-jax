@@ -97,6 +97,7 @@ export TF_CPP_VMODULE=legate_pjrt_buffer=$debug,legate_computation=$debug,legate
 export JAX_TRACEBACK_FILTERING=off
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export JAX_COMPILER_DETAILED_LOGGING_MIN_OPS=0
+export UCX_TLS=^mm
 
 echo "Running $@ with ${gpus} GPUS"
 
