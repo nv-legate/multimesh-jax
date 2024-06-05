@@ -1,0 +1,69 @@
+diff --git a/transformer_engine/jax/cpp_extensions.py b/transformer_engine/jax/cpp_extensions.py
+index ba1d443..4bf666b 100644
+--- a/transformer_engine/jax/cpp_extensions.py
++++ b/transformer_engine/jax/cpp_extensions.py
+@@ -199,6 +199,7 @@ def register_primitive(cls):
+     inner_p.def_impl(partial(xla.apply_primitive, inner_p))
+     inner_p.def_abstract_eval(cls.abstract)
+     mlir.register_lowering(inner_p, cls.lowering, platform='cuda')
++    mlir.register_lowering(inner_p, cls.lowering, platform='legate')
+     cls.inner_primitive = inner_p
+ 
+     outer_p = core.Primitive(name_of_wrapper_p())
+@@ -681,8 +682,8 @@ class LayerNormBwdPrimitive(BasePrimitive):
+                 LayerNormBwdPrimitive.impl(dz, x, mu, rsigma, gamma,
+                      zero_centered_gamma=zero_centered_gamma,
+                      epsilon=epsilon)
+-            global_dgamma = all_reduce_sum_along_dp_fsdp(local_dgamma)
+-            global_dbeta = all_reduce_sum_along_dp_fsdp(local_dbeta)
++            global_dgamma = all_reduce_sum_along_dp_fsdp(local_dgamma, mesh)
++            global_dbeta = all_reduce_sum_along_dp_fsdp(local_dbeta, mesh)
+             return local_dx, global_dgamma, global_dbeta
+ 
+         return mesh, sharded_impl, out_shardings, arg_shardings
+diff --git a/transformer_engine/jax/sharding.py b/transformer_engine/jax/sharding.py
+index 205ac56..fbfda1f 100644
+--- a/transformer_engine/jax/sharding.py
++++ b/transformer_engine/jax/sharding.py
+@@ -30,8 +30,8 @@ W_TP_AXES = 'nvte_w_tp'
+ W_JOINED_AXES = 'nvte_w_joined'
+ 
+ 
+-def _get_mesh_info(resource: str):
+-    mesh = _PXLA_THREAD_RESOURCES.env.physical_mesh
++def _get_mesh_info(resource: str, mesh):
++    mesh = mesh or _PXLA_THREAD_RESOURCES.env.physical_mesh
+     assert resource in mesh.axis_names, \
+         f"{resource} is not in the axis_names of Mesh {mesh}."
+     return mesh.shape[resource], resource
+@@ -130,12 +130,12 @@ def get_padded_spec(spec, ndim):
+     return spec + (None,) * (ndim - len(spec))
+ 
+ 
+-def lax_paral_op(x: jnp.array, ops: Callable, mesh_resource: str):
++def lax_paral_op(x: jnp.array, ops: Callable, mesh_resource: str, mesh):
+     """
+     A wrapper function to invoke lax.p* operations, like psum.
+     """
+     if mesh_resource is not None:
+-        _, resource = _get_mesh_info(mesh_resource)
++        _, resource = _get_mesh_info(mesh_resource, mesh)
+         return ops(x, resource)
+     return x
+ 
+@@ -198,12 +198,12 @@ def global_mesh_resource() -> MeshResource:
+     return _GLOBAL_MESH_RESOURCE
+ 
+ 
+-def all_reduce_sum_along_dp_fsdp(x: jnp.array):
++def all_reduce_sum_along_dp_fsdp(x: jnp.array, mesh):
+     """
+     All-Reduce (Sum) along DP and FSDP mesh axes.
+     """
+-    x = lax_paral_op(x, jax.lax.psum, global_mesh_resource().dp_resource)
+-    return lax_paral_op(x, jax.lax.psum, global_mesh_resource().fsdp_resource)
++    x = lax_paral_op(x, jax.lax.psum, global_mesh_resource().dp_resource, mesh)
++    return lax_paral_op(x, jax.lax.psum, global_mesh_resource().fsdp_resource, mesh)
+ 
+ 
+ def all_reduce_max_along_all_axes_except_PP(x: jnp.array):

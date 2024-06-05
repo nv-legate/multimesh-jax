@@ -66,7 +66,7 @@ RUN cd /opt/MLNX_OFED_LINUX-5.4-3.5.8.0-ubuntu22.04-x86_64 && \
 
 # Python 3.10.6 is a requirement to make lingvo happy with all the other dependencies
 RUN conda run --no-capture-out -n legere conda install -c conda-forge -y cmake cython ninja openblas \
-  python==3.10.6 rust openssh
+  python==3.10.6 rust openssh gdb==14.2
 
 RUN cd /opt && \
   conda run --no-capture-out -n legere git clone -b master https://github.com/openucx/ucx.git ucx
@@ -84,22 +84,6 @@ RUN cd /opt/ucx && \
 RUN conda run --no-capture-out -n legere python -m pip install build cffi gin-config numpy pyarrow \
 pybind11 pybind11-global scikit-build tensorflow typing_extensions
 
-COPY xla /opt/xla
-
-COPY jax /opt/jaxlib
-COPY build-jaxlib.sh /opt/jaxlib
-
-ARG BAZEL_CACHE=grpc://host.docker.internal:9092
-
-RUN cd /opt/jaxlib && ./build-jaxlib.sh  ${BAZEL_CACHE} && \
-  conda run --no-capture-out -n legere python -m pip install dist/*.whl
-
-COPY jax /opt/jax
-
-RUN cd /opt/jax && \
-  conda run --no-capture-out -n legere python -m pip install -e .
-
-
 COPY legion /opt/legion
 
 ARG LEGATE_BUILD_TYPE=Release
@@ -109,6 +93,8 @@ RUN cd /opt/legion && \
 -DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++ -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc \
 -DCMAKE_LIBRARY_PATH:STRING=/usr/lib/x86_64-linux-gnu -DCMAKE_CXX_STANDARD:STRING=17 \
 -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE:STRING="${LEGATE_BUILD_TYPE}" -DLegion_USE_CUDA:BOOL=ON \
+-DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -ggdb" \
+-DCMAKE_CXX_FLAGS_DEBUG="-O0 -ggdb" \
 -DLegion_MAX_DIM:STRING=5 -DLegion_USE_OpenMP:BOOL=ON -DLegion_USE_GASNet:BOOL=OFF \
 -DLegion_USE_Python:BOOL=ON -DLegion_VERSION:STRING=24.5.0 -DLegion_BUILD_BINDINGS:BOOL=ON \
 -DLegion_REDOP_COMPLEX:BOOL=ON -DLegion_HIJACK_CUDART:BOOL=OFF -DLegion_GPU_REDUCTIONS:BOOL=OFF \
@@ -135,11 +121,20 @@ RUN cd /opt/legate && \
 -DCMAKE_INSTALL_PREFIX:PATH=/opt/install/miniconda/envs/legere && \
   conda run --no-capture-out -n legere cmake --build build
 
-RUN cd /opt/legate && \
-  export CMAKE_ARGS="-DFIND_LEGATE_CORE_CPP:BOOL=ON -Dlegate_core_ROOT:PATH=/opt/legate/build" && \
-  conda run --no-capture-out -n legere cmake --install build --prefix \
-/opt/install/miniconda/envs/legere && \
-  conda run --no-capture-out -n legere python -m pip install .
+COPY xla /opt/xla
+
+COPY jax /opt/jaxlib
+COPY build-jaxlib.sh /opt/jaxlib
+
+ARG BAZEL_CACHE=grpc://host.docker.internal:9092
+
+RUN cd /opt/jaxlib && ./build-jaxlib.sh  ${BAZEL_CACHE} && \
+  conda run --no-capture-out -n legere python -m pip install dist/*.whl
+
+COPY jax /opt/jax
+
+RUN cd /opt/jax && \
+  conda run --no-capture-out -n legere python -m pip install -e .
 
 COPY configure-xla.sh /opt/xla
 
@@ -193,6 +188,11 @@ RUN cd /opt/praxis  && conda run -n legere python -m pip install -e . --no-deps 
 COPY paxml /opt/paxml
 RUN cd /opt/paxml   && conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
 
+COPY te /opt/te
+RUN export NVTE_FRAMEWORK=jax && cd /opt/te \
+   && conda run -n legere python -m pip install cmake \
+   && conda run -n legere python -m pip install -e . --no-build-isolation
+
 RUN cd /opt && \
   wget https://developer.nvidia.com/downloads/assets/tools/secure/nsight-systems/2024_1/nsight-systems-2024.1.1_2024.1.1.59-1_amd64.deb && \
   apt-get update && \
@@ -206,6 +206,8 @@ RUN mkdir -p /root/.config/NVIDIA\ Corporation && \
 COPY entrypoint.sh /opt/entrypoint.sh
 
 COPY tags /opt/tags
+COPY praxis.patch /opt/praxis.patch
+COPY paxml.patch /opt/paxml.patch
 
 ENTRYPOINT [ "/opt/entrypoint.sh" ]
 

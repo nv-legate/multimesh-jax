@@ -13,7 +13,11 @@ export CC_OPT_FLAGS=--Wno-sign-compare
 export TF_SET_ANDROID_WORKSPACE=0
 
 conda run --no-capture-out -n legere python configure.py \
-  --backend CUDA --host_compiler GCC \
+  --backend CUDA \
+  --host_compiler GCC \
   --nccl \
   --nccl_version=$TF_NCCL_VERSION \
   --cuda_compute_capabilities=sm_80,sm_90a
+
+python_version=$(/opt/install/miniconda/envs/legere/bin/python --version | awk '{print $2}' | cut -d . -f 1-2)
+echo "build --repo_env HERMETIC_PYTHON_VERSION=${python_version}" >> xla_configure.bazelrc

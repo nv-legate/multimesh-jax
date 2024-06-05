@@ -3,7 +3,8 @@
 cuda_version=12.4.1
 cudnn_version=
 build_type=Release
-label=`echo $build_type | tr '[:upper:]' '[:lower:]'`
+default_label=`echo $build_type | tr '[:upper:]' '[:lower:]'`
+label=${1:-$default_label}
 
 ./tags.sh
 docker build \
