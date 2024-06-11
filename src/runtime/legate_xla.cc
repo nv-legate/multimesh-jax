@@ -915,3 +915,9 @@ extern "C" void LegateShutdown() {
   legate_xla::StopLegate();
   ShutdownLegateClient();
 }
+
+extern "C" void LegateFence() {
+  // Make sure to clear all handles held by Legate
+  // so that nothing gets deleted during program cleanup
+  legate_xla::Fence();
+}

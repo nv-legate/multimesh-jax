@@ -4,6 +4,7 @@ from .legate_jax_impl import (
     register_task_factory,
     shutdown,
     replicate_parameters_smaller_than_num_elements,
+    fence,
     unregister_task,
     clear_tasks,
     compile_hlo_module,
