@@ -39,6 +39,8 @@ extern "C" void DisableLegateRecomputation();
 
 extern "C" void LegateShutdown();
 
+extern "C" void ReplicateParametersSmallerThanNumElements(int64_t num_elements);
+
 namespace py = pybind11;
 
 template <class To, class From>
@@ -156,6 +158,12 @@ PYBIND11_MODULE(legate_jax_impl, m) {
         }
       },
       py::arg("enable"));
+  m.def(
+      "replicate_parameters_smaller_than_num_elements",
+      [](int64_t num_elements) {
+        ReplicateParametersSmallerThanNumElements(num_elements);
+      },
+      py::arg("num_elements"));
   m.def(
       "enable_recomputation",
       [](bool enable) {

@@ -219,16 +219,13 @@ struct Shape {
   SupportedType type;
   std::vector<int64_t> dims;
   std::optional<std::vector<int64_t>> tile_shape;
-  int64_t replicated{1};
+  int64_t explicit_replication{1};
   size_t num_tiles{1};
 };
 
 bool operator==(const Shape &lhs, const Shape &rhs);
 
-struct Tile {
-  std::vector<int64_t> origin;
-  std::vector<int64_t> dims;
-};
+bool operator!=(const Shape &lhs, const Shape &rhs);
 
 struct StoreHandleImpl;
 

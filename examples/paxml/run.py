@@ -243,10 +243,10 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
-    "--dump-only",
+    "--dump-hlo",
     action="store_true",
     default=False,
-    help="Whether to only dump HLO modules without full execution",
+    help="Whether to dump HLO modules without full execution",
 )
 
 paxml = parser.add_argument_group("PaxML")
@@ -263,6 +263,13 @@ paxml.add_argument(
     type=int,
     default=12,
     help="The number of attention heads",
+)
+
+paxml.add_argument(
+    "--sequence-length",
+    type=int,
+    default=2048,
+    help="The sequence length",
 )
 
 paxml.add_argument(
@@ -378,19 +385,15 @@ if args.debug_nccl:
     vmodule.append("nccl_collective_thunk")
     vmodule.append("nccl_api")
 
-if args.dump_only:
+
+if args.dump_hlo:
     # forces a debug mode on the run where the HLO module
     # is generated from a single CPU run
-    args.cpus = 1
+    args.cpus = args.gpus
     args.gpus = 0
-    args.pp = 1
-    args.tp = 1
-    args.dp = 1
-    args.fsdp = 1
-    args.nodes = 1
     if args.batch_size is None:
         raise ValueError(
-            "must give explicit --batch-size when using --dump-only"
+            "must give explicit --batch-size when using --dump-hlo"
         )
 
 xla_debug = xla_debug_levels[args.debug]
@@ -434,7 +437,7 @@ if args.collective_matmul is not None:
         ]
     )
 
-if args.dump_only and args.dump is None:
+if args.dump_hlo and args.dump is None:
     raise ValueError(
         "--dump-only requsted, but not HLO dump folder passed to --dump"
     )
@@ -554,6 +557,11 @@ class LambadaConfig:
             # to ensure that input batches are fully sharded
             ("seq", "z"),
         ]
+        transformer_mesh = [
+            transformer_x_dim,
+            transformer_y_dim,
+            transformer_z_dim,
+        ]
 
         # try to shard as much as possible over the batch dimension
         if (
@@ -643,7 +651,7 @@ class LambadaConfig:
         register_task_factory(
             r"(layers_\d+)",
             device_callback=compute_devices,
-            dims=[transformer_x_dim, transformer_y_dim, transformer_z_dim],
+            dims=transformer_mesh,
             device_axes=["x", "y", "z"],
             logical_axes=transformer_axes,
             fusion_color=fusion_color,
@@ -702,6 +710,7 @@ ClientConfig:
 PaxLegateConfig:
   configurable = @LambadaConfig
   enable_tracing = {args.enable_tracing}
+  local_mesh = ({args.dp}, {args.fsdp}, {args.tp}, 1)
 
 LambadaConfig:
   num_devices = {total_devices}
@@ -766,13 +775,13 @@ if (not args.autoshard and not args.hlo) or args.backend != "legate":
         raise ValueError(
             "cannot configure pipeline parallelism through native CUDA backend"
         )
-    argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1,1]")
-    argv.append(f"--fdl.ICI_MESH_SHAPE=[{args.dp},{args.fsdp},{args.tp},1]")
 else:
     argv.append("-enable_auto_sharding")
-    argv.append(f"--fdl.ICI_MESH_SHAPE=[1,{total_devices},1,1]")
-    argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1,1]")
 
+argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1,1]")
+argv.append(
+    f"--fdl.ICI_MESH_SHAPE=[{args.dp},{args.fsdp},{args.tp * args.pp},1]"
+)
 
 if num_nodes > 1:
     argv.append("--multiprocess_gpu")
@@ -784,7 +793,10 @@ elif args.optimizer == "sgd":
 
 # always enable recomputation
 with legate.jax.enable_recomputation(True):
-    if args.hlo is None:
+    legate.jax.replicate_parameters_smaller_than_num_elements(
+        batch_size * args.sequence_length
+    )
+    if args.hlo is None or args.dump_hlo:
         import jaxlib
 
         sys.argv = argv
@@ -792,7 +804,7 @@ with legate.jax.enable_recomputation(True):
             runpy.run_module("paxml.main", run_name="__main__")
         except jaxlib.xla_extension.XlaRuntimeError as e:
             need_throw = True
-            if args.dump_only:
+            if args.dump_hlo:
                 path = Path(args.dump)
                 if path.exists():
                     globber = (
@@ -809,14 +821,32 @@ with legate.jax.enable_recomputation(True):
 
             if need_throw:
                 raise e
+        except Exception as e:
+            # if dumping the hlo, squash the exception
+            if not args.dump_hlo:
+                raise e
+            else:
+                print(e)
 
-    else:
+    if args.hlo is not None:
+        # restore the original GPU count
+        if args.dump_hlo:
+            args.gpus = args.cpus
+        # sort of funky here, but we have to instantiate the client
+        # to force custom call registration
+        # the easiest way to instantiate is to print the device list
+        import jax
+
+        print(jax.devices())
         platform = "gpu" if args.gpus else "cpu"
-        legate.jax.compile_hlo_module(
-            args.hlo,
-            num_partitions=total_devices,
-            erase_sharding=args.erase_explicit_sharding,
-            autoshard=args.autoshard,
-            platform=platform,
-            device_mem_gb=args.fbmem,
-        )
+        from paxml.partitioning import LegateMeshWrapper
+
+        with LegateMeshWrapper.mode(LegateMeshWrapper.Mode.COMPILING):
+            legate.jax.compile_hlo_module(
+                args.hlo,
+                num_partitions=total_devices,
+                erase_sharding=args.erase_explicit_sharding,
+                autoshard=args.autoshard,
+                platform=platform,
+                device_mem_gb=args.fbmem,
+            )

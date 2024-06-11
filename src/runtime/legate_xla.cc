@@ -40,11 +40,7 @@ int64_t GetRunId() {
 }
 
 size_t LaunchSize(const Shape &shape, size_t default_size) {
-  if (shape.replicated) {
-    return default_size;
-  }
-
-  size_t size = shape.replicated;
+  size_t size = shape.explicit_replication;
   for (size_t dim = 0; dim < shape.dims.size(); ++dim) {
     if (shape.tile_shape.has_value()) {
       size_t color_shape = shape.dims[dim] / (*shape.tile_shape)[dim];
@@ -101,7 +97,7 @@ Shape ComputeStoreShape(const Shape &shape) {
   }
   bool scalar = dim_product <= 1;
 
-  Shape store_shape{.type = shape.type, .replicated = 1};
+  Shape store_shape{.type = shape.type, .explicit_replication = 1};
 
   if (scalar) {
     // ignore replication on scalars
@@ -109,8 +105,8 @@ Shape ComputeStoreShape(const Shape &shape) {
     return store_shape;
   }
 
-  if (shape.replicated > 1) {
-    store_shape.dims.push_back(shape.replicated);
+  if (shape.explicit_replication > 1) {
+    store_shape.dims.push_back(shape.explicit_replication);
     store_shape.dims.insert(store_shape.dims.end(), shape.dims.begin(),
                             shape.dims.end());
     store_shape.tile_shape = {1};
@@ -146,13 +142,19 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &vec) {
 
 bool operator==(const Shape &lhs, const Shape &rhs) {
   bool global_match = lhs.type == rhs.type && lhs.dims == rhs.dims &&
-                      lhs.replicated == rhs.replicated &&
+                      lhs.explicit_replication == rhs.explicit_replication &&
                       lhs.tile_shape.has_value() == rhs.tile_shape.has_value();
   if (!global_match) {
     return false;
   }
 
-  return *lhs.tile_shape == *rhs.tile_shape;
+  // if they both have tile shapes, check if equal
+  if (lhs.tile_shape.has_value() && rhs.tile_shape.has_value()) {
+    return *lhs.tile_shape == *rhs.tile_shape;
+  }
+
+  // these can only be equal if neither has tile shapes
+  return !lhs.tile_shape.has_value() && !rhs.tile_shape.has_value();
 }
 
 bool operator!=(const Shape &lhs, const Shape &rhs) { return !(lhs == rhs); }
@@ -427,9 +429,10 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
   }
 
   auto check_replication_error = [=](const StoreHandle &store) {
-    if (store.impl->HasPartition() && store.impl->shape().replicated > 1) {
-      size_t tensor_launch_size =
-          store.impl->shape().replicated * store.impl->shape().num_tiles;
+    if (store.impl->HasPartition() &&
+        store.impl->shape().explicit_replication > 1) {
+      size_t tensor_launch_size = store.impl->shape().explicit_replication *
+                                  store.impl->shape().num_tiles;
       if (tensor_launch_size < launch_size) {
         // if this was created with a manual replication smaller than the
         // launch size then not all partitions will be satisfied
@@ -687,14 +690,10 @@ StoreFuture AssembleShards(const legate_xla::Shape &logical_shape,
 }
 
 StoreHandle Reshard(const StoreHandle &handle, const Shape &reshard_shape) {
+  log_xla.debug() << "Resharding " << handle.impl->name() << " from "
+                  << handle.impl->shape() << " to " << reshard_shape;
   if (!handle.impl->shape().tile_shape.has_value() ||
       reshard_shape != handle.impl->shape()) {
-
-    if (reshard_shape.replicated > 1) {
-      std::string error_msg =
-          handle.impl->name() + " cannot reshard replicated store";
-      throw std::runtime_error(std::move(error_msg));
-    }
 
     auto resharding = handle.impl->FindResharding(reshard_shape);
     if (resharding) {
@@ -707,10 +706,13 @@ StoreHandle Reshard(const StoreHandle &handle, const Shape &reshard_shape) {
                          .unique_id = handle.unique_id};
     }
 
-    auto core_runtime = legate::Runtime::get_runtime();
+    if (reshard_shape.explicit_replication > 1 ||
+        handle.impl->shape().explicit_replication > 1) {
+      std::string error_msg = handle.impl->name() +
+                              " cannot reshard store with explicit replication";
+      throw std::runtime_error(std::move(error_msg));
+    }
 
-    const auto &range = core_runtime->get_machine().processor_range();
-    auto global_size = range.high - range.low;
     auto new_impl = std::make_shared<StoreHandleImpl>(
         handle.impl->store(), std::move(reshard_shape), handle.impl->name());
 
@@ -720,10 +722,13 @@ StoreHandle Reshard(const StoreHandle &handle, const Shape &reshard_shape) {
                     << ", new=" << new_impl->shape()
                     << ", store=" << new_impl.get();
 
-    new_impl->SetPartition(new_impl->store().partition_by_tiling(
-        {reshard_shape.tile_shape->begin(), reshard_shape.tile_shape->end()}));
-
     handle.impl->AddResharding(new_impl);
+
+    if (reshard_shape.explicit_replication > 1 || reshard_shape.num_tiles > 1) {
+      new_impl->SetPartition(new_impl->store().partition_by_tiling(
+          {reshard_shape.tile_shape->begin(),
+           reshard_shape.tile_shape->end()}));
+    }
 
     return StoreHandle{.impl = std::move(new_impl),
                        .unique_id = handle.unique_id};
@@ -891,7 +896,8 @@ std::ostream &operator<<(std::ostream &os, const Shape &shape) {
   os << "Shape(type="
      << static_cast<std::underlying_type<SupportedType>::type>(shape.type)
      << ",dim=" << shape.dims << "),tile=" << tile
-     << ", replication=" << shape.replicated;
+     << ", replication=" << shape.explicit_replication
+     << ", num_tiles=" << shape.num_tiles;
   return os;
 }
 

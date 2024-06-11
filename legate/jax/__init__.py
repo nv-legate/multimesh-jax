@@ -3,6 +3,7 @@ from .legate_jax_impl import (
     register_task,
     register_task_factory,
     shutdown,
+    replicate_parameters_smaller_than_num_elements,
     unregister_task,
     clear_tasks,
     compile_hlo_module,

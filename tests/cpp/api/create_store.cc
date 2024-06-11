@@ -133,7 +133,7 @@ void test_all_types(std::vector<int64_t> dims) {
     legate_xla::Shape shape = {.type = type,
                                .dims = dims,
                                .tile_shape = tile,
-                               .replicated = replication};
+                               .explicit_replication = replication};
     test_create_store(shape, num_devices);
   }
 }

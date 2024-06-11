@@ -128,10 +128,9 @@ void test_legate_shape(legate_xla::Shape shape) {
   auto future = legate_xla::AssembleShards(
       shape, shards, {0, num_shards},
       new legate_xla::TaskArgHold<legate_xla::LegateStream>(stream));
-  if (future.future){
+  if (future.future) {
     future.future->Wait();
   }
-
 
   std::vector<void *> device_slices(num_shards);
   legate_xla::SliceLocalShards(future.store, device_slices, {0, num_shards});
@@ -164,7 +163,7 @@ void test_shape(std::vector<int64_t> dims) {
   test_legate_shape({.type = legate_xla::SupportedType::S32,
                      .dims = dims,
                      .tile_shape = tile_shape,
-                     .replicated = replication});
+                     .explicit_replication = replication});
 }
 
 TEST(AssembleShardsTest, BasicAssemble) {
