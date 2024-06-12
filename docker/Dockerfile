@@ -11,6 +11,20 @@ vim wget zlib1g-dev && \
   update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12 && \
   update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
 
+RUN cd /opt && \
+  curl -fsSL https://developer.download.nvidia.com/devtools/repos/ubuntu2204/amd64/nvidia.pub | apt-key add - && \
+  echo "deb https://developer.download.nvidia.com/devtools/repos/ubuntu2204/amd64/ /" >> /etc/apt/sources.list.d/nsys.list
+
+RUN cd /opt && \
+  wget https://developer.nvidia.com/downloads/assets/tools/secure/nsight-systems/2024_1/nsight-systems-2024.1.1_2024.1.1.59-1_amd64.deb && \
+  apt-get update && \
+  dpkg --configure -a && \
+  apt-get -y -f install && \
+  apt-get -y install nsight-systems-2024.1.1 --reinstall
+
+RUN mkdir -p /root/.config/NVIDIA\ Corporation && \
+  echo "CuptiUsePerThreadBuffer=false" > /root/.config/NVIDIA\ Corporation/nsys-config.ini
+
 ENV CUDA_PATH="/usr/local/cuda/lib64/stubs"
 
 RUN cd /opt && \
@@ -20,10 +34,6 @@ RUN cd /opt && \
   apt-get update && \
   apt-get install -y bazel-6.1.2 && \
   ln -s /usr/bin/bazel-6.1.2 /usr/bin/bazel
-
-RUN cd /opt && \
-  curl -fsSL https://developer.download.nvidia.com/devtools/repos/ubuntu2204/amd64/nvidia.pub | apt-key add - && \
-  echo "deb https://developer.download.nvidia.com/devtools/repos/ubuntu2204/amd64/ /" >> /etc/apt/sources.list.d/nsys.list
 
 ENV PATH="/opt/install/miniconda/bin:${PATH}"
 
@@ -110,7 +120,6 @@ RUN cd /opt/legion && \
 
 COPY legate /opt/legate
 
-
 RUN cd /opt/legate && \
   conda run --no-capture-out -n legere cmake -S . -B build -DCMAKE_GENERATOR:STRING=Ninja \
 -DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++ -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc \
@@ -145,11 +154,12 @@ COPY legate-jax /opt/legate-jax
 RUN cd /opt/legate-jax && \
   conda run --no-capture-out -n legere cmake -S . -B build -DCMAKE_GENERATOR:STRING="Unix Makefiles" \
 -DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++ -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc \
+-DCMAKE_BUILD_TYPE:STRING="${LEGATE_BUILD_TYPE}" \
 -DCMAKE_LIBRARY_PATH:STRING=/usr/lib/x86_64-linux-gnu -DCMAKE_CXX_STANDARD:STRING=17 \
 -DLegateXLA_BAZEL_REMOTE_CACHE:STRING="${BAZEL_CACHE}" \
 -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Release \
 -DCPM_xla_SOURCE:PATH=/opt/xla -Dlegate_core_ROOT:PATH=/opt/legate/build \
--DLegateXLA_HLO_RUNNER:BOOL=OFF -DLegateXLA_ASAN:BOOL=OFF \
+-DLegateXLA_ASAN:BOOL=OFF \
 -DCMAKE_INSTALL_RPATH:PATH=/opt/install/miniconda/envs/legere/lib \
 -DCMAKE_INSTALL_PREFIX:PATH=/opt/install/miniconda/envs/legere && \ 
 conda run --no-capture-out -n legere cmake --build build --parallel
@@ -192,16 +202,6 @@ COPY te /opt/te
 RUN export NVTE_FRAMEWORK=jax && cd /opt/te \
    && conda run -n legere python -m pip install cmake \
    && conda run -n legere python -m pip install -e . --no-build-isolation
-
-RUN cd /opt && \
-  wget https://developer.nvidia.com/downloads/assets/tools/secure/nsight-systems/2024_1/nsight-systems-2024.1.1_2024.1.1.59-1_amd64.deb && \
-  apt-get update && \
-  dpkg --configure -a && \
-  apt-get -y -f install && \
-  apt-get -y install nsight-systems-2024.1.1 --reinstall
-
-RUN mkdir -p /root/.config/NVIDIA\ Corporation && \
-  echo "CuptiUsePerThreadBuffer=false" > /root/.config/NVIDIA\ Corporation/nsys-config.ini
 
 COPY entrypoint.sh /opt/entrypoint.sh
 

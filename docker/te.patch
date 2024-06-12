@@ -1,8 +1,35 @@
 diff --git a/transformer_engine/jax/cpp_extensions.py b/transformer_engine/jax/cpp_extensions.py
-index ba1d443..4bf666b 100644
+index ba1d443..ecf6185 100644
 --- a/transformer_engine/jax/cpp_extensions.py
 +++ b/transformer_engine/jax/cpp_extensions.py
-@@ -199,6 +199,7 @@ def register_primitive(cls):
+@@ -104,14 +104,23 @@ def jax_dtype_to_te_dtype(jax_dtype):
+     return converter.get(jax_dtype)
+ 
+ 
+-def get_padded_spec(arg_info):
++def get_padded_spec(arg_info, mesh):
+     """
+     Get padded spec for partitioning from arguments' information
+     """
+     if arg_info.sharding is None:
+         return te_get_padded_spec(None, arg_info.ndim)
+-    ndim, spec = arg_info.ndim, arg_info.sharding.spec
+-    return te_get_padded_spec(spec, ndim)
++
++    from jax._src.sharding_impls import PositionalSharding, parse_flatten_op_sharding    
++    if isinstance(arg_info.sharding, PositionalSharding):
++        s = arg_info.sharding._to_xla_hlo_sharding(arg_info.ndim)
++        pspec = parse_flatten_op_sharding(s, mesh)[0]
++        spec = tuple(d for d in pspec)
++        print("SPEC", arg_info.shape, spec, arg_info.sharding)
++    else:
++        spec = arg_info.sharding.spec
++
++    return te_get_padded_spec(spec, arg_info.ndim)
+ 
+ 
+ def _check_valid_batch_dims(bdims):
+@@ -199,6 +208,7 @@ def register_primitive(cls):
      inner_p.def_impl(partial(xla.apply_primitive, inner_p))
      inner_p.def_abstract_eval(cls.abstract)
      mlir.register_lowering(inner_p, cls.lowering, platform='cuda')
@@ -10,7 +37,59 @@ index ba1d443..4bf666b 100644
      cls.inner_primitive = inner_p
  
      outer_p = core.Primitive(name_of_wrapper_p())
-@@ -681,8 +682,8 @@ class LayerNormBwdPrimitive(BasePrimitive):
+@@ -432,7 +442,7 @@ class LayerNormFwdPrimitive(BasePrimitive):
+     @staticmethod
+     def infer_sharding_from_operands(zero_centered_gamma, epsilon, mesh, arg_infos, result_infos):
+         del zero_centered_gamma, epsilon, result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         if x_spec[-1] is not None:
+             warnings.warn(
+                 f"Does not support to shard hidden dim in {LayerNormFwdPrimitive.name}! " \
+@@ -446,7 +456,7 @@ class LayerNormFwdPrimitive(BasePrimitive):
+     @staticmethod
+     def partition(zero_centered_gamma, epsilon, mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec, g_spec, b_spec = map(get_padded_spec, arg_infos)
++        x_spec, g_spec, b_spec = map(partial(get_padded_spec, mesh=mesh), arg_infos)
+         if x_spec[-1] is not None:
+             warnings.warn(
+                 f"Does not support to shard hidden dim in {LayerNormFwdPrimitive.name}! " \
+@@ -632,14 +642,14 @@ class LayerNormBwdPrimitive(BasePrimitive):
+     @staticmethod
+     def infer_sharding_from_operands(zero_centered_gamma, epsilon, mesh, arg_infos, result_infos):
+         del zero_centered_gamma, epsilon, result_infos
+-        x_spec = get_padded_spec(arg_infos[1])
++        x_spec = get_padded_spec(arg_infos[1], mesh)
+         if x_spec[-1] is not None:
+             warnings.warn(
+                 f"Does not support to shard hidden dim in {LayerNormBwdPrimitive.name}! " \
+                 f"Force to not shard the hidden dim, which might introduce extra collective ops, " \
+                 f"and hurt performance."
+             )
+-        g_b_spec = get_padded_spec(arg_infos[4])
++        g_b_spec = get_padded_spec(arg_infos[4], mesh)
+         if g_b_spec[-1] is not None:
+             warnings.warn(
+                 f"{LayerNormBwdPrimitive.name} does not support sharding of gradients " \
+@@ -654,14 +664,14 @@ class LayerNormBwdPrimitive(BasePrimitive):
+     @staticmethod
+     def partition(zero_centered_gamma, epsilon, mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[1])
++        x_spec = get_padded_spec(arg_infos[1], mesh)
+         if x_spec[-1] is not None:
+             warnings.warn(
+                 f"Does not support to shard hidden dim in {LayerNormBwdPrimitive.name}! " \
+                 f"Force to not shard the hidden dim, which might introduce extra collective ops, " \
+                 f"and hurt performance."
+             )
+-        g_b_spec = get_padded_spec(arg_infos[4])
++        g_b_spec = get_padded_spec(arg_infos[4], mesh)
+         if g_b_spec[-1] is not None:
+             warnings.warn(
+                 f"{LayerNormBwdPrimitive.name} does not support sharding of gradients " \
+@@ -681,8 +691,8 @@ class LayerNormBwdPrimitive(BasePrimitive):
                  LayerNormBwdPrimitive.impl(dz, x, mu, rsigma, gamma,
                       zero_centered_gamma=zero_centered_gamma,
                       epsilon=epsilon)
@@ -21,6 +100,573 @@ index ba1d443..4bf666b 100644
              return local_dx, global_dgamma, global_dbeta
  
          return mesh, sharded_impl, out_shardings, arg_shardings
+@@ -833,7 +843,7 @@ class RmsNormFwdPrimitive(BasePrimitive):
+     @staticmethod
+     def infer_sharding_from_operands(epsilon, mesh, arg_infos, result_infos):
+         del epsilon, result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         if x_spec[-1] is not None:
+             warnings.warn(
+                 f"Does not support to shard hidden dim in {RmsNormFwdPrimitive.name}! " \
+@@ -1006,14 +1016,14 @@ class RmsNormBwdPrimitive(BasePrimitive):
+     @staticmethod
+     def infer_sharding_from_operands(epsilon, mesh, arg_infos, result_infos):
+         del epsilon, result_infos
+-        x_spec = get_padded_spec(arg_infos[1])
++        x_spec = get_padded_spec(arg_infos[1], mesh)
+         if x_spec[-1] is not None:
+             warnings.warn(
+                 f"Does not support to shard hidden dim in {RmsNormBwdPrimitive.name}! " \
+                 f"Force to not shard the hidden dim, which might introduce extra collective ops, " \
+                 f"and hurt performance."
+             )
+-        g_spec = get_padded_spec(arg_infos[3])
++        g_spec = get_padded_spec(arg_infos[3], mesh)
+         if g_spec[-1] is not None:
+             warnings.warn(
+                 f"{RmsNormBwdPrimitive.name} does not support sharding of parameter gamma " \
+@@ -1026,14 +1036,14 @@ class RmsNormBwdPrimitive(BasePrimitive):
+     @staticmethod
+     def partition(epsilon, mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[1])
++        x_spec = get_padded_spec(arg_infos[1], mesh)
+         if x_spec[-1] is not None:
+             warnings.warn(
+                 f"Does not support to shard hidden dim in {RmsNormBwdPrimitive.name}! " \
+                 f"Force to not shard the hidden dim, which might introduce extra collective ops, " \
+                 f"and hurt performance."
+             )
+-        g_spec = get_padded_spec(arg_infos[3])
++        g_spec = get_padded_spec(arg_infos[3], mesh)
+         if g_spec[-1] is not None:
+             warnings.warn(
+                 f"{RmsNormBwdPrimitive.name} does not support sharding of parameter gamma " \
+@@ -1167,7 +1177,7 @@ class SoftmaxPrimitive(BasePrimitive):
+         softmax_forward infer_sharding_from_operands
+         """
+         del scale_factor, result_infos    # Unused.
+-        logits_spec = get_padded_spec(arg_infos[0])
++        logits_spec = get_padded_spec(arg_infos[0], mesh)
+         if logits_spec[-1] is not None:
+             warnings.warn(
+                 f"Sharding the hidden dimension is not supported in {cls.name}! " \
+@@ -1183,7 +1193,7 @@ class SoftmaxPrimitive(BasePrimitive):
+         softmax_forward partitioning
+         """
+         del result_infos
+-        logits_spec = get_padded_spec(arg_infos[0])
++        logits_spec = get_padded_spec(arg_infos[0], mesh)
+         if logits_spec[-1] is not None:
+             warnings.warn(
+                 f"Sharding the hidden dimension is not supported in {cls.name}! " \
+@@ -1271,7 +1281,7 @@ class SoftmaxPrimitive(BasePrimitive):
+         softmax_backward infer_sharding_from_operands
+         """
+         del scale_factor, result_infos    # Unused.
+-        dz_spec = get_padded_spec(arg_infos[0])
++        dz_spec = get_padded_spec(arg_infos[0], mesh)
+         if dz_spec[-1] is not None:
+             warnings.warn(
+                 f"Sharding the hidden dimension is not supported in {cls.name}! " \
+@@ -1288,8 +1298,8 @@ class SoftmaxPrimitive(BasePrimitive):
+         """
+         del result_infos
+ 
+-        dz_spec = get_padded_spec(arg_infos[0])
+-        softmax_out_spec = get_padded_spec(arg_infos[1])
++        dz_spec = get_padded_spec(arg_infos[0], mesh)
++        softmax_out_spec = get_padded_spec(arg_infos[1], mesh)
+         if dz_spec[-1] is not None or softmax_out_spec[-1] is not None:
+             warnings.warn(
+                 f"Sharding the hidden dimension is not supported in {cls.name}! " \
+@@ -2087,7 +2097,7 @@ class SelfFusedAttnFwdPrimitive(BasePrimitive):
+                                      result_infos):
+         del attn_bias_type, attn_mask_type, scaling_factor
+         del dropout_probability, is_training, result_infos
+-        x_spec = get_padded_spec(arg_infos[0])    # (...batch, seqlen, 3, head, hidden)
++        x_spec = get_padded_spec(arg_infos[0], mesh)    # (...batch, seqlen, 3, head, hidden)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec[:-3], *x_spec[-2:]))
+         softmax_aux_sharding = NamedSharding(
+             mesh, PartitionSpec(*x_spec[:-4], x_spec[-2], x_spec[-4], None))
+@@ -2098,7 +2108,7 @@ class SelfFusedAttnFwdPrimitive(BasePrimitive):
+     def partition(attn_bias_type, attn_mask_type, scaling_factor, dropout_probability, is_training,
+                   mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])    # (...batch, seqlen, 3, head, hidden)
++        x_spec = get_padded_spec(arg_infos[0], mesh)    # (...batch, seqlen, 3, head, hidden)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec[:-3], *x_spec[-2:]))
+         softmax_aux_sharding = NamedSharding(
+             mesh, PartitionSpec(*x_spec[:-4], x_spec[-2], x_spec[-4], None))
+@@ -2278,8 +2288,8 @@ class SelfFusedAttnBwdPrimitive(BasePrimitive):
+                                      result_infos):
+         del attn_bias_type, attn_mask_type, scaling_factor, dropout_probability,
+         del is_training, result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
+-        bias_spec = get_padded_spec(arg_infos[1])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
++        bias_spec = get_padded_spec(arg_infos[1], mesh)
+         dx_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+         dbias_sharding = NamedSharding(mesh, PartitionSpec(*bias_spec))
+         return (dx_sharding, dbias_sharding)
+@@ -2288,8 +2298,8 @@ class SelfFusedAttnBwdPrimitive(BasePrimitive):
+     def partition(attn_bias_type, attn_mask_type, scaling_factor, dropout_probability, is_training,
+                   mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
+-        bias_spec = get_padded_spec(arg_infos[1])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
++        bias_spec = get_padded_spec(arg_infos[1], mesh)
+         dx_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+         dbias_sharding = NamedSharding(mesh, PartitionSpec(*bias_spec))
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+@@ -2511,8 +2521,8 @@ class CrossFusedAttnFwdPrimitive(BasePrimitive):
+                                      result_infos):
+         del attn_bias_type, attn_mask_type, scaling_factor
+         del dropout_probability, is_training, result_infos
+-        q_spec = get_padded_spec(arg_infos[0])    # (...batch, q_seqlen, head, hidden)
+-        kv_spec = get_padded_spec(arg_infos[1])    # (...batch, kv_seqlen, 2, head, hidden)
++        q_spec = get_padded_spec(arg_infos[0], mesh)    # (...batch, q_seqlen, head, hidden)
++        kv_spec = get_padded_spec(arg_infos[1], mesh)    # (...batch, kv_seqlen, 2, head, hidden)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*q_spec))
+         softmax_aux_sharding = NamedSharding(
+             mesh, PartitionSpec(*q_spec[:-3], q_spec[-2], q_spec[-3], kv_spec[-4]))
+@@ -2523,8 +2533,8 @@ class CrossFusedAttnFwdPrimitive(BasePrimitive):
+     def partition(attn_bias_type, attn_mask_type, scaling_factor, dropout_probability, is_training,
+                   mesh, arg_infos, result_infos):
+         del result_infos
+-        q_spec = get_padded_spec(arg_infos[0])    # (...batch, q_seqlen, head, hidden)
+-        kv_spec = get_padded_spec(arg_infos[1])    # (...batch, kv_seqlen, 2, head, hidden)
++        q_spec = get_padded_spec(arg_infos[0], mesh)    # (...batch, q_seqlen, head, hidden)
++        kv_spec = get_padded_spec(arg_infos[1], mesh)    # (...batch, kv_seqlen, 2, head, hidden)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*q_spec))
+         softmax_aux_sharding = NamedSharding(
+             mesh, PartitionSpec(*q_spec[:-3], q_spec[-2], q_spec[-3], kv_spec[-4]))
+@@ -2723,9 +2733,9 @@ class CrossFusedAttnBwdPrimitive(BasePrimitive):
+                                      result_infos):
+         del attn_bias_type, attn_mask_type, scaling_factor
+         del dropout_probability, is_training, result_infos
+-        q_spec = get_padded_spec(arg_infos[0])
+-        kv_spec = get_padded_spec(arg_infos[1])
+-        bias_spec = get_padded_spec(arg_infos[2])
++        q_spec = get_padded_spec(arg_infos[0], mesh)
++        kv_spec = get_padded_spec(arg_infos[1], mesh)
++        bias_spec = get_padded_spec(arg_infos[2], mesh)
+         dq_sharding = NamedSharding(mesh, PartitionSpec(*q_spec))
+         dkv_sharding = NamedSharding(mesh, PartitionSpec(*kv_spec))
+         dbias_sharding = NamedSharding(mesh, PartitionSpec(*bias_spec))
+@@ -2735,9 +2745,9 @@ class CrossFusedAttnBwdPrimitive(BasePrimitive):
+     def partition(attn_bias_type, attn_mask_type, scaling_factor, dropout_probability, is_training,
+                   mesh, arg_infos, result_infos):
+         del result_infos
+-        q_spec = get_padded_spec(arg_infos[0])
+-        kv_spec = get_padded_spec(arg_infos[1])
+-        bias_spec = get_padded_spec(arg_infos[2])
++        q_spec = get_padded_spec(arg_infos[0], mesh)
++        kv_spec = get_padded_spec(arg_infos[1], mesh)
++        bias_spec = get_padded_spec(arg_infos[2], mesh)
+         dq_sharding = NamedSharding(mesh, PartitionSpec(*q_spec))
+         dkv_sharding = NamedSharding(mesh, PartitionSpec(*kv_spec))
+         dbias_sharding = NamedSharding(mesh, PartitionSpec(*bias_spec))
+@@ -2967,8 +2977,8 @@ class FusedAttnFwdPrimitive(BasePrimitive):
+                                      result_infos):
+         del attn_bias_type, attn_mask_type, scaling_factor
+         del dropout_probability, is_training, result_infos
+-        q_spec = get_padded_spec(arg_infos[0])    # (...batch, q_seqlen, head, hidden)
+-        k_spec = get_padded_spec(arg_infos[1])    # (...batch, kv_seqlen, head, hidden)
++        q_spec = get_padded_spec(arg_infos[0], mesh)    # (...batch, q_seqlen, head, hidden)
++        k_spec = get_padded_spec(arg_infos[1], mesh)    # (...batch, kv_seqlen, head, hidden)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*q_spec))
+         softmax_aux_sharding = NamedSharding(
+             mesh, PartitionSpec(*q_spec[:-3], q_spec[-2], q_spec[-3], k_spec[-3]))
+@@ -2979,8 +2989,8 @@ class FusedAttnFwdPrimitive(BasePrimitive):
+     def partition(attn_bias_type, attn_mask_type, scaling_factor, dropout_probability, is_training,
+                   mesh, arg_infos, result_infos):
+         del result_infos
+-        q_spec = get_padded_spec(arg_infos[0])    # (...batch, q_seqlen, head, hidden)
+-        k_spec = get_padded_spec(arg_infos[1])    # (...batch, kv_seqlen, head, hidden)
++        q_spec = get_padded_spec(arg_infos[0], mesh)    # (...batch, q_seqlen, head, hidden)
++        k_spec = get_padded_spec(arg_infos[1], mesh)    # (...batch, kv_seqlen, head, hidden)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*q_spec))
+         softmax_aux_sharding = NamedSharding(
+             mesh, PartitionSpec(*q_spec[:-3], q_spec[-2], q_spec[-3], k_spec[-3]))
+@@ -3185,10 +3195,10 @@ class FusedAttnBwdPrimitive(BasePrimitive):
+                                      result_infos):
+         del attn_bias_type, attn_mask_type, scaling_factor
+         del dropout_probability, is_training, result_infos
+-        q_spec = get_padded_spec(arg_infos[0])
+-        k_spec = get_padded_spec(arg_infos[1])
+-        v_spec = get_padded_spec(arg_infos[2])
+-        bias_spec = get_padded_spec(arg_infos[3])
++        q_spec = get_padded_spec(arg_infos[0], mesh)
++        k_spec = get_padded_spec(arg_infos[1], mesh)
++        v_spec = get_padded_spec(arg_infos[2], mesh)
++        bias_spec = get_padded_spec(arg_infos[3], mesh)
+         dq_sharding = NamedSharding(mesh, PartitionSpec(*q_spec))
+         dk_sharding = NamedSharding(mesh, PartitionSpec(*k_spec))
+         dv_sharding = NamedSharding(mesh, PartitionSpec(*v_spec))
+@@ -3199,10 +3209,10 @@ class FusedAttnBwdPrimitive(BasePrimitive):
+     def partition(attn_bias_type, attn_mask_type, scaling_factor, dropout_probability, is_training,
+                   mesh, arg_infos, result_infos):
+         del result_infos
+-        q_spec = get_padded_spec(arg_infos[0])
+-        k_spec = get_padded_spec(arg_infos[1])
+-        v_spec = get_padded_spec(arg_infos[2])
+-        bias_spec = get_padded_spec(arg_infos[3])
++        q_spec = get_padded_spec(arg_infos[0], mesh)
++        k_spec = get_padded_spec(arg_infos[1], mesh)
++        v_spec = get_padded_spec(arg_infos[2], mesh)
++        bias_spec = get_padded_spec(arg_infos[3], mesh)
+         dq_sharding = NamedSharding(mesh, PartitionSpec(*q_spec))
+         dk_sharding = NamedSharding(mesh, PartitionSpec(*k_spec))
+         dv_sharding = NamedSharding(mesh, PartitionSpec(*v_spec))
+@@ -3343,7 +3353,7 @@ class GeluPrimitive(BasePrimitive):
+         gated_gelu infer_sharding_from_operands
+         """
+         del result_infos    # Unused.
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+         return out_sharding
+ 
+@@ -3353,7 +3363,7 @@ class GeluPrimitive(BasePrimitive):
+         gated_gelu partitioning
+         """
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+         impl = GeluPrimitive.impl
+@@ -3457,7 +3467,7 @@ class DGeluPrimitive(BasePrimitive):
+         dgelu infer_sharding_from_operands
+         """
+         del result_infos    # Unused.
+-        gelu_out_spec = get_padded_spec(arg_infos[1])
++        gelu_out_spec = get_padded_spec(arg_infos[1], mesh)
+         dx_sharding = NamedSharding(mesh, PartitionSpec(*gelu_out_spec))
+         return dx_sharding
+ 
+@@ -3467,7 +3477,7 @@ class DGeluPrimitive(BasePrimitive):
+         dgelu partition
+         """
+         del result_infos
+-        dx_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1])))
++        dx_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1], mesh)))
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+         out_shardings = dx_sharding
+         impl = DGeluPrimitive.impl
+@@ -3566,7 +3576,7 @@ class GatedGeluPrimitive(BasePrimitive):
+         gated_gelu infer_sharding_from_operands
+         """
+         del result_infos    # Unused.
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec[:-2], x_spec[-1]))
+         return out_sharding
+ 
+@@ -3575,8 +3585,9 @@ class GatedGeluPrimitive(BasePrimitive):
+         """
+         gated_gelu partitioning
+         """
++        raise Exception("here")
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec[:-2], x_spec[-1]))
+         impl = GatedGeluPrimitive.impl
+@@ -3689,7 +3700,7 @@ class DgatedGeluPrimitive(BasePrimitive):
+         dgated_gelu infer_sharding_from_operands
+         """
+         del result_infos    # Unused.
+-        gelu_out_spec = get_padded_spec(arg_infos[1])
++        gelu_out_spec = get_padded_spec(arg_infos[1], mesh)
+         dx_sharding = NamedSharding(mesh, PartitionSpec(*gelu_out_spec))
+         return dx_sharding
+ 
+@@ -3698,8 +3709,9 @@ class DgatedGeluPrimitive(BasePrimitive):
+         """
+         dgated_gelu partition
+         """
++        raise Exception("here")
+         del result_infos
+-        dx_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1])))
++        dx_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1], mesh)))
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+         out_shardings = dx_sharding
+         impl = DgatedGeluPrimitive.impl
+@@ -3873,22 +3885,22 @@ class CastTransposePrimitive(BasePrimitive):
+     def infer_sharding_from_operands(out_dtype, static_axis_boundary, transpose_axis_boundary, mesh,
+                                      arg_infos, result_infos):
+         del out_dtype, result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         casted_x_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+         xt_spec = _multidim_transpose(x_spec, static_axis_boundary, transpose_axis_boundary)
+         casted_transposed_x_sharding = NamedSharding(mesh, PartitionSpec(*xt_spec))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1], mesh)))
+         return (casted_x_sharding, casted_transposed_x_sharding, amax_sharding)
+ 
+     @staticmethod
+     def partition(out_dtype, static_axis_boundary, transpose_axis_boundary, mesh, arg_infos,
+                   result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         casted_x_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+         xt_spec = _multidim_transpose(x_spec, static_axis_boundary, transpose_axis_boundary)
+         casted_transposed_x_sharding = NamedSharding(mesh, PartitionSpec(*xt_spec))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1], mesh)))
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+         out_shardings = (casted_x_sharding, casted_transposed_x_sharding, amax_sharding)
+ 
+@@ -4016,17 +4028,17 @@ class CastFP8Primitive(BasePrimitive):
+     @staticmethod
+     def infer_sharding_from_operands(out_dtype, mesh, arg_infos, result_infos):
+         del out_dtype, result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         casted_x_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1], mesh)))
+         return (casted_x_sharding, amax_sharding)
+ 
+     @staticmethod
+     def partition(out_dtype, mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         casted_x_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1], mesh)))
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+         out_shardings = (casted_x_sharding, amax_sharding)
+ 
+@@ -4143,7 +4155,7 @@ class TransposePrimitive(BasePrimitive):
+     def infer_sharding_from_operands(static_axis_boundary, transpose_axis_boundary, mesh, arg_infos,
+                                      result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         xt_spec = _multidim_transpose(x_spec, static_axis_boundary, transpose_axis_boundary)
+         transposed_x_sharding = NamedSharding(mesh, PartitionSpec(*xt_spec))
+         return transposed_x_sharding
+@@ -4151,7 +4163,7 @@ class TransposePrimitive(BasePrimitive):
+     @staticmethod
+     def partition(static_axis_boundary, transpose_axis_boundary, mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         xt_spec = _multidim_transpose(x_spec, static_axis_boundary, transpose_axis_boundary)
+         transposed_x_sharding = NamedSharding(mesh, PartitionSpec(*xt_spec))
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+@@ -4362,7 +4374,7 @@ class LayerNormFwdFp8Primitive(BasePrimitive):
+     def infer_sharding_from_operands(out_dtype, zero_centered_gamma, epsilon, mesh, arg_infos,
+                                      result_infos):
+         del out_dtype, zero_centered_gamma, epsilon, result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         if x_spec[-1] is not None:
+             warnings.warn(
+                 f"Does not support to shard hidden dim in {LayerNormFwdPrimitive.name}! " \
+@@ -4371,15 +4383,15 @@ class LayerNormFwdFp8Primitive(BasePrimitive):
+ 
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec[:-1], None))
+         mu_sharding = rsigma_sharding = NamedSharding(mesh, PartitionSpec(*x_spec[:-1]))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[3])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[3], mesh)))
+         return (out_sharding, mu_sharding, rsigma_sharding, amax_sharding)
+ 
+     @staticmethod
+     def partition(out_dtype, zero_centered_gamma, epsilon, mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
+-        g_spec = get_padded_spec(arg_infos[1])
+-        b_spec = get_padded_spec(arg_infos[2])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
++        g_spec = get_padded_spec(arg_infos[1], mesh)
++        b_spec = get_padded_spec(arg_infos[2], mesh)
+         if x_spec[-1] is not None:
+             warnings.warn(
+                 f"Does not support to shard hidden dim in {LayerNormFwdFp8Primitive.name}! " \
+@@ -4401,8 +4413,8 @@ class LayerNormFwdFp8Primitive(BasePrimitive):
+         b_sharding = NamedSharding(mesh, PartitionSpec(None))
+         out_sharding = x_sharding
+         mu_sharding = rsigma_sharding = NamedSharding(
+-            mesh, PartitionSpec(*get_padded_spec(arg_infos[0])[:-1]))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[3])))
++            mesh, PartitionSpec(*get_padded_spec(arg_infos[0], mesh)[:-1]))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[3], mesh)))
+         fp8_meta_sharding = amax_sharding
+         arg_shardings = (x_sharding, g_sharding, b_sharding) + (fp8_meta_sharding,) * 3
+         out_shardings = (out_sharding, mu_sharding, rsigma_sharding, amax_sharding)
+@@ -4606,7 +4618,7 @@ class RmsNormFwdFp8Primitive(BasePrimitive):
+     @staticmethod
+     def infer_sharding_from_operands(out_dtype, epsilon, mesh, arg_infos, result_infos):
+         del out_dtype, epsilon, result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         if x_spec[-1] is not None:
+             warnings.warn(
+                 f"Does not support to shard hidden dim in {RmsNormFwdFp8Primitive.name}! " \
+@@ -4615,14 +4627,14 @@ class RmsNormFwdFp8Primitive(BasePrimitive):
+             )
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec[:-1], None))
+         rsigma_sharding = NamedSharding(mesh, PartitionSpec(*x_spec[:-1]))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2], mesh)))
+         return (out_sharding, rsigma_sharding, amax_sharding)
+ 
+     @staticmethod
+     def partition(out_dtype, epsilon, mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
+-        g_spec = get_padded_spec(arg_infos[1])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
++        g_spec = get_padded_spec(arg_infos[1], mesh)
+         if x_spec[-1] is not None:
+             warnings.warn(
+                 f"Does not support to shard hidden dim in {RmsNormFwdFp8Primitive.name}! " \
+@@ -4637,8 +4649,8 @@ class RmsNormFwdFp8Primitive(BasePrimitive):
+         x_sharding = NamedSharding(mesh, PartitionSpec(*x_spec[:-1], None))
+         g_sharding = NamedSharding(mesh, PartitionSpec(None))
+         out_sharding = x_sharding
+-        rsigma_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[0])[:-1]))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2])))
++        rsigma_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[0], mesh)[:-1]))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2], mesh)))
+         fp8_meta_sharding = amax_sharding
+         arg_shardings = (x_sharding, g_sharding) + (fp8_meta_sharding,) * 3
+         out_shardings = (out_sharding, rsigma_sharding, amax_sharding)
+@@ -4771,17 +4783,18 @@ class GeluFp8Primitive(BasePrimitive):
+     @staticmethod
+     def infer_sharding_from_operands(out_dtype, mesh, arg_infos, result_infos):
+         del out_dtype, result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1], mesh)))
+         return (out_sharding, amax_sharding)
+ 
+     @staticmethod
+     def partition(out_dtype, mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        raise Exception("here")
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1], mesh)))
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+         out_shardings = (out_sharding, amax_sharding)
+ 
+@@ -4971,20 +4984,20 @@ class DGeluDBiasCastTransposePrimitive(BasePrimitive):
+     def infer_sharding_from_operands(out_dtype, static_axis_boundary, transpose_axis_boundary, mesh,
+                                      arg_infos, result_infos):
+         del out_dtype, result_infos
+-        x_spec = get_padded_spec(arg_infos[1])
++        x_spec = get_padded_spec(arg_infos[1], mesh)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+         xt_spec = _multidim_transpose(x_spec, static_axis_boundary, transpose_axis_boundary)
+         tranposed_out_sharding = NamedSharding(mesh, PartitionSpec(*xt_spec))
+         dbias_shaprding = NamedSharding(
+             mesh, PartitionSpec(*x_spec[:static_axis_boundary + 1], x_spec[-1]))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2], mesh)))
+         return (out_sharding, tranposed_out_sharding, dbias_shaprding, amax_sharding)
+ 
+     @staticmethod
+     def partition(out_dtype, static_axis_boundary, transpose_axis_boundary, mesh, arg_infos,
+                   result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[1])
++        x_spec = get_padded_spec(arg_infos[1], mesh)
+         casted_x_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+         xt_spec = _multidim_transpose(x_spec, static_axis_boundary, transpose_axis_boundary)
+         casted_transposed_x_sharding = NamedSharding(mesh, PartitionSpec(*xt_spec))
+@@ -4992,7 +5005,7 @@ class DGeluDBiasCastTransposePrimitive(BasePrimitive):
+         dbias_shaprding = NamedSharding(
+             mesh, PartitionSpec(*x_spec[:static_axis_boundary + 1], x_spec[-1]))
+ 
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2], mesh)))
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+         out_shardings = (casted_x_sharding, casted_transposed_x_sharding, dbias_shaprding,
+                          amax_sharding)
+@@ -5152,17 +5165,17 @@ class GatedGeluFp8Primitive(BasePrimitive):
+     @staticmethod
+     def infer_sharding_from_operands(out_dtype, mesh, arg_infos, result_infos):
+         del out_dtype, result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec[:-2], x_spec[-1]))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1], mesh)))
+         return (out_sharding, amax_sharding)
+ 
+     @staticmethod
+     def partition(out_dtype, mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[0])
++        x_spec = get_padded_spec(arg_infos[0], mesh)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec[:-2], x_spec[-1]))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[1], mesh)))
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+         out_shardings = (out_sharding, amax_sharding)
+ 
+@@ -5313,22 +5326,22 @@ class DgatedGeluCastTransposePrimitive(BasePrimitive):
+     def infer_sharding_from_operands(out_dtype, static_axis_boundary, mesh, arg_infos,
+                                      result_infos):
+         del out_dtype, result_infos
+-        x_spec = get_padded_spec(arg_infos[1])
++        x_spec = get_padded_spec(arg_infos[1], mesh)
+         out_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+         xt_spec = _multidim_transpose(x_spec, static_axis_boundary, -2)
+         tranposed_out_sharding = NamedSharding(mesh, PartitionSpec(*xt_spec))
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2], mesh)))
+         return (out_sharding, tranposed_out_sharding, amax_sharding)
+ 
+     @staticmethod
+     def partition(out_dtype, static_axis_boundary, mesh, arg_infos, result_infos):
+         del result_infos
+-        x_spec = get_padded_spec(arg_infos[1])
++        x_spec = get_padded_spec(arg_infos[1], mesh)
+         casted_x_sharding = NamedSharding(mesh, PartitionSpec(*x_spec))
+         xt_spec = _multidim_transpose(x_spec, static_axis_boundary, -2)
+         casted_transposed_x_sharding = NamedSharding(mesh, PartitionSpec(*xt_spec))
+ 
+-        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2])))
++        amax_sharding = NamedSharding(mesh, PartitionSpec(*get_padded_spec(arg_infos[2], mesh)))
+         arg_shardings = tuple(arg_i.sharding for arg_i in arg_infos)
+         out_shardings = (casted_x_sharding, casted_transposed_x_sharding, amax_sharding)
+ 
+diff --git a/transformer_engine/jax/praxis/transformer.py b/transformer_engine/jax/praxis/transformer.py
+index d0a37e8..1759faf 100644
+--- a/transformer_engine/jax/praxis/transformer.py
++++ b/transformer_engine/jax/praxis/transformer.py
+@@ -109,6 +109,7 @@ class DotProductAttention(TransformerEngineBaseLayer):
+                  *,
+                  deterministic: bool = False) -> JTensor:
+         """__call__"""
++        raise Exception("here")
+         return self.dot_product_attention(query,
+                                           key,
+                                           value,
+@@ -143,6 +144,7 @@ class MultiHeadAttention(TransformerEngineBaseLayer):
+     scale_attn_logits: bool = False
+     scaled_query_init: bool = True
+     float32_logits: bool = False
++    atten_logit_cap: float = 0.
+ 
+     # Deprecated parameters
+     num_heads: Optional[int] = None
 diff --git a/transformer_engine/jax/sharding.py b/transformer_engine/jax/sharding.py
 index 205ac56..fbfda1f 100644
 --- a/transformer_engine/jax/sharding.py

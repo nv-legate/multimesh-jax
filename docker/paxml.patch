@@ -399,7 +399,7 @@ index ff3d89d..035d1b3 100644
  
  _TASK_HANDLE_RE = re.compile(r'(?:logs\.)?(\d+)\.(.*)\.([^.]+)\.\d+')
 diff --git a/paxml/partitioning.py b/paxml/partitioning.py
-index 7deb362..39f0e12 100644
+index 7deb362..f7ab004 100644
 --- a/paxml/partitioning.py
 +++ b/paxml/partitioning.py
 @@ -42,6 +42,7 @@ from praxis import pax_fiddle
@@ -410,10 +410,131 @@ index 7deb362..39f0e12 100644
  
  # tf_data_service_lib is slow to import, so we do it lazily.
  tf_data_service_lib = lazy_loader.LazyLoader(
-@@ -130,6 +131,19 @@ def compile_for_auto_sharding(
-   compiled = step_fn.lower(
-       train_state, step_key, inputs_shape_dtype, static_args
-   ).compile()
+@@ -64,6 +65,111 @@ TrainStateProvenance = train_states.TrainStateProvenance
+ TrainStateMetadata = trainer_lib.TrainStateMetadata
+ RunningMode = trainer_lib.RunningMode
+ 
++import contextlib
++from jax._src.mesh import thread_resources
++from jax._src import config as jax_config
++import enum
++from collections import OrderedDict
++import numpy as np
++
++class LegateMeshWrapper(contextlib.ContextDecorator):
++
++  class Mode(enum.IntEnum):
++    LOWERING = 0
++    COMPILING = 1
++    NONE = 2
++  _mode = Mode.NONE
++    
++  def __init__(self, global_mesh, local_mesh: tuple[int]):
++    self.global_mesh = global_mesh
++    self.local_shape = OrderedDict( (name, dim) for name, dim in self.global_mesh.shape.items() )
++    for local_dim, (name, global_dim) in zip(local_mesh, self.global_mesh.shape.items()):
++      if local_dim != global_dim:
++        self.local_shape[name] = local_dim
++
++    self.num_local_devices = np.prod(local_mesh)
++
++    local_devices_slice = tuple( slice(0,dim) for dim in local_mesh )
++    self._local_devices = self.global_mesh.devices[local_devices_slice]
++
++
++  @classmethod
++  @contextlib.contextmanager
++  def mode(cls, mode: Mode):
++    save = cls._mode
++    cls._mode = mode
++    yield
++    cls._mode = save
++
++  def __repr__(self):
++    return f"LegateMeshWrapper({repr(self.global_mesh)})"
++
++  def __str__(self):
++    return f"LegateMeshWrapper({str(self.global_mesh)})"
++
++  @property
++  def is_multi_process(self):
++    return self.global_mesh.is_multi_process
++
++  @property
++  def _flat_devices_tuple(self):
++    devices = self.global_mesh._flat_devices_tuple
++    if self.compiling():
++      return devices[:self.num_local_devices]
++    return devices
++  
++  @property
++  def local_devices(self):
++    return self.global_mesh.local_devices
++
++  def compiling(self) -> bool:
++    return LegateMeshWrapper._mode == self.Mode.COMPILING
++
++  @property
++  def axis_names(self):
++    return self.global_mesh.axis_names
++
++  @property
++  def devices(self):
++    if self.compiling():
++      return self._local_devices
++    return self.global_mesh.devices
++  
++  @property
++  def shape(self):
++    if self.compiling():
++      return self.local_shape
++    return self.global_mesh.shape
++
++  @property
++  def _internal_device_list(self):
++    return self.global_mesh._internal_device_list
++  
++  @property
++  def size(self):
++    if self.compiling():
++      return self.num_local_devices
++    return self.global_mesh.size
++  
++  def empty(self):
++    return self.global_mesh.empty()
++  
++  def __enter__(self):
++    new_env = thread_resources.stack[-1].with_mesh(self)
++    thread_resources.stack.append(new_env)
++    thread_resources.env = new_env
++    jax_config.update_thread_local_jit_state(
++        mesh_context_manager=tuple(t.physical_mesh for t in thread_resources.stack
++                                  if not t.physical_mesh.empty))
++    return self
++
++  def __exit__(self, exc_type, exc_value, traceback):
++    thread_resources.stack.pop()
++    thread_resources.env = thread_resources.stack[-1]
++    jax_config.update_thread_local_jit_state(
++        mesh_context_manager=tuple(t.physical_mesh for t in thread_resources.stack
++                                  if not t.physical_mesh.empty))
++    return False
+ 
+ def _identity(x):
+   """A helper identity function, defined globally so it is JIT-compiled once."""
+@@ -127,9 +233,25 @@ def compile_for_auto_sharding(
+     return core.ShapedArray(x.shape, dtype)
+ 
+   inputs_shape_dtype = jax.tree.map(_create_aval, inputs_shape_dtype)
+-  compiled = step_fn.lower(
+-      train_state, step_key, inputs_shape_dtype, static_args
+-  ).compile()
++  with LegateMeshWrapper.mode(LegateMeshWrapper.Mode.LOWERING):
++    lowered = step_fn.lower(
++        train_state, step_key, inputs_shape_dtype, static_args
++    )
++  with LegateMeshWrapper.mode(LegateMeshWrapper.Mode.COMPILING):
++    compiled = lowered.compile()
 +
 +  sharding_str_arr = []
 +  def check(inp, inp_sharding, out):
@@ -430,7 +551,7 @@ index 7deb362..39f0e12 100644
    return compiled, compiled.input_shardings[0]
  
  
-@@ -740,7 +754,9 @@ class PmapPartitioner(Partitioner):
+@@ -740,7 +862,9 @@ class PmapPartitioner(Partitioner):
      ):
        if static_args:
          static_args = static_args.replace(unpadded_global_batch_size=None)
@@ -441,7 +562,18 @@ index 7deb362..39f0e12 100644
  
      return _wrapped_partitioned_step, None  # Input partition spec.
  
-@@ -894,9 +910,17 @@ class PjitPartitioner(Partitioner):
+@@ -782,7 +906,9 @@ class PjitPartitioner(Partitioner):
+     else:
+       logging.info('Using provided mesh for PjitPartitioner')
+     logging.info('device_mesh: %s', device_mesh)
+-    self._global_mesh = jax.sharding.Mesh(device_mesh, model.mesh_axis_names)
++
++    config = trainer_lib.PaxLegateConfig()
++    self._global_mesh = LegateMeshWrapper(jax.sharding.Mesh(device_mesh, model.mesh_axis_names), config.local_mesh)
+ 
+     # Pjit'ed function to preprocess the prng key.
+     self._broadcast_key_fn = None
+@@ -894,9 +1020,17 @@ class PjitPartitioner(Partitioner):
    ) -> NestedJTensor:
      """Preprocess the input batch before using it."""
      if self._reshard_inputs:
@@ -461,7 +593,7 @@ index 7deb362..39f0e12 100644
      return padded_inputs
  
    def get_train_state_metadata(
-@@ -1009,7 +1033,8 @@ class PjitPartitioner(Partitioner):
+@@ -1009,7 +1143,8 @@ class PjitPartitioner(Partitioner):
        # need to keep this resharding, because the resharding is related to the
        # locations of the real data (inputs_split_mapping) and is not visible
        # from HLOs.
@@ -471,7 +603,7 @@ index 7deb362..39f0e12 100644
  
        fn_out = step_fn(
            self._jax_task,
-@@ -1043,18 +1068,14 @@ class PjitPartitioner(Partitioner):
+@@ -1043,18 +1178,14 @@ class PjitPartitioner(Partitioner):
      logging.info('step_fn fn_in_partition_specs=%s', fn_in_partition_specs)
      logging.info('step_fn fn_out_partition_specs=%s', fn_out_partition_specs)
  
@@ -498,7 +630,7 @@ index 7deb362..39f0e12 100644
      extra_kwargs = dict(in_shardings=fn_in_shardings)
      if not use_pspec_on_array_inputs:
        extra_kwargs = {}
-@@ -1172,7 +1193,17 @@ class PjitPartitioner(Partitioner):
+@@ -1172,7 +1303,17 @@ class PjitPartitioner(Partitioner):
          fn_out_partition_specs,
          use_pspec_on_array_inputs=use_pspec_on_array_inputs,
      )
@@ -517,7 +649,7 @@ index 7deb362..39f0e12 100644
  
  
  class AutoShardingPjitPartitioner(PjitPartitioner):
-@@ -1296,8 +1327,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1296,8 +1437,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          else pjit.AUTO(self.global_mesh)
      )
  
@@ -532,7 +664,7 @@ index 7deb362..39f0e12 100644
          is_eval,
          fn_in_partition_specs,
          fn_out_partition_specs,
-@@ -1314,18 +1350,22 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1314,22 +1460,28 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          jax.tree.map(jnp.shape, inputs_shape_dtype),
          static_args,
      )
@@ -562,12 +694,19 @@ index 7deb362..39f0e12 100644
 +          static_args,
 +      )
 +
++
++
 +    new_train_state_pspec = input_shardings[0]
 +    new_input_pspec = input_shardings[2]
      return auto_sharded_step_fn, new_input_pspec, new_train_state_pspec
  
    def get_train_state_metadata(
-@@ -1408,7 +1448,10 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+-      self,
++      self, 
+       discard_opt_states: bool = False,
+       unpadded_global_batch_size: int | None = None,
+   ) -> TrainStateMetadata:
+@@ -1408,7 +1560,10 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
                subset=self._auto_sharding_input_spec, superset=inputs
            )
        )
@@ -579,7 +718,7 @@ index 7deb362..39f0e12 100644
  
      self._auto_sharding_result = (
          AutoShardingPjitPartitioner._AutoShardingResult(
-@@ -1440,6 +1483,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1440,6 +1595,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
      if not self._auto_sharding_result:
        self.get_train_state_metadata(discard_opt_states=is_eval)
      if step_fn is self._auto_sharding_info.step_fn:
@@ -810,7 +949,7 @@ index cfdc402..e475099 100644
          var_weight_hparams)
      train_state_pspecs = ckpt_task.create_train_state_partition_specs(
 diff --git a/paxml/trainer_lib.py b/paxml/trainer_lib.py
-index 6ec25e8..3d8cd2b 100644
+index 6ec25e8..f79d64f 100644
 --- a/paxml/trainer_lib.py
 +++ b/paxml/trainer_lib.py
 @@ -19,7 +19,7 @@ import dataclasses
@@ -837,7 +976,7 @@ index 6ec25e8..3d8cd2b 100644
  from praxis import asserts
  from praxis import base_hyperparams
  from praxis import base_input
-@@ -90,6 +92,14 @@ PMAP_PARALLEL_AXIS_NAME = base_layer.PMAP_PARALLEL_AXIS_NAME
+@@ -90,6 +92,15 @@ PMAP_PARALLEL_AXIS_NAME = base_layer.PMAP_PARALLEL_AXIS_NAME
  instantiate = base_hyperparams.instantiate
  
  
@@ -848,11 +987,12 @@ index 6ec25e8..3d8cd2b 100644
 +@dataclasses.dataclass
 +class PaxLegateConfig(legate.jax.ClientConfig):
 +  enable_tracing: bool = False
++  local_mesh: Optional[tuple[int]] = None
 +
  class RunningMode(enum.Flag):
    """Running mode."""
  
-@@ -167,8 +177,7 @@ def create_train_state_metadata(
+@@ -167,8 +178,7 @@ def create_train_state_metadata(
      A TrainStateMetadata instance.
    """
    var_weight_hparams = jax_task.model.abstract_init_with_metadata(
@@ -862,7 +1002,7 @@ index 6ec25e8..3d8cd2b 100644
    padded_global_shapes = jax_task.create_train_state_padded_shapes(
        var_weight_hparams, discard_opt_states=discard_opt_states
    )
-@@ -217,7 +226,8 @@ def write_post_init_model_hparams_file(
+@@ -217,7 +227,8 @@ def write_post_init_model_hparams_file(
      logging.info('post_init_model_params: %s', params_fpath)
      job_log_dir.mkdir(parents=True, exist_ok=True)
      hyper_params = model.abstract_init_with_mdl_config(
@@ -872,7 +1012,7 @@ index 6ec25e8..3d8cd2b 100644
      )
      with params_fpath.open('w') as params_file:
        hyper_params_dump = base_hyperparams.nested_struct_to_text(hyper_params)
-@@ -379,7 +389,8 @@ def initialize_model_state(
+@@ -379,7 +390,8 @@ def initialize_model_state(
      is_eval_for_init = is_eval
    if not var_weight_hparams:
      var_weight_hparams = model.abstract_init_with_metadata(
@@ -882,7 +1022,7 @@ index 6ec25e8..3d8cd2b 100644
      )
    logging.info('init_var prng_seed: %s', init_key)
    logging.info('var_weight_hparams: %s', var_weight_hparams)
-@@ -396,7 +407,7 @@ def initialize_model_state(
+@@ -396,7 +408,7 @@ def initialize_model_state(
        inputs = jax.tree.map(jnp.zeros_like, inputs_shape_dtype)
        if model.hparams.fprop_dtype == jnp.bfloat16:
          inputs = jax.tree.map(_maybe_to_bfloat16, inputs)
@@ -891,7 +1031,7 @@ index 6ec25e8..3d8cd2b 100644
  
    initial_vars = init_fn(init_key)
    logging.info('initial_vars: %s', jax.tree.map(jnp.shape, initial_vars))
-@@ -809,7 +820,6 @@ class LossFnProtocol(Protocol):
+@@ -809,7 +821,6 @@ class LossFnProtocol(Protocol):
    ) -> tuple[JTensor, sgf.GradAuxInfo]:
      """Produces losses and grad info by passing the inputs through a model."""
  
@@ -899,7 +1039,7 @@ index 6ec25e8..3d8cd2b 100644
  def _get_default_loss_fn(
      jax_task: tasks_lib.SingleTask,
      context_p: base_layer.JaxContext.HParams,
-@@ -920,6 +930,13 @@ class GradFnProtocol(Protocol):
+@@ -920,6 +931,13 @@ class GradFnProtocol(Protocol):
        A tuple of (values, grads).
      """
  
@@ -913,7 +1053,7 @@ index 6ec25e8..3d8cd2b 100644
  
  def _get_default_grad_fn(
      excluded_for_grad: NestedMap, excluded_for_opt: NestedMap
-@@ -942,11 +959,11 @@ def _get_default_grad_fn(
+@@ -942,11 +960,11 @@ def _get_default_grad_fn(
  
      def _loss(
          mdl_vars_grad: NestedJTensor,
@@ -928,7 +1068,7 @@ index 6ec25e8..3d8cd2b 100644
            lambda e, x, y: y if e else x,
            excluded_for_grad,
            mdl_vars_grad,
-@@ -958,8 +975,27 @@ def _get_default_grad_fn(
+@@ -958,8 +976,27 @@ def _get_default_grad_fn(
        g = jax.value_and_grad(_loss, has_aux=True, allow_int=True)
      else:
        g = functools.partial(learner.stochastic_gradient.grad_fn, _loss)
@@ -958,7 +1098,7 @@ index 6ec25e8..3d8cd2b 100644
          lambda eo, eg, m, g: jnp.zeros_like(m) if eg and not eo else g,
          excluded_for_opt,
          excluded_for_grad,
-@@ -994,6 +1030,7 @@ def get_excluded_var_masks(
+@@ -994,6 +1031,7 @@ def get_excluded_var_masks(
    excluded_for_grad = tasks_lib.get_excluded_var_mask_for_grad(
        var_weight_hparams, learner
    )
@@ -966,7 +1106,7 @@ index 6ec25e8..3d8cd2b 100644
    _log_bprop_include_exclude_list(var_weight_hparams, excluded_for_grad)
  
    # Excluded for optimizer states.
-@@ -1090,7 +1127,7 @@ def train_step_single_learner(
+@@ -1090,7 +1128,7 @@ def train_step_single_learner(
  
    if not var_weight_hparams:
      with base_layer.JaxContext.new_context(hparams=context_p):
@@ -975,7 +1115,7 @@ index 6ec25e8..3d8cd2b 100644
    updated_model_vars = jax_task.maybe_adjust_train_state(  # pytype: disable=wrong-arg-types  # jax-ndarray
        step=states.step,
        mdl_vars=states.mdl_vars,
-@@ -1162,6 +1199,7 @@ def train_step_single_learner(
+@@ -1162,6 +1200,7 @@ def train_step_single_learner(
      wps_with_opt = tasks_lib.filter_vars_for_grad_or_opt(
          var_weight_hparams, excluded_for_learner
      )
@@ -983,7 +1123,7 @@ index 6ec25e8..3d8cd2b 100644
      transformed_grads, new_opt_states = learner.update_states(
          grads, states.opt_states[0], vars_with_opt, wps_with_opt
      )
-@@ -1197,6 +1235,7 @@ def train_step_single_learner(
+@@ -1197,6 +1236,7 @@ def train_step_single_learner(
          states.mdl_vars,
          mdl_vars,
      )
@@ -991,7 +1131,7 @@ index 6ec25e8..3d8cd2b 100644
      new_states = states.new_state(
          mdl_vars=mdl_vars, opt_states=[new_opt_states], extra_state=()
      )
-@@ -1300,7 +1339,7 @@ def eval_step_single_learner(
+@@ -1300,7 +1340,7 @@ def eval_step_single_learner(
      var_weight_hparams = model.abstract_init_with_metadata(
          inputs,
          do_eval=not jax_task.hparams.train.always_use_train_for_model_init,
@@ -1000,7 +1140,7 @@ index 6ec25e8..3d8cd2b 100644
  
    if fprop_dtype == jnp.float32:
      pass
-@@ -1554,7 +1593,7 @@ def initialize_partitioned_model_states(
+@@ -1554,7 +1594,7 @@ def initialize_partitioned_model_states(
    model = jax_task.model
    if not var_weight_hparams:
      var_weight_hparams = model.abstract_init_with_metadata(
@@ -1009,7 +1149,7 @@ index 6ec25e8..3d8cd2b 100644
      )
  
    train_state_partition_specs = (
-@@ -1601,19 +1640,19 @@ def initialize_partitioned_model_states(
+@@ -1601,19 +1641,19 @@ def initialize_partitioned_model_states(
        lambda p: jax.sharding.NamedSharding(global_mesh, p),
        prng_key_partition_spec,
    )
@@ -1040,7 +1180,7 @@ index 6ec25e8..3d8cd2b 100644
    train_state_provenance = train_states.build_train_state_provenance(
        partitioned_vars
    )
-@@ -1647,7 +1686,9 @@ def shard_on_batch_dim_partition_spec(
+@@ -1647,7 +1687,9 @@ def shard_on_batch_dim_partition_spec(
    sharding = [-1] * x_dim
    # Assume the first dim is batch, and fully shard the batch dim over the entire
    # mesh.
