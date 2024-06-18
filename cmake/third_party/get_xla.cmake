@@ -37,6 +37,7 @@ function(find_or_configure_xla)
     hlo_partition_test
     legate_buffer_action_test
     legate_sharding_test
+    loop_scheduler_test
     legate_pjrt_client_test
     legate_pjrt_executable_test
     batch_dim_propagation_test

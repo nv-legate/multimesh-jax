@@ -198,7 +198,7 @@ class TaskTest(LegateJaxTestCase):
                 c, arg_maker, arg_shardings=arg_shardings
             )
 
-        legate.jax.unregister_task(r"(task\d+)")
+        legate.jax.clear_tasks()
 
     def test_fully_replicated_sharding(self):
         if jax.device_count() != 4:

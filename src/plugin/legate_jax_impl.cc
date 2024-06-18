@@ -23,19 +23,17 @@ extern "C" void RegisterImplicitTaskWithFactory(
 
 extern "C" void UnregisterImplicitTask(std::string matcher);
 
-extern "C" void EnableFastPath();
+extern "C" void EnableFastPath(bool enable);
 
-extern "C" void DisableFastPath();
+extern "C" void EnableOnlyFuseLoopTasks(bool enable);
+
+extern "C" void EnableTaskFusion(bool enable);
 
 extern "C" void ClearImplicitTasks();
 
-extern "C" void EnableLegateTracing();
+extern "C" void EnableLegateTracing(bool enable);
 
-extern "C" void DisableLegateTracing();
-
-extern "C" void EnableLegateRecomputation();
-
-extern "C" void DisableLegateRecomputation();
+extern "C" void EnableLegateRecomputation(bool enable);
 
 extern "C" void LegateShutdown();
 
@@ -144,24 +142,16 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       py::arg("erase_sharding") = false, py::arg("autoshard") = true,
       py::arg("device_mem_gb") = 0);
   m.def(
-      "enable_fast_path",
-      [](bool enable) {
-        if (enable) {
-          EnableFastPath();
-        } else {
-          DisableFastPath();
-        }
-      },
+      "enable_fast_path", [](bool enable) { EnableFastPath(enable); },
       py::arg("enable"));
   m.def(
-      "enable_tracing",
-      [](bool enable) {
-        if (enable) {
-          EnableLegateTracing();
-        } else {
-          DisableLegateTracing();
-        }
-      },
+      "enable_only_fuse_loop_tasks",
+      [](bool enable) { EnableOnlyFuseLoopTasks(enable); }, py::arg("enable"));
+  m.def(
+      "enable_task_fusion", [](bool enable) { EnableTaskFusion(enable); },
+      py::arg("enable"));
+  m.def(
+      "enable_tracing", [](bool enable) { EnableLegateTracing(enable); },
       py::arg("enable"));
   m.def(
       "replicate_parameters_smaller_than_num_elements",
@@ -171,12 +161,6 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       py::arg("num_elements"));
   m.def(
       "enable_recomputation",
-      [](bool enable) {
-        if (enable) {
-          EnableLegateRecomputation();
-        } else {
-          DisableLegateRecomputation();
-        }
-      },
+      [](bool enable) { EnableLegateRecomputation(enable); },
       py::arg("enable"));
 }

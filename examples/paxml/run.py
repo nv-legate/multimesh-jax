@@ -225,6 +225,7 @@ legate_jax.add_argument(
     "--schedule",
     type=str,
     choices=["fill-drain", "gpipe", "1f1b"],
+    default="fill-drain",
     help="The microbatch schedule to use",
 )
 
@@ -376,7 +377,7 @@ vmodule = [
     "legate_pjrt_executable",
     "mpmd_input_output_buffer_alias",
     "legate_store_cache",
-    "loop_schedule",
+    "loop_scheduler",
     "legate_ifrt_client",
 ]
 
@@ -723,6 +724,9 @@ LambadaConfig:
 MicrobatchConfig:
   size = {mb_size}
   batch_reshape = {args.microbatch_reshape}
+  schedule = '{args.schedule}'
+  num_stages = {num_stages}
+  interleave = {args.interleave}
 """
 
 

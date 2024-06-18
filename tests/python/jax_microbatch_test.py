@@ -5,7 +5,7 @@ import numpy as np
 from absl.testing import absltest
 from jax import config, value_and_grad
 
-from legate.jax import microbatch, register_task, task
+from legate.jax import enable_task_fusion, microbatch, register_task, task
 from legate.jax.test_util import LegateJaxTestCase
 
 config.parse_flags_with_absl()
@@ -50,6 +50,88 @@ class MicrobatchTest(LegateJaxTestCase):
             return ((make_shape(4, 4), make_shape(4, 1), make_shape(4, 1)),)
 
         self._test_against_reference(c, args_maker)
+
+    def test_microbatch_1f1b(self):
+        logical_axes = [
+            ("batch", "x"),
+            ("model", "y"),
+        ]
+
+        register_task(
+            "layer0",
+            devices=[0],
+            dims=[1, 1],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+        register_task(
+            "layer1",
+            devices=[0],
+            dims=[1, 1],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+        register_task(
+            "layer2",
+            devices=[0],
+            dims=[1, 1],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+        register_task(
+            "layer3",
+            devices=[0],
+            dims=[1, 1],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+        register_task(
+            "final",
+            devices=[0],
+            dims=[1, 1],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+
+        def c(params, batch):
+            def inner_comp(x, y):
+                return jnp.einsum("ac,cb->ab", x, y)
+
+            def m(params, batch):
+                x, y, z, w = params
+                with jax.named_scope("layer0"):
+                    s = inner_comp(batch, x)
+                with jax.named_scope("layer1"):
+                    s = inner_comp(s, y)
+                with jax.named_scope("layer2"):
+                    s = inner_comp(s, z)
+                with jax.named_scope("layer3"):
+                    s = inner_comp(s, w)
+                    return s.sum()
+
+            g = value_and_grad(m)
+            g = microbatch(
+                g, dim=0, size=2, argnum=1, schedule="1f1b", num_stages=4
+            )
+            return g(params, batch)
+
+        def args_maker():
+            def make_shape(*shape):
+                size = np.prod(shape)
+                return jnp.arange(size, dtype=np.float32).reshape(*shape)
+
+            return (
+                (
+                    make_shape(4, 4),
+                    make_shape(4, 4),
+                    make_shape(4, 4),
+                    make_shape(4, 4),
+                ),
+                make_shape(12, 4),
+            )
+
+        with enable_task_fusion(False):
+            self._test_against_reference(c, args_maker)
 
     def test_microbatch_implicit_pre_post_task(self):
         logical_axes = [

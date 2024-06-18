@@ -16,6 +16,7 @@ from .lib import (
     enable_fast_path,
     enable_tracing,
     enable_recomputation,
+    enable_task_fusion,
     init,
     ignore_transforms,
     with_sharding_constraint,

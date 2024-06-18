@@ -40,6 +40,10 @@ int64_t GetRunId() {
 }
 
 size_t LaunchSize(const Shape &shape, size_t default_size) {
+  if (shape.explicit_replication == 1 && !shape.tile_shape.has_value()) {
+    return default_size;
+  }
+
   size_t size = shape.explicit_replication;
   for (size_t dim = 0; dim < shape.dims.size(); ++dim) {
     if (shape.tile_shape.has_value()) {

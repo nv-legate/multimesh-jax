@@ -450,12 +450,13 @@ def microbatch(
     dim: int,
     size: int,
     argnum: int = 0,
-    interleave: int = 1,
+    interleave: Optional[int] = None,
     batch_reshape: Optional[int] = None,
     arg_shardings: Optional[Any] = None,
     microbatch_shardings: Optional[Any] = None,
+    schedule: Optional[str] = None,
     unrolling: Optional[int] = None,
-    num_pipeline_stages: Optional[int] = None,
+    num_stages: Optional[int] = None,
 ):
     if should_ignore_transforms():
         return fxn
@@ -489,7 +490,8 @@ def microbatch(
             batch_dim=dim,
             interleave=interleave,
             unrolling=unrolling,
-            num_pipeline_stages=num_pipeline_stages,
+            num_stages=num_stages,
+            schedule=schedule,
         )
 
         mark_microbatch = no_op(
