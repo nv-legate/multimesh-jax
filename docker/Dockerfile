@@ -84,7 +84,7 @@ RUN cd /opt && \
 RUN cd /opt/ucx && \
   conda run --no-capture-out -n legere git remote add legere https://github.com/openucx/ucx.git && \
   conda run --no-capture-out -n legere git fetch legere && \
-  conda run --no-capture-out -n legere git checkout master && \
+  conda run --no-capture-out -n legere git checkout 56166436e6d6cd307d3b7a4148167c9b58ba0a8b && \
   conda run --no-capture-out -n legere ./autogen.sh && \
   conda run --no-capture-out -n legere ./contrib/configure-release --enable-mt \
 --with-cuda=/usr/local/cuda --with-java=no && \

@@ -399,7 +399,7 @@ index ff3d89d..035d1b3 100644
  
  _TASK_HANDLE_RE = re.compile(r'(?:logs\.)?(\d+)\.(.*)\.([^.]+)\.\d+')
 diff --git a/paxml/partitioning.py b/paxml/partitioning.py
-index 7deb362..f7ab004 100644
+index 7deb362..43b5496 100644
 --- a/paxml/partitioning.py
 +++ b/paxml/partitioning.py
 @@ -42,6 +42,7 @@ from praxis import pax_fiddle
@@ -410,7 +410,7 @@ index 7deb362..f7ab004 100644
  
  # tf_data_service_lib is slow to import, so we do it lazily.
  tf_data_service_lib = lazy_loader.LazyLoader(
-@@ -64,6 +65,111 @@ TrainStateProvenance = train_states.TrainStateProvenance
+@@ -64,6 +65,112 @@ TrainStateProvenance = train_states.TrainStateProvenance
  TrainStateMetadata = trainer_lib.TrainStateMetadata
  RunningMode = trainer_lib.RunningMode
  
@@ -500,8 +500,9 @@ index 7deb362..f7ab004 100644
 +      return self.num_local_devices
 +    return self.global_mesh.size
 +  
++  @property
 +  def empty(self):
-+    return self.global_mesh.empty()
++    return self.global_mesh.empty
 +  
 +  def __enter__(self):
 +    new_env = thread_resources.stack[-1].with_mesh(self)
@@ -522,7 +523,7 @@ index 7deb362..f7ab004 100644
  
  def _identity(x):
    """A helper identity function, defined globally so it is JIT-compiled once."""
-@@ -127,9 +233,25 @@ def compile_for_auto_sharding(
+@@ -127,9 +234,25 @@ def compile_for_auto_sharding(
      return core.ShapedArray(x.shape, dtype)
  
    inputs_shape_dtype = jax.tree.map(_create_aval, inputs_shape_dtype)
@@ -551,7 +552,7 @@ index 7deb362..f7ab004 100644
    return compiled, compiled.input_shardings[0]
  
  
-@@ -740,7 +862,9 @@ class PmapPartitioner(Partitioner):
+@@ -740,7 +863,9 @@ class PmapPartitioner(Partitioner):
      ):
        if static_args:
          static_args = static_args.replace(unpadded_global_batch_size=None)
@@ -562,7 +563,7 @@ index 7deb362..f7ab004 100644
  
      return _wrapped_partitioned_step, None  # Input partition spec.
  
-@@ -782,7 +906,9 @@ class PjitPartitioner(Partitioner):
+@@ -782,7 +907,9 @@ class PjitPartitioner(Partitioner):
      else:
        logging.info('Using provided mesh for PjitPartitioner')
      logging.info('device_mesh: %s', device_mesh)
@@ -573,7 +574,7 @@ index 7deb362..f7ab004 100644
  
      # Pjit'ed function to preprocess the prng key.
      self._broadcast_key_fn = None
-@@ -894,9 +1020,17 @@ class PjitPartitioner(Partitioner):
+@@ -894,9 +1021,17 @@ class PjitPartitioner(Partitioner):
    ) -> NestedJTensor:
      """Preprocess the input batch before using it."""
      if self._reshard_inputs:
@@ -593,7 +594,7 @@ index 7deb362..f7ab004 100644
      return padded_inputs
  
    def get_train_state_metadata(
-@@ -1009,7 +1143,8 @@ class PjitPartitioner(Partitioner):
+@@ -1009,7 +1144,8 @@ class PjitPartitioner(Partitioner):
        # need to keep this resharding, because the resharding is related to the
        # locations of the real data (inputs_split_mapping) and is not visible
        # from HLOs.
@@ -603,7 +604,7 @@ index 7deb362..f7ab004 100644
  
        fn_out = step_fn(
            self._jax_task,
-@@ -1043,18 +1178,14 @@ class PjitPartitioner(Partitioner):
+@@ -1043,18 +1179,14 @@ class PjitPartitioner(Partitioner):
      logging.info('step_fn fn_in_partition_specs=%s', fn_in_partition_specs)
      logging.info('step_fn fn_out_partition_specs=%s', fn_out_partition_specs)
  
@@ -630,7 +631,7 @@ index 7deb362..f7ab004 100644
      extra_kwargs = dict(in_shardings=fn_in_shardings)
      if not use_pspec_on_array_inputs:
        extra_kwargs = {}
-@@ -1172,7 +1303,17 @@ class PjitPartitioner(Partitioner):
+@@ -1172,7 +1304,17 @@ class PjitPartitioner(Partitioner):
          fn_out_partition_specs,
          use_pspec_on_array_inputs=use_pspec_on_array_inputs,
      )
@@ -649,7 +650,7 @@ index 7deb362..f7ab004 100644
  
  
  class AutoShardingPjitPartitioner(PjitPartitioner):
-@@ -1296,8 +1437,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1296,8 +1438,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          else pjit.AUTO(self.global_mesh)
      )
  
@@ -664,7 +665,7 @@ index 7deb362..f7ab004 100644
          is_eval,
          fn_in_partition_specs,
          fn_out_partition_specs,
-@@ -1314,22 +1460,28 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1314,22 +1461,28 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          jax.tree.map(jnp.shape, inputs_shape_dtype),
          static_args,
      )
@@ -706,7 +707,7 @@ index 7deb362..f7ab004 100644
        discard_opt_states: bool = False,
        unpadded_global_batch_size: int | None = None,
    ) -> TrainStateMetadata:
-@@ -1408,7 +1560,10 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1408,7 +1561,10 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
                subset=self._auto_sharding_input_spec, superset=inputs
            )
        )
@@ -718,7 +719,7 @@ index 7deb362..f7ab004 100644
  
      self._auto_sharding_result = (
          AutoShardingPjitPartitioner._AutoShardingResult(
-@@ -1440,6 +1595,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1440,6 +1596,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
      if not self._auto_sharding_result:
        self.get_train_state_metadata(discard_opt_states=is_eval)
      if step_fn is self._auto_sharding_info.step_fn:
@@ -949,7 +950,7 @@ index cfdc402..e475099 100644
          var_weight_hparams)
      train_state_pspecs = ckpt_task.create_train_state_partition_specs(
 diff --git a/paxml/trainer_lib.py b/paxml/trainer_lib.py
-index 6ec25e8..f79d64f 100644
+index 6ec25e8..b4b4ec5 100644
 --- a/paxml/trainer_lib.py
 +++ b/paxml/trainer_lib.py
 @@ -19,7 +19,7 @@ import dataclasses
@@ -1039,7 +1040,7 @@ index 6ec25e8..f79d64f 100644
  def _get_default_loss_fn(
      jax_task: tasks_lib.SingleTask,
      context_p: base_layer.JaxContext.HParams,
-@@ -920,6 +931,13 @@ class GradFnProtocol(Protocol):
+@@ -920,6 +931,16 @@ class GradFnProtocol(Protocol):
        A tuple of (values, grads).
      """
  
@@ -1050,10 +1051,13 @@ index 6ec25e8..f79d64f 100644
 +class MicrobatchConfig:
 +  size: Optional[int] = None
 +  batch_reshape: Optional[int] = None
++  schedule: Optional[str] = None
++  num_stages: Optional[int] = None
++  interleave: Optional[int] = None
  
  def _get_default_grad_fn(
      excluded_for_grad: NestedMap, excluded_for_opt: NestedMap
-@@ -942,11 +960,11 @@ def _get_default_grad_fn(
+@@ -942,11 +963,11 @@ def _get_default_grad_fn(
  
      def _loss(
          mdl_vars_grad: NestedJTensor,
@@ -1068,7 +1072,7 @@ index 6ec25e8..f79d64f 100644
            lambda e, x, y: y if e else x,
            excluded_for_grad,
            mdl_vars_grad,
-@@ -958,8 +976,27 @@ def _get_default_grad_fn(
+@@ -958,8 +979,29 @@ def _get_default_grad_fn(
        g = jax.value_and_grad(_loss, has_aux=True, allow_int=True)
      else:
        g = functools.partial(learner.stochastic_gradient.grad_fn, _loss)
@@ -1091,14 +1095,16 @@ index 6ec25e8..f79d64f 100644
 +      slice_shardings = jax.tree_map(microbatch_slice_sharding, inputs)
 +
 +      g = microbatch(g, dim=0, argnum=2, batch_reshape=microbatch_config.batch_reshape, 
-+                     size=microbatch_config.size, arg_shardings=arg_shardings, microbatch_shardings=slice_shardings)
++                     size=microbatch_config.size, arg_shardings=arg_shardings, microbatch_shardings=slice_shardings,
++                     schedule=microbatch_config.schedule, num_stages=microbatch_config.num_stages,
++                     interleave=microbatch_config.interleave)
 +    values, grads = g(with_grad, no_grad, inputs, prng_key)
 +
 +    grads = jax.tree_map(
          lambda eo, eg, m, g: jnp.zeros_like(m) if eg and not eo else g,
          excluded_for_opt,
          excluded_for_grad,
-@@ -994,6 +1031,7 @@ def get_excluded_var_masks(
+@@ -994,6 +1036,7 @@ def get_excluded_var_masks(
    excluded_for_grad = tasks_lib.get_excluded_var_mask_for_grad(
        var_weight_hparams, learner
    )
@@ -1106,7 +1112,7 @@ index 6ec25e8..f79d64f 100644
    _log_bprop_include_exclude_list(var_weight_hparams, excluded_for_grad)
  
    # Excluded for optimizer states.
-@@ -1090,7 +1128,7 @@ def train_step_single_learner(
+@@ -1090,7 +1133,7 @@ def train_step_single_learner(
  
    if not var_weight_hparams:
      with base_layer.JaxContext.new_context(hparams=context_p):
@@ -1115,7 +1121,7 @@ index 6ec25e8..f79d64f 100644
    updated_model_vars = jax_task.maybe_adjust_train_state(  # pytype: disable=wrong-arg-types  # jax-ndarray
        step=states.step,
        mdl_vars=states.mdl_vars,
-@@ -1162,6 +1200,7 @@ def train_step_single_learner(
+@@ -1162,6 +1205,7 @@ def train_step_single_learner(
      wps_with_opt = tasks_lib.filter_vars_for_grad_or_opt(
          var_weight_hparams, excluded_for_learner
      )
@@ -1123,7 +1129,7 @@ index 6ec25e8..f79d64f 100644
      transformed_grads, new_opt_states = learner.update_states(
          grads, states.opt_states[0], vars_with_opt, wps_with_opt
      )
-@@ -1197,6 +1236,7 @@ def train_step_single_learner(
+@@ -1197,6 +1241,7 @@ def train_step_single_learner(
          states.mdl_vars,
          mdl_vars,
      )
@@ -1131,7 +1137,7 @@ index 6ec25e8..f79d64f 100644
      new_states = states.new_state(
          mdl_vars=mdl_vars, opt_states=[new_opt_states], extra_state=()
      )
-@@ -1300,7 +1340,7 @@ def eval_step_single_learner(
+@@ -1300,7 +1345,7 @@ def eval_step_single_learner(
      var_weight_hparams = model.abstract_init_with_metadata(
          inputs,
          do_eval=not jax_task.hparams.train.always_use_train_for_model_init,
@@ -1140,7 +1146,7 @@ index 6ec25e8..f79d64f 100644
  
    if fprop_dtype == jnp.float32:
      pass
-@@ -1554,7 +1594,7 @@ def initialize_partitioned_model_states(
+@@ -1554,7 +1599,7 @@ def initialize_partitioned_model_states(
    model = jax_task.model
    if not var_weight_hparams:
      var_weight_hparams = model.abstract_init_with_metadata(
@@ -1149,7 +1155,7 @@ index 6ec25e8..f79d64f 100644
      )
  
    train_state_partition_specs = (
-@@ -1601,19 +1641,19 @@ def initialize_partitioned_model_states(
+@@ -1601,19 +1646,19 @@ def initialize_partitioned_model_states(
        lambda p: jax.sharding.NamedSharding(global_mesh, p),
        prng_key_partition_spec,
    )
@@ -1180,7 +1186,7 @@ index 6ec25e8..f79d64f 100644
    train_state_provenance = train_states.build_train_state_provenance(
        partitioned_vars
    )
-@@ -1647,7 +1687,9 @@ def shard_on_batch_dim_partition_spec(
+@@ -1647,7 +1692,9 @@ def shard_on_batch_dim_partition_spec(
    sharding = [-1] * x_dim
    # Assume the first dim is batch, and fully shard the batch dim over the entire
    # mesh.
