@@ -17,6 +17,7 @@ from .lib import (
     enable_tracing,
     enable_recomputation,
     enable_task_fusion,
+    only_fuse_loop_tasks,
     init,
     ignore_transforms,
     with_sharding_constraint,

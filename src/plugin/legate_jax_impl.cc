@@ -78,13 +78,11 @@ PYBIND11_MODULE(legate_jax_impl, m) {
     py::gil_scoped_release release;
     LegateShutdown();
   });
-  m.def("fence", []() {
-    LegateFence();
-  });
+  m.def("fence", []() { LegateFence(); });
   m.def("no_op_custom_call",
         []() { return EncapsulateFunction(no_op_entrypoint); });
-  m.def("enable_implicit_tasks", [] { SetEnableImplicitTasks(true); });
-  m.def("disable_implicit_tasks", [] { SetEnableImplicitTasks(false); });
+  m.def("enable_implicit_tasks",
+        [](bool flag) { SetEnableImplicitTasks(flag); });
   m.def(
       "register_task",
       [](py::str task_regex, py::list py_devices, py::list py_device_dims,

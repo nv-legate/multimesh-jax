@@ -230,6 +230,13 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
+    "--only-fuse-loop-tasks",
+    action="store_true",
+    default=False,
+    help="Only fuse tasks inside loops",
+)
+
+legate_jax.add_argument(
     "--microbatch-size",
     type=int,
     default=None,
@@ -797,60 +804,62 @@ elif args.optimizer == "sgd":
 
 # always enable recomputation
 with legate.jax.enable_recomputation(True):
-    legate.jax.replicate_parameters_smaller_than_num_elements(
-        batch_size * args.sequence_length
-    )
-    if args.hlo is None or args.dump_hlo:
-        import jaxlib
+    with legate.jax.only_fuse_loop_tasks(args.only_fuse_loop_tasks):
+        legate.jax.replicate_parameters_smaller_than_num_elements(
+            batch_size * args.sequence_length
+        )
+        if args.hlo is None or args.dump_hlo:
+            import jaxlib
 
-        sys.argv = argv
-        try:
-            runpy.run_module("paxml.main", run_name="__main__")
-        except jaxlib.xla_extension.XlaRuntimeError as e:
-            need_throw = True
-            if args.dump_hlo:
-                path = Path(args.dump)
-                if path.exists():
-                    globber = (
-                        path
-                        / "*pjit_autoshard_step*before_optimizations.hlo.pb"
-                    )
-                    matches = glob.glob(str(globber))
-                    if matches:
-                        print(
-                            "Dump seems to have succeeded in generating "
-                            f"{matches[0]}. Run finished early with error: {e}"
+            sys.argv = argv
+            try:
+                runpy.run_module("paxml.main", run_name="__main__")
+            except jaxlib.xla_extension.XlaRuntimeError as e:
+                need_throw = True
+                if args.dump_hlo:
+                    path = Path(args.dump)
+                    if path.exists():
+                        globber = (
+                            path
+                            / "*pjit_autoshard*before_optimizations.hlo.pb"
                         )
-                        need_throw = False
+                        matches = glob.glob(str(globber))
+                        if matches:
+                            print(
+                                "Dump seems to have succeeded in generating "
+                                f"{matches[0]}. Run finished with error: {e}"
+                            )
+                            need_throw = False
 
-            if need_throw:
-                raise e
-        except Exception as e:
-            # if dumping the hlo, squash the exception
-            if not args.dump_hlo:
-                raise e
-            else:
-                print(e)
+                if need_throw:
+                    raise e
+            except Exception as e:
+                # if dumping the hlo, squash the exception
+                if not args.dump_hlo:
+                    raise e
+                else:
+                    print(e)
 
-    if args.hlo is not None:
-        # restore the original GPU count
-        if args.dump_hlo:
-            args.gpus = args.cpus
-        # sort of funky here, but we have to instantiate the client
-        # to force custom call registration
-        # the easiest way to instantiate is to print the device list
-        import jax
+        if args.hlo is not None:
+            # restore the original GPU count
+            if args.dump_hlo:
+                args.gpus = args.cpus
+            # sort of funky here, but we have to instantiate the client
+            # to force custom call registration
+            # the easiest way to instantiate is to print the device list
+            import jax
 
-        print(jax.devices())
-        platform = "gpu" if args.gpus else "cpu"
-        from paxml.partitioning import LegateMeshWrapper
+            print(jax.devices())
 
-        with LegateMeshWrapper.mode(LegateMeshWrapper.Mode.COMPILING):
-            legate.jax.compile_hlo_module(
-                args.hlo,
-                num_partitions=total_devices,
-                erase_sharding=args.erase_explicit_sharding,
-                autoshard=args.autoshard,
-                platform=platform,
-                device_mem_gb=args.fbmem,
-            )
+            platform = "gpu" if args.gpus else "cpu"
+            from paxml.partitioning import LegateMeshWrapper
+
+            with LegateMeshWrapper.mode(LegateMeshWrapper.Mode.COMPILING):
+                legate.jax.compile_hlo_module(
+                    args.hlo,
+                    num_partitions=total_devices,
+                    erase_sharding=args.erase_explicit_sharding,
+                    autoshard=args.autoshard,
+                    platform=platform,
+                    device_mem_gb=args.fbmem,
+                )

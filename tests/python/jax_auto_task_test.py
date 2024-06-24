@@ -140,6 +140,40 @@ class TaskTest(LegateJaxTestCase):
         with legate.jax.context(config):
             self._test_register_task()
 
+    def test_only_fuse_loop_tasks(self):
+        if jax.device_count() != 2:
+            self.skipTest("need 2 devices")
+
+        class TaskConfigure:
+            def __call__(self):
+                logical_axes = [
+                    ("batch", "x"),
+                    ("model", "y"),
+                ]
+                legate.jax.register_task(
+                    "task0",
+                    devices=[0, 1],
+                    dims=[2, 1],
+                    device_axes=["x", "y"],
+                    logical_axes=logical_axes,
+                )
+                legate.jax.register_task(
+                    "task1",
+                    devices=[0, 1],
+                    dims=[2, 1],
+                    device_axes=["x", "y"],
+                    logical_axes=logical_axes,
+                )
+
+        config = legate.jax.ClientConfig(
+            auto_shard=True, configurable=TaskConfigure
+        )
+        with legate.jax.context(config):
+            with legate.jax.only_fuse_loop_tasks(True):
+                self._test_register_task()
+            with legate.jax.only_fuse_loop_tasks(False):
+                self._test_register_task()
+
     def tearDown(self):
         legate.jax.clear_tasks()
 

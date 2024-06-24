@@ -3,7 +3,16 @@ import json
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional, Sequence, Type, TypeAlias
+from typing import (
+    Any,
+    Callable,
+    List,
+    Optional,
+    Sequence,
+    Type,
+    TypeAlias,
+    Union,
+)
 
 import gin
 import jax
@@ -14,10 +23,10 @@ from jax.tree_util import tree_flatten, tree_unflatten
 
 from .legate_jax_impl import (
     clear_tasks,
-    disable_implicit_tasks,
     enable_fast_path as _enable_fast_path,
     enable_implicit_tasks,
-    enable_recomputation as _enable_recomputaiton,
+    enable_only_fuse_loop_tasks as _enable_only_fuse_loop_tasks,
+    enable_recomputation as _enable_recomputation,
     enable_task_fusion as _enable_task_fusion,
     enable_tracing as _enable_tracing,
     register_task,
@@ -28,19 +37,13 @@ from .no_op import no_op
 
 _ignore_transforms = 0
 
-_fast_path_enabled = True
-
-_tracing_enabled = False
-
-_recomputation_enabled = False
-
-_task_fusion_enabled = True
-
 _GIN_CONFIG_ENV = "LEGATE_GIN_CONFIG"
 
 _auto_shard_enabled = False
 
 _gc_disabled = False
+
+ContextValue = Union[bool, int]
 
 
 @contextmanager
@@ -49,78 +52,64 @@ def ignore_transforms(ignore: bool = True):
     try:
         if ignore:
             if _ignore_transforms == 0:
-                disable_implicit_tasks()
+                enable_implicit_tasks(False)
             _ignore_transforms += 1
         yield
     finally:
         if ignore:
             _ignore_transforms -= 1
             if _ignore_transforms == 0:
-                enable_implicit_tasks()
+                enable_implicit_tasks(True)
 
 
 @contextmanager
-def enable_fast_path(enable: bool = True):
-    global _fast_path_enabled
-
-    current = _fast_path_enabled
+def _set_context_value(
+    flag: ContextValue,
+    enable_fxn: Callable[[ContextValue], None],
+    context_value: list[ContextValue],
+) -> None:
+    current = flag
     try:
-        if current != enable:
-            _enable_fast_path(enable)
-        _fast_path_enabled = enable
+        if flag != context_value[0]:
+            enable_fxn(flag)
+        context_value[0] = flag
         yield
     finally:
-        if current != enable:
-            _enable_fast_path(not enable)
-        _fast_path_enabled = current
+        if current != flag:
+            enable_fxn(current)
+        context_value[0] = current
 
 
 @contextmanager
-def enable_task_fusion(enable: bool = True):
-    global _task_fusion_enabled
-
-    current = _task_fusion_enabled
-    try:
-        if current != enable:
-            _enable_task_fusion(enable)
-        _task_fusion_enabled = enable
+def enable_fast_path(enable: bool = True, context_value=[True]):
+    with _set_context_value(enable, _enable_fast_path, context_value):
         yield
-    finally:
-        if current != enable:
-            _enable_task_fusion(not enable)
-        _task_fusion_enabled = current
 
 
 @contextmanager
-def enable_recomputation(enable: bool = True):
-    global _recomputation_enabled
-
-    current = _recomputation_enabled
-    try:
-        if current != enable:
-            _enable_recomputaiton(enable)
-        _recomputation_enabled = enable
+def enable_task_fusion(enable: bool = True, context_value=[True]):
+    with _set_context_value(enable, _enable_task_fusion, context_value):
         yield
-    finally:
-        if current != enable:
-            _enable_recomputaiton(not enable)
-        _recomputation_enabled = current
 
 
 @contextmanager
-def enable_tracing(enable: bool = True):
-    global _tracing_enabled
-
-    current = _tracing_enabled
-    try:
-        if current != enable:
-            _enable_tracing(enable)
-        _tracing_enabled = enable
+def enable_recomputation(enable: bool = True, context_value=[True]):
+    with _set_context_value(enable, _enable_recomputation, context_value):
         yield
-    finally:
-        if current != enable:
-            _enable_tracing(not enable)
-        _tracing_enabled = current
+
+
+@contextmanager
+def enable_tracing(enable: bool = True, context_value=[True]):
+    with _set_context_value(enable, _enable_tracing, context_value):
+        yield
+
+
+@contextmanager
+def only_fuse_loop_tasks(enable: bool = True, context_value=[False]):
+    with _set_context_value(
+        enable, _enable_only_fuse_loop_tasks, context_value
+    ):
+        yield
 
 
 def should_ignore_transforms() -> bool:
@@ -203,8 +192,8 @@ def optional_kwargs(**kwargs):
 @gin.configurable
 @dataclass
 class ClientConfig:
-    auto_shard: bool = False
-    disable_gc: bool = True
+    auto_shard: Optional[bool] = False
+    disable_gc: Optional[bool] = True
     configurable: Optional[Type] = None
     tasks: List[ImplicitTask] = field(default_factory=list)
 
@@ -213,7 +202,7 @@ def _init_config(client_config: ClientConfig):
     global _gc_disabled
     global _auto_shard_enabled
 
-    if client_config.auto_shard:
+    if client_config.auto_shard is client_config.auto_shard:
         _auto_shard_enabled = True
         jax.lax.with_sharding_constraint = with_sharding_constraint
 
