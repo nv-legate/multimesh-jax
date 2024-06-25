@@ -1,47 +1,28 @@
-diff --git a/src/core/runtime/detail/runtime.cc b/src/core/runtime/detail/runtime.cc
-index c1765aee..6973cb65 100644
+diff --cc src/core/runtime/detail/runtime.cc
+index c1f67fa,6973cb6..0000000
 --- a/src/core/runtime/detail/runtime.cc
 +++ b/src/core/runtime/detail/runtime.cc
-@@ -1418,12 +1418,6 @@ Legion::ShardingID Runtime::get_sharding(const mapping::detail::Machine& machine
-   return result;
- }
- 
--namespace {
--
--std::optional<Runtime> the_runtime{};
--
--}  // namespace
--
- std::int32_t Runtime::finish()
- {
-   if (!initialized()) {
-@@ -1434,26 +1428,13 @@ std::int32_t Runtime::finish()
-   // After this call the context is no longer valid
-   Legion::Runtime::get_runtime()->finish_implicit_task(std::exchange(legion_context_, nullptr));
- 
--  auto ret = Legion::Runtime::wait_for_shutdown();
--  // Do NOT delete, move, re-order, or otherwise modify the following lines under ANY
--  // circumstances.
--  //
--  // They must stay exactly as they are. the_runtime.reset() calls "delete this", and hence any
--  // modification of the runtime object, or any of its derivatives hereafter is strictly
--  // undefined behavior.
--  //
--  // BEGIN DO NOT MODIFY
--  the_runtime.reset();
--  return ret;
--  // END DO NOT MODIFY
-+  return Legion::Runtime::wait_for_shutdown();
- }
- 
- /*static*/ Runtime* Runtime::get_runtime()
- {
--  if (LegateUnlikely(!the_runtime.has_value())) {
--    the_runtime.emplace();
--  }
--  return &*the_runtime;
-+  static auto runtime = std::make_unique<Runtime>();
-+  return runtime.get();
- }
- 
- void Runtime::destroy()
+@@@ -1430,21 -1414,10 +1430,15 @@@ Legion::ShardingID Runtime::get_shardin
+    }
+  
+    // We can now initialize the Legate runtime with the Legion context
+ -  Runtime::get_runtime()->initialize(legion_context);
+ -  return result;
+ +  try {
+ +    Runtime::get_runtime()->initialize(legion_context);
+ +  } catch (const std::exception& e) {
+ +    log_legate().error() << e.what();
+ +    return 1;
+ +  }
+ +  return 0;
+  }
+  
+- namespace {
+- 
+- std::optional<Runtime> the_runtime{};
+- 
+- }  // namespace
+- 
+  std::int32_t Runtime::finish()
+  {
+    if (!initialized()) {

@@ -36,16 +36,16 @@ checkout clu        main                https://github.com/google/CommonLoopUtil
 checkout flax       main                https://github.com/google/flax.git            fdbc640cfc8 flax.patch
 checkout jax        legate-main         ssh://git@github.com/nv-legate/jax.git        67afa4c0
 checkout jaxlib     legate-main         ssh://git@github.com/nv-legate/jax.git        67afa4c0
-checkout legate     cpp-branch-24.05    ssh://git@github.com/nv-legate/legate.core.internal 1c5e17e1f legate.patch
-checkout legate-jax main                ssh://git@github.com/nv-legate/legate.jax.git 78eba668171
-checkout legion     master              ssh://git@gitlab.com/StanfordLegion/legion.git ae7bd61186
+checkout legate     cpp-branch-24.05    ssh://git@github.com/nv-legate/legate.core.internal 411e9da9a02ee legate.patch
+checkout legate-jax main                ssh://git@github.com/nv-legate/legate.jax.git c482f60fa5
+checkout legion     master              ssh://git@gitlab.com/StanfordLegion/legion.git bc02aaa080
 checkout optax      main                https://github.com/google-deepmind/optax.git  a49564e
 checkout orbax      main                https://github.com/google/orbax.git           6673d0c
 checkout paxml      main                https://github.com/google/paxml.git           bd0590f843   paxml.patch
 checkout praxis     main                https://github.com/google/praxis.git          c58bcc       praxis.patch
 checkout seqio      main                https://github.com/google/seqio.git           513d1fe
 checkout te         main                https://github.com/NVIDIA/TransformerEngine.git     1ec33ae11  te.patch
-checkout xla        legate-main         ssh://git@github.com/nv-legate/xla.git        e9723f5b4902
+checkout xla        legate-main         ssh://git@github.com/nv-legate/xla.git        89c89c9a112
 
 pushd te
 git submodule update --init --recursive
