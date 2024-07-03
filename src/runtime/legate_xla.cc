@@ -29,6 +29,15 @@
 namespace legate_xla {
 namespace {
 
+int32_t timeline_priority = std::numeric_limits<int32_t>::max();
+
+struct hash_pair {
+  template <class T1, class T2>
+  size_t operator()(const std::pair<T1, T2> &p) const {
+    return legate::hash_all(p.first, p.second);
+  }
+};
+
 template <class T> struct RefCountScalarArg {
   T arg;
   std::atomic<int> refcount{0};
@@ -387,8 +396,10 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
   auto core_runtime = legate::Runtime::get_runtime();
   auto machine = core_runtime->get_machine();
 
-  auto scope =
-      legate::Scope(compiler->Name()).with_machine(machine.slice(start, stop));
+  auto scope = legate::Scope(compiler->Name())
+                   .with_machine(machine.slice(start, stop))
+                   .with_priority(timeline_priority--);
+
   log_xla.debug() << "CreateExecuteTask " << compiler->Name()
                   << " for launch on slice [" << start << "," << stop << ")";
   if (log_xla.want_debug()) {

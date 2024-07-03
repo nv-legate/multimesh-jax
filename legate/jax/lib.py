@@ -24,13 +24,14 @@ from jax.tree_util import tree_flatten, tree_unflatten
 from .legate_jax_impl import (
     clear_tasks,
     enable_fast_path as _enable_fast_path,
-    enable_implicit_tasks,
+    enable_implicit_tasks as _enable_implicit_tasks,
     enable_only_fuse_loop_tasks as _enable_only_fuse_loop_tasks,
     enable_recomputation as _enable_recomputation,
     enable_task_fusion as _enable_task_fusion,
     enable_tracing as _enable_tracing,
     register_task,
     register_task_factory,
+    split_large_traces as _split_large_traces,
     unregister_task,
 )
 from .no_op import no_op
@@ -52,14 +53,14 @@ def ignore_transforms(ignore: bool = True):
     try:
         if ignore:
             if _ignore_transforms == 0:
-                enable_implicit_tasks(False)
+                _enable_implicit_tasks(False)
             _ignore_transforms += 1
         yield
     finally:
         if ignore:
             _ignore_transforms -= 1
             if _ignore_transforms == 0:
-                enable_implicit_tasks(True)
+                _enable_implicit_tasks(True)
 
 
 @contextmanager
@@ -70,13 +71,11 @@ def _set_context_value(
 ) -> None:
     current = flag
     try:
-        if flag != context_value[0]:
-            enable_fxn(flag)
+        enable_fxn(flag)
         context_value[0] = flag
         yield
     finally:
-        if current != flag:
-            enable_fxn(current)
+        enable_fxn(current)
         context_value[0] = current
 
 
@@ -99,7 +98,15 @@ def enable_recomputation(enable: bool = True, context_value=[True]):
 
 
 @contextmanager
-def enable_tracing(enable: bool = True, context_value=[True]):
+def split_large_traces(split_large_traces: bool = True, context_value=[False]):
+    with _set_context_value(
+        split_large_traces, _split_large_traces, context_value
+    ):
+        yield
+
+
+@contextmanager
+def enable_tracing(enable: bool = True, context_value=[False]):
     with _set_context_value(enable, _enable_tracing, context_value):
         yield
 

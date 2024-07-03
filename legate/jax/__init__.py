@@ -23,6 +23,7 @@ from .lib import (
     with_sharding_constraint,
     ClientConfig,
     context,
+    split_large_traces,
 )
 from .task import (
     task,

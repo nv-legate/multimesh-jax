@@ -35,6 +35,8 @@ extern "C" void EnableLegateTracing(bool enable);
 
 extern "C" void EnableLegateRecomputation(bool enable);
 
+extern "C" void SplitLargeTraces(bool split);
+
 extern "C" void LegateShutdown();
 
 extern "C" void ReplicateParametersSmallerThanNumElements(int64_t num_elements);
@@ -151,6 +153,9 @@ PYBIND11_MODULE(legate_jax_impl, m) {
   m.def(
       "enable_tracing", [](bool enable) { EnableLegateTracing(enable); },
       py::arg("enable"));
+  m.def(
+      "split_large_traces", [](bool split) { SplitLargeTraces(split); },
+      py::arg("split"));
   m.def(
       "replicate_parameters_smaller_than_num_elements",
       [](int64_t num_elements) {

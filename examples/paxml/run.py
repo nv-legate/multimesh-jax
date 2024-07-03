@@ -188,6 +188,13 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
+    "--split-large-traces",
+    action="store_true",
+    default=False,
+    help="Whether to split large traces into smaller sub-traces",
+)
+
+legate_jax.add_argument(
     "--dp",
     type=int,
     default=1,
@@ -447,7 +454,7 @@ if args.collective_matmul is not None:
 
 if args.dump_hlo and args.dump is None:
     raise ValueError(
-        "--dump-only requsted, but not HLO dump folder passed to --dump"
+        "--dump-only requested, but no HLO dump folder passed to --dump"
     )
 
 if args.dump:
@@ -805,40 +812,42 @@ elif args.optimizer == "sgd":
 # always enable recomputation
 with legate.jax.enable_recomputation(True):
     with legate.jax.only_fuse_loop_tasks(args.only_fuse_loop_tasks):
-        legate.jax.replicate_parameters_smaller_than_num_elements(
-            batch_size * args.sequence_length
-        )
-        if args.hlo is None or args.dump_hlo:
-            import jaxlib
+        with legate.jax.split_large_traces(args.split_large_traces):
+            legate.jax.replicate_parameters_smaller_than_num_elements(
+                batch_size * args.sequence_length
+            )
+            if args.hlo is None or args.dump_hlo:
+                import jaxlib
 
-            sys.argv = argv
-            try:
-                runpy.run_module("paxml.main", run_name="__main__")
-            except jaxlib.xla_extension.XlaRuntimeError as e:
-                need_throw = True
-                if args.dump_hlo:
-                    path = Path(args.dump)
-                    if path.exists():
-                        globber = (
-                            path
-                            / "*pjit_autoshard*before_optimizations.hlo.pb"
-                        )
-                        matches = glob.glob(str(globber))
-                        if matches:
-                            print(
-                                "Dump seems to have succeeded in generating "
-                                f"{matches[0]}. Run finished with error: {e}"
+                sys.argv = argv
+                try:
+                    runpy.run_module("paxml.main", run_name="__main__")
+                except jaxlib.xla_extension.XlaRuntimeError as e:
+                    raise e
+                    need_throw = True
+                    if args.dump_hlo:
+                        path = Path(args.dump)
+                        if path.exists():
+                            globber = (
+                                path
+                                / "*pjit_autoshard*before_optimizations.hlo.pb"
                             )
-                            need_throw = False
+                            matches = glob.glob(str(globber))
+                            if matches:
+                                print(
+                                    "Dump succeeded in generating "
+                                    f"{matches[0]}. Run done with error: {e}"
+                                )
+                                need_throw = False
 
-                if need_throw:
-                    raise e
-            except Exception as e:
-                # if dumping the hlo, squash the exception
-                if not args.dump_hlo:
-                    raise e
-                else:
-                    print(e)
+                    if need_throw:
+                        raise e
+                except Exception as e:
+                    # if dumping the hlo, squash the exception
+                    if not args.dump_hlo:
+                        raise e
+                    else:
+                        print(e)
 
         if args.hlo is not None:
             # restore the original GPU count
