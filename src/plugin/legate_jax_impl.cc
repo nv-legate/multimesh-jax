@@ -43,6 +43,8 @@ extern "C" void ReplicateParametersSmallerThanNumElements(int64_t num_elements);
 
 extern "C" void LegateFence();
 
+extern "C" void SetStoreCacheMinParallelism(int64_t parallelism);
+
 namespace py = pybind11;
 
 template <class To, class From>
@@ -163,7 +165,11 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       },
       py::arg("num_elements"));
   m.def(
-      "enable_recomputation",
-      [](bool enable) { EnableLegateRecomputation(enable); },
-      py::arg("enable"));
+      "set_store_cache_min_parallelism",
+      [](int64_t parallelism) { SetStoreCacheMinParallelism(parallelism); },
+      py::arg("parallelism")),
+      m.def(
+          "enable_recomputation",
+          [](bool enable) { EnableLegateRecomputation(enable); },
+          py::arg("enable"));
 }

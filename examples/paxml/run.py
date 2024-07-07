@@ -13,6 +13,14 @@ from typing import Optional
 
 import gin
 
+from legate.jax import (
+    enable_recomputation,
+    only_fuse_loop_tasks,
+    replicate_parameters_smaller_than_num_elements,
+    split_large_traces,
+    store_cache_min_parallelism,
+)
+
 parser = argparse.ArgumentParser(allow_abbrev=False)
 
 legion = parser.add_argument_group("Legion")
@@ -126,6 +134,13 @@ legate_jax.add_argument(
     default=None,
     choices=["info", "debug", "spew"],
     help="The debug level",
+)
+
+legate_jax.add_argument(
+    "--cache-parallelism",
+    type=int,
+    default=3,
+    help="The min parallelism for the store cache. Higher levels improve perf, but increase mem usage",  # noqa: E501
 )
 
 legate_jax.add_argument(
@@ -810,65 +825,67 @@ elif args.optimizer == "sgd":
     argv.append("--fdl.USE_SGD=True")
 
 # always enable recomputation
-with legate.jax.enable_recomputation(True):
-    with legate.jax.only_fuse_loop_tasks(args.only_fuse_loop_tasks):
-        with legate.jax.split_large_traces(args.split_large_traces):
-            legate.jax.replicate_parameters_smaller_than_num_elements(
-                batch_size * args.sequence_length
-            )
-            if args.hlo is None or args.dump_hlo:
-                import jaxlib
+with enable_recomputation(True) as A, only_fuse_loop_tasks(
+    args.only_fuse_loop_tasks
+) as B, split_large_traces(
+    args.split_large_traces
+) as C, store_cache_min_parallelism(
+    args.cache_parallelism
+) as D:
+    replicate_parameters_smaller_than_num_elements(
+        batch_size * args.sequence_length
+    )
+    if args.hlo is None or args.dump_hlo:
+        import jaxlib
 
-                sys.argv = argv
-                try:
-                    runpy.run_module("paxml.main", run_name="__main__")
-                except jaxlib.xla_extension.XlaRuntimeError as e:
-                    raise e
-                    need_throw = True
-                    if args.dump_hlo:
-                        path = Path(args.dump)
-                        if path.exists():
-                            globber = (
-                                path
-                                / "*pjit_autoshard*before_optimizations.hlo.pb"
-                            )
-                            matches = glob.glob(str(globber))
-                            if matches:
-                                print(
-                                    "Dump succeeded in generating "
-                                    f"{matches[0]}. Run done with error: {e}"
-                                )
-                                need_throw = False
-
-                    if need_throw:
-                        raise e
-                except Exception as e:
-                    # if dumping the hlo, squash the exception
-                    if not args.dump_hlo:
-                        raise e
-                    else:
-                        print(e)
-
-        if args.hlo is not None:
-            # restore the original GPU count
+        sys.argv = argv
+        try:
+            runpy.run_module("paxml.main", run_name="__main__")
+        except jaxlib.xla_extension.XlaRuntimeError as e:
+            need_throw = True
             if args.dump_hlo:
-                args.gpus = args.cpus
-            # sort of funky here, but we have to instantiate the client
-            # to force custom call registration
-            # the easiest way to instantiate is to print the device list
-            import jax
+                path = Path(args.dump)
+                if path.exists():
+                    globber = (
+                        path / "*pjit_autoshard*before_optimizations.hlo.pb"
+                    )
+                    matches = glob.glob(str(globber))
+                    if matches:
+                        print(
+                            "Dump succeeded in generating "
+                            f"{matches[0]}. Run done with error: {e}"
+                        )
+                        need_throw = False
 
-            print(jax.devices())
+            if need_throw:
+                raise e
+        except Exception as e:
+            # if dumping the hlo, squash the exception
+            if not args.dump_hlo:
+                raise e
+            else:
+                print(e)
 
-            platform = "gpu" if args.gpus else "cpu"
-            from paxml.partitioning import LegateMeshWrapper
+if args.hlo is not None:
+    # restore the original GPU count
+    if args.dump_hlo:
+        args.gpus = args.cpus
+    # sort of funky here, but we have to instantiate the client
+    # to force custom call registration
+    # the easiest way to instantiate is to print the device list
+    import jax
 
-            with LegateMeshWrapper.mode(LegateMeshWrapper.Mode.COMPILING):
-                legate.jax.compile_hlo_module(
-                    args.hlo,
-                    num_partitions=total_devices,
-                    erase_sharding=args.erase_explicit_sharding,
-                    autoshard=args.autoshard,
-                    platform=platform,
-                    device_mem_gb=args.fbmem,
-                )
+    print(jax.devices())
+
+    platform = "gpu" if args.gpus else "cpu"
+    from paxml.partitioning import LegateMeshWrapper
+
+    with LegateMeshWrapper.mode(LegateMeshWrapper.Mode.COMPILING):
+        legate.jax.compile_hlo_module(
+            args.hlo,
+            num_partitions=total_devices,
+            erase_sharding=args.erase_explicit_sharding,
+            autoshard=args.autoshard,
+            platform=platform,
+            device_mem_gb=args.fbmem,
+        )

@@ -31,6 +31,7 @@ from .legate_jax_impl import (
     enable_tracing as _enable_tracing,
     register_task,
     register_task_factory,
+    set_store_cache_min_parallelism,
     split_large_traces as _split_large_traces,
     unregister_task,
 )
@@ -115,6 +116,14 @@ def enable_tracing(enable: bool = True, context_value=[False]):
 def only_fuse_loop_tasks(enable: bool = True, context_value=[False]):
     with _set_context_value(
         enable, _enable_only_fuse_loop_tasks, context_value
+    ):
+        yield
+
+
+@contextmanager
+def store_cache_min_parallelism(parallelism: int, context_value=[3]):
+    with _set_context_value(
+        parallelism, set_store_cache_min_parallelism, context_value
     ):
         yield
 
