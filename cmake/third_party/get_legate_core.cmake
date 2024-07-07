@@ -35,8 +35,8 @@ function(find_or_configure_legate_core)
 
   set(FIND_PKG_ARGS
       GLOBAL_TARGETS     legate::core
-      BUILD_EXPORT_SET   legate_xla-exports
-      INSTALL_EXPORT_SET legate_xla-exports)
+      BUILD_EXPORT_SET   legate-xla-exports
+      INSTALL_EXPORT_SET legate-xla-exports)
 
   if((NOT CPM_legate_core_SOURCE) AND (NOT CPM_DOWNLOAD_legate_core))
     set(_find_mode QUIET)

@@ -43,7 +43,7 @@ install(TARGETS legate_plugin
 rapids_export(
   INSTALL LegateXLA
   EXPORT_SET legate-xla-exports
-  GLOBAL_TARGETS xla-bridge
+  GLOBAL_TARGETS legate_plugin
   NAMESPACE legate::
   LANGUAGES ${ENABLED_LANGUAGES}
 )
@@ -52,7 +52,7 @@ rapids_export(
 rapids_export(
   BUILD LegateXLA
   EXPORT_SET legate-xla-exports
-  GLOBAL_TARGETS xla-bridge
+  GLOBAL_TARGETS legate_plugin
   NAMESPACE legate::
   LANGUAGES ${ENABLED_LANGUAES}
 )
