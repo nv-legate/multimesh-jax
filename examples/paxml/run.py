@@ -13,14 +13,6 @@ from typing import Optional
 
 import gin
 
-from legate.jax import (
-    enable_recomputation,
-    only_fuse_loop_tasks,
-    replicate_parameters_smaller_than_num_elements,
-    split_large_traces,
-    store_cache_min_parallelism,
-)
-
 parser = argparse.ArgumentParser(allow_abbrev=False)
 
 legion = parser.add_argument_group("Legion")
@@ -728,6 +720,8 @@ class LambadaConfig:
         )
 
 
+# this needs to come later after the env has been fully set up
+# other jax will try and fail spectacularly to load the other platforms
 import legate.jax  # noqa: E402
 
 gin_config = f"""
@@ -825,14 +819,16 @@ elif args.optimizer == "sgd":
     argv.append("--fdl.USE_SGD=True")
 
 # always enable recomputation
-with enable_recomputation(True) as A, only_fuse_loop_tasks(
+with legate.jax.enable_recomputation(
+    True
+) as A, legate.jax.only_fuse_loop_tasks(
     args.only_fuse_loop_tasks
-) as B, split_large_traces(
+) as B, legate.jax.split_large_traces(
     args.split_large_traces
-) as C, store_cache_min_parallelism(
+) as C, legate.jax.store_cache_min_parallelism(
     args.cache_parallelism
 ) as D:
-    replicate_parameters_smaller_than_num_elements(
+    legate.jax.replicate_parameters_smaller_than_num_elements(
         batch_size * args.sequence_length
     )
     if args.hlo is None or args.dump_hlo:
