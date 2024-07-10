@@ -238,7 +238,7 @@ legate_jax.add_argument(
 legate_jax.add_argument(
     "--schedule",
     type=str,
-    choices=["fill-drain", "gpipe", "1f1b"],
+    choices=["fill-drain", "gpipe", "1f1b", "wavefront"],
     default="fill-drain",
     help="The microbatch schedule to use",
 )
