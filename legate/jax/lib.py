@@ -31,7 +31,9 @@ from .legate_jax_impl import (
     enable_tracing as _enable_tracing,
     register_task,
     register_task_factory,
+    set_max_out_of_order,
     set_store_cache_min_parallelism,
+    set_strict_static_order,
     split_large_traces as _split_large_traces,
     unregister_task,
 )
@@ -125,6 +127,20 @@ def store_cache_min_parallelism(parallelism: int, context_value=[3]):
     with _set_context_value(
         parallelism, set_store_cache_min_parallelism, context_value
     ):
+        yield
+
+
+@contextmanager
+def max_out_of_order(max_out_of_order: int, context_value=[2]):
+    with _set_context_value(
+        max_out_of_order, set_max_out_of_order, context_value
+    ):
+        yield
+
+
+@contextmanager
+def strict_static_order(order: bool, context_value=[True]):
+    with _set_context_value(order, set_strict_static_order, context_value):
         yield
 
 

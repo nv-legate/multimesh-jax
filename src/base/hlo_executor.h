@@ -17,6 +17,7 @@
 #pragma once
 
 #include "legate_xla_common.h"
+#include "task_utils.h"
 #include "xla_task.h"
 
 namespace legate_xla {
@@ -26,7 +27,9 @@ public:
   static const int TASK_ID = XLA_EXECUTE_TASK;
 
   enum {
-    ScalarCompilerPointer = 0,
+    ScalarTaskCounter = 0,
+    ScalarEnforceOrdering,
+    ScalarCompilerPointer,
     ScalarRunId,
     ScalarCallbacks,
     ScalarNumScalarArgs,
@@ -35,9 +38,9 @@ public:
 public:
   static void run_executable(legate::TaskContext context, bool cpu);
 
-  static void run_executable(legate::TaskContext context, LegateExecutable *exe,
-                             LegateCompiler *compiler, int64_t run_id,
-                             int scalar_offset, bool cpu);
+  static void run_executable(legate::TaskContext context, const TaskConfig &cfg,
+                             LegateExecutable *exe, LegateCompiler *compiler,
+                             int64_t run_id, int scalar_offset, bool cpu);
 
 public:
   static void cpu_variant(legate::TaskContext context);

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "legate.h"
 
 namespace legate_xla {

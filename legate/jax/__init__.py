@@ -23,6 +23,8 @@ from .lib import (
     ignore_transforms,
     with_sharding_constraint,
     store_cache_min_parallelism,
+    max_out_of_order,
+    strict_static_order,
     ClientConfig,
     context,
     split_large_traces,

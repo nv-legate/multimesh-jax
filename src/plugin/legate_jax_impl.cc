@@ -45,6 +45,10 @@ extern "C" void LegateFence();
 
 extern "C" void SetStoreCacheMinParallelism(int64_t parallelism);
 
+extern "C" void SetMaxOutOfOrder(int64_t parallelism);
+
+extern "C" void SetStrictStaticOrder(bool order);
+
 namespace py = pybind11;
 
 template <class To, class From>
@@ -167,9 +171,16 @@ PYBIND11_MODULE(legate_jax_impl, m) {
   m.def(
       "set_store_cache_min_parallelism",
       [](int64_t parallelism) { SetStoreCacheMinParallelism(parallelism); },
-      py::arg("parallelism")),
-      m.def(
-          "enable_recomputation",
-          [](bool enable) { EnableLegateRecomputation(enable); },
-          py::arg("enable"));
+      py::arg("parallelism"));
+  m.def(
+      "set_strict_static_order",
+      [](bool order) { SetStrictStaticOrder(order); }, py::arg("order"));
+  m.def(
+      "set_max_out_of_order",
+      [](int64_t max_out_of_order) { SetMaxOutOfOrder(max_out_of_order); },
+      py::arg("set_max_out_of_order"));
+  m.def(
+      "enable_recomputation",
+      [](bool enable) { EnableLegateRecomputation(enable); },
+      py::arg("enable"));
 }

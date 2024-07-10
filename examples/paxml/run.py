@@ -136,6 +136,13 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
+    "--max-out-of-order",
+    type=int,
+    default=0,
+    help="The maximum number of tasks that can run out-of-order at at time. 0 is unlimited.",  # noqa: E501
+)
+
+legate_jax.add_argument(
     "--erase-explicit-sharding",
     action="store_true",
     default=False,
@@ -185,9 +192,6 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
-    "--disable-tracing", dest="enable_tracing", action="store_false"
-)
-legate_jax.add_argument(
     "--enable-tracing",
     action="store_true",
     default=False,
@@ -199,6 +203,13 @@ legate_jax.add_argument(
     action="store_true",
     default=False,
     help="Whether to split large traces into smaller sub-traces",
+)
+
+legate_jax.add_argument(
+    "--strict-static-order",
+    action="store_true",
+    default=False,
+    help="Whether to force tasks to follow a pre-defined static order",
 )
 
 legate_jax.add_argument(
@@ -827,7 +838,11 @@ with legate.jax.enable_recomputation(
     args.split_large_traces
 ) as C, legate.jax.store_cache_min_parallelism(
     args.cache_parallelism
-) as D:
+) as D, legate.jax.max_out_of_order(
+    args.max_out_of_order
+) as E, legate.jax.strict_static_order(
+    args.strict_static_order
+):
     legate.jax.replicate_parameters_smaller_than_num_elements(
         batch_size * args.sequence_length
     )

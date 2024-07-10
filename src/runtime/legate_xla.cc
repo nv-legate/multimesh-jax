@@ -14,6 +14,7 @@
 #include <core/runtime/runtime.h>
 #include <core/task/task.h>
 #include <core/type/type_info.h>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <stdexcept>
@@ -24,19 +25,37 @@
 #include <unordered_map>
 #include <utility>
 
+#include "hlo_executor.h"
 #include "legate_runtime.h"
 
 namespace legate_xla {
 namespace {
 
-int32_t timeline_priority = std::numeric_limits<int32_t>::max();
+int64_t global_timeline = 0;
+int64_t max_out_of_order = 0; // default 0 means no limit
+bool strict_static_order = true;
 
-struct hash_pair {
-  template <class T1, class T2>
-  size_t operator()(const std::pair<T1, T2> &p) const {
-    return legate::hash_all(p.first, p.second);
+struct TaskOrderKey {
+  int64_t slice_start;
+  int64_t slice_stop;
+  int64_t mod;
+
+  bool operator==(const TaskOrderKey &k) const {
+    return slice_start == k.slice_start && slice_stop == k.slice_stop &&
+           mod == k.mod;
   }
 };
+
+struct hash_order_key {
+  size_t operator()(const TaskOrderKey &k) const {
+    return legate::hash_all(k.slice_start, k.slice_stop, k.mod);
+  }
+};
+
+std::unordered_map<TaskOrderKey, legate::LogicalStorePartition, hash_order_key>
+    ordering_stores;
+
+std::unordered_map<std::string, int64_t> instance_counter;
 
 template <class T> struct RefCountScalarArg {
   T arg;
@@ -396,12 +415,16 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
   auto core_runtime = legate::Runtime::get_runtime();
   auto machine = core_runtime->get_machine();
 
+  const uint32_t priority = std::numeric_limits<uint32_t>::max() -
+                            static_cast<uint32_t>(global_timeline);
   auto scope = legate::Scope(compiler->Name())
                    .with_machine(machine.slice(start, stop))
-                   .with_priority(timeline_priority--);
+                   .with_priority(priority);
 
   log_xla.debug() << "CreateExecuteTask " << compiler->Name()
-                  << " for launch on slice [" << start << "," << stop << ")";
+                  << " for launch on slice [" << start << "," << stop << ")"
+                  << " at time=" << global_timeline;
+
   if (log_xla.want_debug()) {
     size_t input_idx = 0;
     for (const auto &input : inputs) {
@@ -427,6 +450,15 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
     throw std::runtime_error(sstr.str());
   }
   auto task = runtime->create_task(XlaOpCode::XLA_EXECUTE_TASK, flattened);
+
+  task.add_scalar_arg(global_timeline);
+  if (core_runtime->node_id() >= start && core_runtime->node_id() < stop) {
+    // this will participate in task, increment the timeline
+    ++global_timeline;
+  }
+  // whether to force tasks to run in timeline order
+  task.add_scalar_arg(strict_static_order &&
+                      bool(machine.processor_range().per_node_count == 1));
 
   task.add_scalar_arg(
       legate::Scalar(reinterpret_cast<uint64_t>(compiler_hold)));
@@ -479,7 +511,28 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
       task.add_output(output.impl->store());
     }
   }
-  if (launch_size > 1) {
+
+  // zero or negative indicates no limit to amount of reordering
+  if (max_out_of_order > 0) {
+    TaskOrderKey order_key{.slice_start = start,
+                           .slice_stop = stop,
+                           .mod = global_timeline % max_out_of_order};
+    auto iter = ordering_stores.find(order_key);
+    if (iter == ordering_stores.end()) {
+      auto store = core_runtime->create_store(
+          legate::Shape({launch_size}),
+          legate::primitive_type(legate::Type::Code::INT32),
+          /*optimize_scalar=*/false);
+      auto partition = store.partition_by_tiling({1});
+      task.add_output(partition);
+      ordering_stores[order_key] = std::move(partition);
+    } else {
+      task.add_input(iter->second);
+      task.add_output(iter->second);
+    }
+  }
+
+  if (!strict_static_order && launch_size > 1) {
     task.set_concurrent(true);
   }
   runtime->submit(std::move(task));
@@ -935,4 +988,12 @@ extern "C" void LegateFence() {
   // Make sure to clear all handles held by Legate
   // so that nothing gets deleted during program cleanup
   legate_xla::Fence();
+}
+
+extern "C" void SetMaxOutOfOrder(int64_t max_out_of_order) {
+  legate_xla::max_out_of_order = max_out_of_order;
+}
+
+extern "C" void SetStrictStaticOrder(bool order) {
+  legate_xla::strict_static_order = order;
 }

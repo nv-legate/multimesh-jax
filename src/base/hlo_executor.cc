@@ -1,3 +1,4 @@
+
 /* Copyright 2022 NVIDIA Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +25,7 @@
 #include "xla_task.h"
 #include <chrono>
 #include <core/data/scalar.h>
+#include <mutex>
 #include <type_traits>
 
 namespace legate_xla {
@@ -32,6 +34,75 @@ using namespace Legion;
 using namespace legate;
 
 namespace {
+
+static std::mutex yield_lock;
+
+class TaskOrderer {
+public:
+  TaskOrderer(void) : counter_(0) {}
+
+  void start_task(uint64_t index) {
+    auto event = check_order(index);
+    if (event.has_value()) {
+      const Legion::Internal::LgEvent wait_on(*event);
+      wait_on.wait();
+      log_xla.debug() << "HloExecutor resuming, current=" << counter_
+                      << ", need=" << index;
+    }
+  }
+
+  void end_task(uint64_t index) {
+    log_xla.debug() << "HloExecutor finishing " << index;
+    std::lock_guard<std::mutex> lock(yield_lock);
+    assert(counter_ == index);
+    auto iter = pending_.find(++counter_);
+    if (iter == pending_.end())
+      return;
+    iter->second.trigger();
+    pending_.erase(iter);
+  }
+
+private:
+  std::optional<const Realm::UserEvent> check_order(uint64_t index) {
+    std::lock_guard<std::mutex> lock(yield_lock);
+    assert(counter_ <= index);
+    if (counter_ == index)
+      return std::nullopt;
+
+    log_xla.debug() << "HloExecutor yielding, current=" << counter_
+                    << ", need=" << index;
+    const Realm::UserEvent event = Realm::UserEvent::create_user_event();
+    pending_[index] = event;
+    return event;
+  }
+  std::map<uint64_t, Realm::UserEvent> pending_;
+  uint64_t counter_;
+};
+
+static constexpr int kMaxGpusPerNode = 8;
+std::vector<TaskOrderer> task_orderings(kMaxGpusPerNode);
+
+class TaskOrderGuard {
+public:
+  TaskOrderGuard(uint64_t index, int32_t local_device_id, bool force_order)
+      : local_device_id_(local_device_id), index_(index),
+        force_order_(force_order) {
+    if (force_order_) {
+      task_orderings[local_device_id_].start_task(index_);
+    }
+  }
+
+  ~TaskOrderGuard() {
+    if (force_order_) {
+      task_orderings[local_device_id_].end_task(index_);
+    }
+  }
+
+private:
+  int32_t local_device_id_;
+  uint64_t index_;
+  bool force_order_;
+};
 
 struct get_read_only_buffer_fn {
   template <legate::Type::Code TYPE_CODE, int32_t DIM>
@@ -72,12 +143,21 @@ struct get_write_only_buffer_fn {
   auto exe = compiler->MakeExecutable();
   uint64_t run_id = context.scalars()[ScalarRunId].value<int64_t>();
 
+  auto cfg = get_task_config(context);
+
+  const bool enforce_ordering =
+      context.scalar(ScalarEnforceOrdering).value<bool>();
+  const uint64_t timeline_counter =
+      context.scalar(ScalarTaskCounter).value<uint64_t>();
+  TaskOrderGuard order_guard{timeline_counter, cfg.local_device_id,
+                             /*force_order=*/!cpu && enforce_ordering};
+
   log_xla.info() << "HLOExecutorTask: start " << exe->Name();
 
   auto *callbacks = context.scalars()[ScalarCallbacks]
                         .value<std::vector<std::function<void()>> *>();
 
-  run_executable(context, exe.get(), compiler, run_id, ScalarNumScalarArgs,
+  run_executable(context, cfg, exe.get(), compiler, run_id, ScalarNumScalarArgs,
                  cpu);
   log_xla.info() << "HLOExecutorTask: finish " << exe->Name();
 
@@ -117,12 +197,10 @@ BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
   }
 }
 
-/*static*/ void HLOExecutorTask::run_executable(legate::TaskContext context,
-                                                LegateExecutable *exe,
-                                                LegateCompiler *compiler,
-                                                int64_t run_id,
-                                                int scalar_offset, bool cpu) {
-  auto cfg = get_task_config(context);
+/*static*/ void HLOExecutorTask::run_executable(
+    legate::TaskContext context, const TaskConfig &cfg, LegateExecutable *exe,
+    LegateCompiler *compiler, int64_t run_id, int scalar_offset, bool cpu) {
+
   log_xla.debug() << "Running task " << exe->Name() << " for device "
                   << cfg.my_device_id << " in range ["
                   << cfg.device_id_range.low << "," << cfg.device_id_range.high
@@ -133,7 +211,7 @@ BufferAllocation GetScalarVariant(void *buffer, const Scalar &scalar,
 
   std::vector<legate_xla::BufferAllocation> inputs, outputs;
 
-  int64_t num_scalar_arguments =
+  const int64_t num_scalar_arguments =
       context.scalar(ScalarNumScalarArgs).value<int64_t>();
   if (num_scalar_arguments > kMaxScalarArguments) {
     throw std::runtime_error(
