@@ -51,8 +51,6 @@ public:
     return std::nullopt;
   }
 
-  std::pair<int, int> MachineSlice() const override { return {0, 1}; }
-
   size_t LaunchSize() const override { return 1; }
 
   int ReplicaCount() const override { return 1; }
@@ -70,7 +68,7 @@ public:
     return std::unique_ptr<LegateExecutable>(new TestExecutable);
   }
 
-  std::pair<int, int> MachineSlice() const override { return {0, 1}; }
+  std::pair<int64_t, int64_t> MachineSlice() const override { return {0, 1}; }
 
   size_t LaunchSize() const override { return 1; }
 
@@ -93,10 +91,10 @@ TEST(TimerTest, BasicTimer) {
   // just validate that this runs without trouble
 
   legate_xla::StartTimer("first");
-  legate_xla::CreateExecuteTask(hold, {}, {}, {}, nullptr);
+  legate_xla::CreateExecuteTask(hold, {}, {}, {}, nullptr, {0,1});
   legate_xla::StopTimer("first");
   legate_xla::StartTimer("second");
-  legate_xla::CreateExecuteTask(hold, {}, {}, {}, nullptr);
+  legate_xla::CreateExecuteTask(hold, {}, {}, {}, nullptr, {0,1});
   legate_xla::StopTimer("second");
 }
 

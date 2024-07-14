@@ -1,6 +1,7 @@
 #include <iostream>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
 #include <string>
 
@@ -10,7 +11,8 @@ extern "C" void RegisterImplicitTask(
     std::string matcher, std::vector<int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color);
+    int64_t fusion_color, std::optional<int64_t> loop_submesh_size,
+    bool loop_submesh_reverse);
 
 extern "C" void SetEnableImplicitTasks(bool flag);
 
@@ -95,7 +97,8 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       "register_task",
       [](py::str task_regex, py::list py_devices, py::list py_device_dims,
          py::list py_device_axes, py::list py_logical_axes,
-         int64_t fusion_color) {
+         int64_t fusion_color, std::optional<int64_t> loop_submesh_size,
+         bool loop_submesh_reverse) {
         RegisterImplicitTask(
             task_regex.cast<std::string>(),
             py_devices.cast<std::vector<int64_t>>(),
@@ -103,11 +106,12 @@ PYBIND11_MODULE(legate_jax_impl, m) {
             py_device_axes.cast<std::vector<std::string>>(),
             py_logical_axes
                 .cast<std::vector<std::pair<std::string, std::string>>>(),
-            fusion_color);
+            fusion_color, loop_submesh_size, loop_submesh_reverse);
       },
       py::arg("task_regex"), py::arg("devices"), py::arg("dims"),
       py::arg("device_axes"), py::arg("logical_axes"),
-      py::arg("fusion_color") = 0);
+      py::arg("fusion_color") = 0, py::arg("loop_submesh_size") = py::none(),
+      py::arg("loop_submesh_reverse") = false);
   m.def(
       "register_task_factory",
       [](py::str task_regex,

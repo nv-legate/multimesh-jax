@@ -378,7 +378,7 @@ void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler_hold) {
   auto [start, stop] = compiler->MachineSlice();
   log_xla.debug() << "CreateCompileTask " << compiler->Name()
                   << " scheduling on slice [" << start << "," << stop << ")";
-  size_t launch_size = compiler->LaunchSize();
+  size_t launch_size = stop - start;
 
   auto scope =
       legate::Scope(compiler->Name()).with_machine(machine.slice(start, stop));
@@ -403,9 +403,10 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
                        const std::vector<ScalarArgument> &scalars,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
-                       std::vector<std::function<void()>> *on_done) {
+                       std::vector<std::function<void()>> *on_done,
+                       std::pair<int64_t,int64_t> machine_slice) {
   auto *compiler = compiler_hold->get();
-  auto [start, stop] = compiler->MachineSlice();
+  auto [start, stop] = machine_slice;
 
   size_t launch_size = compiler->LaunchSize();
   legate::Shape flattened({launch_size});

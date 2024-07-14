@@ -143,6 +143,13 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
+    "--load-balance-embeddings",
+    action="store_true",
+    default=False,
+    help="Whether to rotate microbatches across different submeshes for load-balancing",  # noqa: E501
+)
+
+legate_jax.add_argument(
     "--erase-explicit-sharding",
     action="store_true",
     default=False,
@@ -526,7 +533,7 @@ num_stages = num_stages_per_interleave * args.interleave
 layers_per_stage = args.num_layers // num_stages
 layers_per_interleave = args.num_layers // args.interleave
 
-if args.distribute_embeddings:
+if args.distribute_embeddings or args.load_balance_embeddings:
     logits_num_devices = total_devices
     embeddings_num_devices = total_devices
 else:
@@ -570,6 +577,15 @@ class LambadaConfig:
                 "FSDP parallelism cannot exceed the microbatch size"
             )
 
+        if args.load_balance_embeddings:
+            loop_dependent_embeddings_submesh_size = transformer_num_devices
+            loop_dependent_logits_submesh_size = transformer_num_devices
+            embeddings_submesh_num_devices = transformer_num_devices
+        else:
+            loop_dependent_embeddings_submesh_size = None
+            loop_dependent_logits_submesh_size = None
+            embeddings_submesh_num_devices = self.embeddings_num_devices
+
         transformer_x_dim = args.dp
         transformer_y_dim = args.fsdp
         transformer_z_dim = args.tp
@@ -609,16 +625,16 @@ class LambadaConfig:
             transformer_z_dim //= rescale
             transformer_axes.append(("mdl", "x"))
 
-        max_embedding_x_dim = self.embeddings_num_devices // args.tp
+        max_embedding_x_dim = embeddings_submesh_num_devices // args.tp
         embedding_x_dim = min(
             microbatch_size,
-            self.embeddings_num_devices,
+            embeddings_submesh_num_devices,
             max_embedding_x_dim,
         )
 
         if args.sequence_parallel:
             embedding_y_dim = (
-                self.embeddings_num_devices // embedding_x_dim // args.tp
+                embeddings_submesh_num_devices // embedding_x_dim // args.tp
             )
             embedding_z_dim = args.tp
             # favor the seq dimension when sharding activations
@@ -635,7 +651,7 @@ class LambadaConfig:
             ]
         else:
             embedding_y_dim = 1
-            embedding_z_dim = self.embeddings_num_devices // embedding_x_dim
+            embedding_z_dim = embeddings_submesh_num_devices // embedding_x_dim
             # shard batch and hidden dimensions on x-axis
             # shard vocab dimension on z-axis
             embeddings_axes = [
@@ -696,6 +712,7 @@ class LambadaConfig:
             dims=embeddings_mesh,
             device_axes=embeddings_device_axes,
             logical_axes=embeddings_axes,
+            loop_submesh_size=loop_dependent_embeddings_submesh_size,
         )
 
         register_task(
@@ -704,6 +721,7 @@ class LambadaConfig:
             dims=embeddings_mesh,
             device_axes=embeddings_device_axes,
             logical_axes=embeddings_axes,
+            loop_submesh_size=loop_dependent_embeddings_submesh_size,
         )
 
         register_task(
@@ -712,6 +730,8 @@ class LambadaConfig:
             dims=embeddings_mesh,
             device_axes=embeddings_device_axes,
             logical_axes=embeddings_axes,
+            loop_submesh_size=loop_dependent_logits_submesh_size,
+            loop_submesh_reverse=True,
         )
 
         register_task(
@@ -720,11 +740,13 @@ class LambadaConfig:
             dims=embeddings_mesh,
             device_axes=embeddings_device_axes,
             logical_axes=embeddings_axes,
+            loop_submesh_size=loop_dependent_logits_submesh_size,
+            loop_submesh_reverse=True,
         )
 
         register_task(
             "default",
-            devices=devices[: self.embeddings_num_devices],
+            devices=devices[:embeddings_submesh_num_devices],
             dims=embeddings_mesh,
             device_axes=embeddings_device_axes,
             logical_axes=embeddings_axes,

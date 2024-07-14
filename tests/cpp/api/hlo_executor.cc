@@ -46,8 +46,6 @@ public:
     return std::nullopt;
   }
 
-  std::pair<int, int> MachineSlice() const override { return {0, 1}; }
-
   size_t LaunchSize() const override { return 1; }
 
   int ReplicaCount() const override { return 1; }
@@ -93,7 +91,9 @@ public:
     return std::unique_ptr<LegateExecutable>(new TestExecutable(fxn_));
   }
 
-  std::pair<int, int> MachineSlice() const override { return {0, 1}; }
+  std::pair<int64_t, int64_t> MachineSlice() const override {
+    return {0, 1};
+  }
 
   size_t LaunchSize() const override { return 1; }
 
@@ -136,7 +136,7 @@ TEST(HLOExecutorTest, ScalarArgumemts) {
   auto *hold = Hold(compiler);
 
   legate_xla::CreateExecuteTask(hold, {{kScalar0, 0}, {kScalar1, 1}}, {}, {},
-                                nullptr);
+                                nullptr, {0, 1});
 
   cv.wait(lk, [&] { return ready; });
 }

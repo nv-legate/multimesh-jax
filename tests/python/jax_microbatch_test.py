@@ -4,8 +4,16 @@ import jax.numpy as jnp
 import numpy as np
 from absl.testing import absltest
 from jax import config, value_and_grad
+from jax.experimental.pjit import AUTO
+from jax.sharding import Mesh, PartitionSpec as P
 
-from legate.jax import enable_task_fusion, microbatch, register_task, task
+from legate.jax import (
+    enable_task_fusion,
+    microbatch,
+    register_task,
+    task,
+    with_sharding_constraint,
+)
 from legate.jax.test_util import LegateJaxTestCase
 
 config.parse_flags_with_absl()
@@ -16,6 +24,9 @@ class MicrobatchTest(LegateJaxTestCase):
         return jnp.arange(np.prod(shape)).reshape(shape)
 
     def test_simple_microbatch(self):
+        if jax.device_count() != 1:
+            self.skipTest("need 1 device")
+
         def c(x):
             def f(x):
                 return (x * x).sum()
@@ -29,6 +40,9 @@ class MicrobatchTest(LegateJaxTestCase):
         self._test_against_reference(c, args_maker)
 
     def test_microbatch_pre_post_task(self):
+        if jax.device_count() != 1:
+            self.skipTest("need 1 device")
+
         def c(args):
             def m(args):
                 x, y, z = args
@@ -52,6 +66,9 @@ class MicrobatchTest(LegateJaxTestCase):
         self._test_against_reference(c, args_maker)
 
     def test_microbatch_1f1b(self):
+        if jax.device_count() != 1:
+            self.skipTest("need 1 device")
+
         logical_axes = [
             ("batch", "x"),
             ("model", "y"),
@@ -134,6 +151,9 @@ class MicrobatchTest(LegateJaxTestCase):
             self._test_against_reference(c, args_maker)
 
     def test_microbatch_implicit_pre_post_task(self):
+        if jax.device_count() != 1:
+            self.skipTest("need 1 device")
+
         logical_axes = [
             ("batch", "x"),
             ("model", "y"),
@@ -185,7 +205,112 @@ class MicrobatchTest(LegateJaxTestCase):
 
         self._test_against_reference(c, args_maker)
 
+    def test_microbatch_implicit_dynamic_slice_devices(self):
+        if jax.device_count() != 4:
+            self.skipTest("need 4 devices")
+
+        def c(batch, params):
+            @jax.jit
+            def inner_comp(x, y):
+                return jnp.einsum("ab,bc->ac", x, y)
+
+            def m(batch, params):
+                x, y, z = params
+                x = with_sharding_constraint(x, P("model", None))
+                y = with_sharding_constraint(y, P("model", None))
+                z = with_sharding_constraint(z, P("model", None))
+                batch = with_sharding_constraint(batch, P("batch", "model"))
+                with jax.named_scope("layer0"):
+                    s = inner_comp(batch, x)
+                with jax.named_scope("layer1"):
+                    s = inner_comp(s, y)
+                with jax.named_scope("layer2"):
+                    return inner_comp(s, z).sum(axis=0)
+
+            m = microbatch(m, dim=0, size=2)
+
+            s = m(batch, params)
+            with jax.named_scope("layer2"):
+                return s.sum()
+
+        def args_maker(abstract: bool = False):
+            def make_shape(*shape):
+                if abstract:
+                    return jax.core.ShapedArray(shape, np.float32)
+                size = np.prod(shape)
+                return jnp.arange(size, dtype=np.float32).reshape(*shape)
+
+            return (
+                make_shape(4, 4),
+                (make_shape(4, 1), make_shape(4, 1), make_shape(4, 1)),
+            )
+
+        def make_lowered(mesh):
+            with mesh:
+                f = jax.jit(
+                    c,
+                    in_shardings=(
+                        AUTO(mesh),
+                        (AUTO(mesh), AUTO(mesh), AUTO(mesh)),
+                    ),
+                    out_shardings=(AUTO(mesh)),
+                )
+                batch, params = args_maker(abstract=True)
+                print(batch, params)
+                lowered = f.lower(batch, params).compile()
+                return lowered
+
+        mesh = Mesh(
+            np.array(jax.devices()).reshape(1, 4),
+            ("batch", "model"),
+        )
+        lowered = make_lowered(mesh)
+        reference_shardings = lowered.input_shardings[0][0]
+
+        logical_axes = [
+            ("batch", "x"),
+            ("model", "y"),
+        ]
+
+        register_task(
+            "layer0",
+            devices=[0, 1, 2, 3],
+            dims=[1, 2],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+            loop_submesh_size=2,
+        )
+        register_task(
+            "layer1",
+            devices=[0, 1],
+            dims=[1, 2],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+        register_task(
+            "layer2",
+            devices=[2, 3],
+            dims=[1, 2],
+            device_axes=["x", "y"],
+            logical_axes=logical_axes,
+        )
+        jax.clear_caches()
+
+        lowered = make_lowered(mesh)
+        arg_shardings = lowered.input_shardings[0]
+
+        with mesh:
+            self._test_against_reference(
+                c,
+                args_maker,
+                arg_shardings=arg_shardings,
+                reference_shardings=reference_shardings,
+            )
+
     def test_microbatch_no_tasks(self):
+        if jax.device_count() != 1:
+            self.skipTest("need 1 device")
+
         def c(args):
             def f(args):
                 x, y, z = args
@@ -204,6 +329,9 @@ class MicrobatchTest(LegateJaxTestCase):
         self._test_against_reference(c, args_maker)
 
     def test_microbatch_batch_reshape_simple(self):
+        if jax.device_count() != 1:
+            self.skipTest("need 1 device")
+
         def c(args):
             def f(x):
                 return x.sum()
@@ -221,6 +349,9 @@ class MicrobatchTest(LegateJaxTestCase):
         self._test_against_reference(c, args_maker)
 
     def test_microbatch_batch_reshape_multi_arg(self):
+        if jax.device_count() != 1:
+            self.skipTest("need 1 device")
+
         def c(args):
             def f(args):
                 x, y, z = args
@@ -239,6 +370,9 @@ class MicrobatchTest(LegateJaxTestCase):
         self._test_against_reference(c, args_maker)
 
     def test_multiple_microbatch_slices(self):
+        if jax.device_count() != 1:
+            self.skipTest("need 1 device")
+
         def c(args):
             def f(args):
                 x, y, z = args
@@ -257,6 +391,9 @@ class MicrobatchTest(LegateJaxTestCase):
         self._test_against_reference(c, args_maker)
 
     def test_multiple_microbatch(self):
+        if jax.device_count() != 1:
+            self.skipTest("need 1 device")
+
         def c(x, param1, param2):
             def g(x, param):
                 return (x * param).sum()
@@ -285,6 +422,9 @@ class MicrobatchTest(LegateJaxTestCase):
         self._test_against_reference(c, args_maker)
 
     def test_simple_microbatch_grad(self):
+        if jax.device_count() != 1:
+            self.skipTest("need 1 device")
+
         def c(param, x):
             def f(param, x):
                 return (x * param).sum()
@@ -301,6 +441,9 @@ class MicrobatchTest(LegateJaxTestCase):
         self._test_against_reference(c, args_maker)
 
     def test_multiple_microbatch_grad(self):
+        if jax.device_count() != 1:
+            self.skipTest("need 1 device")
+
         def c(params, x):
             def g(x, param):
                 return (x * param).sum()
