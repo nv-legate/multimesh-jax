@@ -808,6 +808,12 @@ if args.backend == "legate":
         profile=args.profile,
     )
 
+if args.dump_hlo:
+    ici_mesh = "[1,1,1,1]"
+    per_core_batch_size = batch_size
+else:
+    ici_mesh = f"[{args.dp},{args.fsdp},{args.tp * args.pp},1]"
+
 argv = [
     "this",
     "--job_log_dir=logs",
@@ -839,11 +845,13 @@ else:
     argv.append("-enable_auto_sharding")
 
 argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1,1]")
-argv.append(
-    f"--fdl.ICI_MESH_SHAPE=[{args.dp},{args.fsdp},{args.tp * args.pp},1]"
-)
+if args.dump_hlo:
+    argv.append(f"--fdl.ICI_MESH_SHAPE={ici_mesh}")
+    per_core_batch_size = batch_size
+else:
+    argv.append(f"--fdl.ICI_MESH_SHAPE={ici_mesh}")
 
-if num_nodes > 1:
+if num_nodes > 1 and not args.dump_hlo:
     argv.append("--multiprocess_gpu")
 
 if args.optimizer == "adafactor":
@@ -914,6 +922,9 @@ if args.hlo is not None:
     from paxml.partitioning import LegateMeshWrapper
 
     with LegateMeshWrapper.mode(LegateMeshWrapper.Mode.COMPILING):
+        legate.jax.replicate_parameters_smaller_than_num_elements(
+            batch_size * args.sequence_length
+        )
         legate.jax.compile_hlo_module(
             args.hlo,
             num_partitions=total_devices,
