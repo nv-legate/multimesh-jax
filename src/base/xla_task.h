@@ -83,9 +83,9 @@ private:
   static void run_task(legate::TaskContext context);
 };
 
-class XLAMaterializeTask : public XlaTask<XLAMaterializeTask> {
+class XLAOffloadTask : public XlaTask<XLAOffloadTask> {
 public:
-  static const int32_t TASK_ID = XlaOpCode::XLA_MATERIALIZE_TASK;
+  static const int32_t TASK_ID = XlaOpCode::XLA_OFFLOAD_TASK;
 
 public:
   static void gpu_variant(legate::TaskContext context);

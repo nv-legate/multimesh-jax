@@ -23,6 +23,7 @@ from .lib import (
     ignore_transforms,
     with_sharding_constraint,
     store_cache_min_parallelism,
+    host_offload_min_reuse_distance,
     max_out_of_order,
     strict_static_order,
     ClientConfig,

@@ -10,6 +10,7 @@
 #include <core/data/logical_store.h>
 #include <core/data/scalar.h>
 #include <core/experimental/trace.h>
+#include <core/mapping/machine.h>
 #include <core/mapping/mapping.h>
 #include <core/runtime/runtime.h>
 #include <core/task/task.h>
@@ -240,6 +241,55 @@ private:
 
 StoreHandle::~StoreHandle() {}
 
+namespace {
+
+// these reference StoreHandleImpl and have to be in a separate anon namespace
+
+void OffloadTask(const std::vector<StoreHandle> &stores, uint64_t launch_size,
+                 bool save_values, const char *operation) {
+  auto runtime = legate_xla::Runtime::get_runtime();
+  auto core_runtime = legate::Runtime::get_runtime();
+  auto task = runtime->create_task(XlaOpCode::XLA_OFFLOAD_TASK,
+                                   legate::Shape({launch_size}));
+
+  for (const auto &store : stores) {
+    log_xla.debug() << operation << " " << store.impl->name();
+    if (store.impl->HasPartition()) {
+      if (save_values) {
+        task.add_input(store.impl->partition());
+      }
+      task.add_output(store.impl->partition());
+    } else {
+      if (save_values) {
+        task.add_input(store.impl->store());
+      }
+      task.add_output(store.impl->store());
+    }
+  }
+  runtime->submit(std::move(task));
+}
+
+void OffloadDtoH(const std::vector<StoreHandle> &stores,
+                 std::pair<int64_t, int64_t> device_slice, std::string name,
+                 bool save_values) {
+  log_xla.debug() << "Offloading " << stores.size() << " stores from task "
+                  << name << " on slice [" << device_slice.first << "..."
+                  << device_slice.second << ")";
+  auto runtime = legate_xla::Runtime::get_runtime();
+  auto core_runtime = legate::Runtime::get_runtime();
+  auto machine = core_runtime->get_machine();
+  const uint64_t launch_size = device_slice.second - device_slice.first;
+  auto scope =
+      legate::Scope("OffloadDtoH" + std::move(name))
+          .with_machine(machine.only(legate::mapping::TaskTarget::CPU)
+                            .slice(device_slice.first, device_slice.second));
+
+  OffloadTask(stores, launch_size, save_values, "OffloadDtoH");
+  core_runtime->issue_mapping_fence();
+}
+
+} // namespace
+
 legate::Type::Code SupportedTypeToLegateType(SupportedType type) {
   legate::Type::Code code;
   switch (type) {
@@ -390,13 +440,23 @@ void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler_hold) {
   }
   auto task = runtime->create_task(XlaOpCode::XLA_COMPILE_TASK, {launch_size});
 
-  task.add_scalar_arg(
-      legate::Scalar(reinterpret_cast<uint64_t>(compiler_hold)));
-  task.add_scalar_arg(legate::Scalar(GetRunId()));
+  task.add_scalar_arg(reinterpret_cast<uint64_t>(compiler_hold));
+  task.add_scalar_arg(GetRunId());
   // number of partitions
-  task.add_scalar_arg(legate::Scalar(int64_t(1)));
+  task.add_scalar_arg(int64_t(1));
 
   runtime->submit(std::move(task));
+}
+
+void OffloadDtoH(const std::vector<StoreHandle> &stores,
+                 std::pair<int64_t, int64_t> device_slice, std::string name) {
+  OffloadDtoH(stores, device_slice, std::move(name), /*save_values=*/true);
+}
+
+void InvalidateDeviceInstances(const std::vector<StoreHandle> &stores,
+                               std::pair<int64_t, int64_t> device_slice,
+                               std::string name) {
+  OffloadDtoH(stores, device_slice, std::move(name), /*save_values=*/false);
 }
 
 void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
@@ -404,7 +464,7 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
                        std::vector<std::function<void()>> *on_done,
-                       std::pair<int64_t,int64_t> machine_slice) {
+                       std::pair<int64_t, int64_t> machine_slice) {
   auto *compiler = compiler_hold->get();
   auto [start, stop] = machine_slice;
 

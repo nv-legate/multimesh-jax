@@ -1,6 +1,7 @@
 
 #include "legate_mapper.h"
 #include "legate_xla_c.h"
+#include <core/mapping/mapping.h>
 
 using namespace legate;
 
@@ -25,13 +26,19 @@ Mapper::store_mappings(const mapping::Task &task,
   mappings.reserve(task.num_inputs() + task.num_outputs() +
                    task.num_reductions());
 
-  auto default_option = options.front();
+  const mapping::StoreTarget target = [&] {
+    if (task.task_id() == XLA_OFFLOAD_TASK) {
+      return mapping::StoreTarget::ZCMEM;
+    }
+    return options.front();
+  }();
+
   auto append_mapping = [&](const auto &arrays) {
     for (auto &array : arrays) {
       auto stores = array.stores();
       for (auto &store : stores) {
         mappings.push_back(legate::mapping::StoreMapping::default_mapping(
-            store, default_option, /*exact=*/true));
+            store, target, /*exact=*/true));
       }
     }
   };

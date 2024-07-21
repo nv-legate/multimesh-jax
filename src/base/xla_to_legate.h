@@ -7,12 +7,19 @@ namespace legate_xla {
 
 void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler);
 
-void CreateExecuteTask(TaskArgHold<LegateCompiler>* compiler,
-                       const std::vector<ScalarArgument>& scalars,
-                       const std::vector<StoreHandle>& inputs,
-                       const std::vector<StoreHandle>& outputs,
-                       std::vector<std::function<void()>>* on_done,
-                       std::pair<int64_t,int64_t> machine_slice);
+void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler,
+                       const std::vector<ScalarArgument> &scalars,
+                       const std::vector<StoreHandle> &inputs,
+                       const std::vector<StoreHandle> &outputs,
+                       std::vector<std::function<void()>> *on_done,
+                       std::pair<int64_t, int64_t> machine_slice);
+
+void OffloadDtoH(const std::vector<StoreHandle> &stores,
+                 std::pair<int64_t, int64_t> device_slice, std::string name);
+
+void InvalidateDeviceInstances(const std::vector<StoreHandle> &stores,
+                               std::pair<int64_t, int64_t> device_slice,
+                               std::string name);
 
 void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
                         size_t num_local_devices);

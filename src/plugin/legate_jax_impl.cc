@@ -51,6 +51,8 @@ extern "C" void SetMaxOutOfOrder(int64_t parallelism);
 
 extern "C" void SetStrictStaticOrder(bool order);
 
+extern "C" void SetHostOffloadMinReuseDistance(int64_t reuse_distance);
+
 namespace py = pybind11;
 
 template <class To, class From>
@@ -187,4 +189,10 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       "enable_recomputation",
       [](bool enable) { EnableLegateRecomputation(enable); },
       py::arg("enable"));
+  m.def(
+      "set_host_offload_min_reuse_distance",
+      [](int64_t reuse_distance) {
+        SetHostOffloadMinReuseDistance(reuse_distance);
+      },
+      py::arg("reuse_distance"));
 }

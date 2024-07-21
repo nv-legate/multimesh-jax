@@ -31,6 +31,7 @@ from .legate_jax_impl import (
     enable_tracing as _enable_tracing,
     register_task,
     register_task_factory,
+    set_host_offload_min_reuse_distance,
     set_max_out_of_order,
     set_store_cache_min_parallelism,
     set_strict_static_order,
@@ -141,6 +142,14 @@ def max_out_of_order(max_out_of_order: int, context_value=[2]):
 @contextmanager
 def strict_static_order(order: bool, context_value=[True]):
     with _set_context_value(order, set_strict_static_order, context_value):
+        yield
+
+
+@contextmanager
+def host_offload_min_reuse_distance(reuse_distance: int, context_value=[0]):
+    with _set_context_value(
+        reuse_distance, set_host_offload_min_reuse_distance, context_value
+    ):
         yield
 
 
@@ -298,10 +307,12 @@ def init(
     gpus: int = 0,
     fbmem: int = 8000,
     sysmem: int = 4000,
+    zcmem: int = 32,
     eager_alloc_percentage: int = 50,
     debug: Optional[str] = None,
     network: str = "none",
     profile: Optional[str] = None,
+    no_physical_tracing: bool = False,
 ) -> None:
     if config is None:
         config = os.environ.get(_GIN_CONFIG_ENV)
@@ -332,12 +343,15 @@ def init(
         "-ll:fsize",
         fbmem,
         "-ll:zsize",
-        32,
+        zcmem,
         "-ll:networks",
         network,
         "-lg:eager_alloc_percentage",
         eager_alloc_percentage,
     ]
+    if no_physical_tracing:
+        legion_args.append("-lg:no_physical_tracing")
+
     if debug is not None:
         debug_levels = {
             "info": 2,

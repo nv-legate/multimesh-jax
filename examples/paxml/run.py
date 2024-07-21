@@ -40,6 +40,13 @@ legion.add_argument(
 )
 
 legion.add_argument(
+    "--zcmem",
+    type=int,
+    default=4,
+    help="The amount in GB of zero-copy (host pinned) memory to use",
+)
+
+legion.add_argument(
     "--sysmem",
     type=int,
     default=4,
@@ -58,6 +65,13 @@ legion.add_argument(
     type=int,
     default=None,
     help="The amount in GB of frame-buffer memory to reserve for eager allocations",  # noqa: E501
+)
+
+legion.add_argument(
+    "--no-physical-tracing",
+    action="store_true",
+    default=False,
+    help="Whether to only perform logical tracing, not full physical tracing",
 )
 
 legion.add_argument(
@@ -220,6 +234,13 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
+    "--host-offload-min-reuse-distance",
+    type=int,
+    default=0,
+    help="The minimum reuse distance to trigger host-offload of intermediates. 0 indicates no offloading",  # noqa: E501
+)
+
+legate_jax.add_argument(
     "--dp",
     type=int,
     default=1,
@@ -265,6 +286,14 @@ legate_jax.add_argument(
     "--only-fuse-loop-tasks",
     action="store_true",
     default=False,
+    help="Only fuse tasks inside loops",
+)
+
+legate_jax.add_argument(
+    "--disable-task-fusion",
+    action="store_false",
+    default=True,
+    dest="enable_task_fusion",
     help="Only fuse tasks inside loops",
 )
 
@@ -407,6 +436,11 @@ paxml.add_argument(
 
 args = parser.parse_args()
 
+
+if args.host_offload_min_reuse_distance > 0 and args.gpus > args.cpus:
+    raise Exception(
+        f"host offloading requires at least as many CPUs as GPUs per process: {args.cpus} < {args.gpus}"  # noqa: E501
+    )
 
 vmodule = [
     "legate_pjrt_buffer",
@@ -798,14 +832,17 @@ else:
 if args.backend == "legate":
     legate.jax.init(
         configurable=configurable,
+        auto_shard=args.autoshard,
         cpus=args.cpus,
         gpus=args.gpus,
         sysmem=args.sysmem * 1000,
         fbmem=args.fbmem * 1000,
+        zcmem=args.zcmem * 1000,
         eager_alloc_percentage=eager_alloc_percentage,
         network=args.network,
         debug=args.debug,
         profile=args.profile,
+        no_physical_tracing=args.no_physical_tracing,
     )
 
 if args.dump_hlo:
@@ -872,6 +909,10 @@ with legate.jax.enable_recomputation(
     args.max_out_of_order
 ) as E, legate.jax.strict_static_order(
     args.strict_static_order
+) as F, legate.jax.host_offload_min_reuse_distance(
+    args.host_offload_min_reuse_distance
+) as G, legate.jax.enable_task_fusion(
+    args.enable_task_fusion
 ):
     legate.jax.replicate_parameters_smaller_than_num_elements(
         batch_size * args.sequence_length

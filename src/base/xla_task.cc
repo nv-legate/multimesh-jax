@@ -136,9 +136,19 @@ void XLASetScalarTask::gpu_variant(legate::TaskContext context) {
              cudaMemcpyHostToDevice);
 }
 
-void XLAMaterializeTask::cpu_variant(legate::TaskContext context) {}
+void XLAOffloadTask::cpu_variant(legate::TaskContext context) {
+  for (auto &&store : context.outputs()) {
+    log_xla.debug() << "offloading store with volume="
+                    << store.domain().get_volume();
+  }
+}
 
-void XLAMaterializeTask::gpu_variant(legate::TaskContext context) {}
+void XLAOffloadTask::gpu_variant(legate::TaskContext context) {
+  for (auto &&store : context.outputs()) {
+    log_xla.debug() << "restoring store with volume="
+                    << store.domain().get_volume();
+  }
+}
 
 namespace // unnamed
 {
@@ -147,7 +157,7 @@ static void __attribute__((constructor)) register_tasks(void) {
   XLAInitZeroTask::register_variants();
   XLAStoreBufferActionTask::register_variants();
   XLASetScalarTask::register_variants();
-  XLAMaterializeTask::register_variants();
+  XLAOffloadTask::register_variants();
 }
 } // namespace
 
