@@ -328,47 +328,6 @@ class MicrobatchTest(LegateJaxTestCase):
 
         self._test_against_reference(c, args_maker)
 
-    def test_microbatch_batch_reshape_simple(self):
-        if jax.device_count() != 1:
-            self.skipTest("need 1 device")
-
-        def c(args):
-            def f(x):
-                return x.sum()
-
-            f = microbatch(f, dim=0, size=2, batch_reshape=2)
-            return f(args)
-
-        def args_maker():
-            def make_shape(*shape):
-                size = np.prod(shape)
-                return jnp.arange(size).reshape(*shape)
-
-            return (make_shape(6, 1),)
-
-        self._test_against_reference(c, args_maker)
-
-    def test_microbatch_batch_reshape_multi_arg(self):
-        if jax.device_count() != 1:
-            self.skipTest("need 1 device")
-
-        def c(args):
-            def f(args):
-                x, y, z = args
-                return (x * y * z).sum()
-
-            f = microbatch(f, dim=0, size=4, batch_reshape=2)
-            return f(args)
-
-        def args_maker():
-            def make_shape(*shape):
-                size = np.prod(shape)
-                return jnp.arange(size).reshape(*shape)
-
-            return ((make_shape(8, 4), make_shape(8, 1), make_shape(8, 1)),)
-
-        self._test_against_reference(c, args_maker)
-
     def test_multiple_microbatch_slices(self):
         if jax.device_count() != 1:
             self.skipTest("need 1 device")

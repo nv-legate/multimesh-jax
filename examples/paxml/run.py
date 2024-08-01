@@ -452,17 +452,6 @@ if args.debug_nccl:
     vmodule.append("nccl_collective_thunk")
     vmodule.append("nccl_api")
 
-
-if args.dump_hlo:
-    # forces a debug mode on the run where the HLO module
-    # is generated from a single CPU run
-    args.cpus = args.gpus
-    args.gpus = 0
-    if args.batch_size is None:
-        raise ValueError(
-            "must give explicit --batch-size when using --dump-hlo"
-        )
-
 xla_debug = xla_debug_levels[args.debug]
 
 vmodule_str = ",".join([f"{root}={xla_debug}" for root in vmodule])
@@ -549,6 +538,17 @@ if total_parallelism != total_devices:
     raise ValueError(
         f"PP={args.pp} DP={args.dp} TP={args.tp} FSDP={args.fsdp} does not multiply to total no. of GPUS {total_devices}"  # noqa: E501
     )
+
+
+if args.dump_hlo:
+    # forces a debug mode on the run where the HLO module
+    # is generated from a single CPU run
+    args.cpus = args.gpus
+    args.gpus = 0
+    if args.batch_size is None:
+        raise ValueError(
+            "must give explicit --batch-size when using --dump-hlo"
+        )
 
 batch_size = args.batch_size or total_devices * 4
 mb_size = args.microbatch_size or batch_size
@@ -639,25 +639,7 @@ class LambadaConfig:
             transformer_z_dim,
         ]
 
-        # try to shard as much as possible over the batch dimension
-        if (
-            args.max_replica_sharding
-            and transformer_x_dim < microbatch_size
-            and transformer_y_dim == 1
-        ):
-            rescale = min(
-                transformer_z_dim, microbatch_size // transformer_x_dim
-            )
-            transformer_x_dim *= rescale
-            transformer_z_dim //= rescale
-            transformer_axes.append(("mdl", "x"))
-
-        max_embedding_x_dim = embeddings_submesh_num_devices // args.tp
-        embedding_x_dim = min(
-            microbatch_size,
-            embeddings_submesh_num_devices,
-            max_embedding_x_dim,
-        )
+        embedding_x_dim = args.dp
 
         if args.sequence_parallel:
             embedding_y_dim = (
@@ -673,8 +655,6 @@ class LambadaConfig:
                 ("seq", "y"),
                 ("seq", "z"),
                 ("mdl", "z"),
-                ("replica", "y"),
-                ("replica", "z"),
             ]
         else:
             embedding_y_dim = 1
@@ -838,8 +818,8 @@ if args.backend == "legate":
     )
 
 if args.dump_hlo:
-    ici_mesh = "[1,1,1,1]"
-    per_core_batch_size = batch_size
+    ici_mesh = f"[{args.dp},1,1,1]"
+    per_core_batch_size = batch_size // args.dp
 else:
     ici_mesh = f"[{args.dp},{args.fsdp},{args.tp * args.pp},1]"
 
@@ -876,7 +856,7 @@ else:
 argv.append("--fdl.DCN_MESH_SHAPE=[1,1,1,1]")
 if args.dump_hlo:
     argv.append(f"--fdl.ICI_MESH_SHAPE={ici_mesh}")
-    per_core_batch_size = batch_size
+    per_core_batch_size = batch_size // args.dp
 else:
     argv.append(f"--fdl.ICI_MESH_SHAPE={ici_mesh}")
 

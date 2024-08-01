@@ -451,9 +451,7 @@ def microbatch(
     size: int,
     argnum: int = 0,
     interleave: Optional[int] = None,
-    batch_reshape: Optional[int] = None,
     arg_shardings: Optional[Any] = None,
-    microbatch_shardings: Optional[Any] = None,
     schedule: Optional[str] = None,
     unrolling: Optional[int] = None,
     num_stages: Optional[int] = None,
@@ -476,17 +474,10 @@ def microbatch(
         if num_microbatches == 1:
             return fxn(*args, **kwargs)
 
-        if batch_reshape is not None:
-            slice_dim = dim + 1
-            slice_size = size // batch_reshape
-        else:
-            slice_dim = dim
-            slice_size = size
-
         json_args = optional_kwargs(
             num_microbatches=num_microbatches,
-            slice_dim=slice_dim,
-            size=slice_size,
+            slice_dim=dim,
+            size=size,
             batch_dim=dim,
             interleave=interleave,
             unrolling=unrolling,
@@ -512,47 +503,17 @@ def microbatch(
         else:
             pre_slice_shardings = arg_shardings
 
-        if microbatch_shardings is None or isinstance(microbatch_shardings, P):
-            post_slice_shardings = jax.tree_map(
-                lambda a: microbatch_shardings, x
-            )
-        else:
-            post_slice_shardings = microbatch_shardings
-
-        def slice_microbatch(x, offset: int, arg_pspec: P, slice_pspec: P):
+        def slice_microbatch(x, offset: int, arg_pspec: P):
             if arg_pspec is not None:
                 x = with_sharding_constraint(x, arg_pspec)
 
-            if batch_reshape is None:
-                offsets = [0] * len(x.shape)
-                offsets[dim] = offset
-                sizes = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
-                x = jax.lax.dynamic_slice(x, offsets, sizes)
-            else:
-                reshaped = (
-                    x.shape[:dim]
-                    + (batch_reshape, x.shape[dim] // batch_reshape)
-                    + x.shape[dim + 1 :]
-                )
-                final_shape = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
-                sizes = (
-                    x.shape[:dim]
-                    + (batch_reshape, size // batch_reshape)
-                    + x.shape[dim + 1 :]
-                )
-                offsets = [0] * (len(x.shape) + 1)
-                offsets[dim + 1] = offset // batch_reshape
-                x = x.reshape(reshaped)
-                x = jax.lax.dynamic_slice(x, offsets, sizes)
-                x = x.reshape(final_shape)
-
-            if slice_pspec is not None:
-                x = with_sharding_constraint(x, slice_pspec)
+            sizes = x.shape[:dim] + (size,) + x.shape[dim + 1 :]
+            offsets = [0] * len(x.shape)
+            offsets[dim] = offset
+            x = jax.lax.dynamic_slice(x, offsets, sizes)
             return mark_microbatch_slice(x)
 
-        abstract_slices = tree_map(
-            lambda a: slice_microbatch(a, 0, None, None), x
-        )
+        abstract_slices = tree_map(lambda a: slice_microbatch(a, 0, None), x)
 
         new_args = args[:argnum] + (abstract_slices,) + args[argnum + 1 :]
         result_shapes = jax.eval_shape(fxn, *new_args, **kwargs)
@@ -568,12 +529,9 @@ def microbatch(
             (offset, prev_args) = loop_args
 
             slices = tree_map(
-                lambda a, arg_pspec, slice_pspec: slice_microbatch(
-                    a, offset, arg_pspec, slice_pspec
-                ),
+                lambda a, arg_pspec: slice_microbatch(a, offset, arg_pspec),
                 x,
                 pre_slice_shardings,
-                post_slice_shardings,
             )
 
             # prep the offsets for the next loop
@@ -582,6 +540,7 @@ def microbatch(
             new_args = args[:argnum] + (slices,) + args[argnum + 1 :]
             results = fxn(*new_args, **kwargs)
             flat_results, _ = jax.tree_util.tree_flatten(results)
+
             new_results = [x + y for x, y in zip(flat_prev, flat_results)]
             return (offset, jax.tree_util.tree_unflatten(treedef, new_results))
 
@@ -589,6 +548,7 @@ def microbatch(
         offset, result = jax.lax.fori_loop(
             0, num_microbatches, body_fun, (offset, initial_results)
         )
+
         return result
 
     return wrapped
