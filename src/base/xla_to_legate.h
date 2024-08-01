@@ -14,7 +14,8 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler,
                        std::vector<std::function<void()>> *on_done,
                        std::pair<int64_t, int64_t> machine_slice);
 
-void OffloadDtoH(const std::vector<StoreHandle> &stores,
+void OffloadDtoH(const std::vector<StoreHandle> &blocking_users,
+                 const std::vector<StoreHandle> &to_offload,
                  std::pair<int64_t, int64_t> device_slice, std::string name);
 
 void InvalidateDeviceInstances(const std::vector<StoreHandle> &stores,

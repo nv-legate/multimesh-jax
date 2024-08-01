@@ -206,13 +206,6 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
-    "--microbatch-reshape",
-    type=int,
-    default=None,
-    help="Reshape microbatches to take strided slices",
-)
-
-legate_jax.add_argument(
     "--enable-tracing",
     action="store_true",
     default=False,
@@ -813,7 +806,6 @@ LambadaConfig:
 
 MicrobatchConfig:
   size = {mb_size}
-  batch_reshape = {args.microbatch_reshape}
   schedule = '{args.schedule}'
   num_stages = {num_stages}
   interleave = {args.interleave}

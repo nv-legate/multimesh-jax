@@ -92,4 +92,13 @@ public:
   static void cpu_variant(legate::TaskContext context);
 };
 
+class XLAFenceTask : public XlaTask<XLAFenceTask> {
+public:
+  static const int32_t TASK_ID = XlaOpCode::XLA_FENCE_TASK;
+
+public:
+  static void gpu_variant(legate::TaskContext context);
+  static void cpu_variant(legate::TaskContext context);
+};
+
 } // namespace legate_xla

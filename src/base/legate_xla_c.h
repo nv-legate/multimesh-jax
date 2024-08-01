@@ -11,6 +11,7 @@ enum XlaOpCode {
   XLA_STORE_BUFFER_ACTION,
   XLA_SET_SCALAR_TASK,
   XLA_OFFLOAD_TASK,
+  XLA_FENCE_TASK,
 };
 
 enum XlaTunable {
