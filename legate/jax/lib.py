@@ -73,7 +73,7 @@ def _set_context_value(
     enable_fxn: Callable[[ContextValue], None],
     context_value: list[ContextValue],
 ) -> None:
-    current = flag
+    current = context_value[0]
     try:
         enable_fxn(flag)
         context_value[0] = flag

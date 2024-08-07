@@ -171,6 +171,11 @@ mark_output = no_op(name="TaskEnd")
 mark_input = no_op(name="TaskStart")
 
 
+def reset():
+    global _next_color
+    _next_color = 0
+
+
 def shard_axes(*args):
     import flax.linen as nn
 
@@ -382,7 +387,7 @@ def task(
         return WrappedTask
 
     if name is None:
-        name = f"{fxn.__name__}.{counter[0]}"
+        name = f"{fxn.__name__}"
         counter[0] += 1
 
     if configure is not None:

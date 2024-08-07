@@ -37,6 +37,7 @@ from .task import (
     parallelize_step,
     shard_axes,
     Task,
+    reset,
 )
 
 from . import _version
