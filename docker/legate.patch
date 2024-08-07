@@ -1,28 +1,13 @@
-diff --cc src/core/runtime/detail/runtime.cc
-index c1f67fa,6973cb6..0000000
+diff --git a/src/core/runtime/detail/runtime.cc b/src/core/runtime/detail/runtime.cc
+index 04cb5b15..3bc2556a 100644
 --- a/src/core/runtime/detail/runtime.cc
 +++ b/src/core/runtime/detail/runtime.cc
-@@@ -1430,21 -1414,10 +1430,15 @@@ Legion::ShardingID Runtime::get_shardin
-    }
-  
-    // We can now initialize the Legate runtime with the Legion context
- -  Runtime::get_runtime()->initialize(legion_context);
- -  return result;
- +  try {
- +    Runtime::get_runtime()->initialize(legion_context);
- +  } catch (const std::exception& e) {
- +    log_legate().error() << e.what();
- +    return 1;
- +  }
- +  return 0;
-  }
-  
-- namespace {
-- 
-- std::optional<Runtime> the_runtime{};
-- 
-- }  // namespace
-- 
-  std::int32_t Runtime::finish()
-  {
-    if (!initialized()) {
+@@ -1797,7 +1797,7 @@ RuntimeManager::State RuntimeManager::state() const noexcept { return state_; }
+ 
+ void RuntimeManager::reset() noexcept
+ {
+-  rt_.reset();
++  //rt_.reset();
+   state_ = State::FINALIZED;
+ }
+ 
