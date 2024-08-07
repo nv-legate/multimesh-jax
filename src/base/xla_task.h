@@ -34,7 +34,7 @@ template <typename T> struct XlaTask : public legate::LegateTask<T> {
 // Generic initialization of LegateBuffer from host data ptr
 class XLACopyDeviceToDevice : public XlaTask<XLACopyDeviceToDevice> {
 public:
-  static const int32_t TASK_ID = XlaOpCode::XLA_COPY_DEVICE_TO_DEVICE;
+  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_COPY_DEVICE_TO_DEVICE};
 
   enum ScalarArgs {
     ScalarSourcePointer = 0,
@@ -49,7 +49,7 @@ public:
 // Generic initialization of LegateBuffer to zero
 class XLAInitZeroTask : public XlaTask<XLAInitZeroTask> {
 public:
-  static const int32_t TASK_ID = XlaOpCode::XLA_INIT_ZERO_TASK;
+  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_INIT_ZERO_TASK};
 
 public:
   static void gpu_variant(legate::TaskContext context);
@@ -57,7 +57,7 @@ public:
 
 class XLASetScalarTask : public XlaTask<XLASetScalarTask> {
 public:
-  static const int32_t TASK_ID = XlaOpCode::XLA_SET_SCALAR_TASK;
+  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_SET_SCALAR_TASK};
 
 public:
   static void gpu_variant(legate::TaskContext context);
@@ -66,7 +66,7 @@ public:
 
 class XLAStoreBufferActionTask : public XlaTask<XLAStoreBufferActionTask> {
 public:
-  static const int32_t TASK_ID = XlaOpCode::XLA_STORE_BUFFER_ACTION;
+  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_STORE_BUFFER_ACTION};
 
   enum ScalarArgs {
     ScalarIsBlocking,
@@ -85,7 +85,7 @@ private:
 
 class XLAOffloadTask : public XlaTask<XLAOffloadTask> {
 public:
-  static const int32_t TASK_ID = XlaOpCode::XLA_OFFLOAD_TASK;
+  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_OFFLOAD_TASK};
 
 public:
   static void gpu_variant(legate::TaskContext context);
@@ -94,7 +94,7 @@ public:
 
 class XLAFenceTask : public XlaTask<XLAFenceTask> {
 public:
-  static const int32_t TASK_ID = XlaOpCode::XLA_FENCE_TASK;
+  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_FENCE_TASK};
 
 public:
   static void gpu_variant(legate::TaskContext context);

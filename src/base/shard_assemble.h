@@ -19,6 +19,7 @@
 #include "legate_xla_common.h"
 #include "xla_task.h"
 #include <core/data/scalar.h>
+#include <core/utilities/typedefs.h>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -27,7 +28,7 @@ namespace legate_xla {
 
 class ShardAssembleTask : public XlaTask<ShardAssembleTask> {
 public:
-  static constexpr int32_t TASK_ID = XLA_SHARD_ASSEMBLE_TASK;
+  static constexpr auto TASK_ID = legate::LocalTaskID{XLA_SHARD_ASSEMBLE_TASK};
 
   enum ScalarArgs {
     ScalarCompilerPointer,

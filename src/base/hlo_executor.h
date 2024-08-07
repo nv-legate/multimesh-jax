@@ -19,12 +19,13 @@
 #include "legate_xla_common.h"
 #include "task_utils.h"
 #include "xla_task.h"
+#include <core/utilities/typedefs.h>
 
 namespace legate_xla {
 
 class HLOExecutorTask : public XlaTask<HLOExecutorTask> {
 public:
-  static const int TASK_ID = XLA_EXECUTE_TASK;
+  static constexpr auto TASK_ID = legate::LocalTaskID{XLA_EXECUTE_TASK};
 
   enum {
     ScalarTaskCounter = 0,

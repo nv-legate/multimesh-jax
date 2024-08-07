@@ -16,6 +16,7 @@ limitations under the License.
 #include "legate_runtime.h"
 #include "legate.h"
 #include "legate_mapper.h"
+#include <core/utilities/typedefs.h>
 
 using namespace Legion;
 using namespace legate;
@@ -34,12 +35,12 @@ std::vector<LogicalStore> &Runtime::get_tmp_stores() {
 }
 
 AutoTask Runtime::create_task(XlaOpCode task_id) {
-  return core_runtime_->create_task(context_, task_id);
+  return core_runtime_->create_task(context_, legate::LocalTaskID{task_id});
 }
 
 ManualTask Runtime::create_task(XlaOpCode task_id,
                                 const legate::Shape &launch_shape) {
-  return core_runtime_->create_task(context_, task_id, launch_shape.extents());
+  return core_runtime_->create_task(context_, legate::LocalTaskID{task_id}, launch_shape.extents());
 }
 
 void Runtime::submit(legate::AutoTask task) {

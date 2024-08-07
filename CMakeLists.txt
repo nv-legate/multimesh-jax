@@ -16,7 +16,7 @@
 
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 project(LegateXLA LANGUAGES C CXX CUDA)
-set(LegateXLA_VERSION 24.05.00)
+set(LegateXLA_VERSION 24.09.00)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -86,6 +86,6 @@ rapids_cmake_install_lib_dir(lib_dir)
 if (SKBUILD)
   include(legate_xla_python.cmake)
 elseif(LegateXLA_ENABLE_TESTS)
-  add_subdirectory(tests/cpp)
+  add_subdirectory(tests)
 endif()
 

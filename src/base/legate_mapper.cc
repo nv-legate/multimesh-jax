@@ -2,6 +2,7 @@
 #include "legate_mapper.h"
 #include "legate_xla_c.h"
 #include <core/mapping/mapping.h>
+#include <core/utilities/typedefs.h>
 
 using namespace legate;
 
@@ -27,7 +28,7 @@ Mapper::store_mappings(const mapping::Task &task,
                    task.num_reductions());
 
   const mapping::StoreTarget target = [&] {
-    if (task.task_id() == XLA_OFFLOAD_TASK) {
+    if (task.task_id() == legate::LocalTaskID{XLA_OFFLOAD_TASK}) {
       return mapping::StoreTarget::ZCMEM;
     }
     return options.front();
