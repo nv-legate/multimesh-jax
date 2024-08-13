@@ -13,7 +13,7 @@ def initialize():
         "legate", priority=500, library_path=str(lib), options=None
     )
 
-    from jax.lib import xla_client
+    from jax._src.lib import xla_client
     from jaxlib import xla_extension as xe
 
     xla_client.register_custom_call_handler(
