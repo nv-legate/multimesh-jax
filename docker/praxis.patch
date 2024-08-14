@@ -1,8 +1,8 @@
 diff --git a/praxis/base_layer.py b/praxis/base_layer.py
-index cc5f24c..84502d4 100644
+index 3f628b8..09fe860 100644
 --- a/praxis/base_layer.py
 +++ b/praxis/base_layer.py
-@@ -246,7 +246,7 @@ def to_partition_spec(
+@@ -247,7 +247,7 @@ def to_partition_spec(
                f's_i: {s_i}, mesh_axis_names: {mesh_axis_names}')
            split_dims.append(mesh_axis_names[s_i])
        elif isinstance(s_i, str):
@@ -11,13 +11,61 @@ index cc5f24c..84502d4 100644
          split_dims.append(s_i)
        elif isinstance(s_i, (tuple, list)):
          split_dims.append(_parse_split_dims(s_i))
+diff --git a/praxis/contrib/gpu/scripts_gpu/models.py b/praxis/contrib/gpu/scripts_gpu/models.py
+index a926c58..59fd2f5 100644
+--- a/praxis/contrib/gpu/scripts_gpu/models.py
++++ b/praxis/contrib/gpu/scripts_gpu/models.py
+@@ -81,9 +81,9 @@ def compute_xent_loss_helper(
+     )
+   predicted_labels = predictions.per_example_argmax.astype(labels.dtype)
+   num_preds = predictions.total_weight
+-  mean_acc = jnp.sum((labels == predicted_labels) * weights) / jnp.maximum(
+-      num_preds, 1
+-  )
++  #mean_acc = jnp.sum((labels == predicted_labels) * weights) / jnp.maximum(
++  #    num_preds, 1
++  #)
+   metric_weight = jnp.array(num_preds, predictions.avg_xent.dtype)
+ 
+   if hasattr(predictions, 'avg_xent_weight'):
+@@ -99,7 +99,7 @@ def compute_xent_loss_helper(
+           jnp.array(1.0, predictions.aux_loss.dtype),
+       ),
+       log_pplx=(predictions.avg_xent, avg_xent_weight),
+-      fraction_of_correct_next_step_preds=(mean_acc, metric_weight),
++      #fraction_of_correct_next_step_preds=(mean_acc, metric_weight),
+       num_predictions=(num_preds, jnp.array(1.0, num_preds.dtype)),
+   )
+ 
+@@ -176,12 +176,12 @@ def compute_eval_metrics_helper(
+     )
+     num_nonpadding = jnp.sum(input_batch.eval_sample_weights)
+ 
+-    mean_acc_strict = jnp.sum(
+-        jnp.sum((labels == predicted_labels) * weights, axis=-1) == num_acc
+-    ) / jnp.maximum(num_nonpadding, 1)
+-    strict_weight = jnp.array(num_nonpadding, predictions.avg_xent.dtype)
+-
+-    metrics.acc_strict = (mean_acc_strict, strict_weight)
++    #mean_acc_strict = jnp.sum(
++    #    jnp.sum((labels == predicted_labels) * weights, axis=-1) == num_acc
++    #) / jnp.maximum(num_nonpadding, 1)
++    #strict_weight = jnp.array(num_nonpadding, predictions.avg_xent.dtype)
++    #
++    #metrics.acc_strict = (mean_acc_strict, strict_weight)
+ 
+   elif eval_task == 'boolq':
+ 
 diff --git a/praxis/contrib/gpu/scripts_gpu/te_helper.py b/praxis/contrib/gpu/scripts_gpu/te_helper.py
 new file mode 100644
-index 0000000..d0afc1a
+index 0000000..d3d5dbd
 --- /dev/null
 +++ b/praxis/contrib/gpu/scripts_gpu/te_helper.py
-@@ -0,0 +1,321 @@
+@@ -0,0 +1,399 @@
 +import os
++
++from absl import logging
++
 +
 +from praxis import base_layer
 +from praxis import pax_fiddle
@@ -28,6 +76,13 @@ index 0000000..d0afc1a
 +from praxis.layers import attentions, grouped_query_attention, multi_query_attention
 +from praxis.layers import embedding_softmax
 +from praxis.layers import normalizations
++
++from praxis.contrib.gpu.scripts_gpu.lora_layers import (
++    LoraAttentionProjection,
++    LoraCombinedQKVProjection,
++    LoraLinear,
++)
++
 +
 +try:
 +    import transformer_engine.jax as te
@@ -196,7 +251,7 @@ index 0000000..d0afc1a
 +                assert attn_tpl.attention_extra_logit is None
 +                assert attn_tpl.ngrammer_tpl is None
 +                te_tpl.enable_rotary_pos_emb = attn_tpl.use_rotary_position_emb
-+                if issubclass(attn_tpl.rotary_position_emb_tpl.cls, embedding_softmax.RotaryPositionalEmbedding):
++                if attn_tpl.rotary_position_emb_tpl.cls == embedding_softmax.RotaryPositionalEmbedding:
 +                    te_tpl.rotary_pos_emb_group_method = 'alternate'
 +            elif issubclass(attn_tpl.cls, grouped_query_attention.GroupedQueryAttention):
 +                te_tpl.num_gqa_groups = attn_tpl.num_kv_heads
@@ -207,7 +262,7 @@ index 0000000..d0afc1a
 +            elif issubclass(attn_tpl.cls, multi_query_attention.MultiQueryDotProductAttention):
 +                te_tpl.num_gqa_groups = attn_tpl.num_kv_heads
 +                te_tpl.enable_rotary_pos_emb = attn_tpl.use_rotary_position_emb
-+                if issubclass(attn_tpl.rotary_position_emb_tpl.cls, embedding_softmax.RotaryPositionalEmbedding):
++                if attn_tpl.rotary_position_emb_tpl.cls == embedding_softmax.RotaryPositionalEmbedding:
 +                    te_tpl.rotary_pos_emb_group_method = 'alternate'
 +            else:
 +                raise ValueError(f'Unsupported {attn_tpl.cls=}')
@@ -227,7 +282,7 @@ index 0000000..d0afc1a
 +        assert (transformer_layer_tpl.tr_fflayer_tpl.has_bias ==
 +            transformer_layer_tpl.tr_atten_tpl.use_bias), "TE only allows same bias settings."
 +        te_transformer_tpl.use_bias = transformer_layer_tpl.tr_fflayer_tpl.has_bias
-+        te_transformer_tpl.self_attn_mask_type = 'causal' \
++        te_transformer_tpl.self_attn_mask_type = 'padding_causal' \
 +            if stacked_transformer_obj.mask_self_attention else 'padding'
 +
 +        te_transformer_tpl.logical_axes_rules = te_flax.extend_logical_axis_rules(tuple())
@@ -252,13 +307,81 @@ index 0000000..d0afc1a
 +        assert len(stacked_transformer_obj.moe_layers) == 0
 +        assert stacked_transformer_obj.ngrammer_tpls is None
 +
++        def update_lora_te_tpl(te_tpl, transformer_layer_tpl):
++            lora_enabled = False
++            te_lora_scope = "none"
++            lora_rank = None
++            if (
++                transformer_layer_tpl.tr_fflayer_tpl.fflayer_tpl.linear_tpl.__fn_or_cls__
++                is LoraLinear
++            ):
++                lora_enabled = True
++                mlp_included_in_lora = True
++                current_rank = (
++                    transformer_layer_tpl.tr_fflayer_tpl.fflayer_tpl.linear_tpl.rank
++                )
++                lora_rank = (
++                    current_rank if lora_rank is None else lora_rank & current_rank
++                )
++
++            attention_included_in_lora = False
++            if (
++                hasattr(transformer_layer_tpl.tr_atten_tpl, "combined_qkv_proj_tpl")
++                and transformer_layer_tpl.tr_atten_tpl.combined_qkv_proj_tpl.__fn_or_cls__
++                is LoraCombinedQKVProjection
++            ):
++                lora_enabled = True
++                attention_included_in_lora = True
++                current_rank = (
++                    transformer_layer_tpl.tr_atten_tpl.combined_qkv_proj_tpl.rank
++                )
++                lora_rank = (
++                    current_rank if lora_rank is None else lora_rank & current_rank
++                )
++
++            if (
++                hasattr(transformer_layer_tpl.tr_atten_tpl, "proj_tpl")
++                and transformer_layer_tpl.tr_atten_tpl.proj_tpl.__fn_or_cls__
++                is LoraAttentionProjection
++            ):
++                lora_enabled = True
++                attention_included_in_lora = True
++                current_rank = transformer_layer_tpl.tr_atten_tpl.proj_tpl.rank
++                lora_rank = (
++                    current_rank if lora_rank is None else lora_rank & current_rank
++                )
++
++            if lora_enabled:
++                assert (
++                    lora_rank > 0
++                ), "LoRA rank should be the same for all layers and greater than 0."
++                if attention_included_in_lora and mlp_included_in_lora:
++                    te_lora_scope = "all"
++                elif attention_included_in_lora and not mlp_included_in_lora:
++                    te_lora_scope = "exclude_mlp"
++                elif mlp_included_in_lora and not attention_included_in_lora:
++                    te_lora_scope = "mlp"
++
++                te_transformer_tpl.low_rank_adaptation_scope = te_lora_scope
++                te_transformer_tpl.low_rank_adaptation_dim = lora_rank
++
++            return te_tpl
++
++        try:
++            te_transformer_tpl = update_lora_te_tpl(
++                te_transformer_tpl, transformer_layer_tpl
++            )
++        except Exception as e:
++            logging.warning(f"Unable to use LoRA with TE: {e}")
++        
++
 +        return te_transformer_tpl
 +
 +    @staticmethod
-+    def get_input_bld(_, batch_axes, mdl_axis):
++    def get_input_bld(original_bld, batch_axes, mdl_axis):
 +        if ENABLE_TE_SP:
 +            return [batch_axes, mdl_axis, None]
-+        return [batch_axes, None, None]
++        return original_bld
 +
 +    @staticmethod
 +    def get_bld_mapping_for_pipelined_transformer(_):
@@ -339,7 +462,7 @@ index 0000000..d0afc1a
 +    def check_checkpoint_policy(tpl):
 +        return TransformerEngineHelper.get_helper().check_checkpoint_policy(tpl)
 diff --git a/praxis/layers/attentions.py b/praxis/layers/attentions.py
-index d853bbf..d036265 100644
+index ed9bc9f..fb36427 100644
 --- a/praxis/layers/attentions.py
 +++ b/praxis/layers/attentions.py
 @@ -1182,6 +1182,7 @@ class DotProductAttention(base_layer.BaseLayer):
@@ -363,8 +486,216 @@ index d853bbf..d036265 100644
      if self.attention_mask_summary:
        self.add_summary('attention_mask', atten_mask)
      if self.attention_extra_logit is None:
+diff --git a/praxis/layers/checkpoint_policy.py b/praxis/layers/checkpoint_policy.py
+index 5f173fd..3566142 100644
+--- a/praxis/layers/checkpoint_policy.py
++++ b/praxis/layers/checkpoint_policy.py
+@@ -40,6 +40,7 @@ class AutodiffCheckpointType(str, enum.Enum):
+   SAVE_QKV_OUT_PROJ_SEPARATE = 'save_qkv_out_proj_separate'
+   SAVE_DOT_EXCEPT_LOGITS_FFN1 = 'save_dot_except_logits_ffn1'
+   SAVE_DOT_EXCEPT_LOGITS = 'save_dot_except_logits'
++  SAVE_QKV_OUT_PROJ_FFN = 'save_qkv_out_proj_ffn'
+ 
+ 
+ def custom_policy(checkpoint_policy: AutodiffCheckpointType):
+@@ -52,6 +53,10 @@ def custom_policy(checkpoint_policy: AutodiffCheckpointType):
+     return jax.checkpoint_policies.checkpoint_dots
+   if checkpoint_policy == AutodiffCheckpointType.SAVE_DOT_WITH_NO_BATCH_DIM:
+     return jax.checkpoint_policies.checkpoint_dots_with_no_batch_dims
++  if checkpoint_policy == AutodiffCheckpointType.SAVE_QKV_OUT_PROJ_FFN:
++    return jax.checkpoint_policies.save_only_these_names(
++        'combined_qkv_proj', 'out_proj', 'ffn1', 'ffn2'
++    )
+   if checkpoint_policy == AutodiffCheckpointType.SAVE_QKV_OUT_PROJ:
+     return jax.checkpoint_policies.save_only_these_names(
+         'combined_qkv_proj', 'out_proj'
+diff --git a/praxis/layers/embedding_softmax.py b/praxis/layers/embedding_softmax.py
+index c41ef48..08160ae 100644
+--- a/praxis/layers/embedding_softmax.py
++++ b/praxis/layers/embedding_softmax.py
+@@ -320,14 +320,22 @@ class FullSoftmax(base_layer.BaseLayer):
+       )
+       logits = log_probs = None
+ 
+-    # Compute total softmax cross-entropy loss for the output tensor.
+-    total_xent = jnp.sum(
++    per_batch_xent = jnp.sum(
+         jnp.expand_dims(per_example_xent, axis=-1) * class_weights,
+         dtype=jnp.float32,
++        axis=[-2,-1],
++    )
++    per_batch_weight = jnp.sum(
++        class_weights, axis=[-2,-1], dtype=jnp.float32
+     )
+-    total_weight = jnp.sum(class_weights, dtype=jnp.float32)
++
++    avg_batch_xent = per_batch_xent / per_batch_weight
++    avg_xent = jnp.sum(avg_batch_xent)
++    total_xent = jnp.sum(per_batch_xent)
++    total_weight = jnp.sum(per_batch_weight)
+ 
+     if self.z_loss_weight > 0.0:
++      raise Exception("z_loss_weight not supported")
+       assert logits is not None
+       z_loss = (
+           jnp.sum(_compute_z_loss(logits) * class_weights, dtype=jnp.float32)
+@@ -348,7 +356,7 @@ class FullSoftmax(base_layer.BaseLayer):
+         per_example_xent=per_example_xent.astype(jnp.float32),
+         total_xent=total_xent,
+         total_weight=total_weight,
+-        avg_xent=(total_xent / (total_weight + 1e-6)).astype(jnp.float32),
++        avg_xent=avg_xent,
+     )
+     if class_ids is not None:
+       output_nmap.accuracy = (
+diff --git a/praxis/layers/grok.py b/praxis/layers/grok.py
+index f66d143..d1effc4 100644
+--- a/praxis/layers/grok.py
++++ b/praxis/layers/grok.py
+@@ -59,6 +59,7 @@ def GrokStackedTransformerHParams(
+     combine_qkv=False,
+     bidirectional=False,
+     use_fp8=False,
++    use_te_dpa=False,
+ ) -> pax_fiddle.Config[transformers.StackedTransformer]:
+   """Common setup for Grok-1 Transformer layers.
+ 
+@@ -168,6 +169,7 @@ def GrokStackedTransformerHParams(
+   p.transformer_layer_params_tpl.tr_atten_tpl = pax_fiddle.Config(
+       multi_query_attention.MultiQueryDotProductAttention,
+       num_kv_heads=attention_num_groups,
++      use_te_dpa=use_te_dpa,
+   )
+   tr_atten_tpl = p.transformer_layer_params_tpl.tr_atten_tpl
+   tr_atten_tpl.combine_qkv = False
+@@ -225,6 +227,7 @@ def GrokUniTransformerLmHParams(
+     model_type=LanguageModelType.CAUSAL,
+     checkpoint_policy=AutodiffCheckpointType.SAVE_NOTHING,
+     use_fp8=False,
++    use_te_dpa=False,
+ ) -> pax_fiddle.Config[transformer_models.TransformerLm]:
+   """Common setup for Grok-1 Decoder-only Transformer Model.
+ 
+@@ -328,6 +331,7 @@ def GrokUniTransformerLmHParams(
+       bidirectional=bidirectional,
+       moe_gating_embedding_level=moe_gating_embedding_level,
+       use_fp8=use_fp8,
++      use_te_dpa=use_te_dpa,
+   )
+   num_blocks = num_transformer_layers
+ 
+diff --git a/praxis/layers/multi_query_attention.py b/praxis/layers/multi_query_attention.py
+index 67bdf55..67d3557 100644
+--- a/praxis/layers/multi_query_attention.py
++++ b/praxis/layers/multi_query_attention.py
+@@ -17,7 +17,7 @@
+ 
+ import math
+ from typing import Callable, Mapping, Sequence
+-
++from absl import logging
+ from flax import linen as nn
+ import jax
+ from jax import numpy as jnp
+@@ -31,7 +31,7 @@ from praxis.layers import attentions
+ from praxis.layers import base_ops
+ from praxis.layers import embedding_softmax
+ from praxis.layers import stochastics
+-
++from transformer_engine.jax.flax.transformer import DotProductAttention as TEDotProductAttention
+ 
+ WeightInit = base_layer.WeightInit
+ WeightHParams = base_layer.WeightHParams
+@@ -209,6 +209,7 @@ class MultiQueryDotProductAttention(base_layer.BaseLayer):
+   pv_einsum_tpl: LayerTpl = template_field(base_ops.EinsumOp)
+   scale_query_by_dim_per_head: bool = False
+   chunked_attn_num_seq_split: int = 1
++  use_te_dpa: bool = False  # Experimental way to use TE flash attention when can't use standard TE
+ 
+   # SPMD partition related params.
+   #
+@@ -347,6 +348,20 @@ class MultiQueryDotProductAttention(base_layer.BaseLayer):
+     self.create_child('post', post_proj_p)
+     self.create_child('qk_einsum', self.qk_einsum_tpl.clone())
+     self.create_child('pv_einsum', self.pv_einsum_tpl.clone())
++    self.dpa_layer = TEDotProductAttention(
++                  head_dim=dim_per_head,
++                  num_attention_heads=self.num_heads,
++                  num_gqa_groups=self.num_kv_heads,
++                  attn_mask_type='causal', # 'causal' or 'padding'
++                  attn_bias_type='no_bias', # 'no_bias', 'pre_scale_bias' or 'post_scale_bias'
++                  attention_dropout=0.,
++                  dropout_rng_name='aqt',
++                  dtype=jnp.bfloat16,
++                  float32_logits=False,
++                  qkv_layout='BSHD_BSHD_BSHD', # 'BS3HD', 'BSHD_BS2HD' or 'BSHD_BSHD_BSHD'
++                  scale_factor=1.0/math.sqrt(self.num_heads),
++                  transpose_batch_sequence=False
++            ) 
+ 
+   def _shard_bnh(self, x: JTensor) -> JTensor:
+     """Shards tensors of shape [b, n, h].
+@@ -828,29 +843,36 @@ class MultiQueryDotProductAttention(base_layer.BaseLayer):
+     else:
+       key_proj = self._shard_blnh(key_proj)
+       value_proj = self._shard_blnh(value_proj)
+-      b, t, n, h = query_proj.shape
+-      _, s, nk, _ = key_proj.shape
+-      assert n % nk == 0
+-      v_q = jnp.reshape(query_proj, (b, t, nk, n // nk, h))
+-      if relative_bias is not None:
+-        v_rb = jnp.reshape(relative_bias, (b, nk, n // nk, t, s))
+-      else:
+-        v_rb = None
+-      with self._context_for_kv_vmap():
+-        encoded, atten_probs = jax.vmap(
+-            self._dot_atten,
+-            in_axes=(2, 2, 2, None, 1),
+-            out_axes=(2, 1),
+-        )(
+-            v_q,
+-            key_proj,
+-            value_proj,
+-            atten_mask,
+-            v_rb,
++      if self.use_te_dpa:
++        logging.warning(
++            'use_te_dpa is set to True, so TE dpa is used as an experimental way to use TE flash attention.'
+         )
+-      encoded = self._shard_blnh(jnp.reshape(encoded, (b, t, n, h)))
+-      if atten_probs is not None:
+-        atten_probs = jnp.reshape(atten_probs, (b, t, n, s))
++        atten_probs = None
++        encoded = self.dpa_layer(query_proj, key_proj, value_proj)
++      else:
++        b, t, n, h = query_proj.shape
++        _, s, nk, _ = key_proj.shape
++        assert n % nk == 0
++        v_q = jnp.reshape(query_proj, (b, t, nk, n // nk, h))
++        if relative_bias is not None:
++          v_rb = jnp.reshape(relative_bias, (b, nk, n // nk, t, s))
++        else:
++          v_rb = None
++        with self._context_for_kv_vmap():
++          encoded, atten_probs = jax.vmap(
++              self._dot_atten,
++              in_axes=(2, 2, 2, None, 1),
++              out_axes=(2, 1),
++          )(
++              v_q,
++              key_proj,
++              value_proj,
++              atten_mask,
++              v_rb,
++          )
++        encoded = self._shard_blnh(jnp.reshape(encoded, (b, t, n, h)))
++        if atten_probs is not None:
++          atten_probs = jnp.reshape(atten_probs, (b, t, n, s))
+ 
+     # Post projection
+     encoded = self.post(encoded)
 diff --git a/praxis/layers/pipeline.py b/praxis/layers/pipeline.py
-index e3b2f7c..b31526e 100644
+index fb2f72f..56f8787 100644
 --- a/praxis/layers/pipeline.py
 +++ b/praxis/layers/pipeline.py
 @@ -28,6 +28,8 @@ from praxis import pax_fiddle
@@ -376,7 +707,7 @@ index e3b2f7c..b31526e 100644
  
  NestedMap = py_utils.NestedMap
  JTensor = pytypes.JTensor
-@@ -414,6 +416,7 @@ class LayerwiseShardablePipelined(base_layer.BaseLayer):
+@@ -420,6 +422,7 @@ class LayerwiseShardablePipelined(base_layer.BaseLayer):
              NON_TRAINABLE: 0,
              INTERMEDIATES: 0,
              HYPER_PARAMS: 0,
@@ -384,7 +715,7 @@ index e3b2f7c..b31526e 100644
          },
          split_rngs={PARAMS: self.is_initializing(), RANDOM: True},
          metadata_params={
-@@ -798,7 +801,7 @@ class LayerwiseShardablePipelined(base_layer.BaseLayer):
+@@ -840,7 +843,7 @@ class LayerwiseShardablePipelined(base_layer.BaseLayer):
      #
      # Note that fprop should not use PARAMS rng because there is no var init.
      variable_carry = []
@@ -393,7 +724,7 @@ index e3b2f7c..b31526e 100644
      if self.is_mutable_collection(NON_TRAINABLE):
        variable_carry.append(NON_TRAINABLE)
      else:
-@@ -821,7 +824,7 @@ class LayerwiseShardablePipelined(base_layer.BaseLayer):
+@@ -863,7 +866,7 @@ class LayerwiseShardablePipelined(base_layer.BaseLayer):
      if bf16_vars_to_convert is not None:
        scan_fn = nn.map_variables(
            scan_fn,
@@ -403,7 +734,7 @@ index e3b2f7c..b31526e 100644
            trans_in_fn=_get_to_f32_converter(bf16_vars_to_convert),
            trans_out_fn=_get_to_bf16_converter(bf16_vars_to_convert),
 diff --git a/praxis/layers/transformer_models.py b/praxis/layers/transformer_models.py
-index 9b87c9f..ce919c8 100644
+index 8709b27..09c8786 100644
 --- a/praxis/layers/transformer_models.py
 +++ b/praxis/layers/transformer_models.py
 @@ -33,6 +33,7 @@ from praxis.layers import embedding_softmax
@@ -414,216 +745,7 @@ index 9b87c9f..ce919c8 100644
  
  NestedMap = py_utils.NestedMap
  JTensor = pytypes.JTensor
-@@ -126,6 +127,99 @@ def _set_embedding_softmax_sharding_params_for_transformers(
-   return embedding_softmax_p
- 
- 
-+def _set_stacked_transformer_sharding_with_expert_parallelism(
-+    stacked_transformer_p,
-+    *,
-+    w_df,
-+    w_dnh,
-+    w_emh,
-+    a_bld,
-+    a_blf,
-+    a_blnh,
-+    a_egch,
-+    a_egcm,
-+    a_blh=None,
-+    a_bd=None,
-+    a_bf=None,
-+):
-+  """Set sharding params for the stacked transformer layer."""
-+  stacked_p = stacked_transformer_p
-+  if fdl.get_callable(stacked_p) == transformers.PipelinedTransformer:
-+    stacked_p = stacked_p.pipeline_stage
-+  if issubclass(
-+      fdl.get_callable(stacked_p), transformers.StackedTransformerRepeated
-+  ):
-+    stacked_p = stacked_p.block
-+  transformer_p = stacked_p.transformer_layer_params_tpl
-+  if isinstance(transformer_p, Sequence):
-+    transformer_p_lst = transformer_p
-+  else:
-+    transformer_p_lst = [transformer_p]
-+  for t_p in transformer_p_lst:
-+    for atten_p in (t_p.tr_atten_tpl, t_p.cross_atten_tpl):
-+      if atten_p is None:
-+        continue
-+      atten_wp = atten_p.weight_split_dims_mapping
-+      atten_wp.proj = w_dnh
-+      w_n_sharding = None if w_dnh is None else w_dnh[1]
-+      atten_wp.dconv = [w_n_sharding, None]
-+      atten_ap = atten_p.activation_split_dims_mapping
-+      atten_ap.blnh = a_blnh
-+      atten_ap.bld = a_bld
-+      if hasattr(atten_ap, 'bd'):
-+        atten_ap.bd = a_bd
-+      if issubclass(
-+          fdl.get_callable(atten_p),
-+          multi_query_attention.MultiQueryDotProductAttention,
-+      ):
-+        atten_wp.proj_headless = [w_dnh[0], w_dnh[2]]
-+        if a_blh is None:
-+          atten_ap.blh = [a_blnh[0], a_blnh[1], a_blnh[3]]
-+        else:
-+          atten_ap.blh = a_blh
-+
-+    ff_p = t_p.tr_fflayer_tpl
-+    ff_wp = ff_p.weight_split_dims_mapping
-+    ff_wp.ffn0 = w_df
-+    if w_df is None:
-+      ff_wp.ffn1 = None
-+    else:
-+      ff_wp.ffn1 = [w_df[1], w_df[0]]
-+    ff_ap = ff_p.activation_split_dims_mapping
-+    ff_ap.ffn0 = a_blf
-+    if hasattr(ff_ap, 'ffn0_extend_step'):
-+      ff_ap.ffn0_extend_step = a_bf
-+    ff_ap.ffn1 = a_bld
-+    if hasattr(ff_ap, 'ffn1_extend_step'):
-+      ff_ap.ffn1_extend_step = a_bd
-+
-+  if stacked_p.moe_layer_tpl is not None:
-+    # Set Moe layer sharding hparams.
-+    moe_p = stacked_p.moe_layer_tpl
-+    moe_wp = moe_p.weight_split_dims_mapping
-+    moe_wp.me = [None, None]  # Replicated.
-+    moe_wp.emh = w_emh
-+    w_e_sharding = None if w_emh is None else w_emh[0]
-+    w_m_sharding = None if w_emh is None else w_emh[1]
-+    w_h_sharding = None if w_emh is None else w_emh[2]
-+    moe_wp.ehm = [w_e_sharding, w_h_sharding, w_m_sharding]
-+    # Activations
-+    a_e_sharding = None if a_egch is None else ('data', 'data_expert')
-+    moe_ap = moe_p.activation_split_dims_mapping
-+    moe_ap.gs = [a_e_sharding, None]
-+    # dispatch and combine tensors
-+    moe_ap.gsec = [a_e_sharding, None, None, None]
-+    moe_ap.gecs = [a_e_sharding, None, None, None]
-+    moe_ap.gec = [a_e_sharding, None, None]
-+    moe_ap.egch = a_egch
-+    a_e_sharding = None if a_egcm is None else ('data', 'data_expert')
-+    a_m_sharding = None if a_egcm is None else a_egcm[3]
-+    moe_ap.gsm = [a_e_sharding, None, a_m_sharding]
-+    moe_ap.egcm = a_egcm
-+    moe_ap.gecm = [a_egcm[1], a_egcm[0], a_egcm[2], a_egcm[3]]
-+  return stacked_transformer_p
-+
-+
- def _set_stacked_transformer_sharding(
-     stacked_transformer_p,
-     *,
-@@ -291,6 +385,108 @@ class TransformerLm(base_layer.BaseLayer):
-   record_activations_in_xent_output: bool = False
-   entropy_loss_weight: float | None = None
- 
-+  @classmethod
-+  def set_sharding_params_with_expert_parallelism(
-+      cls,
-+      lm_p,
-+      *,
-+      replica_axis,
-+      data_axis,
-+      data_expert_axis,
-+      mdl_axis,
-+      ici_mesh_shape,
-+      dcn_mesh_shape=None,
-+      batch_axes=None,
-+      mesh_axis_names,
-+      seq_axis=None,
-+      training_optimized,
-+  ):
-+    """Set Canonical sharding params.
-+
-+    Args:
-+      lm_p: A params of this class.
-+      replica_axis: A string or int of the model replica axis name.
-+      data_axis: A string or int of the data axis name.
-+      data_expert_axis: A string or int of the data/expert axis name.
-+      mdl_axis: A string or int of the mdl axis name.
-+      ici_mesh_shape: Shape of logical mesh for a slice.
-+      dcn_mesh_shape: Shape of logical mesh between slices.
-+      batch_axes: A tuple with all axes used for splitting activations along
-+        batch dimension. Defaults to (replica_axis, data_axis).
-+      mesh_axis_names: A list of length len(shape). Each element of the list is
-+        the name of the corresponding device axis.
-+      training_optimized: A bool indicating whether sharding is optimized for
-+        training by saving activation memory between forward and backward
-+        passes.
-+
-+    Returns:
-+      Params with sharding annotations added.
-+    """
-+    # In the following, model weights are layed out on the [data_axis, mdl_axis]
-+    # 2d mesh. Model weights are always replicated over the replica_axis mesh
-+    # axis.
-+    #
-+    # The batch axis of the activations are always sharded over the combination
-+    # of (replica_axis, data_axis).
-+    if batch_axes is None:
-+      batch_axes = (replica_axis, data_axis, data_expert_axis)
-+    bld = (
-+        [batch_axes, seq_axis, mdl_axis]
-+        if training_optimized
-+        else [batch_axes, None, None]
-+    )
-+    egcm = (
-+        [data_expert_axis, data_axis, None, mdl_axis]
-+        if training_optimized
-+        else [batch_axes, None, None, None]
-+    )
-+
-+    if seq_axis is None:
-+      w_data_axes = (data_axis, data_expert_axis)
-+    else:
-+      w_data_axes = (data_axis, data_expert_axis, seq_axis)
-+
-+    # w_df: sharding for weight of ffn0, shape (d, f). ff1 weights will be
-+    # inferred from it.
-+    w_df = [w_data_axes, mdl_axis]
-+    # w_dnh: Sharding of qkv projection weights, shape (d, num_heads,
-+    # per_head_size)
-+    w_dnh = [w_data_axes, mdl_axis, None]
-+    # w_emh: sharding for first MoE FFN weight, shape (e, m, h). The second MoE
-+    # ffn weight will be inferred from it.
-+    w_emh = [data_expert_axis, data_axis, mdl_axis]
-+    # w_vd: sharding of the embedding weight of (vocab_size, d).
-+    w_vd = [mdl_axis, w_data_axes]
-+    # a_bld: sharding of output of ffn/attention, shape (b, l, d).
-+    a_bld = bld
-+    # a_blf: sharding of output of ffn0, shape (b, l, f).
-+    a_blf = [batch_axes, seq_axis, mdl_axis]
-+    # a_blnh: sharding of the attention activation of shape (b, l, num_heads,
-+    # per_head_size).
-+    a_blnh = [batch_axes, seq_axis, mdl_axis, None]
-+    # a_blv: sharding of the logits activation of shape (b, l, vocab_size).
-+    a_blv = [batch_axes, seq_axis, mdl_axis]
-+    # a_egch: sharding of the output of first MoE FFN, shape (e, g, c, h).
-+    a_egch = [data_expert_axis, data_axis, None, mdl_axis]
-+    # a_egcm: sharding of the output of second MoE FFN, shape (e, g, c, m).
-+    a_egcm = egcm
-+    return cls.set_custom_sharding_params(
-+        lm_p,
-+        ici_mesh_shape=ici_mesh_shape,
-+        dcn_mesh_shape=dcn_mesh_shape,
-+        mesh_axis_names=mesh_axis_names,
-+        w_df=w_df,
-+        w_dnh=w_dnh,
-+        w_emh=w_emh,
-+        w_vd=w_vd,
-+        a_bld=a_bld,
-+        a_blf=a_blf,
-+        a_blnh=a_blnh,
-+        a_blv=a_blv,
-+        a_egch=a_egch,
-+        a_egcm=a_egcm,
-+    )
-+
-   @classmethod
-   def set_sharding_params_v1(
-       cls,
-@@ -340,6 +536,8 @@ class TransformerLm(base_layer.BaseLayer):
+@@ -539,16 +540,15 @@ class TransformerLm(base_layer.BaseLayer):
          if training_optimized
          else [batch_axes, None, None]
      )
@@ -632,199 +754,22 @@ index 9b87c9f..ce919c8 100644
      egcm = (
          [data_axis, None, None, mdl_axis]
          if training_optimized
-@@ -449,6 +647,9 @@ class TransformerLm(base_layer.BaseLayer):
-     lm_p.ici_mesh_shape = ici_mesh_shape
-     lm_p.dcn_mesh_shape = dcn_mesh_shape
-     lm_p.mesh_axis_names = mesh_axis_names
-+    use_expert_parallem = (
-+        mesh_axis_names is not None and 'data_expert' in mesh_axis_names
-+    )
-     pos_emb_w_ld = w_df
-     if (
-         lm_p.position_emb_tpl is not None
-@@ -477,7 +678,22 @@ class TransformerLm(base_layer.BaseLayer):
-         **mesh_kwargs,
+         else [batch_axes, None, None, None]
      )
  
--    def _set_transformer_sharding(transformer_tpl):
-+    def _set_transformer_sharding(transformer_tpl, use_expert_parallem=False):
-+      if use_expert_parallem:
-+        return _set_stacked_transformer_sharding_with_expert_parallelism(
-+            transformer_tpl,
-+            w_df=w_df,
-+            w_dnh=w_dnh,
-+            w_emh=w_emh,
-+            a_bld=a_bld,
-+            a_blf=a_blf,
-+            a_blh=a_blh,
-+            a_blnh=a_blnh,
-+            a_bd=a_bd,
-+            a_bf=a_bf,
-+            a_egch=a_egch,
-+            a_egcm=a_egcm,
-+        )
-       return _set_stacked_transformer_sharding(
-           transformer_tpl,
-           w_df=w_df,
-@@ -495,11 +711,11 @@ class TransformerLm(base_layer.BaseLayer):
+-    if seq_axis is None:
+-      w_data_axes = data_axis
+-    else:
+-      w_data_axes = (data_axis, seq_axis)
++    w_data_axes = data_axis
  
-     if lm_p.stacked_transformer_tpl.cls == transformers.PipelinedTransformer:
-       lm_p.stacked_transformer_tpl.pipeline_stage = _set_transformer_sharding(
--          lm_p.stacked_transformer_tpl.pipeline_stage
-+          lm_p.stacked_transformer_tpl.pipeline_stage, use_expert_parallem
-       )
-     else:
-       lm_p.stacked_transformer_tpl = _set_transformer_sharding(
--          lm_p.stacked_transformer_tpl
-+          lm_p.stacked_transformer_tpl, use_expert_parallem
-       )
- 
-     if lm_p.separate_embedding_tpl is not None:
-@@ -1804,26 +2020,26 @@ class TransformerEncoderDecoder(base_layer.BaseLayer):
-     xent_output.total_loss = xent_output.avg_xent + xent_output.aux_loss
-     return xent_output
- 
--  def __call__(
-+  def fprop_with_encoder_output(
-       self,
--      inputs: JTensor,
-+      encoder_output: JTensor,
-       input_paddings: JTensor,
-       targets: JTensor,
-       target_paddings: JTensor,
-       labels: NestedMap | None = None,
-       input_segment_ids: JTensor | None = None,
-       input_segment_pos: JTensor | None = None,
--      input_segment_mask: JTensor | None = None,
-       target_segment_ids: JTensor | None = None,
-       target_segment_pos: JTensor | None = None,
-       target_segment_mask: JTensor | None = None,
-       cross_segment_mask: JTensor | None = None,
-       start_time_step: int = 0,
-   ) -> NestedMap:
--    """Computes xent loss given the sequence model inputs.
-+    """Computes xent loss given the encoder output.
- 
-     Args:
--      inputs: Input ids. An int32 JTensor of shape [B, S].
-+      encoder_output: A JTensor of shape [B, S, D]. It's the output of the
-+        encoder for the input.
-       input_paddings: A 0/1 JTensor of shape [B, S] with 1 denoting padding
-         corresponding to the input sequence.
-       targets: Target ids. An int32 JTensor of shape [B, T].
-@@ -1838,8 +2054,6 @@ class TransformerEncoderDecoder(base_layer.BaseLayer):
-         token belongs to.
-       input_segment_pos: A JTensor of shape [B, S]. The position of each input
-         token within a segment.
--      input_segment_mask: A JTensor or shape [B, 1, S, S]. The segment mask for
--        packed input tokens.
-       target_segment_ids: A JTensor of shape [B,T]. The segment that each target
-         token belongs to.
-       target_segment_pos: A JTensor of shape [B, T]. The position of each target
-@@ -1859,14 +2073,6 @@ class TransformerEncoderDecoder(base_layer.BaseLayer):
-     """
-     batch, target_seq_length = targets.shape[:2]
- 
--    encoder_output = self.encode(
--        inputs,
--        input_paddings,
--        input_segment_ids,
--        input_segment_pos,
--        input_segment_mask,
--    )
--
-     if self.decoder_embedding_tpl is not None:
-       # Targets have separate embedding params.
-       target_emb = self.decoder_embedding_lookup.emb_lookup(targets)
-@@ -1934,6 +2140,83 @@ class TransformerEncoderDecoder(base_layer.BaseLayer):
- 
-     return self.compute_loss(output, labels)
- 
-+  def __call__(
-+      self,
-+      inputs: JTensor,
-+      input_paddings: JTensor,
-+      targets: JTensor,
-+      target_paddings: JTensor,
-+      labels: NestedMap | None = None,
-+      input_segment_ids: JTensor | None = None,
-+      input_segment_pos: JTensor | None = None,
-+      input_segment_mask: JTensor | None = None,
-+      target_segment_ids: JTensor | None = None,
-+      target_segment_pos: JTensor | None = None,
-+      target_segment_mask: JTensor | None = None,
-+      cross_segment_mask: JTensor | None = None,
-+      start_time_step: int = 0,
-+  ) -> NestedMap:
-+    """Computes xent loss given the sequence model inputs.
-+
-+    Args:
-+      inputs: Input ids. An int32 JTensor of shape [B, S].
-+      input_paddings: A 0/1 JTensor of shape [B, S] with 1 denoting padding
-+        corresponding to the input sequence.
-+      targets: Target ids. An int32 JTensor of shape [B, T].
-+      target_paddings: A 0/1 JTensor of shape [B, T] with 1 denoting padding
-+        corresponding to the target sequence.
-+      labels: A `.NestedMap` containing the following fields: class_weights, a
-+        JTensor with shape [batch, seqlen] containing weights for each target
-+        word. class_ids, a JTensor with shape [B, T] of int32 dtype containing
-+        the target class labels. class_probabilities, a JTensor with shape [B,
-+        T, V] of float values indicating class-membership probabilities.
-+      input_segment_ids: A JTensor of shape [B,S]. The segment that each input
-+        token belongs to.
-+      input_segment_pos: A JTensor of shape [B, S]. The position of each input
-+        token within a segment.
-+      input_segment_mask: A JTensor or shape [B, 1, S, S]. The segment mask for
-+        packed input tokens.
-+      target_segment_ids: A JTensor of shape [B,T]. The segment that each target
-+        token belongs to.
-+      target_segment_pos: A JTensor of shape [B, T]. The position of each target
-+        token within a segment.
-+      target_segment_mask: A JTensor or shape [B, 1, T, T]. The segment mask for
-+        packed target tokens.
-+      cross_segment_mask: A JTensor or shape [B, 1, T, S]. The encoder-decoder
-+        segment mask.
-+      start_time_step: Decode extend_step start time step. When decoding after
-+        prefix, start_time_step will be prefix_len - 1.
-+
-+    Returns:
-+      Returns xent_output, where
-+      `xent_output` is a `.NestedMap` as defined by `SoftmaxLayer`'s return. In
-+      addition, per_sequence_xent is added which equal to the sum of xent loss
-+      for tokens in a sequence.
-+    """
-+    batch, target_seq_length = targets.shape[:2]
-+
-+    encoder_output = self.encode(
-+        inputs,
-+        input_paddings,
-+        input_segment_ids,
-+        input_segment_pos,
-+        input_segment_mask,
-+    )
-+    return self.fprop_with_encoder_output(
-+        encoder_output=encoder_output,
-+        input_paddings=input_paddings,
-+        targets=targets,
-+        target_paddings=target_paddings,
-+        labels=labels,
-+        input_segment_ids=input_segment_ids,
-+        input_segment_pos=input_segment_pos,
-+        target_segment_ids=target_segment_ids,
-+        target_segment_pos=target_segment_pos,
-+        target_segment_mask=target_segment_mask,
-+        cross_segment_mask=cross_segment_mask,
-+        start_time_step=start_time_step,
-+    )
-+
-   def transform_decode_state(
-       self, transform_fn: base_layer.DecodeStateTransformFn
-   ) -> None:
+     # w_df: sharding for weight of ffn0, shape (d, f). ff1 weights will be
+     # inferred from it.
 diff --git a/praxis/layers/transformers.py b/praxis/layers/transformers.py
-index e593112..0cbde48 100644
+index 74ed8b8..6aceb45 100644
 --- a/praxis/layers/transformers.py
 +++ b/praxis/layers/transformers.py
-@@ -39,6 +39,7 @@ from praxis.layers import pipeline
+@@ -40,6 +40,7 @@ from praxis.layers import pipeline
  from praxis.layers import repeats
  from praxis.layers import stats
  from praxis.layers import stochastics
@@ -832,7 +777,7 @@ index e593112..0cbde48 100644
  
  NestedMap = py_utils.NestedMap
  WeightInit = base_layer.WeightInit
-@@ -1366,12 +1367,15 @@ class Transformer(base_layer.BaseLayer):
+@@ -1375,12 +1376,15 @@ class Transformer(base_layer.BaseLayer):
        atten_probs: A NestedMap with keys `self_atten` <float>[B, N, T, T].
      """
  
@@ -848,7 +793,7 @@ index e593112..0cbde48 100644
      if self.norm_policy == 'primer_hybrid':
        inputs_normalized = self.pre_layer_norm(inputs)
      elif self.norm_policy == 'pre':
-@@ -1382,7 +1386,7 @@ class Transformer(base_layer.BaseLayer):
+@@ -1391,7 +1395,7 @@ class Transformer(base_layer.BaseLayer):
      # Compute self-attention, key/value vectors are the input itself
      atten_output, self_atten_probs = self.self_attention(
          inputs_normalized,
@@ -857,7 +802,7 @@ index e593112..0cbde48 100644
          inputs_normalized,
          atten_mask=attention_mask,
          query_segment_pos=segment_pos,
-@@ -1717,23 +1721,10 @@ class StackedTransformer(base_layer.BaseLayer):
+@@ -1726,23 +1730,10 @@ class StackedTransformer(base_layer.BaseLayer):
          p_i = self._clone_layer_params(self.transformer_layer_params_tpl[ii])
        else:
          p_i = self._clone_layer_params(self.transformer_layer_params_tpl)
@@ -884,7 +829,7 @@ index e593112..0cbde48 100644
  
        if self.moe_layers and i in self.moe_layers:
          assert self.num_experts > 0
-@@ -1852,6 +1843,8 @@ class StackedTransformer(base_layer.BaseLayer):
+@@ -1861,6 +1852,8 @@ class StackedTransformer(base_layer.BaseLayer):
        )
        return x_out
  
@@ -893,7 +838,7 @@ index e593112..0cbde48 100644
      fprop = _fprop
      if self.remat:
        fprop = nn.remat(
-@@ -2044,6 +2037,8 @@ class StackedTransformerRepeated(base_layer.BaseLayer):
+@@ -2053,6 +2046,8 @@ class StackedTransformerRepeated(base_layer.BaseLayer):
    def setup(self) -> None:
      wp = self.weight_split_dims_mapping
  
@@ -902,7 +847,7 @@ index e593112..0cbde48 100644
      repeat_l_params = pax_fiddle.Config(
          repeats.Repeat,
          sub_tpl=self.block,
-@@ -2321,7 +2316,7 @@ class PipelinedTransformer(base_layer.BaseLayer):
+@@ -2330,7 +2325,7 @@ class PipelinedTransformer(base_layer.BaseLayer):
      else:
        assert self.pipeline_stage.cls == StackedTransformerRepeated
        xformer_layer_p = self.pipeline_stage.block.transformer_layer_params_tpl
@@ -912,10 +857,10 @@ index e593112..0cbde48 100644
        # Annotate the inputs before the pipeline to prevent unexpected
        # propagation from earlier layers.
 diff --git a/praxis/py_utils.py b/praxis/py_utils.py
-index a4f9c94..63eae4c 100644
+index 88b7bea..f731391 100644
 --- a/praxis/py_utils.py
 +++ b/praxis/py_utils.py
-@@ -517,6 +517,7 @@ def maybe_pad_uneven_sharding(
+@@ -527,6 +527,7 @@ def maybe_pad_uneven_sharding(
    """Pads xs to make them evenly shardable, if needed."""
  
    def _maybe_pad(x, pspec, shape):
@@ -923,3 +868,18 @@ index a4f9c94..63eae4c 100644
      if is_optax_masked_node(x):
        return x
      paddings = get_uneven_sharding_paddings(pspec, shape, mesh_shape,
+diff --git a/requirements.in b/requirements.in
+index c277921..66260d4 100644
+--- a/requirements.in
++++ b/requirements.in
+@@ -8,8 +8,8 @@ clu @ git+https://github.com/google/CommonLoopUtils
+ einops
+ etils
+ fiddle @ git+https://github.com/google/fiddle
+-flax @ git+https://github.com/google/flax
+-jax @ git+https://github.com/google/jax
++flax
++jax
+ jax-bitempered-loss
+ jaxtyping
+ lingvo
