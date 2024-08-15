@@ -7,7 +7,7 @@ SHELL [ "/bin/bash", "-eo", "pipefail", "-c" ]
 RUN apt-get update && \
   apt-get install -y --no-install-recommends gcc-12 g++-12 apt-transport-https autoconf automake curl \
 gdb git gnupg libnl-3-200 libnl-3-dev libnl-route-3-200 libnl-route-3-dev libtool numactl python3 \
-vim wget zlib1g-dev && \
+vim wget zlib1g-dev build-essential devscripts debhelper fakeroot && \
   update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12 && \
   update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
 
@@ -24,6 +24,11 @@ RUN cd /opt && \
 
 RUN mkdir -p /root/.config/NVIDIA\ Corporation && \
   echo "CuptiUsePerThreadBuffer=false" > /root/.config/NVIDIA\ Corporation/nsys-config.ini
+
+ARG CUSTOM_NCCL
+COPY nccl /opt/nccl
+COPY build-nccl.sh /opt/nccl
+RUN echo ${CUSTOM_NCCL} && cd /opt/nccl && CUSTOM_NCCL="${CUSTOM_NCCL}" && ./build-nccl.sh
 
 ENV CUDA_PATH="/usr/local/cuda/lib64/stubs"
 
@@ -109,6 +114,7 @@ RUN cd /opt/legion && \
 -DLegion_USE_Python:BOOL=ON -DLegion_VERSION:STRING=24.9.0 -DLegion_BUILD_BINDINGS:BOOL=ON \
 -DLegion_REDOP_COMPLEX:BOOL=ON -DLegion_HIJACK_CUDART:BOOL=OFF -DLegion_GPU_REDUCTIONS:BOOL=OFF \
 -DLegion_REDOP_HALF:BOOL=ON -DCUDA_NVCC_FLAGS:STRING=-std=c++17 \
+-DLegion_MAX_NUM_NODES=4096 \
 -DLegion_DEFAULT_LOCAL_FIELDS:STRING=0 -DLegion_NETWORKS:STRING=ucx \
 -DCMAKE_INSTALL_RPATH:PATH=/opt/install/miniconda/envs/legere/lib \
 -DCMAKE_INSTALL_PREFIX:PATH=/opt/install/miniconda/envs/legere && \

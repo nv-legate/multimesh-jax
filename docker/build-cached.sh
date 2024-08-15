@@ -2,6 +2,7 @@
 
 cuda_version=12.4.1
 cudnn_version=
+custom_nccl=0
 build_type=Release
 default_label=`echo $build_type | tr '[:upper:]' '[:lower:]'`
 label=${1:-$default_label}
@@ -14,6 +15,7 @@ docker build \
  --build-arg LEGATE_BUILD_TYPE=${build_type} \
  --build-arg CUDA_VERSION=${cuda_version} \
  --build-arg CUDNN_VERSION=${cudnn_version} \
+ --build-arg CUSTOM_NCCL=${custom_nccl} \
  .
 
 

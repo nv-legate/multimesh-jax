@@ -46,6 +46,7 @@ checkout praxis     main                https://github.com/google/praxis.git    
 checkout seqio      main                https://github.com/google/seqio.git           513d1fe
 checkout te         main                https://github.com/NVIDIA/TransformerEngine.git  0b303dad4c  te.patch
 checkout xla        legate-main         ssh://git@github.com/nv-legate/xla.git        f6e746a4
+checkout nccl       master              https://github.com/NVIDIA/nccl.git            6203b4c95d71
 
 pushd te
 git submodule update --init --recursive
