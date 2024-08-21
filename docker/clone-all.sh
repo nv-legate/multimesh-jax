@@ -37,7 +37,7 @@ checkout flax       main                https://github.com/google/flax.git      
 checkout jax        legate-main         ssh://git@github.com/nv-legate/jax.git        bc414e394
 checkout jaxlib     legate-main         ssh://git@github.com/nv-legate/jax.git        bc414e394
 checkout legate     main                ssh://git@github.com/nv-legate/legate.core.internal 4732dce legate.patch
-checkout legate-jax main                ssh://git@github.com/nv-legate/legate.jax.git   046a6304e3
+checkout legate-jax main                ssh://git@github.com/nv-legate/legate.jax.git  4fa4124163
 checkout legion     master              ssh://git@gitlab.com/StanfordLegion/legion.git 6da07108
 checkout optax      main                https://github.com/google-deepmind/optax.git  a49564e
 checkout orbax      main                https://github.com/google/orbax.git           6673d0c

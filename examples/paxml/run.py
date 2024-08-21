@@ -11,6 +11,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+try:
+    from jax_plugins.legate import init
+except ImportError:
+    pass
 import gin
 
 parser = argparse.ArgumentParser(allow_abbrev=False)
@@ -583,7 +587,7 @@ for key, val in env.items():
 
 @gin.configurable
 @dataclass
-class LambadaConfig:
+class PaxTransformerConfig:
     num_devices: int = -1
     transformer_num_devices: int = -1
     logits_num_devices: int = -1
@@ -767,16 +771,12 @@ import legate.jax  # noqa: E402
 gin_config = f"""
 import paxml.trainer_lib
 
-ClientConfig:
-  auto_shard = {args.autoshard}
-  disable_gc = True
-
 PaxLegateConfig:
-  configurable = @LambadaConfig
+  configurable = @PaxTransformerConfig
   enable_tracing = {args.enable_tracing}
   local_mesh = ({args.dp}, {args.fsdp}, {args.tp}, 1)
 
-LambadaConfig:
+PaxTransformerConfig:
   num_devices = {total_devices}
   transformer_num_devices = {transformer_num_devices}
   logits_num_devices = {logits_num_devices}
@@ -794,17 +794,8 @@ MicrobatchConfig:
 
 gin.parse_config(gin_config)
 
-if args.hlo:
-    # When doing a compile-only test, the config
-    # needs to be passed explicitly to the init function
-    configurable = LambadaConfig
-else:
-    configurable = None
-
 if args.backend == "legate":
-    legate.jax.init(
-        configurable=configurable,
-        auto_shard=args.autoshard,
+    init(
         cpus=args.cpus,
         gpus=args.gpus,
         sysmem=args.sysmem * 1000,
@@ -924,25 +915,20 @@ if args.hlo is not None:
     # restore the original GPU count
     if args.dump_hlo:
         args.gpus = args.cpus
-    # sort of funky here, but we have to instantiate the client
-    # to force custom call registration
-    # the easiest way to instantiate is to print the device list
-    import jax
-
-    print(jax.devices())
 
     platform = "gpu" if args.gpus else "cpu"
     from paxml.partitioning import LegateMeshWrapper
 
     with LegateMeshWrapper.mode(LegateMeshWrapper.Mode.COMPILING):
-        legate.jax.replicate_parameters_smaller_than_num_elements(
-            batch_size * args.sequence_length
-        )
-        legate.jax.compile_hlo_module(
-            args.hlo,
-            num_partitions=total_devices,
-            erase_sharding=args.erase_explicit_sharding,
-            autoshard=args.autoshard,
-            platform=platform,
-            device_mem_gb=args.fbmem,
-        )
+        with legate.jax.tasks(configurable=PaxTransformerConfig()):
+            legate.jax.replicate_parameters_smaller_than_num_elements(
+                batch_size * args.sequence_length
+            )
+            legate.jax.compile_hlo_module(
+                args.hlo,
+                num_partitions=total_devices,
+                erase_sharding=args.erase_explicit_sharding,
+                autoshard=args.autoshard,
+                platform=platform,
+                device_mem_gb=args.fbmem,
+            )

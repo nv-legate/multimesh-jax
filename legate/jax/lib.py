@@ -1,18 +1,7 @@
-import gc
 import json
-import os
 from contextlib import contextmanager
-from dataclasses import dataclass, field
-from typing import (
-    Any,
-    Callable,
-    List,
-    Optional,
-    Sequence,
-    Type,
-    TypeAlias,
-    Union,
-)
+from dataclasses import dataclass
+from typing import Any, Callable, Optional, Sequence, Type, TypeAlias, Union
 
 import gin
 import jax
@@ -29,80 +18,81 @@ from .legate_jax_impl import (
     enable_recomputation as _enable_recomputation,
     enable_task_fusion as _enable_task_fusion,
     enable_tracing as _enable_tracing,
-    register_task,
-    register_task_factory,
     set_host_offload_min_reuse_distance,
     set_max_out_of_order,
     set_store_cache_min_parallelism,
     set_strict_static_order,
     split_large_traces as _split_large_traces,
-    unregister_task,
 )
 from .no_op import no_op
 
 _ignore_transforms = 0
 
-_GIN_CONFIG_ENV = "LEGATE_GIN_CONFIG"
-
-_auto_shard_enabled = False
-
-_gc_disabled = False
+_auto_shard = False
 
 ContextValue = Union[bool, int]
 
 
 @contextmanager
-def ignore_transforms(ignore: bool = True):
+def ignore_transforms(ignore: Optional[bool] = True):
     global _ignore_transforms
-    try:
-        if ignore:
-            if _ignore_transforms == 0:
-                _enable_implicit_tasks(False)
-            _ignore_transforms += 1
+    if ignore is None:
         yield
-    finally:
-        if ignore:
-            _ignore_transforms -= 1
-            if _ignore_transforms == 0:
-                _enable_implicit_tasks(True)
+    else:
+        try:
+            if ignore:
+                if _ignore_transforms == 0:
+                    _enable_implicit_tasks(False)
+                _ignore_transforms += 1
+            yield
+        finally:
+            if ignore:
+                _ignore_transforms -= 1
+                if _ignore_transforms == 0:
+                    _enable_implicit_tasks(True)
 
 
 @contextmanager
 def _set_context_value(
-    flag: ContextValue,
+    flag: Optional[ContextValue],
     enable_fxn: Callable[[ContextValue], None],
     context_value: list[ContextValue],
 ) -> None:
-    current = context_value[0]
-    try:
-        enable_fxn(flag)
-        context_value[0] = flag
+    if flag is None:
         yield
-    finally:
-        enable_fxn(current)
-        context_value[0] = current
+    else:
+        current = context_value[0]
+        try:
+            enable_fxn(flag)
+            context_value[0] = flag
+            yield
+        finally:
+            enable_fxn(current)
+            context_value[0] = current
 
 
 @contextmanager
-def enable_fast_path(enable: bool = True, context_value=[True]):
+def enable_fast_path(enable: Optional[bool] = None, context_value=[True]):
     with _set_context_value(enable, _enable_fast_path, context_value):
         yield
 
 
 @contextmanager
-def enable_task_fusion(enable: bool = True, context_value=[True]):
+def enable_task_fusion(enable: Optional[bool] = None, context_value=[True]):
     with _set_context_value(enable, _enable_task_fusion, context_value):
         yield
 
 
 @contextmanager
-def enable_recomputation(enable: bool = True, context_value=[True]):
+def enable_recomputation(enable: Optional[bool] = None, context_value=[True]):
     with _set_context_value(enable, _enable_recomputation, context_value):
         yield
 
 
 @contextmanager
-def split_large_traces(split_large_traces: bool = True, context_value=[False]):
+def split_large_traces(
+    split_large_traces: Optional[bool] = None, context_value=[False]
+):
     with _set_context_value(
         split_large_traces, _split_large_traces, context_value
     ):
@@ -110,13 +100,13 @@ def split_large_traces(split_large_traces: bool = True, context_value=[False]):
 
 
 @contextmanager
-def enable_tracing(enable: bool = True, context_value=[False]):
+def enable_tracing(enable: Optional[bool] = None, context_value=[False]):
     with _set_context_value(enable, _enable_tracing, context_value):
         yield
 
 
 @contextmanager
-def only_fuse_loop_tasks(enable: bool = True, context_value=[False]):
+def only_fuse_loop_tasks(enable: Optional[bool] = None, context_value=[False]):
     with _set_context_value(
         enable, _enable_only_fuse_loop_tasks, context_value
     ):
@@ -124,7 +114,9 @@ def only_fuse_loop_tasks(enable: bool = True, context_value=[False]):
 
 
 @contextmanager
-def store_cache_min_parallelism(parallelism: int, context_value=[3]):
+def store_cache_min_parallelism(
+    parallelism: Optional[int] = None, context_value=[3]
+):
     with _set_context_value(
         parallelism, set_store_cache_min_parallelism, context_value
     ):
@@ -132,7 +124,9 @@ def store_cache_min_parallelism(parallelism: int, context_value=[3]):
 
 
 @contextmanager
-def max_out_of_order(max_out_of_order: int, context_value=[2]):
+def max_out_of_order(
+    max_out_of_order: Optional[int] = None, context_value=[2]
+):
     with _set_context_value(
         max_out_of_order, set_max_out_of_order, context_value
     ):
@@ -140,17 +134,33 @@ def max_out_of_order(max_out_of_order: int, context_value=[2]):
 
 
 @contextmanager
-def strict_static_order(order: bool, context_value=[True]):
+def strict_static_order(order: Optional[bool] = None, context_value=[True]):
     with _set_context_value(order, set_strict_static_order, context_value):
         yield
 
 
 @contextmanager
-def host_offload_min_reuse_distance(reuse_distance: int, context_value=[0]):
-    with _set_context_value(
-        reuse_distance, set_host_offload_min_reuse_distance, context_value
-    ):
+def host_offload_min_reuse_distance(
+    reuse_distance: Optional[int] = None, context_value=[0]
+):
+    if reuse_distance is None:
         yield
+    else:
+        with _set_context_value(
+            reuse_distance, set_host_offload_min_reuse_distance, context_value
+        ):
+            yield
+
+
+@contextmanager
+def autoshard(autoshard: Optional[bool] = None):
+    global _auto_shard
+    if autoshard is not None:
+        current = _auto_shard
+        _auto_shard = autoshard
+    yield
+    if autoshard is not None:
+        _auto_shard = current
 
 
 def should_ignore_transforms() -> bool:
@@ -181,7 +191,9 @@ def _canonicalize_axes(ndim: int, pspec: PartitionSpec):
 
 
 def with_sharding_constraint(x: Any, axis_resources: Any):
-    if _ignore_transforms:
+    global _auto_shard
+
+    if _ignore_transforms or not _auto_shard:
         return lax_with_sharding_constraint(x, axis_resources)
     flat_args, arg_treedef = tree_flatten(x)
     axis_flat = flatten_axis_resources(
@@ -233,160 +245,78 @@ def optional_kwargs(**kwargs):
 @gin.configurable
 @dataclass
 class ClientConfig:
-    auto_shard: Optional[bool] = False
-    disable_gc: Optional[bool] = True
     configurable: Optional[Type] = None
-    tasks: List[ImplicitTask] = field(default_factory=list)
-
-
-def _init_config(client_config: ClientConfig):
-    global _gc_disabled
-    global _auto_shard_enabled
-
-    if client_config.auto_shard is client_config.auto_shard:
-        _auto_shard_enabled = True
-        jax.lax.with_sharding_constraint = with_sharding_constraint
-
-    if client_config.disable_gc:
-        _gc_disabled = True
-        gc.disable()
-
-    if client_config.configurable:
-        task_configure = client_config.configurable()
-        task_configure()
-
-    for name, devices, dims, device_axes, logical_axes in client_config.tasks:
-        if callable(devices):
-            register_task_factory(
-                name=name,
-                device_factory=devices,
-                dims=dims,
-                device_axes=device_axes,
-                logical_axes=logical_axes,
-            )
-        else:
-            register_task(
-                name,
-                devices=devices,
-                dims=dims,
-                device_axes=device_axes,
-                logical_axes=logical_axes,
-            )
 
 
 @contextmanager
-def context(client_config: ClientConfig):
-    global _gc_disabled
-    global _auto_shard_enabled
-    current_gc_disabled = _gc_disabled
-    current_auto_shard_enabled = _auto_shard_enabled
+def tasks(configurable: Optional[Type] = None):
+    clear_tasks()
 
-    _init_config(client_config)
+    if configurable is not None:
+        task_configure = configurable()
+        task_configure()
 
     yield
 
-    if _gc_disabled and not current_gc_disabled:
-        gc.enable()
-
-    if _auto_shard_enabled and not current_auto_shard_enabled:
-        jax.lax.with_sharding_constraint = lax_with_sharding_constraint
-
-    for name, devices, dims, device_axes, logical_axes in client_config.tasks:
-        unregister_task(name)
-
-    if client_config.configurable:
-        clear_tasks()
+    clear_tasks()
 
 
-def init(
-    config: os.PathLike | None = None,
-    auto_shard: Optional[bool] = None,
-    disable_gc: Optional[bool] = None,
-    configurable: Optional[type] = None,
-    cpus: int = 4,
-    gpus: int = 0,
-    fbmem: int = 8000,
-    sysmem: int = 4000,
-    zcmem: int = 32,
-    eager_alloc_percentage: int = 50,
-    debug: Optional[str] = None,
-    network: str = "none",
-    profile: Optional[str] = None,
-    no_physical_tracing: bool = False,
-) -> None:
-    if config is None:
-        config = os.environ.get(_GIN_CONFIG_ENV)
-    if config is not None:
-        gin.parse_config_file(str(config), print_includes_and_imports=True)
+@contextmanager
+def _context(
+    _configurable=None,
+    _autoshard: Optional[bool] = None,
+    _strict_static_order: Optional[bool] = None,
+    _enable_tracing: Optional[bool] = None,
+    _host_offload_min_reuse_distance=None,
+    _only_fuse_loop_tasks=None,
+    _split_large_traces=None,
+    _enable_task_fusion=None,
+    _enable_fast_path=None,
+    _ignore_transforms=None,
+):
+    with tasks(configurable=_configurable) as A, autoshard(
+        _autoshard
+    ) as B, strict_static_order(_strict_static_order) as C, enable_tracing(
+        _enable_tracing
+    ) as D, host_offload_min_reuse_distance(
+        _host_offload_min_reuse_distance
+    ) as E, only_fuse_loop_tasks(
+        _only_fuse_loop_tasks
+    ) as F, split_large_traces(
+        _split_large_traces
+    ) as G, enable_task_fusion(
+        _enable_task_fusion
+    ) as H, enable_fast_path(
+        _enable_fast_path
+    ) as J, ignore_transforms(
+        _ignore_transforms
+    ) as K:  # noqa: F841
+        yield
 
-    # the indirection here is to avoid setting any parameters
-    # that are unspecificed programmatically to make them overwritable by gin
-    kwargs = optional_kwargs(
-        auto_shard=auto_shard, disable_gc=disable_gc, configurable=configurable
-    )
 
-    cpus = cpus or 4
-    gpus = gpus or 0
-
-    legion_args = [
-        "-lg:local",
-        0,
-        "-ll:cpu",
-        cpus,
-        "-ll:gpu",
-        gpus,
-        "-cuda:skipbusy",
-        "-ll:util",
-        2,
-        "-ll:csize",
-        sysmem,
-        "-ll:fsize",
-        fbmem,
-        "-ll:zsize",
-        zcmem,
-        "-ll:networks",
-        network,
-        "-lg:eager_alloc_percentage",
-        eager_alloc_percentage,
-    ]
-    if no_physical_tracing:
-        legion_args.append("-lg:no_physical_tracing")
-
-    if debug is not None:
-        debug_levels = {
-            "info": 2,
-            "debug": 1,
-            "spew": 0,
-        }
-        level = debug_levels[debug]
-
-        # lower means more output from legate
-        # if any debug is active, set to active
-        legion_args.append(f"-level legate.xla={level}")
-
-    if profile is not None:
-        legion_args.extend(
-            [
-                "-lg:prof",
-                1,
-                "-lg:prof_logfile",
-                f"{profile}_%s.gz",
-            ]
-        )
-
-    if network != "ucx":
-        legion_args.extend(["-ll:ib_rsize", "0"])
-
-    legion_args_str = (
-        " ".join(map(str, legion_args))
-        + " "
-        + os.environ.get("LEGION_DEFAULT_ARGS", "")
-    )
-    os.environ["LEGION_DEFAULT_ARGS"] = legion_args_str
-
-    xla_flags = os.environ.get("XLA_FLAGS", "")
-    xla_flags += f"  --xla_force_host_platform_device_count={cpus}"
-    os.environ["XLA_FLAGS"] = xla_flags
-
-    client_config = ClientConfig(**kwargs)
-    _init_config(client_config)
+@contextmanager
+def context(
+    configurable=None,
+    autoshard: Optional[bool] = None,
+    strict_static_order: Optional[bool] = None,
+    enable_tracing: Optional[bool] = None,
+    host_offload_min_reuse_distance: Optional[int] = None,
+    only_fuse_loop_tasks: Optional[bool] = None,
+    split_large_traces: Optional[bool] = None,
+    enable_task_fusion: Optional[bool] = None,
+    enable_fast_path: Optional[bool] = None,
+    ignore_transforms: Optional[bool] = None,
+):
+    with _context(
+        _configurable=configurable,
+        _autoshard=autoshard,
+        _strict_static_order=strict_static_order,
+        _enable_tracing=enable_tracing,
+        _host_offload_min_reuse_distance=host_offload_min_reuse_distance,
+        _only_fuse_loop_tasks=only_fuse_loop_tasks,
+        _split_large_traces=split_large_traces,
+        _enable_task_fusion=enable_task_fusion,
+        _enable_fast_path=enable_fast_path,
+        _ignore_transforms=ignore_transforms,
+    ):
+        yield

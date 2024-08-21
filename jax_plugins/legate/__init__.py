@@ -3,6 +3,8 @@ from pathlib import Path
 import atexit
 import functools
 
+from .init import init
+
 
 def initialize():
     import jax._src.xla_bridge as xb
@@ -17,8 +19,7 @@ def initialize():
     from jaxlib import xla_extension as xe
 
     xla_client.register_custom_call_handler(
-        "CUDA",
-        functools.partial(register_custom_call_target, c_api)
+        "CUDA", functools.partial(register_custom_call_target, c_api)
     )
 
     import legate.jax

@@ -14,12 +14,13 @@ from .legate_jax_impl import (
 from .legate_xla_compiler import register_custom_call_target
 
 from .lib import (
+    autoshard,
+    context,
     enable_fast_path,
     enable_tracing,
     enable_recomputation,
     enable_task_fusion,
     only_fuse_loop_tasks,
-    init,
     ignore_transforms,
     with_sharding_constraint,
     store_cache_min_parallelism,
@@ -27,9 +28,10 @@ from .lib import (
     max_out_of_order,
     strict_static_order,
     ClientConfig,
-    context,
+    tasks,
     split_large_traces,
 )
+
 from .task import (
     task,
     microbatch,

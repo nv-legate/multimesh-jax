@@ -4,9 +4,9 @@ import paxml.trainer_lib
 ClientConfig:
   auto_shard = True
   disable_gc = True # this is the control-replication problem
-  configurable = @legate_tasks.LambadaConfig
+  configurable = @legate_tasks.PaxTransformerConfig
 
-LambadaConfig:
+PaxTransformerConfig:
   transformer_num_devices = 8
   logits_num_devices = 8
   embeddings_num_devices = 8

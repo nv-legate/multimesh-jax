@@ -7,7 +7,7 @@ import gin
 
 @gin.configurable
 @dataclass
-class LambadaConfig:
+class PaxTransformerConfig:
     transformer_num_devices: int = 4
     logits_num_devices: int = 4
     embeddings_num_devices: int = 4

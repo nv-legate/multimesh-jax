@@ -1,7 +1,11 @@
-import os
-import tempfile
-from pathlib import Path
 from typing import List
+
+try:
+    from jax_plugins.legate import init
+
+    init()
+except ImportError:
+    pass
 
 import jax
 import jax._src.test_util as jtu
@@ -23,21 +27,6 @@ import legate.jax
 from legate.jax.test_util import LegateJaxTestCase
 
 config.parse_flags_with_absl()
-
-_RESHARD_GIN_CONFIG = """
-
-logical_axes = [
-   ("batch", "x"),
-   ("embed", "y"),
-]
-
-ClientConfig:
-  auto_shard = True
-  tasks = [
-    ("embeddings", [0,1,2,3,4,5,6,7], [8,1], ["batch","embed"], %logical_axes),
-    ("layer0", [0,1,2,3], [2,2], ["batch","embed"], %logical_axes),
-  ]
-"""
 
 
 def make_shape(*shape, dtype=np.float32):
@@ -134,10 +123,7 @@ class TaskTest(LegateJaxTestCase):
                     logical_axes=logical_axes,
                 )
 
-        config = legate.jax.ClientConfig(
-            auto_shard=True, configurable=TaskConfigure
-        )
-        with legate.jax.context(config):
+        with legate.jax.context(configurable=TaskConfigure, autoshard=True):
             self._test_register_task()
 
     def test_only_fuse_loop_tasks(self):
@@ -165,10 +151,7 @@ class TaskTest(LegateJaxTestCase):
                     logical_axes=logical_axes,
                 )
 
-        config = legate.jax.ClientConfig(
-            auto_shard=True, configurable=TaskConfigure
-        )
-        with legate.jax.context(config):
+        with legate.jax.context(configurable=TaskConfigure, autoshard=True):
             with legate.jax.only_fuse_loop_tasks(True):
                 self._test_register_task()
             with legate.jax.only_fuse_loop_tasks(False):
@@ -467,158 +450,6 @@ class TaskTest(LegateJaxTestCase):
             self._test_against_reference(
                 c, arg_maker, legate_shardings, reference_shardings
             )
-
-    def test_reshard_gin_config(self):
-        if jax.device_count() != 8:
-            self.skipTest("need 8 devices")
-
-        vocab = 2
-        batch_size = 8
-        seq = 1
-        embed_size = 8
-
-        with tempfile.TemporaryDirectory() as d:
-            f_path = Path(d) / "test.gin"
-            f = open(f_path, "w")
-            f.write(_RESHARD_GIN_CONFIG)
-            f.close()
-
-            legate.jax.init(config=f_path)
-
-        def f(params, batch):
-            embed, fc = params
-            with jax.named_scope("embeddings"):
-                batch = legate.jax.with_sharding_constraint(
-                    batch, P("batch", "seq")
-                )
-                embed = legate.jax.with_sharding_constraint(
-                    embed, P("vocab", "embed")
-                )
-                batch = jax.nn.one_hot(batch, num_classes=vocab)
-                x = jnp.einsum("bsv,ve->bse", batch, embed)
-            with jax.named_scope("layer0"):
-                fc = legate.jax.with_sharding_constraint(
-                    fc, P("embed", "hidden")
-                )
-                x = legate.jax.with_sharding_constraint(
-                    x, P("batch", "seq", "embed")
-                )
-                x = jnp.einsum("bsh,eh->bsh", x, fc)
-                return x
-
-        mesh = Mesh(
-            np.array(jax.devices()).reshape(8, 1),
-            ("batch", "model"),
-        )
-
-        with mesh:
-            f = jax.jit(
-                f,
-                in_shardings=(AUTO(mesh), AUTO(mesh)),
-                out_shardings=(AUTO(mesh)),
-            )
-            batch = jax.core.ShapedArray((batch_size, seq), np.float32)
-            fc = jax.core.ShapedArray((embed_size, embed_size), np.float32)
-            embed = jax.core.ShapedArray((vocab, embed_size), np.float32)
-            params = (embed, fc)
-            lowered = f.lower(params, batch).compile()
-
-        (
-            _,
-            fc_sharding,
-        ) = lowered.input_shardings[
-            0
-        ][0]
-        batch_sharding = lowered.input_shardings[0][1]
-
-        self.assertTrue(isinstance(fc_sharding, GSPMDSharding))
-        self.assertEqual(
-            fc_sharding._hlo_sharding.tile_assignment_devices(), [0, 1, 2, 3]
-        )
-        self.assertTrue(fc_sharding._hlo_sharding.replicate_on_last_tile_dim())
-
-        self.assertTrue(isinstance(batch_sharding, GSPMDSharding))
-        self.assertEqual(
-            batch_sharding._hlo_sharding.tile_assignment_devices(),
-            [0, 1, 2, 3, 4, 5, 6, 7],
-        )
-        self.assertFalse(
-            batch_sharding._hlo_sharding.replicate_on_last_tile_dim()
-        )
-
-    def test_reshard_gin_config_from_env(self):
-        if jax.device_count() < 8:
-            self.skipTest("need >= 8 devices")
-
-        vocab = 2
-        batch_size = 8
-        seq = 1
-        embed_size = 8
-
-        with tempfile.TemporaryDirectory() as d:
-            f_path = Path(d) / "test.gin"
-            f = open(f_path, "w")
-            f.write(_RESHARD_GIN_CONFIG)
-            f.close()
-
-            os.environ["LEGATE_GIN_CONFIG"] = str(f_path)
-            legate.jax.init()
-
-        def f(params, batch):
-            embed, fc = params
-            with jax.named_scope("embeddings"):
-                batch = legate.jax.with_sharding_constraint(
-                    batch, P("batch", "seq")
-                )
-                embed = legate.jax.with_sharding_constraint(
-                    embed, P("vocab", "embed")
-                )
-                batch = jax.nn.one_hot(batch, num_classes=vocab)
-                x = jnp.einsum("bsv,ve->bse", batch, embed)
-            with jax.named_scope("layer0"):
-                fc = legate.jax.with_sharding_constraint(
-                    fc, P("embed", "hidden")
-                )
-                x = legate.jax.with_sharding_constraint(
-                    x, P("batch", "seq", "embed")
-                )
-                x = jnp.einsum("bsh,eh->bsh", x, fc)
-                return x
-
-        mesh = Mesh(
-            np.array(jax.devices()).reshape(8, 1),
-            ("batch", "model"),
-        )
-
-        with mesh:
-            f = jax.jit(
-                f,
-                in_shardings=(AUTO(mesh), AUTO(mesh)),
-                out_shardings=(AUTO(mesh)),
-            )
-            batch = jax.core.ShapedArray((batch_size, seq), np.float32)
-            fc = jax.core.ShapedArray((embed_size, embed_size), np.float32)
-            embed = jax.core.ShapedArray((vocab, embed_size), np.float32)
-            params = (embed, fc)
-            lowered = f.lower(params, batch).compile()
-
-        _, fc_sharding = lowered.input_shardings[0][0]
-        batch_sharding = lowered.input_shardings[0][1]
-
-        self.assertTrue(isinstance(fc_sharding, GSPMDSharding))
-        self.assertEqual(
-            fc_sharding._hlo_sharding.tile_assignment_devices(), [0, 1, 2, 3]
-        )
-        self.assertTrue(fc_sharding._hlo_sharding.replicate_on_last_tile_dim())
-
-        self.assertTrue(isinstance(batch_sharding, GSPMDSharding))
-        self.assertEqual(
-            batch_sharding._hlo_sharding.tile_assignment_devices(),
-            [0, 1, 2, 3, 4, 5, 6, 7],
-        )
-        self.assertFalse(
-            batch_sharding._hlo_sharding.replicate_on_last_tile_dim()
-        )
 
     def test_auto_shard_multiple_axes(self):
         if jax.device_count() < 8:
@@ -935,5 +766,4 @@ class TaskTest(LegateJaxTestCase):
 
 
 if __name__ == "__main__":
-    legate.jax.init()
     absltest.main(testLoader=jtu.JaxTestLoader())

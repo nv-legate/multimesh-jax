@@ -3,6 +3,14 @@ import jax._src.test_util as jtu
 import jax.numpy as jnp
 import numpy as np
 from absl.testing import absltest
+
+try:
+    from jax_plugins.legate import init
+
+    init()
+except ImportError:
+    pass
+
 from jax import config
 from jax.sharding import (
     Mesh,
@@ -405,5 +413,4 @@ class TaskTest(LegateJaxTestCase):
 
 
 if __name__ == "__main__":
-    legate.jax.init()
     absltest.main(testLoader=jtu.JaxTestLoader())
