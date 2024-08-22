@@ -121,8 +121,3 @@ def init(
     import legate.jax
 
     jax.lax.with_sharding_constraint = legate.jax.with_sharding_constraint
-
-    # sort of funky here, but we have to instantiate the client
-    # to force custom call registration
-    # the easiest way to instantiate is to get the device list
-    _ = jax.devices()
