@@ -8,10 +8,11 @@ import jax
 import jax.lax
 import jax.numpy as jnp
 import numpy as np
-from jax import random
-from jax._src.ad_checkpoint import _optimization_barrier
+from jax import core as jax_core, random
 from jax._src.lib import xla_client as xc
 from jax.experimental.pjit import AUTO, pjit
+from jax.interpreters import ad, mlir
+from jax.interpreters.mlir import hlo, ir
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from jax.tree_util import tree_map
 
@@ -22,7 +23,6 @@ from .lib import (
 )
 from .no_op import no_op
 
-_next_color = 0
 _task_depth = 0
 
 
@@ -171,11 +171,6 @@ mark_output = no_op(name="TaskEnd")
 mark_input = no_op(name="TaskStart")
 
 
-def reset():
-    global _next_color
-    _next_color = 0
-
-
 def shard_axes(*args):
     import flax.linen as nn
 
@@ -199,6 +194,75 @@ class Task:
     devices: np.ndarray | Sequence[xc.Device] | None = None
     device_axes: Optional[Sequence[str]] = None
     logical_axes: Optional[Sequence[Tuple[str, str]]] = None
+
+
+def __legate_task_lowering_impl(*args, jaxpr, **unused_kwargs):
+    del unused_kwargs
+    return jax_core.jaxpr_as_fun(jaxpr)(*args)
+
+
+def _custom_abstract_eval(*args, jaxpr, **unused_kwargs):
+    del unused_kwargs
+    del args
+    return jaxpr.out_avals
+
+
+legate_task_p = jax_core.Primitive("legate_task")
+legate_task_p.multiple_results = True
+legate_task_p.def_abstract_eval(_custom_abstract_eval)
+legate_task_p.def_impl(__legate_task_lowering_impl)
+
+
+def call_legate_task(f, *args, config: str = "", **kwargs):
+    jaxpr, out_shapes = jax.make_jaxpr(
+        partial(f, **kwargs), return_shape=True
+    )(*args)
+    flat_args = jax.tree.leaves(args)
+    out_tree = jax.tree.structure(out_shapes)
+    out_flat = legate_task_p.bind(
+        *flat_args, name=f.__name__, jaxpr=jaxpr, config=config
+    )
+    return jax.tree.unflatten(out_tree, out_flat)
+
+
+def call_legate_task_fwd(f, *args, config: str = "", **kwargs):
+    return call_legate_task(f, *args, config=config, **kwargs), args
+
+
+def call_legate_task_bwd(f, primals, tangents, config: str = "", **kwargs):
+    return call_legate_task(f, primals, tangents, config=config, **kwargs)
+
+
+def _legate_task_lowering(
+    ctx,
+    *args,
+    name,
+    jaxpr,
+    config: str = "",
+):
+    impl = mlir.core_call_lowering(
+        ctx, *args, name=name + ".impl", call_jaxpr=jaxpr
+    )
+    call_op = impl[0].owner
+    called_fn = call_op.attributes["callee"]
+    legate_task = hlo.CustomCallOp(
+        [r.type for r in call_op.results],
+        call_op.operands,
+        call_target_name="LegateTask",
+        called_computations=ir.ArrayAttr.get([called_fn]),
+        backend_config=ir.StringAttr.get(config),
+    )
+    return legate_task.results
+
+
+mlir.register_lowering(legate_task_p, _legate_task_lowering)
+
+
+def legate_task_linear(ct, _, **kwargs):
+    return (legate_task_p.bind(ct, **kwargs),)
+
+
+ad.deflinear2(legate_task_p, legate_task_linear)
 
 
 def _get_wrapped_task(
@@ -245,101 +309,29 @@ def _get_wrapped_task(
     if logical_axes is None:
         logical_axes = []
 
-    def _config_str(dependency_type: str, phase: str):
-        global _next_color
-        args = dict(
-            type=dependency_type,
-            name=f"{phase}.{name}",
-            devices=devices,
-            color=_next_color,
-            autosharding=dict(
-                dims=dims,
-                device_axes=device_axes,
-                logical_axes=logical_axes,
-            ),
-        )
-        return json.dumps(args)
+    args = dict(
+        name=name,
+        devices=devices,
+        autosharding=dict(
+            dims=dims,
+            device_axes=device_axes,
+            logical_axes=logical_axes,
+        ),
+    )
 
-    def start_task(inp):
-        global _next_color
+    wrapped = partial(call_legate_task, fxn, config=json.dumps(args))
 
-        _next_color += 1
+    fwd = partial(call_legate_task_fwd, fxn, config=json.dumps(args))
 
-        mark_input_fwd = partial(
-            mark_input, config=_config_str("input", "fwd")
-        )
-        result = _optimization_barrier(tree_map(mark_input_fwd, inp))
-        if out_shardings is not None:
-            result = jax.lax.with_sharding_constraint(result, out_shardings)
-        return result
+    def f_bwd(primals, tangents):
+        _, f_vjp = jax.vjp(fxn, *primals)
+        return f_vjp(tangents)
 
-    def finish_task(inp):
-        mark_output_fwd = partial(
-            mark_output, config=_config_str("output", "fwd")
-        )
-        return _optimization_barrier(tree_map(mark_output_fwd, inp))
+    bwd = partial(call_legate_task_bwd, f_bwd, config=json.dumps(args))
 
-    start = jax.custom_vjp(start_task)
-    finish = jax.custom_vjp(finish_task)
-
-    def args_task_barrier_fwd(inp):
-        global _next_color
-
-        _next_color += 1
-        mark_input_fwd = partial(
-            mark_input, config=_config_str("input", "fwd")
-        )
-        with jax.named_scope(f"args_{name}_forward"):
-            result = _optimization_barrier(tree_map(mark_input_fwd, inp))
-            if out_shardings is not None:
-                result = jax.lax.with_sharding_constraint(
-                    result, out_shardings
-                )
-            return result, None
-
-    def args_task_barrier_bwd(_, g):
-        mark_output_bwd = partial(
-            mark_output, config=_config_str("output", "bwd")
-        )
-        with jax.named_scope(f"args_{name}_backward"):
-            return (_optimization_barrier(tree_map(mark_output_bwd, g)),)
-
-    def result_task_barrier_fwd(inp):
-        mark_output_fwd = partial(
-            mark_output, config=_config_str("output", "fwd")
-        )
-        with jax.named_scope(f"result_{name}_forward"):
-            return (
-                _optimization_barrier(tree_map(mark_output_fwd, inp)),
-                None,
-            )
-
-    def result_task_barrier_bwd(_, g):
-        global _next_color
-
-        _next_color += 1
-
-        mark_input_bwd = partial(
-            mark_input, config=_config_str("input", "bwd")
-        )
-        with jax.named_scope(f"result_{name}_backward"):
-            return (_optimization_barrier(tree_map(mark_input_bwd, g)),)
-
-    start.defvjp(args_task_barrier_fwd, args_task_barrier_bwd)
-    finish.defvjp(result_task_barrier_fwd, result_task_barrier_bwd)
-
-    def wrapped(*args, **kwargs):
-        with jax.named_scope(f"task:{name}"):
-            with check_nested_task() as depth:
-                if depth > 0:
-                    # for now only the outermost task matters
-                    return fxn(*args, **kwargs)
-
-                new_args = start(args)
-                res = fxn(*new_args, **kwargs)
-                return finish(res)
-
-    return wrapped
+    vjp_taskify = jax.custom_vjp(wrapped)
+    vjp_taskify.defvjp(fwd, bwd)
+    return vjp_taskify
 
 
 def task(
@@ -352,12 +344,7 @@ def task(
     devices: np.ndarray | Sequence[xc.Device] | None = None,
     device_axes: Optional[Sequence[str]] = None,
     logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
-    configure: Optional[Callable[..., Task]] = None,
-    configure_args: Optional[Sequence[str]] = None,
 ):
-    global _next_color
-    global _task_depth
-
     if should_ignore_transforms():
         return fxn
 
@@ -379,8 +366,6 @@ def task(
                     devices=devices,
                     device_axes=device_axes,
                     logical_axes=logical_axes,
-                    configure=configure,
-                    configure_args=configure_args,
                 )
                 return wrapped_call(*args, **kwargs)
 
@@ -389,51 +374,6 @@ def task(
     if name is None:
         name = f"{fxn.__name__}"
         counter[0] += 1
-
-    if configure is not None:
-        if (
-            devices is not None
-            or device_axes is not None
-            or logical_axes is not None
-        ):
-            raise ValueError(
-                "cannot give both a configure type and devices/device_axes"
-                "/logical_axees to legate.jax.task"
-            )
-
-        if out_shardings is not None:
-            raise ValueError(
-                "cannot give both configure and out_shardings to task"
-            )
-
-        if configure_args:
-            # we can't know all the arguments until the function is invoked
-            # so we have to defer creating the actual wrapped task until the
-            # function is called
-            def wrapped(*args, **kwargs):
-                configure_kwargs = {}
-                if configure_args is not None:
-                    for arg in configure_args:
-                        configure_kwargs[arg] = kwargs[arg]
-
-                task_config: Task = configure(**configure_kwargs)
-
-                return _get_wrapped_task(
-                    fxn,
-                    name,
-                    out_shardings=out_shardings,
-                    mesh=task_config.mesh,
-                    devices=task_config.devices,
-                    device_axes=task_config.device_axes,
-                    logical_axes=task_config.logical_axes,
-                )(*args, **kwargs)
-
-            return wrapped
-
-        task_config: Task = configure()
-        devices = task_config.devices
-        device_axes = task_config.device_axes
-        logical_axes = task_config.logical_axes
 
     return _get_wrapped_task(
         fxn,
