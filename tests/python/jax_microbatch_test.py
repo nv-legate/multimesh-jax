@@ -11,7 +11,6 @@ from legate.jax import (
     enable_task_fusion,
     microbatch,
     register_task,
-    reset as lj_reset,
     task,
     with_sharding_constraint,
 )
@@ -207,6 +206,7 @@ class MicrobatchTest(LegateJaxTestCase):
         self._test_against_reference(c, args_maker)
 
     def test_microbatch_implicit_dynamic_slice_devices(self):
+        self.skipTest("no CPU collective support yet")
         if jax.device_count() != 4:
             self.skipTest("need 4 devices")
 
@@ -404,8 +404,6 @@ class MicrobatchTest(LegateJaxTestCase):
     def test_multiple_microbatch_grad(self):
         if jax.device_count() != 1:
             self.skipTest("need 1 device")
-
-        lj_reset()
 
         def c(params, x):
             def g(x, param):

@@ -30,6 +30,7 @@ from .lib import (
     ClientConfig,
     tasks,
     split_large_traces,
+    mjit,
 )
 
 from .task import (

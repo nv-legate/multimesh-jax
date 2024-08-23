@@ -252,7 +252,7 @@ class TaskTest(LegateJaxTestCase):
                 return legate.jax.with_sharding_constraint(x, P("batch", None))
 
         mesh = Mesh(np.array(jax.devices()).reshape(4, 1), ("batch", "model"))
-        with mesh:
+        with mesh, legate.jax.autoshard(True):
             f = jax.jit(
                 c,
                 in_shardings=(AUTO(mesh), AUTO(mesh)),
@@ -384,7 +384,7 @@ class TaskTest(LegateJaxTestCase):
 
         batch_size = 8
         model_dim = 4
-        with mesh:
+        with mesh, legate.jax.autoshard(True):
             f = jax.jit(
                 c,
                 in_shardings=(
@@ -446,10 +446,92 @@ class TaskTest(LegateJaxTestCase):
             (None, None),
         )
 
-        with mesh:
+        with mesh, legate.jax.autoshard(True):
             self._test_against_reference(
                 c, arg_maker, legate_shardings, reference_shardings
             )
+
+    def test_reshard_explicitly_sharded_argument(self):
+        if jax.device_count() != 4:
+            self.skipTest("need 4 devices")
+
+        mesh = Mesh(
+            np.array(jax.devices()).reshape(4, 1, 1),
+            ("batch", "cxn", "ext"),
+        )
+
+        logical_axes = [
+            ("batch", "x"),
+            ("embed", "x"),
+            ("model", "y"),
+        ]
+
+        devices = np.array(jax.devices())
+
+        def f(batch, param):
+            param = legate.jax.with_sharding_constraint(param, P("cxn", "ext"))
+            return jnp.einsum("bc,ce->be", batch, param)
+
+        def c(batch, params):
+            layer0 = legate.jax.task(
+                f,
+                name="layer0",
+                devices=devices[:2].reshape(2, 1),
+                device_axes=("x", "y"),
+                logical_axes=logical_axes,
+            )
+            layer1 = legate.jax.task(
+                f,
+                name="layer1",
+                devices=devices[2:].reshape(2, 1),
+                device_axes=("x", "y"),
+                logical_axes=logical_axes,
+            )
+
+            def inner(batch, params):
+                (fc0, fc1) = params
+                x = layer0(batch, fc0)
+                return layer1(x, fc1)
+
+            return inner(batch, params)
+
+        batch_sharding = NamedSharding(mesh, P("batch", None))
+
+        batch_size = 8
+        model_dim = 4
+        with mesh, legate.jax.autoshard(True):
+            # use the legate jax mjit to annotate all arguments
+            # with logical autosharding annotations
+            jf = legate.jax.mjit(
+                c,
+                in_shardings=(
+                    batch_sharding,
+                    (AUTO(mesh), AUTO(mesh)),
+                ),
+                out_shardings=(AUTO(mesh)),
+            )
+            batch = jax.core.ShapedArray((batch_size, model_dim), np.float32)
+            fc0 = jax.core.ShapedArray((model_dim, model_dim), np.float32)
+            fc1 = jax.core.ShapedArray((model_dim, model_dim), np.float32)
+            # make sure the complication succeeds
+            _ = jf.lower(batch, (fc0, fc1)).compile()
+
+        with mesh, legate.jax.autoshard(True):
+            # use standard jit so that arguments are explicitly sharded
+            # without logical autosharding annotations
+            jf = jax.jit(
+                c,
+                in_shardings=(
+                    batch_sharding,
+                    (AUTO(mesh), AUTO(mesh)),
+                ),
+                out_shardings=(AUTO(mesh)),
+            )
+            batch = jax.core.ShapedArray((batch_size, model_dim), np.float32)
+            fc0 = jax.core.ShapedArray((model_dim, model_dim), np.float32)
+            fc1 = jax.core.ShapedArray((model_dim, model_dim), np.float32)
+            # make sure the compilcation succeeds
+            _ = jf.lower(batch, (fc0, fc1)).compile()
 
     def test_auto_shard_multiple_axes(self):
         if jax.device_count() < 8:

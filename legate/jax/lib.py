@@ -8,7 +8,7 @@ import jax
 from jax._src.pjit import flatten_axis_resources
 from jax.lax import with_sharding_constraint as lax_with_sharding_constraint
 from jax.sharding import NamedSharding, PartitionSpec
-from jax.tree_util import tree_flatten, tree_unflatten
+from jax.tree_util import tree_flatten, tree_map, tree_unflatten
 
 from .legate_jax_impl import (
     clear_tasks,
@@ -292,6 +292,29 @@ def _context(
         _ignore_transforms
     ) as K:  # noqa: F841
         yield
+
+
+def mjit(f, *args, in_shardings=None, out_shardings=None, **kwargs):
+    # for any shardings that are named shardings, we should convert them into
+    # logical names so we know how to translate logical names onto different
+    # gpu submeshes within the computation
+    def _annotate_shardings(x, sharding):
+        if isinstance(sharding, NamedSharding):
+            return with_sharding_constraint(x, sharding.spec)
+        return x
+
+    def wrapped(*fargs, **fkwargs):
+        new_args = tree_map(_annotate_shardings, fargs, in_shardings)
+        result = f(*new_args, **fkwargs)
+        return tree_map(_annotate_shardings, result, out_shardings)
+
+    return jax.jit(
+        wrapped,
+        *args,
+        in_shardings=in_shardings,
+        out_shardings=out_shardings,
+        **kwargs,
+    )
 
 
 @contextmanager
