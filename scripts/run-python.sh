@@ -87,6 +87,7 @@ export LEGION_DEFAULT_ARGS="-ll:py 0 \
  -ll:zsize 32 \
  -ll:networks $network \
  -ll:ib_rsize 0 \
+ -logfile test.log \
  $level \
  -lg:eager_alloc_percentage 50"
 

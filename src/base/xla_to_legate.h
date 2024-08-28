@@ -30,6 +30,9 @@ StoreHandle CreateStore(const legate_xla::Shape &shape,
 
 StoreHandle Reshard(const StoreHandle &handle, const Shape &reshard_shape);
 
+bool TilingMatches(const legate_xla::StoreHandle &handle, int64_t num_tiles,
+                   int64_t explicit_replication);
+
 void SliceLocalShards(const StoreHandle &handle,
                       std::vector<void *> &local_shards,
                       std::pair<int64_t, int64_t> slice);

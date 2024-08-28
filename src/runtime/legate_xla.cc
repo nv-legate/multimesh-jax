@@ -155,7 +155,9 @@ Shape ComputeStoreShape(const Shape &shape) {
     store_shape.dims = {1};
   } else {
     store_shape.dims = shape.dims;
-    store_shape.tile_shape = shape.tile_shape;
+    if (shape.num_tiles > 1) {
+      store_shape.tile_shape = shape.tile_shape;
+    } // else single tile indicates replicated, remove tile_shape
   }
 
   return store_shape;
@@ -445,6 +447,12 @@ size_t ShapeNumElements(Shape shape) {
     return std::accumulate(begin(shape.dims), end(shape.dims), 1,
                            std::multiplies<size_t>());
   }
+}
+
+bool TilingMatches(const legate_xla::StoreHandle &handle, int64_t num_tiles,
+                   int64_t explicit_replication) {
+  return handle.impl->shape().explicit_replication == explicit_replication &&
+         handle.impl->shape().num_tiles == num_tiles;
 }
 
 void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler_hold) {
