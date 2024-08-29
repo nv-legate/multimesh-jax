@@ -563,10 +563,10 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
     // this will participate in task, increment the timeline
     ++global_timeline;
   }
+  const bool strict_static_order_task =
+      strict_static_order && machine.processor_range().per_node_count == 1;
   // whether to force tasks to run in timeline order
-  task.add_scalar_arg(strict_static_order &&
-                      bool(machine.processor_range().per_node_count == 1));
-
+  task.add_scalar_arg(strict_static_order_task);
   task.add_scalar_arg(
       legate::Scalar(reinterpret_cast<uint64_t>(compiler_hold)));
   task.add_scalar_arg(legate::Scalar(GetRunId()));
@@ -639,7 +639,7 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
     }
   }
 
-  if (!strict_static_order && launch_size > 1) {
+  if (strict_static_order_task && launch_size > 1) {
     task.set_concurrent(true);
   }
   runtime->submit(std::move(task));
