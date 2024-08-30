@@ -37,7 +37,7 @@ checkout flax       main                https://github.com/google/flax.git      
 checkout jax        legate-main         ssh://git@github.com/nv-legate/jax.git        bc414e394
 checkout jaxlib     legate-main         ssh://git@github.com/nv-legate/jax.git        bc414e394
 checkout legate     main                ssh://git@github.com/nv-legate/legate.core.internal 4732dce legate.patch
-checkout legate-jax main                ssh://git@github.com/nv-legate/legate.jax.git  4fa4124163
+checkout legate-jax main                ssh://git@github.com/nv-legate/legate.jax.git  28651c3f
 checkout legion     master              ssh://git@gitlab.com/StanfordLegion/legion.git 6da07108
 checkout optax      main                https://github.com/google-deepmind/optax.git  a49564e
 checkout orbax      main                https://github.com/google/orbax.git           6673d0c
@@ -45,7 +45,7 @@ checkout paxml      main                https://github.com/google/paxml.git     
 checkout praxis     main                https://github.com/google/praxis.git          81154d8e       praxis.patch
 checkout seqio      main                https://github.com/google/seqio.git           513d1fe
 checkout te         main                https://github.com/NVIDIA/TransformerEngine.git  0b303dad4c  te.patch
-checkout xla        legate-main         ssh://git@github.com/nv-legate/xla.git        f6e746a4
+checkout xla        legate-main         ssh://git@github.com/nv-legate/xla.git        bb10ee305668
 checkout nccl       master              https://github.com/NVIDIA/nccl.git            6203b4c95d71
 
 pushd te
