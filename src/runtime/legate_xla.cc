@@ -639,7 +639,7 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
     }
   }
 
-  if (strict_static_order_task && launch_size > 1) {
+  if (!strict_static_order_task && launch_size > 1) {
     task.set_concurrent(true);
   }
   runtime->submit(std::move(task));
