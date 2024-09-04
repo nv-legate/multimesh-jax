@@ -8,15 +8,16 @@ import jax
 import jax.lax
 import jax.numpy as jnp
 import numpy as np
-from jax import core as jax_core, random
+from jax import core as jax_core
 from jax._src.lib import xla_client as xc
-from jax.experimental.pjit import AUTO, pjit
+from jax.experimental.pjit import AUTO
 from jax.interpreters import ad, mlir
 from jax.interpreters.mlir import hlo, ir
-from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from jax.sharding import Mesh, PartitionSpec as P
 from jax.tree_util import tree_map
 
 from .lib import (
+    autoshard,
     optional_kwargs,
     should_ignore_transforms,
     with_sharding_constraint,
@@ -67,114 +68,74 @@ class AutoParallelAbstractFxn:
 
 
 def parallelize(
-    fxn, devices: Optional[Sequence[xc.Device] | np.ndarray] = None
+    model: Callable,
+    *,
+    init_params: Optional[Callable] = None,
+    get_input_batch: Optional[Callable] = None,
+    initial_batch: Optional[Any] = None,
+    devices: Optional[Sequence[xc.Device] | np.ndarray] = None,
 ):
     if devices is None:
         devices = jax.devices()
 
-    return AutoParallelAbstractFxn(fxn, devices=devices)
+    flat_devices = np.asarray(devices).flatten()
+    mesh = Mesh(flat_devices, ["x"])
+
+    with autoshard(True):
+        param_shapes = jax.eval_shape(init_params)
+        abstract_params = jax.tree_map(
+            lambda x: jax.core.ShapedArray(x.shape, x.dtype), param_shapes
+        )
+
+        param_shardings = jax.tree_map(lambda x: AUTO(mesh), param_shapes)
+        if initial_batch is None:
+            if get_input_batch is None:
+                raise ValueError(
+                    "legate.jax.parallelize requires either get_input_batch"
+                    "function or initial_batch parameter"
+                )
+
+            batch_shapes = jax.eval_shape(get_input_batch)
+            batch_sharding = jax.tree_map(lambda x: AUTO(mesh), batch_shapes)
+            initial_batch = jax.tree_map(
+                lambda x: jax.core.ShapedArray(x.shape, x.dtype), batch_shapes
+            )
+        else:
+            batch_sharding = jax.tree_map(lambda x: x.sharding, initial_batch)
+            batch_shapes = jax.tree_map(
+                lambda x: jax.core.ShapedArray(x.shape, x.dtype), initial_batch
+            )
+
+        result_shape = jax.eval_shape(model, param_shapes, batch_shapes)
+        out_shardings = jax.tree_map(lambda x: AUTO(mesh), result_shape)
+
+        jit_f = jax.jit(
+            model,
+            in_shardings=(param_shardings, batch_sharding),
+            out_shardings=out_shardings,
+        )
+
+        compiled = jit_f.lower(abstract_params, initial_batch).compile()
+
+    derived_param_shardings = compiled.input_shardings[0][0]
+    derived_batch_shardings = compiled.input_shardings[0][1]
+    init_sharded_params = jax.jit(
+        init_params, out_shardings=derived_param_shardings
+    )
+
+    if get_input_batch is None:
+        return compiled, init_sharded_params
+
+    init_sharded_batch = jax.jit(
+        get_input_batch, out_shardings=derived_batch_shardings
+    )
+    return compiled, init_sharded_params, init_sharded_batch
 
 
 def put_to_devices(host_array: np.ndarray, devices) -> list[Any]:
     num_devices = len(devices)
     per_device_arrays = np.split(host_array, num_devices, axis=0)
     return jax.device_put(per_device_arrays, devices)
-
-
-def parallelize_step(
-    model,
-    optimizer,
-    batch: Any,
-    mesh: Optional[Mesh] = None,
-    fully_shard_first_batch_dim: bool = True,
-):
-    import flax.linen as nn
-    from flax.training.train_state import TrainState
-
-    if mesh is None:
-        mesh = Mesh(jax.devices(), ("x",))
-
-    def init_fn(k, x, model, optimizer):
-        params = model.init(k, x)
-        state = TrainState.create(
-            apply_fn=model.apply, params=params, tx=optimizer
-        )
-        return state
-
-    init_fn = partial(init_fn, model=model, optimizer=optimizer)
-
-    variable_avals = jax.eval_shape(init_fn, random.key(42), batch)
-    variable_spec = nn.get_partition_spec(variable_avals)
-    grad_fn = jax.value_and_grad(model.apply)
-
-    def label_sharding(x, s):
-        return jax.lax.with_sharding_constraint(x, s)
-
-    def step_fn(variables, inputs):
-        flat_vars, treedef = jax.tree_util.tree_flatten(variables)
-        flat_spec, _ = jax.tree_util.tree_flatten(variable_spec)
-        flat_vars = [
-            label_sharding(v, s) for v, s in zip(flat_vars, flat_spec)
-        ]
-        variables = jax.tree_util.tree_unflatten(treedef, flat_vars)
-        params = variables.params
-        loss, grads = grad_fn(params, inputs)
-        variables = variables.apply_gradients(grads=grads)
-        return loss, variables
-
-    variable_shardings = jax.tree_map(lambda x: AUTO(mesh), variable_avals)
-
-    result_shape = jax.eval_shape(step_fn, variable_avals, batch)
-    out_shardings = jax.tree_map(lambda x: AUTO(mesh), result_shape)
-
-    if fully_shard_first_batch_dim:
-        first_axis_name = mesh.axis_names[0]
-        batch_shardings = jax.tree_map(
-            lambda x: NamedSharding(mesh, P(first_axis_name)), batch
-        )
-    else:
-        batch_shardings = jax.tree_map(lambda x: AUTO(mesh), batch)
-    batch_avals = jax.tree_map(
-        lambda x: jax.ShapeDtypeStruct(x.shape, dtype=x.dtype), batch
-    )
-
-    # pjit is required here so we get the global mesh context
-    compiled_step = (
-        pjit(
-            step_fn,
-            in_shardings=(variable_shardings, batch_shardings),
-            out_shardings=out_shardings,
-        )
-        .lower(variable_avals, batch_avals)
-        .compile()
-    )
-    variable_shardings, batch_shardings = compiled_step.input_shardings[0]
-
-    def make_sharded_array(host_array, sharding):
-        device_buffers = put_to_devices(host_array, mesh.local_devices)
-        return jax.make_array_from_single_device_arrays(
-            host_array.shape, sharding, device_buffers
-        )
-
-    def prepare_batch(replicated_batch_arrays):
-        return jax.tree_map(
-            make_sharded_array, replicated_batch_arrays, batch_shardings
-        )
-
-    init_fn = pjit(init_fn, out_shardings=variable_shardings)
-    init_variables = init_fn(random.key(42), batch)
-
-    return compiled_step, init_variables, prepare_batch, mesh
-
-
-mark_output = no_op(name="TaskEnd")
-mark_input = no_op(name="TaskStart")
-
-
-def shard_axes(*args):
-    import flax.linen as nn
-
-    return nn.with_partitioning(nn.initializers.xavier_normal(), args)
 
 
 @contextmanager
@@ -347,29 +308,6 @@ def task(
 ):
     if should_ignore_transforms():
         return fxn
-
-    if isinstance(fxn, type):
-        # we need to transform functions, not types, which means
-        # we neee to "defer" the transformation until this class is
-        # instantiated
-        class WrappedTask(fxn):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-
-            def __call__(self, *args, **kwargs):
-                parent_call = super().__call__
-                wrapped_call = task(
-                    parent_call,
-                    name,
-                    out_shardings=out_shardings,
-                    mesh=mesh,
-                    devices=devices,
-                    device_axes=device_axes,
-                    logical_axes=logical_axes,
-                )
-                return wrapped_call(*args, **kwargs)
-
-        return WrappedTask
 
     if name is None:
         name = f"{fxn.__name__}"

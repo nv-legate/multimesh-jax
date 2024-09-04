@@ -6,9 +6,10 @@ from typing import Any, Callable, Optional, Sequence, Type, TypeAlias, Union
 import gin
 import jax
 from jax._src.pjit import flatten_axis_resources
+from jax.experimental.pjit import AUTO, pjit
 from jax.lax import with_sharding_constraint as lax_with_sharding_constraint
-from jax.sharding import NamedSharding, PartitionSpec
-from jax.tree_util import tree_flatten, tree_map, tree_unflatten
+from jax.sharding import Mesh, NamedSharding, PartitionSpec
+from jax.tree_util import tree_flatten, tree_unflatten
 
 from .legate_jax_impl import (
     clear_tasks,
@@ -294,7 +295,15 @@ def _context(
         yield
 
 
-def mjit(f, *args, in_shardings=None, out_shardings=None, **kwargs):
+def mjit(
+    f,
+    *args,
+    mesh=None,
+    devices=None,
+    in_shardings=None,
+    out_shardings=None,
+    **kwargs,
+):
     # for any shardings that are named shardings, we should convert them into
     # logical names so we know how to translate logical names onto different
     # gpu submeshes within the computation
@@ -304,11 +313,25 @@ def mjit(f, *args, in_shardings=None, out_shardings=None, **kwargs):
         return x
 
     def wrapped(*fargs, **fkwargs):
-        new_args = tree_map(_annotate_shardings, fargs, in_shardings)
+        if in_shardings is not None:
+            new_args = jax.tree.map(_annotate_shardings, fargs, in_shardings)
+        else:
+            new_args = fargs
         result = f(*new_args, **fkwargs)
-        return tree_map(_annotate_shardings, result, out_shardings)
+        if out_shardings is not None:
+            return jax.tree.map(_annotate_shardings, result, out_shardings)
+        return result
 
-    return jax.jit(
+    if out_shardings is None:
+        if mesh is None:
+            if devices is None:
+                raise ValueError(
+                    "one of out_shardings, mesh, or devices must be passed to mjit"  # noqa: E501
+                )
+            mesh = Mesh(devices, ("x",))
+        out_shardings = AUTO(mesh)
+
+    return pjit(
         wrapped,
         *args,
         in_shardings=in_shardings,

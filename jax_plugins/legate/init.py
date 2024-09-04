@@ -1,12 +1,12 @@
 import gc
 import os
-from typing import Optional
+from typing import Optional, Sequence
 
 
 def init(
     disable_gc: Optional[bool] = None,
-    cpus: int = 4,
-    gpus: int = 0,
+    cpus: Optional[int] = None,
+    gpus: Optional[int] = None,
     fbmem: int = 8000,
     sysmem: int = 4000,
     zcmem: int = 32,
@@ -14,19 +14,25 @@ def init(
     debug: Optional[str] = None,
     network: str = "none",
     profile: Optional[str] = None,
+    distributed: bool = False,
     no_physical_tracing: bool = False,
     dump: Optional[str] = None,
+    coordinator_address: str | None = None,
+    num_processes: int = 1,
+    process_id: int = 0,
+    local_device_ids: int | Sequence[int] | None = None,
+    cluster_detection_method: str | None = None,
+    initialization_timeout: int = 300,
+    coordinator_bind_address: str | None = None,
 ) -> None:
-    cpus = cpus or 4
-    gpus = gpus or 0
+    # if cpus is explicitly specified and gpus is not
+    # assume there are no GPUs on the system
+    if cpus is not None and gpus is None:
+        gpus = 0
 
     legion_args = [
         "-lg:local",
         0,
-        "-ll:cpu",
-        cpus,
-        "-ll:gpu",
-        gpus,
         "-cuda:skipbusy",
         "-ll:util",
         2,
@@ -41,6 +47,13 @@ def init(
         "-lg:eager_alloc_percentage",
         eager_alloc_percentage,
     ]
+    if cpus is not None:
+        legion_args.append("-ll:cpu")
+        legion_args.append(cpus)
+    if gpus is not None:
+        legion_args.append("-ll:gpu")
+        legion_args.append(gpus)
+
     if no_physical_tracing:
         legion_args.append("-lg:no_physical_tracing")
 
@@ -105,7 +118,8 @@ def init(
     os.environ["LEGION_DEFAULT_ARGS"] = legion_args_str
 
     xla_flags = os.environ.get("XLA_FLAGS", "")
-    xla_flags += f"  --xla_force_host_platform_device_count={cpus}"
+    if cpus is not None:
+        xla_flags += f"  --xla_force_host_platform_device_count={cpus}"
     os.environ["XLA_FLAGS"] = xla_flags
 
     existing_platforms = os.environ.get("JAX_PLATFORMS") or ""
@@ -121,3 +135,14 @@ def init(
     import legate.jax
 
     jax.lax.with_sharding_constraint = legate.jax.with_sharding_constraint
+
+    if distributed:
+        jax.distributed.initialize(
+            coordinator_address=coordinator_address,
+            num_processes=num_processes,
+            process_id=process_id,
+            local_device_ids=local_device_ids,
+            cluster_detection_method=cluster_detection_method,
+            initialization_timeout=initialization_timeout,
+            coordinator_bind_address=coordinator_bind_address,
+        )

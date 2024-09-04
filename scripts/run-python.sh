@@ -94,7 +94,7 @@ export LEGION_DEFAULT_ARGS="-ll:py 0 \
 export JAX_PLATFORMS=legate,cuda,cpu
 export TF_CPP_MIN_LOG_LEVEL=$min_level
 export TF_CPP_MAX_LOG_LEVEL=$debug
-export TF_CPP_VMODULE=legate_pjrt_buffer=$debug,legate_computation=$debug,legate_pjrt_client=$debug,hlo_partition=$debug,legate_pjrt_executable=$debug,legate_store_cache=$debug,loop_scheduler=$debug,legate_ifrt_client=$debug,pjrt_executable=$debug,loop_scheduler=$debug,legate_store_cache=$debug,topology_util=$debug,legate_utils=$debug
+export TF_CPP_VMODULE=legate_pjrt_buffer=$debug,legate_computation=$debug,legate_pjrt_client=$debug,hlo_partition=$debug,legate_pjrt_executable=$debug,legate_store_cache=$debug,loop_scheduler=$debug,legate_ifrt_client=$debug,pjrt_executable=$debug,loop_scheduler=$debug,legate_store_cache=$debug,topology_util=$debug,legate_utils=$debug,platform_util=$debug
 export JAX_TRACEBACK_FILTERING=off
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export JAX_COMPILER_DETAILED_LOGGING_MIN_OPS=0

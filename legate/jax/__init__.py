@@ -37,8 +37,6 @@ from .task import (
     task,
     microbatch,
     parallelize,
-    parallelize_step,
-    shard_axes,
     Task,
 )
 
