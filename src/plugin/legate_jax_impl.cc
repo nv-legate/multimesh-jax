@@ -47,8 +47,6 @@ extern "C" void LegateFence();
 
 extern "C" void SetStoreCacheMinParallelism(int64_t parallelism);
 
-extern "C" void SetMaxOutOfOrder(int64_t parallelism);
-
 extern "C" void SetStrictStaticOrder(bool order);
 
 extern "C" void SetHostOffloadMinReuseDistance(int64_t reuse_distance);
@@ -96,7 +94,7 @@ PYBIND11_MODULE(legate_jax_impl, m) {
   m.def("enable_implicit_tasks",
         [](bool flag) { SetEnableImplicitTasks(flag); });
   m.def(
-      "register_task",
+      "_register_task",
       [](py::str task_regex, py::list py_devices, py::list py_device_dims,
          py::list py_device_axes, py::list py_logical_axes,
          int64_t fusion_color, std::optional<int64_t> loop_submesh_size,
@@ -115,7 +113,7 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       py::arg("fusion_color") = 0, py::arg("loop_submesh_size") = py::none(),
       py::arg("loop_submesh_reverse") = false);
   m.def(
-      "register_task_factory",
+      "_register_task_factory",
       [](py::str task_regex,
          std::function<std::vector<int64_t>(const std::string &)>
              device_callback,
@@ -181,10 +179,6 @@ PYBIND11_MODULE(legate_jax_impl, m) {
   m.def(
       "set_strict_static_order",
       [](bool order) { SetStrictStaticOrder(order); }, py::arg("order"));
-  m.def(
-      "set_max_out_of_order",
-      [](int64_t max_out_of_order) { SetMaxOutOfOrder(max_out_of_order); },
-      py::arg("set_max_out_of_order"));
   m.def(
       "enable_recomputation",
       [](bool enable) { EnableLegateRecomputation(enable); },

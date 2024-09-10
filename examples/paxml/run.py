@@ -596,7 +596,7 @@ class PaxTransformerConfig:
     layers_per_interleave: Optional[int] = None
 
     def __call__(self):
-        from legate.jax import register_task, register_task_factory
+        from legate.jax import register_task
 
         devices = list(range(self.num_devices))
 
@@ -708,9 +708,9 @@ class PaxTransformerConfig:
         else:
             fusion_color = 0
 
-        register_task_factory(
+        register_task(
             r"(layers_\d+)",
-            device_callback=compute_devices,
+            callback=compute_devices,
             dims=transformer_mesh,
             device_axes=["x", "y", "z"],
             logical_axes=transformer_axes,
@@ -868,13 +868,11 @@ with legate.jax.enable_recomputation(
     args.split_large_traces
 ) as C, legate.jax.store_cache_min_parallelism(
     args.cache_parallelism
-) as D, legate.jax.max_out_of_order(
-    args.max_out_of_order
-) as E, legate.jax.strict_static_order(
+) as D, legate.jax.strict_static_order(
     args.strict_static_order
-) as F, legate.jax.host_offload_min_reuse_distance(
+) as E, legate.jax.host_offload_min_reuse_distance(
     args.host_offload_min_reuse_distance
-) as G, legate.jax.enable_task_fusion(
+) as F, legate.jax.enable_task_fusion(
     args.enable_task_fusion
 ):
     legate.jax.replicate_parameters_smaller_than_num_elements(

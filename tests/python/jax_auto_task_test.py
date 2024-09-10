@@ -172,9 +172,9 @@ class TaskTest(LegateJaxTestCase):
         def device_factory(name: str) -> List[int]:
             return [0, 1]
 
-        legate.jax.register_task_factory(
+        legate.jax.register_task(
             r"(task\d+)",
-            device_callback=device_factory,
+            callback=device_factory,
             dims=[2, 1],
             device_axes=["x", "y"],
             logical_axes=logical_axes,

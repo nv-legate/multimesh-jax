@@ -1,7 +1,5 @@
 from .legate_jax_impl import (
     no_op_custom_call,
-    register_task,
-    register_task_factory,
     shutdown,
     replicate_parameters_smaller_than_num_elements,
     set_store_cache_min_parallelism,
@@ -25,7 +23,6 @@ from .lib import (
     with_sharding_constraint,
     store_cache_min_parallelism,
     host_offload_min_reuse_distance,
-    max_out_of_order,
     strict_static_order,
     ClientConfig,
     tasks,
@@ -33,12 +30,7 @@ from .lib import (
     mjit,
 )
 
-from .task import (
-    task,
-    microbatch,
-    parallelize,
-    Task,
-)
+from .task import task, microbatch, parallelize, register_task
 
 from . import _version
 

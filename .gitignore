@@ -1,2 +1,5 @@
 /_skbuild
 .cache
+/docs/build
+/docs/notebooks/.ipynb_checkpoints/
+/docs/_autosummary

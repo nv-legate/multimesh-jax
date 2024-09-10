@@ -33,7 +33,6 @@ namespace legate_xla {
 namespace {
 
 int64_t global_timeline = 0;
-int64_t max_out_of_order = 0; // default 0 means no limit
 bool strict_static_order = true;
 
 struct TaskOrderKey {
@@ -52,9 +51,6 @@ struct hash_order_key {
     return legate::hash_all(k.slice_start, k.slice_stop, k.mod);
   }
 };
-
-std::unordered_map<TaskOrderKey, legate::LogicalStorePartition, hash_order_key>
-    ordering_stores;
 
 std::unordered_map<std::string, int64_t> instance_counter;
 
@@ -619,26 +615,6 @@ void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler_hold,
     }
   }
 
-  // zero or negative indicates no limit to amount of reordering
-  if (max_out_of_order > 0) {
-    TaskOrderKey order_key{.slice_start = start,
-                           .slice_stop = stop,
-                           .mod = global_timeline % max_out_of_order};
-    auto iter = ordering_stores.find(order_key);
-    if (iter == ordering_stores.end()) {
-      auto store = core_runtime->create_store(
-          legate::Shape({launch_size}),
-          legate::primitive_type(legate::Type::Code::INT32),
-          /*optimize_scalar=*/false);
-      auto partition = store.partition_by_tiling({1});
-      task.add_output(partition);
-      ordering_stores[order_key] = std::move(partition);
-    } else {
-      task.add_input(iter->second);
-      task.add_output(iter->second);
-    }
-  }
-
   if (!strict_static_order_task && launch_size > 1) {
     task.set_concurrent(true);
   }
@@ -758,13 +734,13 @@ void SliceLocalShards(const StoreHandle &handle,
                                "on all nodes will violate control replication");
     }
   } else {
-    launch_size = LaunchSize(handle.impl->shape(), local_shards.size());
     tracker.emplace(machine.slice(start, stop));
   }
 
   log_xla.debug() << "SliceLocalShards: slice " << local_shards.size()
                   << " shards on launch size " << launch_size << " on store "
                   << handle.impl.get() << " " << handle.impl->name()
+                  << " " << handle.impl->shape()
                   << " on machine slice [" << start << "," << stop << ")";
 
   auto task =
@@ -1095,10 +1071,6 @@ extern "C" void LegateFence() {
   // Make sure to clear all handles held by Legate
   // so that nothing gets deleted during program cleanup
   legate_xla::Fence();
-}
-
-extern "C" void SetMaxOutOfOrder(int64_t max_out_of_order) {
-  legate_xla::max_out_of_order = max_out_of_order;
 }
 
 extern "C" void SetStrictStaticOrder(bool order) {
