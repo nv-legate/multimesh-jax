@@ -1,5 +1,7 @@
 #! /usr/bin/env bash
 
+pushd /opt/jaxlib
+
 BAZEL_CACHE=$1
 
 export PYTHON_BIN_PATH=/opt/install/miniconda/envs/legere/bin/python
