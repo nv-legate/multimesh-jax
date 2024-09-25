@@ -1,8 +1,10 @@
 #include "legate_to_xla.h"
-#include "legate_xla_c.h"
 #include "legate_xla_common.h"
+#include "xla_task.h"
 #include "xla_to_legate.h"
 
+#include <realm/memory.h>
+#include <realm/processor.h>
 #include <zuku/store.h>
 #include <zuku/future.h>
 #include <zuku/defer.h>
@@ -22,7 +24,7 @@
 #include <realm.h>
 
 #include "hlo_executor.h"
-#include "legate_runtime.h"
+#include "hlo_loader.h"
 
 
 using zuku::defer;
@@ -57,13 +59,8 @@ std::vector<int64_t> LocalDeviceIds(const zuku::DeviceList& devices){
 }
 
 Realm::Processor LocalProcessor(int64_t local_index){
+  //TODO: get the default local processor
   return Realm::Processor{};
-}
-
-std::vector<Realm::Processor> LocalProcessors(const std::pair<int64_t, int64_t>& slice)
-{
-  // TODO: return the actual processors
-  return {};
 }
 
 Realm::Event LastExecuteTask(const Realm::Processor& p){
@@ -75,17 +72,30 @@ void SetLastExecuteTask(const Realm::Processor& p, Realm::Event ev){
   //TODO: set last event
 }
 
-int64_t IsLocal(const std::pair<int64_t,int64_t> machine_slice){
-  // TODO; fix device index check
-  return true;
-}
-
 zuku::View<zuku::ShardedArray> GetView(const StoreHandle& handle){
   return handle.impl->array.view();
 }
 
+std::vector<zuku::View<zuku::ShardedArray>> GetViews(const std::vector<StoreHandle>& handles){
+  std::vector<zuku::View<zuku::ShardedArray>> views;
+  views.reserve(handles.size());
+  for (auto&& handle : handles){
+    views.push_back(GetView(handle));
+  }
+  return views;
+}
+
 zuku::Store<zuku::ShardedArray> GetStore(const StoreHandle& handle){
   return handle.impl->array.child();
+}
+
+std::vector<zuku::Store<zuku::ShardedArray>> GetStores(const std::vector<StoreHandle>& handles){
+  std::vector<zuku::Store<zuku::ShardedArray>> stores;
+  stores.reserve(handles.size());
+  for (auto&& handle : handles){
+    stores.push_back(GetStore(handle));
+  }
+  return stores;
 }
 
 static int64_t NextStoreId() {
@@ -173,25 +183,14 @@ void OffloadDtoH(const std::vector<StoreHandle> &to_offload,
 
 } // namespace
 
-void CreateCompileTask(std::shared_ptr<LegateCompiler> compiler) {
-  // TODO: put this on the correct processor
-  auto [start, stop] = compiler->MachineSlice();
-
-  auto local_procs = LocalProcessors(compiler->MachineSlice());
-  if (local_procs.empty()){
-    return;
-  }
+void CreateCompileTask(int64_t local_device_id, std::shared_ptr<LegateCompiler> compiler) {
+  Realm::Processor p = LocalProcessor(local_device_id);
 
   // TODO, rotate which GPUs are used for compilation
-  auto token = zuku::on(local_procs[0]).defer([](int64_t run_id, std::shared_ptr<LegateCompiler> compiler){
+  auto token = zuku::on(p).defer([](int64_t run_id, std::shared_ptr<LegateCompiler> compiler){
     // TODO: execute the compiler task
+    LoadAndCompile(/*run_id=*/0, compiler);
   }, GetRunId(), std::move(compiler));
-
-  // TODO: fix device index
-  const int64_t device_index = 0;
-  if (device_index < start || device_index >= stop){
-    return;
-  }
 
   pending_compilation_events.insert(token.Event());
 }
@@ -226,14 +225,14 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                        std::vector<std::function<void()>> *on_done) {
   
   Realm::Processor p = LocalProcessor(local_device_id);
-
-  std::vector<Realm::Processor> local_procs = LocalProcessors(machine_slice);
   int64_t index = 0;
   Realm::Event prev_task = LastExecuteTask(p);
-  auto view_inputs = GetViews(index, inputs);
-  auto store_outputs = GetStores(index, outputs);
-  auto token = zuku::on(p).after(prev_task).defer([](int64_t run_id, std::shared_ptr<LegateCompiler> compiler, std::vector<ScalarArgument> scalars, zuku::view_vector<ShardedArray> inputs, zuku::store_vector<ShardedArray> outputs){
+  auto view_inputs = GetViews(inputs);
+  auto store_outputs = GetStores(outputs);
+  auto token = zuku::on(p).after(prev_task).defer([](int64_t run_id, std::shared_ptr<LegateCompiler> compiler, std::vector<ScalarArgument> scalars,
+                                                             zuku::ro_vector<zuku::ShardedArray> inputs, zuku::rw_vector<zuku::ShardedArray> outputs){
     // TODO: execute the task
+    RunExecutable(run_id, std::move(compiler), std::move(scalars), std::move(inputs), std::move(outputs));
   }, run_id, compiler, scalars, std::move(view_inputs), std::move(store_outputs));
 
   if (on_done){
@@ -245,32 +244,29 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
 }
 
 void Destroy(StoreHandle &store) {
-  LOCK;
-
-  log_xla.debug() << "Destroy array " << store.impl->name
-                  << ", store=" << store.impl.get();
   // no need to synchronize -- just removing the reference
   store.impl = nullptr;
 }
 
-void StoreBufferAction(int64_t local_device_id, BufferAction* actions,
-                       const StoreHandle &store, BufferActionConfig config) {
+void StoreBufferAction(int64_t local_device_id, BufferAction* action,
+                       const StoreHandle &store, bool blocking) {
   Realm::Processor p = LocalProcessor(local_device_id);
-  auto token = on(p).defer([](BufferAction* action, zuku::ShardedArray& array){
-    // TODO: execute the buffer action
-  }, action, GetStore(store));
+  auto token = on(p).defer([](int64_t local_device_id, BufferAction* action, zuku::ShardedArray& array){
+    ApplyStoreBufferAction(local_device_id, action, array);
+  }, local_device_id, action, GetStore(store));
 
-  if (config.blocking){
+  if (blocking){
     token.Wait();
   }
 }
 
-void SliceLocalShard(int64_t local_device_id, const StoreHandle &handle, void* host_buffer){
+void* SliceLocalShard(int64_t local_device_id, const StoreHandle &handle){
+  throw std::runtime_error("SliceLocalShard: unimplemented");
   Realm::Processor p = LocalProcessor(local_device_id);
-  auto token = on(p).defer([](void* host_buffer, zuku::ShardedArray& array){
+  auto buffer = on(p).defer([](zuku::ShardedArray& array){
       // do the slicing
-    }, host_buffer, GetStore(handle));
-  token.Wait();
+    }, GetStore(handle));
+  return nullptr;
 }
 
 StoreHandle AssembleShards(int64_t local_device_id, zuku::ShardedShape shape,
@@ -279,15 +275,22 @@ StoreHandle AssembleShards(int64_t local_device_id, zuku::ShardedShape shape,
                     std::optional<StoreHandle> existing_store) {
   Realm::Processor p = LocalProcessor(local_device_id);
 
+  StoreHandle output = [&]{
+    if (existing_store.has_value()){
+      return *std::move(existing_store);
+    }
+    return CreateStore(local_device_id, shape);
+  }();
+
   auto token = on(p).defer([](legate_xla::Shard shard, zuku::ShardedArray& array){
-    // do the slicing
-  }, shard, GetStore(store));
+    //TODO: do the slicing
+  }, local_shard, GetStore(output));
 
   if (!IsGpu()){
     token.Wait();
   }
 
-  return store;
+  return output;
 }
 
 StoreHandle Reshard(const StoreHandle &handle, zuku::ShardedShape reshard_shape) {
@@ -309,16 +312,11 @@ void StopTimer(const std::string &name) {
   // TODO: stop a timer
 }
 
-StoreHandle CreateStore(zuku::ShardedShape shape,
+StoreHandle CreateStore(int64_t local_device_id, zuku::ShardedShape shape,
                         std::optional<std::string> name) {
-  auto local_devices = LocalDeviceIds(shape.sharding.mesh.devices);
-  std::vector<StoreHandleImpl::ArrayVariant> arrays;
-  arrays.reserve(local_devices.size());
-  for (int64_t dev : local_devices){
-    auto store = zuku::ShardedArray::Create(std::move(shape));
-    arrays.push_back(std::move(store));
-  }
-
+  // TODO: select the default memory
+  Realm::Memory m{};
+  auto array = zuku::ShardedArray::Create(local_device_id, m, std::move(shape));
   std::string array_name = [&]{
     if (name.has_value()){
       return *std::move(name);
@@ -326,7 +324,7 @@ StoreHandle CreateStore(zuku::ShardedShape shape,
     return std::string("anonymous");
   }();
 
-  StoreHandleImpl impl{ .name = std::move(array_name), .arrays = std::move(arrays) };
+  StoreHandleImpl impl{ .name = std::move(array_name), .array = std::move(array) };
   return StoreHandle{
     .impl = std::make_shared<StoreHandleImpl>(std::move(impl)),
     .unique_id = NextStoreId()
@@ -352,7 +350,6 @@ void StartLegate() {
 extern "C" void LegateShutdown() {
   // Make sure to clear all handles held by Legate
   // so that nothing gets deleted during program cleanup
-  legate_xla::log_xla.info() << "Shutting down Legate";
   legate_xla::StopLegate();
   ShutdownLegateClient();
 }

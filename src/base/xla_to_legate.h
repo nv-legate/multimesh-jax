@@ -23,7 +23,7 @@ StoreHandle CreateStore(int64_t local_device_id, zuku::ShardedShape shape,
 
 void Reshard(const StoreHandle &src, const StoreHandle& dst);
 
-void SliceLocalShard(int64_t local_device_id, const StoreHandle &handle, void* host_buffer);
+void* SliceLocalShard(int64_t local_device_id, const StoreHandle &handle);
 
 void StartTimer(const std::string &name);
 

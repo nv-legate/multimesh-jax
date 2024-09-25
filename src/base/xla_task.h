@@ -16,89 +16,13 @@
 
 #pragma once
 
-#include "legate.h"
-#include "legate_xla_c.h"
-#include <core/task/task_context.h>
+#include "legate_xla_common.h"
+#include <zuku/store.h>
+#include <zuku/tiled_array.h>
 
 namespace legate_xla {
 
-extern Legion::Logger log_xla;
-struct Registry {
-  static legate::TaskRegistrar &get_registrar();
-};
-
-template <typename T> struct XlaTask : public legate::LegateTask<T> {
-  using Registrar = Registry;
-};
-
-// Generic initialization of LegateBuffer from host data ptr
-class XLACopyDeviceToDevice : public XlaTask<XLACopyDeviceToDevice> {
-public:
-  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_COPY_DEVICE_TO_DEVICE};
-
-  enum ScalarArgs {
-    ScalarSourcePointer = 0,
-    ScalarSourceSize,
-    ScalarTaskWaiter
-  };
-
-public:
-  static void gpu_variant(legate::TaskContext context);
-};
-
-// Generic initialization of LegateBuffer to zero
-class XLAInitZeroTask : public XlaTask<XLAInitZeroTask> {
-public:
-  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_INIT_ZERO_TASK};
-
-public:
-  static void gpu_variant(legate::TaskContext context);
-};
-
-class XLASetScalarTask : public XlaTask<XLASetScalarTask> {
-public:
-  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_SET_SCALAR_TASK};
-
-public:
-  static void gpu_variant(legate::TaskContext context);
-  static void cpu_variant(legate::TaskContext context);
-};
-
-class XLAStoreBufferActionTask : public XlaTask<XLAStoreBufferActionTask> {
-public:
-  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_STORE_BUFFER_ACTION};
-
-  enum ScalarArgs {
-    ScalarIsBlocking,
-    ScalarTaskWaiter,
-    ScalarNumActions,
-    ScalarAction
-  };
-
-public:
-  static void gpu_variant(legate::TaskContext context);
-  static void cpu_variant(legate::TaskContext context);
-
-private:
-  static void run_task(legate::TaskContext context);
-};
-
-class XLAOffloadTask : public XlaTask<XLAOffloadTask> {
-public:
-  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_OFFLOAD_TASK};
-
-public:
-  static void gpu_variant(legate::TaskContext context);
-  static void cpu_variant(legate::TaskContext context);
-};
-
-class XLAFenceTask : public XlaTask<XLAFenceTask> {
-public:
-  static constexpr auto TASK_ID = legate::LocalTaskID{XlaOpCode::XLA_FENCE_TASK};
-
-public:
-  static void gpu_variant(legate::TaskContext context);
-  static void cpu_variant(legate::TaskContext context);
-};
+void CopyDeviceToDevice(const void* src, zuku::ShardedArray& array);
+void ApplyStoreBufferAction(int64_t local_device_id, BufferAction* action, zuku::ShardedArray& array);
 
 } // namespace legate_xla

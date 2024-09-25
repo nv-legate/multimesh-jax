@@ -6,7 +6,6 @@ if (LegateJAX_ASAN)
 endif()
 
 set(_srcs
-    legate_runtime.cc
     legate_xla.cc)
 
 add_library(legate_xla_runtime ${_srcs})

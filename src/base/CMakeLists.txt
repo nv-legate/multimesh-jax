@@ -3,15 +3,7 @@ set(_srcs
   allocator.cc
   executable_cache.cc
   hlo_executor.cc
-  hlo_executor.cu
   hlo_loader.cc
-  hlo_loader.cu
-  legate_mapper.cc
-  registration.cc
-  shard_assemble.cc
-  shard_assemble.cu
-  shard_getter.cc
-  shard_getter.cu
   task_utils.cc
   xla_task.cc
 )
@@ -21,6 +13,7 @@ add_library(
   OBJECT
   ${_srcs}
 )
+set_target_properties(legate_xla_base PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
 target_include_directories(legate_xla_base PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 

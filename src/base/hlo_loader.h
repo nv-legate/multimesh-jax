@@ -18,11 +18,11 @@
 
 #include "legate_xla_common.h"
 #include "xla_task.h"
-#include <core/data/scalar.h>
-#include <core/utilities/typedefs.h>
+#include <zuku/store.h>
 #include <cstdint>
 #include <memory>
 #include <optional>
+
 
 namespace legate_xla {
 
@@ -32,28 +32,6 @@ struct HloLoaderOptions {
   std::optional<uint64_t> hlo_id = std::nullopt;
 };
 
-class HLOLoaderTask : public XlaTask<HLOLoaderTask> {
-public:
-  static constexpr auto TASK_ID = legate::LocalTaskID{XLA_COMPILE_TASK};
-
-  enum ScalarArgs {
-    ScalarCompilerPointer,
-    ScalarRunId,
-  };
-
-public:
-  static void cpu_variant(legate::TaskContext context);
-
-  static void gpu_variant(legate::TaskContext context);
-
-public:
-  static void
-  load_and_compile(legate::TaskContext context, LegateCompiler *compiler,
-                   uint64_t run_id, const std::string &platform_name,
-                   const HloLoaderOptions &options = HloLoaderOptions{});
-
-  static void load_and_compile(legate::TaskContext context,
-                               const std::string &platform_name);
-};
+void LoadAndCompile(int64_t run_id, const std::shared_ptr<LegateCompiler>& compiler);
 
 } // namespace legate_xla

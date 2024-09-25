@@ -19,34 +19,12 @@
 #include "legate_xla_common.h"
 #include "task_utils.h"
 #include "xla_task.h"
-#include <core/utilities/typedefs.h>
+#include <zuku/vector.h>
+#include <zuku/tiled_array.h>
 
 namespace legate_xla {
 
-class HLOExecutorTask : public XlaTask<HLOExecutorTask> {
-public:
-  static constexpr auto TASK_ID = legate::LocalTaskID{XLA_EXECUTE_TASK};
-
-  enum {
-    ScalarTaskCounter = 0,
-    ScalarEnforceOrdering,
-    ScalarCompilerPointer,
-    ScalarRunId,
-    ScalarCallbacks,
-    ScalarNumScalarArgs,
-  };
-
-public:
-  static void run_executable(legate::TaskContext context, bool cpu);
-
-  static void run_executable(legate::TaskContext context, const TaskConfig &cfg,
-                             LegateExecutable *exe, LegateCompiler *compiler,
-                             int64_t run_id, int scalar_offset, bool cpu);
-
-public:
-  static void cpu_variant(legate::TaskContext context);
-
-  static void gpu_variant(legate::TaskContext context);
-};
+void RunExecutable(int64_t run_id, std::shared_ptr<LegateCompiler> compiler, std::vector<ScalarArgument> scalars,
+                   zuku::ro_vector<zuku::ShardedArray> inputs, zuku::rw_vector<zuku::ShardedArray> outputs);
 
 } // namespace legate_xla

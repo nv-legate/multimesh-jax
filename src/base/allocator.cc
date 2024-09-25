@@ -15,39 +15,23 @@
  */
 
 #include "allocator.h"
+#include <realm.h>
 
 namespace legate_xla {
 
-using namespace Legion;
-using namespace legate;
-
-extern Legion::Logger log_xla;
-
 DeferredBufferAllocator::DeferredBufferAllocator() {
-  auto proc = Processor::get_executing_processor();
-  mem_kind = proc.kind() == Processor::TOC_PROC ? Memory::GPU_FB_MEM
-                                                : Memory::SYSTEM_MEM;
+  auto proc = Realm::Processor::get_executing_processor();
+  mem_kind = proc.kind() == Realm::Processor::TOC_PROC ? Realm::Memory::GPU_FB_MEM
+                                                : Realm::Memory::SYSTEM_MEM;
 }
 
 void *DeferredBufferAllocator::Allocate(size_t size) {
-  log_xla.debug() << "Allocating deferred buffer of size " << size;
-  Buffer buffer(mem_kind, legate::Rect<1>(0, size - 1));
-  void *p = buffer.ptr(0);
-#ifdef DEBUG_LEGATE_LLM
-  assert(buffers.find(p) == buffers.end());
-#endif
-  buffers[p] = buffer;
-  return p;
+  throw std::runtime_error("DeferredBufferAllocator::Allocate: unimplmeneted");
+  return nullptr;
 }
 
 void DeferredBufferAllocator::Free(void *buf, size_t size) {
-  log_xla.debug() << "Freeing deferred buffer of size " << size;
-  auto finder = buffers.find(buf);
-#ifdef DEBUG_LEGATE_LLM
-  assert(finder != buffers.end());
-#endif
-  finder->second.destroy();
-  buffers.erase(finder);
+  throw std::runtime_error("DeferredBufferAllocator::Free: unimplmeneted");
 }
 
 } // namespace legate_xla

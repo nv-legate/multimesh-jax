@@ -20,70 +20,25 @@
 #include "legate_to_xla.h"
 #include "task_utils.h"
 
-using namespace legate;
-
 namespace legate_xla {
 
-/*static*/ void HLOLoaderTask::load_and_compile(
-    TaskContext context, LegateCompiler *compiler, uint64_t run_id,
-    const std::string &platform_name, const HloLoaderOptions &options) {
-
-  const uint64_t hlo_id = options.hlo_id.value_or(compiler->HloId());
-
+void LoadAndCompile(int64_t run_id, const std::shared_ptr<LegateCompiler>& compiler){
   // only one GPU per node should be running the compilation
-  compile_executable(hlo_id, [&] {
-    auto cfg = get_task_config(context);
-    uint32_t partitions = options.num_partitions.has_value()
-                              ? *options.num_partitions
-                              : cfg.num_tasks;
+  compile_executable(compiler->HloId(), [&] {
     DeferredBufferAllocator allocator;
-    // only print stats (if requested) on the lowest node
-    bool print_stats = options.print_stats && (cfg.my_node == cfg.min_node);
-
     try {
       compiler->Compile(
           run_id,
-          {.replica_count =
-               1, // TODO: we do not handle psum calls or replica all-reduces
-           .num_partitions = (int)partitions,
+          {
            .run_hlo_passes = true,
-           .stream_executor_index = cfg.local_device_id,
+           .stream_executor_index = 0,
            .allocator = &allocator,
-           .print_stats = print_stats});
+           .print_stats = false});
     } catch (const std::exception &e) {
-      log_xla.error() << "Standard exception caught during 'Compile', message '"
-                      << e.what() << "'";
     } catch (...) {
-      log_xla.error() << "Exception caught during 'Compile'";
     }
     return compiler->MakeExecutable();
   });
 }
-
-/*static*/ void
-HLOLoaderTask::load_and_compile(TaskContext context,
-                                const std::string &platform_name) {
-  auto *compiler_hold = reinterpret_cast<TaskArgHold<LegateCompiler> *>(
-      context.scalar(ScalarCompilerPointer).value<uint64_t>());
-  uint64_t run_id = context.scalar(ScalarRunId).value<uint64_t>();
-  log_xla.debug() << "HLOLoaderTask start on " << compiler_hold->get()->Name()
-                  << " with "
-                  << context.machine().processor_range().per_node_count
-                  << " workers";
-  load_and_compile(context, compiler_hold->get(), run_id, platform_name);
-  Release(compiler_hold, context.machine().processor_range().per_node_count);
-  log_xla.debug() << "HLOLoaderTask done";
-}
-
-/*static*/ void HLOLoaderTask::cpu_variant(TaskContext context) {
-  load_and_compile(context, "cpu");
-}
-
-namespace // unnamed
-{
-static void __attribute__((constructor)) register_tasks(void) {
-  HLOLoaderTask::register_variants();
-}
-} // namespace
 
 } // namespace legate_xla

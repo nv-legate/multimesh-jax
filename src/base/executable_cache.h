@@ -21,6 +21,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <vector>
+#include <functional>
 
 namespace legate_xla {
 

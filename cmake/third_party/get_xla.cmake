@@ -77,8 +77,6 @@ function(find_or_configure_xla)
     --override_repository=zuku=${zuku_SOURCE_DIR})
  endif()
 
-
- set(target_names //xla/python:xla_extension)
  add_custom_command(
     OUTPUT  ${xla_client_library}
     OUTPUT  ${xla_compiler_library}
