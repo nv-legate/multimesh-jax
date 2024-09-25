@@ -1,5 +1,5 @@
 
-if (LegateXLA_ASAN)
+if (LegateJAX_ASAN)
   add_compile_options(-fsanitize=address)
   add_link_options(-fsanitize=address)
   add_compile_options(-fno-common)
@@ -16,7 +16,7 @@ set_target_properties(legate_xla_runtime PROPERTIES
          ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 
 target_include_directories(legate_xla_runtime PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
-target_link_libraries(legate_xla_runtime PUBLIC legate::core legate_xla_base)
+target_link_libraries(legate_xla_runtime PUBLIC Legion::Realm Legion::RealmRuntime legate_xla_base zuku::zuku)
 
 add_library(legate::xla_runtime ALIAS legate_xla_runtime)
 

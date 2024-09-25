@@ -24,7 +24,8 @@ add_library(
 
 target_include_directories(legate_xla_base PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
-target_link_libraries(legate_xla_base PUBLIC legate::core)
+target_link_libraries(legate_xla_base PUBLIC Legion::Realm Legion::RealmRuntime)
+target_link_libraries(legate_xla_base PUBLIC zuku::zuku)
 add_library(legate::xla_base ALIAS legate_xla_base)
 
 include(CPack)

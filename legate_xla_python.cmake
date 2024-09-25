@@ -40,7 +40,7 @@ configure_file(
 
 add_library(xla_python INTERFACE)
 add_library(legate::xla_python ALIAS xla_python)
-target_link_libraries(xla_python INTERFACE legate::core)
+target_link_libraries(xla_python INTERFACE Legion::Realm Legion::RealmRuntime)
 
 ##############################################################################
 # - install targets ----------------------------------------------------------

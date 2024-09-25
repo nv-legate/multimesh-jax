@@ -3,39 +3,27 @@
 #include <set>
 #include <string>
 
+#include <src/zuku/shape.h>
+
 namespace legate_xla {
 
-void CreateCompileTask(TaskArgHold<LegateCompiler> *compiler);
+void CreateCompileTask(int64_t local_device_id, std::shared_ptr<LegateCompiler> compiler);
 
-void CreateExecuteTask(TaskArgHold<LegateCompiler> *compiler,
+void CreateExecuteTask(int64_t local_device_id, std::shared_ptr<LegateCompiler> compiler,
                        const std::vector<ScalarArgument> &scalars,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
-                       std::vector<std::function<void()>> *on_done,
+                       std::vector<std::function<void()>>* on_done,
                        std::pair<int64_t, int64_t> machine_slice);
 
-void OffloadDtoH(const std::vector<StoreHandle> &blocking_users,
-                 const std::vector<StoreHandle> &to_offload,
-                 std::pair<int64_t, int64_t> device_slice, std::string name);
+void OffloadDtoH(const StoreHandle& src, const StoreHandle& dst);
 
-void InvalidateDeviceInstances(const std::vector<StoreHandle> &stores,
-                               std::pair<int64_t, int64_t> device_slice,
-                               std::string name);
-
-void CopyDeviceToDevice(const StoreHandle &store, const void *src, size_t size,
-                        size_t num_local_devices);
-
-StoreHandle CreateStore(const legate_xla::Shape &shape,
+StoreHandle CreateStore(int64_t local_device_id, zuku::ShardedShape shape,
                         std::optional<std::string> name = std::nullopt);
 
-StoreHandle Reshard(const StoreHandle &handle, const Shape &reshard_shape);
+void Reshard(const StoreHandle &src, const StoreHandle& dst);
 
-bool TilingMatches(const legate_xla::StoreHandle &handle, int64_t num_tiles,
-                   int64_t explicit_replication);
-
-void SliceLocalShards(const StoreHandle &handle,
-                      std::vector<void *> &local_shards,
-                      std::pair<int64_t, int64_t> slice);
+void SliceLocalShard(int64_t local_device_id, const StoreHandle &handle, void* host_buffer);
 
 void StartTimer(const std::string &name);
 
@@ -48,36 +36,19 @@ struct Shard {
   size_t size;
 };
 
-StoreFuture
-AssembleShards(const legate_xla::Shape &logical_shape,
-               const std::vector<legate_xla::Shard> &local_shards,
-               std::pair<int64_t, int64_t> slice,
-               TaskArgHold<LegateStream> *stream_hold,
+StoreHandle AssembleShards(int64_t local_device_id, zuku::ShardedShape shape,
+               legate_xla::Shard shard,
+               std::shared_ptr<LegateStream> stream,
                std::optional<StoreHandle> existing_store = std::nullopt);
 
 std::set<int> GetLocalDevices(int my_node);
 
 bool IsGpu();
 
-struct BufferActionConfig {
-  bool blocking{false};
-  std::pair<int, int> machine_slice;
-};
+void StoreBufferAction(int64_t local_device_id, BufferAction* actions,
+                       const StoreHandle &store, bool blocking);
 
-void StoreBufferAction(const std::vector<BufferAction *> &actions,
-                       const StoreHandle &store,
-                       BufferActionConfig config = {});
-
-void BeginTrace(uint32_t id);
-
-void EndTrace(uint32_t id);
-
-void SetScalar(legate_xla::StoreHandle store, size_t launch_size,
-               int32_t scalar);
-
-void Synchronize(const StoreHandle &store);
-
-void Fence();
+void FenceCompilation();
 
 void Destroy(StoreHandle &store);
 

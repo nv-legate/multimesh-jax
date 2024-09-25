@@ -15,8 +15,8 @@
 #=============================================================================
 
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
-project(LegateXLA LANGUAGES C CXX CUDA)
-set(LegateXLA_VERSION 24.09.00)
+project(LegateJAX LANGUAGES C CXX CUDA)
+set(LegateJAX_VERSION 24.9.0)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -63,29 +63,33 @@ rapids_cpm_init(OVERRIDE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json)
 
 enable_testing()
 
-option(LegateXLA_ENABLE_CUDA ON "Whether to build with CUDA")
+option(LegateJAX_ENABLE_CUDA ON "Whether to build with CUDA")
 
-option(LegateXLA_ASAN OFF "Whether to build with address saniziter")
+option(LegateJAX_ASAN OFF "Whether to build with address saniziter")
 
-option(LegateXLA_ENABLE_TESTS "Whether to build the tests" ON)
+option(LegateJAX_ENABLE_TESTS "Whether to build the tests" ON)
+
+option(LegateJAX_PLUGIN "Whether to build the full Jaxlib plugin" ON)
 
 if (SKBUILD)
-  find_package(LegateXLA)
+  find_package(LegateJAX)
 else()
-  set(LegateXLA_FOUND FALSE)
+  set(LegateJAX_FOUND FALSE)
 endif()
 
-if (NOT LegateXLA_FOUND)
-  include(cmake/third_party/get_legate_core.cmake)
+if (NOT LegateJAX_FOUND)
+  include(cmake/third_party/get_realm.cmake)
   add_subdirectory(src)
 endif()
+
+include(cmake/third_party/get_zuku.cmake)
 
 include(GNUInstallDirs)
 rapids_cmake_install_lib_dir(lib_dir)
 
 if (SKBUILD)
   include(legate_xla_python.cmake)
-elseif(LegateXLA_ENABLE_TESTS)
+elseif(LegateJAX_ENABLE_TESTS)
   add_subdirectory(tests)
 endif()
 

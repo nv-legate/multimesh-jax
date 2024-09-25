@@ -31,7 +31,7 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-find_package(legate_core REQUIRED)
+find_package(Legion REQUIRED)
 
 enable_testing()
 
@@ -44,7 +44,7 @@ set(unit_SRC
 )
 
 add_executable(cpp_tests ${main_SRC} ${unit_SRC})
-target_link_libraries(cpp_tests PRIVATE legate::core legate::xla_runtime GTest::gtest GTest::gmock)
+target_link_libraries(cpp_tests PRIVATE Legion::Realm Legion::RealmRuntime legate::xla_runtime GTest::gtest GTest::gmock)
 
 include(GoogleTest)
 gtest_add_tests(TARGET cpp_tests)

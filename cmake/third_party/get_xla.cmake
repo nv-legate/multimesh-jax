@@ -2,7 +2,7 @@ function(find_or_configure_xla)
   include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
   rapids_cpm_package_details(OpenXLA version git_repo git_branch shallow exclude_from_all)
 
-  set(LegateXLA_BAZEL_REMOTE_CACHE "" CACHE STRING "An optional remote cache for bazel builds")
+  set(LegateJAX_BAZEL_REMOTE_CACHE "" CACHE STRING "An optional remote cache for bazel builds")
 
   if (xla_REPOSITORY)
     set(git_repo ${legate_core_REPOSITORY})
@@ -61,21 +61,28 @@ function(find_or_configure_xla)
    --define framework_shared_object=false
    --config=cuda
  )
- if (LegateXLA_ASAN)
+ if (LegateJAX_ASAN)
    list (APPEND _bazel_options
      --copt -fsanitize=address
      --linkopt -fsanitize=address)
  endif()
 
- if (LegateXLA_BAZEL_REMOTE_CACHE)
+ if (LegateJAX_BAZEL_REMOTE_CACHE)
     list (APPEND _bazel_options
-     --remote_cache ${LegateXLA_BAZEL_REMOTE_CACHE})
+     --remote_cache ${LegateJAX_BAZEL_REMOTE_CACHE})
  endif()
 
+ if (DEFINED zuku_SOURCE_DIR)
+  list(APPEND _bazel_options
+    --override_repository=zuku=${zuku_SOURCE_DIR})
+ endif()
+
+
+ set(target_names //xla/python:xla_extension)
  add_custom_command(
     OUTPUT  ${xla_client_library}
     OUTPUT  ${xla_compiler_library}
-    COMMENT "Building XLA components..."
+    COMMENT "Building XLA components ${target_names}..."
     COMMAND rm -rf "${xla_SOURCE_DIR}/bazel-bin" && XLA_LEGATE_SOURCE_DIR=${CMAKE_SOURCE_DIR} bazel --batch build ${_bazel_options} ${target_names} --check_visibility=false
     WORKING_DIRECTORY ${xla_SOURCE_DIR}
     DEPENDS ${xla_source_files}

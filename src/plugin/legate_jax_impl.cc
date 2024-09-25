@@ -43,8 +43,6 @@ extern "C" void LegateShutdown();
 
 extern "C" void ReplicateParametersSmallerThanNumElements(int64_t num_elements);
 
-extern "C" void LegateFence();
-
 extern "C" void SetStoreCacheMinParallelism(int64_t parallelism);
 
 extern "C" void SetStrictStaticOrder(bool order);
@@ -88,7 +86,6 @@ PYBIND11_MODULE(legate_jax_impl, m) {
     py::gil_scoped_release release;
     LegateShutdown();
   });
-  m.def("fence", []() { LegateFence(); });
   m.def("no_op_custom_call",
         []() { return EncapsulateFunction(no_op_entrypoint); });
   m.def("enable_implicit_tasks",
