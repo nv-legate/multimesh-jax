@@ -18,10 +18,10 @@ void CreateExecuteTask(int64_t local_device_id, std::shared_ptr<LegateCompiler> 
 
 void OffloadDtoH(const StoreHandle& src, const StoreHandle& dst);
 
-StoreHandle CreateStore(int64_t local_device_id, zuku::ShardedShape shape,
+StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id, zuku::ShardedShape shape,
                         std::optional<std::string> name = std::nullopt);
 
-void Reshard(const StoreHandle &src, const StoreHandle& dst);
+void Reshard(int64_t local_device_id, int64_t global_device_id, const StoreHandle &src, const StoreHandle& dst);
 
 void* SliceLocalShard(int64_t local_device_id, const StoreHandle &handle);
 
@@ -36,7 +36,7 @@ struct Shard {
   size_t size;
 };
 
-StoreHandle AssembleShards(int64_t local_device_id, zuku::ShardedShape shape,
+StoreHandle AssembleShards(int64_t local_device_id, int64_t global_device_id, zuku::ShardedShape shape,
                legate_xla::Shard shard,
                std::shared_ptr<LegateStream> stream,
                std::optional<StoreHandle> existing_store = std::nullopt);
