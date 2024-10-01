@@ -147,7 +147,7 @@ void test_legate_shape(legate_xla::Shape shape) {
 }
 
 void test_shape(std::vector<int64_t> dims) {
-  int64_t num_devices = legate_xla::GetLocalDevices(0).size();
+  int64_t num_devices = legate_xla::GetLocalDevices().size();
   int64_t replication = 1;
   std::vector<int64_t> tile_shape;
   if (dims.size() > 0 && dims[0] >= num_devices &&

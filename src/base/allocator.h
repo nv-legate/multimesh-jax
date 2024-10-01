@@ -17,16 +17,35 @@
 #pragma once
 
 #include "legate_xla_common.h"
-#include <unordered_map>
+#include <processor.h>
 #include <realm.h>
+#include <unordered_map>
+#include <zuku/tiled_array.h>
 
 namespace legate_xla {
 
-struct DeferredBufferAllocator : TaskMemoryAllocator {
-  DeferredBufferAllocator();
-  virtual void *Allocate(size_t size) override;
-  virtual void Free(void *buf, size_t size) override;
-  Realm::Memory::Kind mem_kind;
+class TempBufferAllocator : public TaskMemoryAllocator {
+public:
+  TempBufferAllocator(const zuku::ArrayTile &temp);
+  void *Allocate(size_t size) override;
+  void Free(void *buf, size_t size) override;
+
+private:
+  const char *base_ptr_;
+  const char *next_ptr_;
+  const int64_t size_;
+  int64_t freed_size_;
+};
+
+class DynamicBufferAllocator : public TaskMemoryAllocator {
+public:
+  DynamicBufferAllocator(zuku::Processor p) : proc_(std::move(p)) {}
+  void *Allocate(size_t size) override;
+  void Free(void *buf, size_t size) override;
+
+private:
+  std::unordered_map<void *, zuku::ArrayTile> tiles_;
+  zuku::Processor proc_;
 };
 
 } // namespace legate_xla

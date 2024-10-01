@@ -18,11 +18,11 @@
 
 #include "legate_xla_common.h"
 #include "xla_task.h"
-#include <zuku/store.h>
 #include <cstdint>
 #include <memory>
 #include <optional>
-
+#include <processor.h>
+#include <zuku/store.h>
 
 namespace legate_xla {
 
@@ -32,6 +32,7 @@ struct HloLoaderOptions {
   std::optional<uint64_t> hlo_id = std::nullopt;
 };
 
-void LoadAndCompile(int64_t run_id, const std::shared_ptr<LegateCompiler>& compiler);
+void LoadAndCompile(int64_t run_id, zuku::Processor p,
+                    const std::shared_ptr<LegateCompiler> &compiler);
 
 } // namespace legate_xla

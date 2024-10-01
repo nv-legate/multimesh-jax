@@ -18,16 +18,6 @@
 # - User Options  ------------------------------------------------------------
 
 
-execute_process(
-  COMMAND ${CMAKE_C_COMPILER}
-    -E -DLEGATE_USE_PYTHON_CFFI
-    -I "${CMAKE_CURRENT_SOURCE_DIR}/src/base"
-    -P "${CMAKE_CURRENT_SOURCE_DIR}/src/base/legate_xla_c.h"
-  ECHO_ERROR_VARIABLE
-  OUTPUT_VARIABLE header
-  COMMAND_ERROR_IS_FATAL ANY
-)
-
 set(libpath "")
 
 set(pyroot jax_plugins/legate)

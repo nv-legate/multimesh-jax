@@ -111,7 +111,7 @@ void test_create_store(legate_xla::Shape shape, size_t num_devices) {
 }
 
 void test_all_types(std::vector<int64_t> dims) {
-  int64_t num_devices = legate_xla::GetLocalDevices(0).size();
+  int64_t num_devices = legate_xla::GetLocalDevices().size();
   int64_t replication = 1;
   std::vector<int64_t> tile_shape;
   if (dims.size() > 0 && dims[0] >= num_devices &&

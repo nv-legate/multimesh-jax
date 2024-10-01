@@ -38,11 +38,11 @@ set_target_properties(legate_plugin
 
 install(TARGETS legate_plugin
         DESTINATION ${lib_dir}
-        EXPORT legate-xla-exports)
+        EXPORT legate-jax-exports)
 
 rapids_export(
   INSTALL LegateJAX
-  EXPORT_SET legate-xla-exports
+  EXPORT_SET legate-jax-exports
   GLOBAL_TARGETS legate_plugin
   NAMESPACE legate::
   LANGUAGES ${ENABLED_LANGUAGES}
@@ -51,7 +51,7 @@ rapids_export(
 # build export targets
 rapids_export(
   BUILD LegateJAX
-  EXPORT_SET legate-xla-exports
+  EXPORT_SET legate-jax-exports
   GLOBAL_TARGETS legate_plugin
   NAMESPACE legate::
   LANGUAGES ${ENABLED_LANGUAES}

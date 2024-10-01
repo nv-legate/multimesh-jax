@@ -1,9 +1,14 @@
 {
   "packages" : {
-    "LegateCore": {
-      "version" : "23.7.0",
-      "git_url" : "git@github.com:nv-legate/legate.core.internal.git",
-      "git_tag" : "b86527f4a298c50d8cf57d350c31e584698eb783"
+    "realm": {
+      "version" : "24.9.0",
+	    "git_url" : "https://gitlab.com/StanfordLegion/legion.git",
+      "git_tag" : "228238b0d3154fa18faa38e7d75a74914b893738"
+    },
+    "zuku": {
+      "version" : "24.9.0",
+	    "git_url" : "ssh://git@gitlab-master.nvidia.com:12051/jwilke/realm-poc.git",
+      "git_tag" : "364194439b86f783c6f700c3657768c4d38c04d3"
     },
     "OpenXLA" : {
       "version" : "23.7.0",

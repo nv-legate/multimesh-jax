@@ -49,7 +49,7 @@ function(find_or_configure_zuku)
   if(zuku_FOUND)
     message(STATUS "CPM: using local package Zuku")
   else()
-    rapids_cpm_find(zuku ${FIND_PKG_ARGS}
+    rapids_cpm_find(zuku ${PKG_VERSION} ${FIND_PKG_ARGS}
         CPM_ARGS
           GIT_REPOSITORY ${git_repo}
           GIT_BRANCH ${git_branch}

@@ -27,4 +27,4 @@ rapids_cmake_install_lib_dir(lib_dir)
 
 install(TARGETS legate_xla_base
         DESTINATION ${lib_dir}
-        EXPORT legate-xla-exports)
+        EXPORT legate-jax-exports)

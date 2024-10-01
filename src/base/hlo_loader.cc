@@ -19,21 +19,20 @@
 #include "executable_cache.h"
 #include "legate_to_xla.h"
 #include "task_utils.h"
+#include <processor.h>
 
 namespace legate_xla {
 
-void LoadAndCompile(int64_t run_id, const std::shared_ptr<LegateCompiler>& compiler){
+void LoadAndCompile(int64_t run_id, zuku::Processor p,
+                    const std::shared_ptr<LegateCompiler> &compiler) {
   // only one GPU per node should be running the compilation
   compile_executable(compiler->HloId(), [&] {
-    DeferredBufferAllocator allocator;
+    DynamicBufferAllocator allocator{p};
     try {
-      compiler->Compile(
-          run_id,
-          {
-           .run_hlo_passes = true,
-           .stream_executor_index = 0,
-           .allocator = &allocator,
-           .print_stats = false});
+      compiler->Compile(run_id, {.run_hlo_passes = true,
+                                 .stream_executor_index = (int)p.local_id(),
+                                 .allocator = &allocator,
+                                 .print_stats = false});
     } catch (const std::exception &e) {
     } catch (...) {
     }

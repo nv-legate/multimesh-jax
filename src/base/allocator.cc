@@ -15,23 +15,54 @@
  */
 
 #include "allocator.h"
+#include "legate_xla_common.h"
 #include <realm.h>
+#include <realm/event.h>
+#include <shape.h>
+#include <tiled_array.h>
+#include <zuku/defer.h>
 
 namespace legate_xla {
 
-DeferredBufferAllocator::DeferredBufferAllocator() {
-  auto proc = Realm::Processor::get_executing_processor();
-  mem_kind = proc.kind() == Realm::Processor::TOC_PROC ? Realm::Memory::GPU_FB_MEM
-                                                : Realm::Memory::SYSTEM_MEM;
+TempBufferAllocator::TempBufferAllocator(const zuku::ArrayTile &array)
+    : size_(array.byte_size()), base_ptr_(array.ptr<char>()), freed_size_(0) {
+  next_ptr_ = base_ptr_;
 }
 
-void *DeferredBufferAllocator::Allocate(size_t size) {
-  throw std::runtime_error("DeferredBufferAllocator::Allocate: unimplmeneted");
-  return nullptr;
+void *TempBufferAllocator::Allocate(size_t size) {
+  const int64_t size_to_allocate = AlignTempSize(size);
+
+  void *ret_ptr = const_cast<char *>(next_ptr_);
+  next_ptr_ += size_to_allocate;
+
+  return ret_ptr;
 }
 
-void DeferredBufferAllocator::Free(void *buf, size_t size) {
-  throw std::runtime_error("DeferredBufferAllocator::Free: unimplmeneted");
+void TempBufferAllocator::Free(void *buf, size_t size) {
+  const int64_t size_allocated = AlignTempSize(size);
+  freed_size_ += size_allocated;
+  // we are a dumb allocator, only reset the next pointer
+  // once all previous temp allocations have been freed
+  if (freed_size_ == size_) {
+    next_ptr_ = base_ptr_;
+  }
 }
+
+void *DynamicBufferAllocator::Allocate(size_t size) {
+  zuku::TileShape shape{
+      .type = zuku::SupportedType::S8,
+      .dims = {(int64_t)size},
+  };
+  auto [event, tile] =
+      zuku::ArrayTile::Create(std::move(shape), {.processor = proc_});
+  // we don't have a good way to be asynchronous with XLA
+  event.wait();
+
+  void *data = tile.data();
+  tiles_.insert({tile.data(), std::move(tile)});
+  return data;
+}
+
+void DynamicBufferAllocator::Free(void *buf, size_t size) { tiles_.erase(buf); }
 
 } // namespace legate_xla

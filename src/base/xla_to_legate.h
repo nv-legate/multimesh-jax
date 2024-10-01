@@ -7,23 +7,31 @@
 
 namespace legate_xla {
 
-void CreateCompileTask(int64_t local_device_id, std::shared_ptr<LegateCompiler> compiler);
+void CreateCompileTask(int64_t local_device_id,
+                       std::shared_ptr<LegateCompiler> compiler);
 
-void CreateExecuteTask(int64_t local_device_id, std::shared_ptr<LegateCompiler> compiler,
+void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
+                       zuku::DeviceList mesh,
+                       std::shared_ptr<LegateCompiler> compiler,
                        const std::vector<ScalarArgument> &scalars,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
-                       std::vector<std::function<void()>>* on_done,
-                       std::pair<int64_t, int64_t> machine_slice);
+                       const BufferHandle &temp_buffer,
+                       std::vector<std::function<void()>> *on_done);
 
-void OffloadDtoH(const StoreHandle& src, const StoreHandle& dst);
+void OffloadDtoH(const StoreHandle &src, const StoreHandle &dst);
 
-StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id, zuku::ShardedShape shape,
+StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
+                        zuku::ShardedShape shape,
                         std::optional<std::string> name = std::nullopt);
 
-void Reshard(int64_t local_device_id, int64_t global_device_id, const StoreHandle &src, const StoreHandle& dst);
+BufferHandle CreateBuffer(int64_t local_device_id, int64_t global_device_id,
+                          int64_t size);
 
-void* SliceLocalShard(int64_t local_device_id, const StoreHandle &handle);
+void Reshard(int64_t local_device_id, int64_t global_device_id,
+             const StoreHandle &src, const StoreHandle &dst);
+
+void *SliceLocalShard(int64_t local_device_id, const StoreHandle &handle);
 
 void StartTimer(const std::string &name);
 
@@ -36,16 +44,17 @@ struct Shard {
   size_t size;
 };
 
-StoreHandle AssembleShards(int64_t local_device_id, int64_t global_device_id, zuku::ShardedShape shape,
-               legate_xla::Shard shard,
+StoreHandle
+AssembleShards(int64_t local_device_id, int64_t global_device_id,
+               zuku::ShardedShape shape, legate_xla::Shard shard,
                std::shared_ptr<LegateStream> stream,
                std::optional<StoreHandle> existing_store = std::nullopt);
 
-std::set<int> GetLocalDevices(int my_node);
+std::set<int> GetLocalDevices();
 
 bool IsGpu();
 
-void StoreBufferAction(int64_t local_device_id, BufferAction* actions,
+void StoreBufferAction(int64_t local_device_id, BufferAction *actions,
                        const StoreHandle &store, bool blocking);
 
 void FenceCompilation();

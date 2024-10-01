@@ -14,8 +14,8 @@ function(find_or_configure_xla)
 
   rapids_cpm_find(xla ${version}
       GLOBAL_TARGETS     xla::xla
-      BUILD_EXPORT_SET   legate-xla-exports
-      INSTALL_EXPORT_SET legate-xla-exports
+      BUILD_EXPORT_SET   legate-jax-exports
+      INSTALL_EXPORT_SET legate-jax-exports
       CPM_ARGS
         GIT_REPOSITORY ${git_repo}
         GIT_TAG        ${git_tag}

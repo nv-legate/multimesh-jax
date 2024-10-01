@@ -3,7 +3,6 @@ from .legate_jax_impl import (
     shutdown,
     replicate_parameters_smaller_than_num_elements,
     set_store_cache_min_parallelism,
-    fence,
     unregister_task,
     clear_tasks,
     compile_hlo_module,

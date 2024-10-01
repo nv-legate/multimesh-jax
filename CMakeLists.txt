@@ -79,10 +79,9 @@ endif()
 
 if (NOT LegateJAX_FOUND)
   include(cmake/third_party/get_realm.cmake)
+  include(cmake/third_party/get_zuku.cmake)
   add_subdirectory(src)
 endif()
-
-include(cmake/third_party/get_zuku.cmake)
 
 include(GNUInstallDirs)
 rapids_cmake_install_lib_dir(lib_dir)

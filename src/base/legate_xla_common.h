@@ -4,12 +4,12 @@
 #include <condition_variable>
 #include <functional>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <stdint.h>
 #include <utility>
 #include <variant>
 #include <vector>
-#include <numeric>
 
 #include "src/zuku/shape.h"
 
@@ -28,11 +28,13 @@ struct BufferAllocation {
 };
 
 struct InputOutputAliasConfig {
-  std::unordered_map<int64_t,int64_t> param_to_output;
-  std::unordered_map<int64_t,int64_t> output_to_param;
+  std::unordered_map<int64_t, int64_t> param_to_output;
+  std::unordered_map<int64_t, int64_t> output_to_param;
 };
 
 struct CompileConfig {
+  int replica_count = 1;
+  int num_partitions = 1;
   bool run_hlo_passes = true;
   int stream_executor_index = 0;
   TaskMemoryAllocator *allocator = nullptr;
@@ -42,45 +44,43 @@ struct CompileConfig {
 };
 
 struct DeviceConfig {
-  int local_device_id = 0;
-  int global_device_id = 0;
-  int replica_count = 1;
-  int num_partitions = 1;
+  int64_t local_device_id = 0;
+  int64_t global_device_id = 0;
+  int64_t replica_count = 1;
+  int64_t num_partitions = 1;
 };
-
 
 class DeviceAssignment {
 public:
-  explicit DeviceAssignment(const DeviceConfig &config)
+  explicit DeviceAssignment(const DeviceConfig &config,
+                            zuku::DeviceList devices)
       : local_device_id_(config.local_device_id),
         global_device_id_(config.global_device_id),
         replica_count_(config.replica_count),
-        num_partitions_(config.num_partitions),
-        global_device_ids_(config.replica_count * config.num_partitions,
-                           /*fill_value=*/-1) {}
+        num_partitions_(config.num_partitions), devices_(std::move(devices)) {}
 
-  int &operator()(int replica, int partition) {
-    return global_device_ids_[partition * replica_count_ + replica];
+  int64_t operator()(int replica, int partition) {
+    return devices_[partition * replica_count_ + replica];
   }
 
-  int GlobalDeviceId() const { return global_device_id_; }
+  int64_t GlobalDeviceId() const { return global_device_id_; }
 
-  int LocalDeviceId() const { return local_device_id_; }
+  int64_t LocalDeviceId() const { return local_device_id_; }
 
-  int ReplicaCount() const { return replica_count_; }
+  int64_t ReplicaCount() const { return replica_count_; }
 
-  int NumPartitions() const { return num_partitions_; }
+  int64_t NumPartitions() const { return num_partitions_; }
 
-  int GlobalDeviceId(int replica, int partition) const {
-    return global_device_ids_[partition * replica_count_ + replica];
+  int64_t GlobalDeviceId(int replica, int partition) const {
+    return devices_[partition * replica_count_ + replica];
   }
 
 private:
-  int local_device_id_;
-  int global_device_id_;
-  int replica_count_;
-  int num_partitions_;
-  std::vector<int> global_device_ids_;
+  int64_t local_device_id_;
+  int64_t global_device_id_;
+  int64_t replica_count_;
+  int64_t num_partitions_;
+  zuku::DeviceList devices_;
 };
 
 class LegateExecutable {
@@ -165,8 +165,6 @@ public:
   virtual ~BufferAction() = default;
 };
 
-
-
 struct ScalarArgument {
   using ValueVariant =
       std::variant<float, double, int32_t, int64_t, uint32_t, uint64_t>;
@@ -182,9 +180,21 @@ struct StoreHandle {
   ~StoreHandle();
 };
 
-const zuku::Sharding& GetSharding(const StoreHandle& handle);
-StoreHandle View(const StoreHandle& handle);
-StoreHandle Child(const StoreHandle& handle);
+const zuku::Sharding &GetSharding(const StoreHandle &handle);
+StoreHandle View(const StoreHandle &handle);
+StoreHandle Child(const StoreHandle &handle);
 
+struct BufferHandleImpl;
+struct BufferHandle {
+  std::shared_ptr<BufferHandleImpl> impl;
+  ~BufferHandle();
+};
+
+static constexpr int64_t kTempMinAlignment = 4096;
+
+inline int64_t AlignTempSize(int64_t size) {
+  return ((size + kTempMinAlignment - 1) / kTempMinAlignment) *
+         kTempMinAlignment;
+}
 
 } // namespace legate_xla

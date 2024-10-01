@@ -19,12 +19,16 @@
 #include "legate_xla_common.h"
 #include "task_utils.h"
 #include "xla_task.h"
-#include <zuku/vector.h>
 #include <zuku/tiled_array.h>
+#include <zuku/vector.h>
 
 namespace legate_xla {
 
-void RunExecutable(int64_t run_id, std::shared_ptr<LegateCompiler> compiler, std::vector<ScalarArgument> scalars,
-                   zuku::ro_vector<zuku::ShardedArray> inputs, zuku::rw_vector<zuku::ShardedArray> outputs);
+void RunExecutable(int64_t run_id, zuku::DeviceList devices, zuku::Processor p,
+                   std::shared_ptr<LegateCompiler> compiler,
+                   std::vector<ScalarArgument> scalars,
+                   zuku::ro_vector<zuku::ShardedArray> inputs,
+                   zuku::rw_vector<zuku::ShardedArray> outputs,
+                   const zuku::ArrayTile &temp);
 
 } // namespace legate_xla
