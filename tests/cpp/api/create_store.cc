@@ -14,13 +14,13 @@
  *
  */
 
-#include "legate_xla_utils.h"
 #include <gtest/gtest.h>
 #include <legate_xla_common.h>
 #include <numeric>
 #include <xla_to_legate.h>
+#include <zuku/shape.h>
 
-using SupportedType = legate_xla::SupportedType;
+using SupportedType = zuku::SupportedType;
 static constexpr std::array all_types = {
     SupportedType::S32, SupportedType::F32, SupportedType::F64,
     SupportedType::S8,  SupportedType::S16, SupportedType::S32,
@@ -41,8 +41,8 @@ private:
 };
 
 template <class T>
-void test_create_store_tmpl(legate_xla::Shape shape, size_t num_devices) {
-  auto type_size = legate_xla::SupportedTypeSizeOf(shape.type);
+void test_create_store_tmpl(zuku::ShardedShape shape, size_t num_devices) {
+  auto type_size = zuku::SupportedTypeSizeOf(shape.type);
   auto num_elements = legate_xla::ShapeNumElements(shape);
   size_t shard_num_elements = num_elements / num_devices;
   size_t shard_size = shard_num_elements * type_size;

@@ -1,16 +1,12 @@
+from jax_plugins.legate import init_test
+
+init_test()
+
 import jax
 import jax._src.test_util as jtu
 import jax.numpy as jnp
 import numpy as np
 from absl.testing import absltest
-
-try:
-    from jax_plugins.legate import init
-
-    init()
-except ImportError:
-    pass
-
 from jax import config
 from jax.sharding import (
     Mesh,

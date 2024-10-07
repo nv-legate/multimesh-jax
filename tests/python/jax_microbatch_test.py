@@ -1,3 +1,7 @@
+from jax_plugins.legate import init_test
+
+init_test()
+
 import jax
 import jax._src.test_util as jtu
 import jax.numpy as jnp

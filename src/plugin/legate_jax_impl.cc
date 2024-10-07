@@ -6,6 +6,7 @@
 #include <string>
 
 #include "legate_to_xla.h"
+#include "legate_xla_common.h"
 
 extern "C" void RegisterImplicitTask(
     std::string matcher, std::vector<int64_t> devices,
@@ -32,8 +33,6 @@ extern "C" void EnableOnlyFuseLoopTasks(bool enable);
 extern "C" void EnableTaskFusion(bool enable);
 
 extern "C" void ClearImplicitTasks();
-
-extern "C" void EnableLegateTracing(bool enable);
 
 extern "C" void EnableLegateRecomputation(bool enable);
 
@@ -110,6 +109,24 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       py::arg("fusion_color") = 0, py::arg("loop_submesh_size") = py::none(),
       py::arg("loop_submesh_reverse") = false);
   m.def(
+      "set_startup_config",
+      [](std::optional<int> cpus, std::optional<int> gpus,
+         std::optional<int64_t> fbmem, std::optional<int64_t> sysmem,
+         std::optional<int64_t> zcmem, std::optional<std::string> network,
+         bool kthreads) {
+        legate_xla::SetStartupConfig({.cpus = cpus,
+                                      .gpus = gpus,
+                                      .fbmem = fbmem,
+                                      .zcmem = zcmem,
+                                      .sysmem = sysmem,
+                                      .network = std::move(network),
+                                      .kthreads = kthreads});
+      },
+      py::arg("cpus") = py::none(), py::arg("gpus") = py::none(),
+      py::arg("fbmem") = py::none(), py::arg("sysmem") = py::none(),
+      py::arg("zcmem") = py::none(), py::arg("network") = py::none(),
+      py::arg("kthreads") = false);
+  m.def(
       "_register_task_factory",
       [](py::str task_regex,
          std::function<std::vector<int64_t>(const std::string &)>
@@ -156,9 +173,6 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       [](bool enable) { EnableOnlyFuseLoopTasks(enable); }, py::arg("enable"));
   m.def(
       "enable_task_fusion", [](bool enable) { EnableTaskFusion(enable); },
-      py::arg("enable"));
-  m.def(
-      "enable_tracing", [](bool enable) { EnableLegateTracing(enable); },
       py::arg("enable"));
   m.def(
       "split_large_traces", [](bool split) { SplitLargeTraces(split); },

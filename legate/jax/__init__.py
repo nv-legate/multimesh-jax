@@ -6,6 +6,7 @@ from .legate_jax_impl import (
     unregister_task,
     clear_tasks,
     compile_hlo_module,
+    set_startup_config,
 )
 
 from .legate_xla_compiler import register_custom_call_target
@@ -14,7 +15,6 @@ from .lib import (
     autoshard,
     context,
     enable_fast_path,
-    enable_tracing,
     enable_recomputation,
     enable_task_fusion,
     only_fuse_loop_tasks,

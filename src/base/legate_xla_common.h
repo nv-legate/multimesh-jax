@@ -15,6 +15,16 @@
 
 namespace legate_xla {
 
+struct StartupConfig {
+  std::optional<int> cpus;
+  std::optional<int> gpus;
+  std::optional<int64_t> fbmem;
+  std::optional<int64_t> zcmem;
+  std::optional<int64_t> sysmem;
+  std::optional<std::string> network;
+  bool kthreads{false};
+};
+
 class TaskMemoryAllocator {
 public:
   virtual void *Allocate(size_t size) = 0;
@@ -196,5 +206,7 @@ inline int64_t AlignTempSize(int64_t size) {
   return ((size + kTempMinAlignment - 1) / kTempMinAlignment) *
          kTempMinAlignment;
 }
+
+void SetStartupConfig(StartupConfig cfg);
 
 } // namespace legate_xla

@@ -51,6 +51,8 @@ BufferHandle::~BufferHandle() {}
 
 namespace {
 
+StartupConfig startup_config;
+
 Realm::Runtime rt;
 
 std::vector<Realm::Event> last_execute_tasks;
@@ -80,11 +82,18 @@ zuku::View<zuku::ShardedArray> GetView(const StoreHandle &handle) {
 }
 
 std::vector<zuku::View<zuku::ShardedArray>>
-GetViews(const std::vector<StoreHandle> &handles) {
+GetViews(const std::vector<StoreHandle> &handles,
+         const std::set<int64_t> &output_ids) {
   std::vector<zuku::View<zuku::ShardedArray>> views;
   views.reserve(handles.size());
   for (auto &&handle : handles) {
-    views.push_back(GetView(handle));
+    if (output_ids.find(handle.unique_id) != output_ids.end()) {
+      // create a view outside the dependency analysis
+      // this will also be passed as an output
+      views.push_back(handle.impl->array.unsafe_view());
+    } else {
+      views.push_back(GetView(handle));
+    }
   }
   return views;
 }
@@ -191,7 +200,6 @@ void OffloadDtoH(const std::vector<StoreHandle> &to_offload,
 std::set<int> GetLocalDevices() {
   std::set<int> procs;
   for (auto &&p : zuku::Processor::DefaultProcs()) {
-    std::cerr << "Have local device : " << p.local_id() << std::endl;
     procs.insert(p.global_id());
   }
   return procs;
@@ -244,11 +252,18 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                        const std::vector<StoreHandle> &outputs,
                        const BufferHandle &temp_buffer,
                        std::vector<std::function<void()>> *on_done) {
-
   zuku::Processor p = LocalProcessor(local_device_id);
+
+  // if any of the outputs overlap with the inputs, then the inputs should be an
+  // unsafe view
+  std::set<int64_t> output_ids;
+  for (auto &&output : outputs) {
+    output_ids.insert(output.unique_id);
+  }
+
   int64_t index = 0;
   Realm::Event prev_task = LastExecuteTask(p);
-  auto view_inputs = GetViews(inputs);
+  auto view_inputs = GetViews(inputs, output_ids);
   auto store_outputs = GetStores(outputs);
   zuku::View<zuku::ArrayTile> temp = temp_buffer.impl->tile.view();
 
@@ -321,10 +336,17 @@ StoreHandle AssembleShards(int64_t local_device_id, int64_t global_device_id,
   }();
 
   auto token = on(p).defer(
-      [](legate_xla::Shard shard, zuku::ShardedArray &array) {
+      [](std::shared_ptr<LegateStream> stream, zuku::Processor p,
+         legate_xla::Shard shard, zuku::ShardedArray &array) {
         // TODO: do the slicing
+        if (p.type() == zuku::Processor::Type::CPU) {
+          ::memcpy(array.tile().data(), shard.data, shard.size);
+        } else if (p.type() == zuku::Processor::Type::GPU) {
+          stream->MemcpyDtoDAsync(array.tile().data(), shard.data, shard.size,
+                                  /*cpu=*/false, shard.local_device_id);
+        }
       },
-      shard, GetStore(output));
+      std::move(stream), p, shard, GetStore(output));
 
   if (!IsGpu()) {
     token.Wait();
@@ -374,7 +396,7 @@ BufferHandle CreateBuffer(int64_t local_device_id, int64_t global_device_id,
 StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
                         zuku::ShardedShape shape,
                         std::optional<std::string> name) {
-  const zuku::DeviceList &devices = shape.sharding.mesh.devices;
+  const zuku::DeviceList &devices = shape.sharding.devices;
 
   zuku::Processor p = LocalProcessor(local_device_id);
   zuku::Store<zuku::ShardedArray> array =
@@ -405,13 +427,26 @@ void StopLegate() {
   bool is_not_stopped = false;
   bool is_stopped = true;
   if (stopped.compare_exchange_strong(is_not_stopped, is_stopped)) {
-    zuku::stop(rt, Realm::Event::merge_events(last_execute_tasks));
+    Realm::Event last_event = Realm::Event::merge_events(last_execute_tasks);
+    // explicitly wait for everything to finish
+    last_event.wait();
+    ShutdownLegateClient();
+    zuku::stop(rt, last_event);
   }
 }
 
 void StartLegate() {
   std::array argv = {"legate-jax"};
-  rt = zuku::Init(1, (char **)argv.data(), {.cpus = 1, .network = false});
+  rt = zuku::Init(argv.size(), (char **)argv.data(),
+                  {
+                      .cpus = startup_config.cpus,
+                      .gpus = startup_config.gpus,
+                      .sysmem = startup_config.sysmem,
+                      .fbmem = startup_config.fbmem,
+                      .zcmem = startup_config.zcmem,
+                      .network = startup_config.network.value_or("default"),
+                      .kthreads = startup_config.kthreads,
+                  });
   const auto &procs = zuku::Processor::DefaultProcs();
   last_execute_tasks.reserve(procs.size());
   for (auto &&proc : procs) {
@@ -420,6 +455,8 @@ void StartLegate() {
   // This has to come after PyFinalize
   atexit(StopLegate);
 }
+
+void SetStartupConfig(StartupConfig cfg) { startup_config = cfg; }
 
 } // namespace legate_xla
 

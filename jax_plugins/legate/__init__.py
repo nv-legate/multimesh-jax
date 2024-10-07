@@ -3,7 +3,7 @@ from pathlib import Path
 import atexit
 import functools
 
-from .init import init
+from .init import init, init_test
 
 
 def initialize():

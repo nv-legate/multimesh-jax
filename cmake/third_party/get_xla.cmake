@@ -49,7 +49,7 @@ function(find_or_configure_xla)
     "//xla/pjrt/legate:liblegate_xla_client.so"
     "//xla/pjrt/legate:legate_xla_compiler.so"
   )
-  if (LegateXla_ENABLE_TESTS)
+  if (LegateJAX_ENABLE_TESTS)
     foreach(test ${test_names})
       list(APPEND target_names "//xla/pjrt/legate:${test}")
       list(APPEND xla_source_files "${xla_SOURCE_DIR}/xla/pjrt/legate/${test}.cc")

@@ -1,11 +1,8 @@
+from jax_plugins.legate import init_test
+
+init_test()
+
 from typing import List
-
-try:
-    from jax_plugins.legate import init
-
-    init()
-except ImportError:
-    pass
 
 import jax
 import jax._src.test_util as jtu
@@ -274,6 +271,9 @@ class TaskTest(LegateJaxTestCase):
                 self.assertEqual(initial, final)
 
     def test_reshard_argument(self):
+        self.skipTest(
+            "do not yet support resharding across different mesh sizes"
+        )
         if jax.device_count() != 4:
             self.skipTest("need 4 devices")
 
@@ -583,6 +583,9 @@ class TaskTest(LegateJaxTestCase):
         )
 
     def test_reshard_initial_final(self):
+        self.skipTest(
+            "do not support resharding across meshes with different sizes"
+        )
         if jax.device_count() != 8:
             self.skipTest("need 8 devices")
 

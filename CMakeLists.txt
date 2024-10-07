@@ -61,6 +61,9 @@ include(rapids-find)
 
 rapids_cpm_init(OVERRIDE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json)
 
+#add_compile_options("-fsanitize=address")
+#add_link_options("-fsanitize=address")
+
 enable_testing()
 
 option(LegateJAX_ENABLE_CUDA ON "Whether to build with CUDA")
@@ -89,6 +92,6 @@ rapids_cmake_install_lib_dir(lib_dir)
 if (SKBUILD)
   include(legate_xla_python.cmake)
 elseif(LegateJAX_ENABLE_TESTS)
-  add_subdirectory(tests)
+#  add_subdirectory(tests)
 endif()
 

@@ -18,7 +18,6 @@ from .legate_jax_impl import (
     enable_only_fuse_loop_tasks as _enable_only_fuse_loop_tasks,
     enable_recomputation as _enable_recomputation,
     enable_task_fusion as _enable_task_fusion,
-    enable_tracing as _enable_tracing,
     set_host_offload_min_reuse_distance,
     set_store_cache_min_parallelism,
     set_strict_static_order,
@@ -169,27 +168,6 @@ def split_large_traces(
     with _set_context_value(
         split_large_traces, _split_large_traces, context_value
     ):
-        yield
-
-
-@contextmanager
-def enable_tracing(enable: Optional[bool] = None, context_value=[False]):
-    """Sets whether runtime tracing should be used to limit overhead.
-
-    The runtime performs numerous dependency analyses which can lead to very
-    high overheads for some programs. Tracing records dependencies and events
-    over the first few function calls. Tracing causes extra overhead on the
-    first few calls, but should reduce overhead on future function calls.
-    In some cases, tracing may slow execution for all function calls.
-
-    Args:
-        enable: optional, whether tracing should be enabled
-        context_value: optional, a global variable holding the current context
-            value. The user should never pass this value. The program begins
-            in a context with ``enable`` False, which means that tracing is
-            not enabled.
-    """
-    with _set_context_value(enable, _enable_tracing, context_value):
         yield
 
 
@@ -521,8 +499,6 @@ def _context(
 ):
     with tasks(configurable=_configurable) as A, autoshard(
         _autoshard
-    ) as B, strict_static_order(_strict_static_order) as C, enable_tracing(
-        _enable_tracing
     ) as D, host_offload_min_reuse_distance(
         _host_offload_min_reuse_distance
     ) as E, only_fuse_loop_tasks(
@@ -544,7 +520,6 @@ def context(
     configurable=None,
     autoshard: Optional[bool] = None,
     strict_static_order: Optional[bool] = None,
-    enable_tracing: Optional[bool] = None,
     host_offload_min_reuse_distance: Optional[int] = None,
     only_fuse_loop_tasks: Optional[bool] = None,
     split_large_traces: Optional[bool] = None,
@@ -559,7 +534,6 @@ def context(
           contexts. Useful for injecting user-defined classes with gin/fiddle.
         autoshard: optional, value to configure the :func:`.autoshard` context manager.
         strict_static_order: optional, value to configure the :func:`.strict_static_order` context manager.
-        enable_tracing: optional, value to configure the :func:`.enable_tracing` context manager.
         host_offload_min_reuse_distance: optional, value to configure the :func:`.host_offload_min_reuse_distance` context manager.
         only_fuse_loop_tasks: optional, value to configure the :func:`.only_fuse_loop_tasks` context manager.
         split_large_traces: optional, value to configure the :func:`.split_large_traces` context manager.
@@ -571,7 +545,6 @@ def context(
         _configurable=configurable,
         _autoshard=autoshard,
         _strict_static_order=strict_static_order,
-        _enable_tracing=enable_tracing,
         _host_offload_min_reuse_distance=host_offload_min_reuse_distance,
         _only_fuse_loop_tasks=only_fuse_loop_tasks,
         _split_large_traces=split_large_traces,
