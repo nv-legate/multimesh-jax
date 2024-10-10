@@ -2,7 +2,6 @@
 
 import argparse
 import glob
-import math
 import os
 import re
 import runpy
@@ -431,7 +430,7 @@ paxml.add_argument(
     help="Whether to dump all intermediate HLO modules",
 )
 
-args = parser.parse_args()
+args, realm_argv = parser.parse_known_args()
 
 
 if args.host_offload_min_reuse_distance > 0 and args.gpus > args.cpus:
@@ -517,19 +516,6 @@ if existing_xla_flags := os.environ.get("XLA_FLAGS", None):
     xla_flags.append(existing_xla_flags)
 
 env["XLA_FLAGS"] = " ".join(xla_flags)
-
-if args.gpus == 0:
-    if args.eager_sysmem is None:
-        eager_alloc_percentage = 50
-    else:
-        eager_alloc_percentage = math.ceil(
-            args.eager_sysmem * 100 / args.sysmem
-        )
-else:
-    if args.eager_fbmem is None:
-        eager_alloc_percentage = 50
-    else:
-        eager_alloc_percentage = math.ceil(args.eager_fbmem * 100 / args.fbmem)
 
 num_nodes = args.nodes or 1
 total_parallelism = args.tp * args.pp * args.dp * args.fsdp
@@ -632,11 +618,15 @@ class PaxTransformerConfig:
         transformer_axes = [
             ("replica", "x"),
             ("data", "y"),
-            ("mdl", "z"),
-            # we minimally need to shard on z dimension here
-            # to ensure that input batches are fully sharded
-            ("seq", "z"),
         ]
+
+        if args.sequence_parallel:
+            transformer_axes.append(("seq", "z"))
+            transformer_axes.append(("mdl", "z"))
+        else:
+            transformer_axes.append(("mdl", "z"))
+            transformer_axes.append(("seq", "z"))
+
         transformer_mesh = [
             transformer_x_dim,
             transformer_y_dim,
@@ -773,7 +763,6 @@ import paxml.trainer_lib
 
 PaxLegateConfig:
   configurable = @PaxTransformerConfig
-  enable_tracing = {args.enable_tracing}
   local_mesh = ({args.dp}, {args.fsdp}, {args.tp}, 1)
 
 PaxTransformerConfig:
@@ -801,11 +790,10 @@ if args.backend == "legate":
         sysmem=args.sysmem * 1000,
         fbmem=args.fbmem * 1000,
         zcmem=args.zcmem * 1000,
-        eager_alloc_percentage=eager_alloc_percentage,
         network=args.network,
         debug=args.debug,
         profile=args.profile,
-        no_physical_tracing=args.no_physical_tracing,
+        realm_argv=realm_argv,
     )
 
 if args.dump_hlo:

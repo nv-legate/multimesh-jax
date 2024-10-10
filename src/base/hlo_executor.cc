@@ -41,11 +41,16 @@ void RunExecutable(int64_t run_id, zuku::DeviceList devices, zuku::Processor p,
                    zuku::ro_vector<zuku::ShardedArray> inputs,
                    zuku::rw_vector<zuku::ShardedArray> outputs,
                    const zuku::ArrayTile &temp) {
+  log_xla.debug() << "Executing " << compiler->Name() << " on "
+                  << p.global_id();
   TempBufferAllocator allocator{temp};
 
   using max_size_scalar_t = int64_t;
   max_size_scalar_t host_scalar_arguments[kMaxScalarArguments];
-  max_size_scalar_t *device_scalar_buffer = [&] {
+  max_size_scalar_t *device_scalar_buffer = [&]() {
+    if (scalars.size() == 0) {
+      return (max_size_scalar_t *)nullptr;
+    }
     if (p.type() == zuku::Processor::Type::GPU) {
       return static_cast<max_size_scalar_t *>(
           allocator.Allocate(sizeof(max_size_scalar_t) * scalars.size()));
@@ -79,6 +84,11 @@ void RunExecutable(int64_t run_id, zuku::DeviceList devices, zuku::Processor p,
       input_buffers.push_back(iter->second);
     } else {
       const zuku::ShardedArray &input_array = inputs[input_store_index++];
+      if (!input_array.HasTile()) {
+        std::cerr << "No tile on " << p.global_id() << " for array "
+                  << input_array.shape() << std::endl;
+        abort();
+      }
       input_buffers.push_back(BufferAllocation{
           .buffer = const_cast<void *>(
               input_array.tile()
@@ -121,8 +131,9 @@ void RunExecutable(int64_t run_id, zuku::DeviceList devices, zuku::Processor p,
       exe->Execute(run_id, input_buffers, output_buffers, &allocator,
                    device_assignment, platform, blocking);
 
+  log_xla.debug() << "Done executing " << compiler->Name();
+
   if (error_message.has_value()) {
-    std::cerr << *error_message << std::endl;
     throw std::runtime_error(*error_message);
   }
 }

@@ -32,7 +32,6 @@ Compiler contexts
    autoshard
    context
    enable_fast_path
-   enable_tracing
    enable_recomputation
    enable_task_fusion
    only_fuse_loop_tasks

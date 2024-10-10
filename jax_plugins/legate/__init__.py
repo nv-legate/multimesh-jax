@@ -24,4 +24,4 @@ def initialize():
 
     import legate.jax
 
-    # atexit.register(legate.jax.shutdown)
+    atexit.register(legate.jax.shutdown)

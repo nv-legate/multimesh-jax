@@ -5,6 +5,7 @@
 
 #include <mesh.h>
 #include <processor.h>
+#include <realm/logging.h>
 #include <realm/memory.h>
 #include <realm/processor.h>
 #include <shape.h>
@@ -33,21 +34,54 @@
 using zuku::after;
 using zuku::on;
 
+namespace {
+
+std::vector<zuku::Store<zuku::ShardedArray>> *keep_from_deleting{nullptr};
+std::vector<zuku::Future<zuku::ArrayTile>> *keep_tiles_from_deleting{nullptr};
+std::atomic<bool> runtime_stopped{false};
+
+} // namespace
+
 namespace legate_xla {
 
 struct StoreHandleImpl {
+  StoreHandleImpl(std::string n, zuku::Store<zuku::ShardedArray> &&a)
+      : name(std::move(n)), array(std::move(a)) {}
+
   std::string name;
 
   zuku::Store<zuku::ShardedArray> array;
+
+  StoreHandleImpl(const StoreHandleImpl &) = delete;
+
+  ~StoreHandleImpl() {
+    if (runtime_stopped.load()) {
+      // this must be occurring during python shutdown
+      // there is no more runtime anymore, which means
+      // we need to "leak" the array
+      keep_from_deleting->push_back(std::move(array));
+    }
+  }
 };
 
 StoreHandle::~StoreHandle() {}
 
 struct BufferHandleImpl {
+  BufferHandleImpl(zuku::Future<zuku::ArrayTile> &&t) : tile(std::move(t)) {}
+
   zuku::Future<zuku::ArrayTile> tile;
+  ~BufferHandleImpl() {
+    if (runtime_stopped.load()) {
+      // this is happening during Python shutdown and the
+      // tile must be "leaked" since there is no more runtime
+      keep_tiles_from_deleting->push_back(std::move(tile));
+    }
+  }
 };
 
 BufferHandle::~BufferHandle() {}
+
+Realm::Logger log_xla("legate.xla");
 
 namespace {
 
@@ -209,7 +243,8 @@ void CreateCompileTask(int64_t local_device_id,
                        std::shared_ptr<LegateCompiler> compiler) {
   zuku::Processor p = LocalProcessor(local_device_id);
 
-  // TODO, rotate which GPUs are used for compilation
+  log_xla.debug() << "CreateCompileTask: " << compiler->Name()
+                  << " on local device " << local_device_id;
   auto token =
       zuku::across(compiler->MachineSlice())
           .if_on(p)
@@ -245,13 +280,13 @@ void InvalidateDeviceInstances(const std::vector<StoreHandle> &stores,
 #endif
 
 void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
-                       zuku::DeviceList devices,
+                       int64_t global_device_id, zuku::DeviceList devices,
                        std::shared_ptr<LegateCompiler> compiler,
                        const std::vector<ScalarArgument> &scalars,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
                        const BufferHandle &temp_buffer,
-                       std::vector<std::function<void()>> *on_done) {
+                       std::function<void()> on_done) {
   zuku::Processor p = LocalProcessor(local_device_id);
 
   // if any of the outputs overlap with the inputs, then the inputs should be an
@@ -261,11 +296,43 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
     output_ids.insert(output.unique_id);
   }
 
-  int64_t index = 0;
   Realm::Event prev_task = LastExecuteTask(p);
   auto view_inputs = GetViews(inputs, output_ids);
   auto store_outputs = GetStores(outputs);
   zuku::View<zuku::ArrayTile> temp = temp_buffer.impl->tile.view();
+
+  log_xla.debug() << "creating execute task " << compiler->Name()
+                  << " across devices " << devices;
+  for (auto &&input : inputs) {
+    log_xla.debug() << compiler->Name() << " has input " << input.impl->name
+                    << ", " << input.impl->array->shape();
+  }
+
+  for (auto &&output : outputs) {
+    log_xla.debug() << compiler->Name() << " has output " << output.impl->name
+                    << ", " << output.impl->array->shape();
+  }
+
+  if (devices.Contains(global_device_id)) {
+    for (auto &&output : outputs) {
+      if (!output.impl->array->HasTile()) {
+        std::cerr << "ouput " << output.impl->name << " has no tile on "
+                  << global_device_id
+                  << ", tensor_id=" << output.impl->array->mesh_unique_id()
+                  << std::endl;
+        abort();
+      }
+    }
+    for (auto &&input : inputs) {
+      if (!input.impl->array->HasTile()) {
+        std::cerr << "input " << input.impl->name << " has no tile on "
+                  << global_device_id
+                  << ", tensor_id=" << input.impl->array->mesh_unique_id()
+                  << std::endl;
+        abort();
+      }
+    }
+  }
 
   auto token =
       zuku::across(std::move(devices))
@@ -286,14 +353,16 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
 
   if (on_done) {
     after(token).defer([](std::function<void()> callback) { callback(); },
-                       on_done->at(index));
+                       std::move(on_done));
   }
   SetLastExecuteTask(p, token.Event());
 }
 
 void Destroy(StoreHandle &store) {
-  // no need to synchronize -- just removing the reference
-  store.impl = nullptr;
+  if (runtime_stopped.load() == false) {
+    // no need to synchronize -- just removing the reference
+    store.impl = nullptr;
+  } // the runtime no longer exists, we can't delete
 }
 
 void StoreBufferAction(int64_t local_device_id, BufferAction *action,
@@ -322,6 +391,10 @@ void *SliceLocalShard(int64_t local_device_id, const StoreHandle &handle) {
   return const_cast<void *>(buffer.wait_and_get());
 }
 
+zuku::ShardedShape GetStoreShardedShape(const StoreHandle &handle) {
+  return handle.impl->array->shape();
+}
+
 StoreHandle AssembleShards(int64_t local_device_id, int64_t global_device_id,
                            zuku::ShardedShape shape, legate_xla::Shard shard,
                            std::shared_ptr<LegateStream> stream,
@@ -335,18 +408,26 @@ StoreHandle AssembleShards(int64_t local_device_id, int64_t global_device_id,
     return CreateStore(local_device_id, global_device_id, shape);
   }();
 
-  auto token = on(p).defer(
-      [](std::shared_ptr<LegateStream> stream, zuku::Processor p,
-         legate_xla::Shard shard, zuku::ShardedArray &array) {
-        // TODO: do the slicing
-        if (p.type() == zuku::Processor::Type::CPU) {
-          ::memcpy(array.tile().data(), shard.data, shard.size);
-        } else if (p.type() == zuku::Processor::Type::GPU) {
-          stream->MemcpyDtoDAsync(array.tile().data(), shard.data, shard.size,
-                                  /*cpu=*/false, shard.local_device_id);
-        }
-      },
-      std::move(stream), p, shard, GetStore(output));
+  log_xla.debug() << "AssembleShards: device=" << local_device_id
+                  << ", shape=" << shape << ", name=" << output.impl->name
+                  << ", id=" << output.unique_id;
+
+  auto token =
+      across(shape.sharding.devices)
+          .if_on(p)
+          .defer(
+              [](std::shared_ptr<LegateStream> stream, zuku::Processor p,
+                 legate_xla::Shard shard, zuku::ShardedArray &array) {
+                // TODO: do the slicing
+                if (p.type() == zuku::Processor::Type::CPU) {
+                  ::memcpy(array.tile().data(), shard.data, shard.size);
+                } else if (p.type() == zuku::Processor::Type::GPU) {
+                  stream->MemcpyDtoDAsync(array.tile().data(), shard.data,
+                                          shard.size,
+                                          /*cpu=*/false, shard.local_device_id);
+                }
+              },
+              std::move(stream), p, shard, GetStore(output));
 
   if (!IsGpu()) {
     token.Wait();
@@ -355,12 +436,24 @@ StoreHandle AssembleShards(int64_t local_device_id, int64_t global_device_id,
   return output;
 }
 
+void Rename(StoreHandle &handle, std::string name) {
+  log_xla.debug() << "renaming " << handle.impl->name << " to " << name
+                  << ", tensor_id=" << handle.impl->array->mesh_unique_id();
+  handle.impl->name = std::move(name);
+}
+
 void Reshard(int64_t local_device_id, int64_t global_device_id,
              const StoreHandle &src, const StoreHandle &dst) {
   zuku::View<zuku::ShardedArray> input = GetView(src);
   zuku::Store<zuku::ShardedArray> output = GetStore(dst);
 
   zuku::Processor p = LocalProcessor(local_device_id);
+
+  log_xla.debug() << "Reshard " << src.impl->name << " from " << input->shape()
+                  << " to " << output->shape()
+                  << " for source=" << input->mesh_unique_id()
+                  << " to dest=" << output->mesh_unique_id() << " on "
+                  << global_device_id;
 
   // zuku will create and execute a resharding plan
   zuku::Reshard(std::move(p), std::move(input), std::move(output));
@@ -385,12 +478,10 @@ BufferHandle CreateBuffer(int64_t local_device_id, int64_t global_device_id,
       .dims = {size},
   };
   zuku::Processor p = LocalProcessor(local_device_id);
-  BufferHandleImpl impl{
-      .tile = zuku::ArrayTile::CreateFuture(std::move(shape),
-                                            {.processor = std::move(p)}),
-  };
+  auto tile = zuku::ArrayTile::CreateFuture(std::move(shape),
+                                            {.processor = std::move(p)});
   return BufferHandle{.impl =
-                          std::make_shared<BufferHandleImpl>(std::move(impl))};
+                          std::make_shared<BufferHandleImpl>(std::move(tile))};
 }
 
 StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
@@ -402,6 +493,13 @@ StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
   zuku::Store<zuku::ShardedArray> array =
       zuku::ShardedArray::Create(std::move(shape), {.processor = std::move(p)});
 
+  const int64_t next_id = NextStoreId();
+  log_xla.debug() << "CreateStore: device=" << local_device_id
+                  << ", shape=" << shape
+                  << ", name=" << name.value_or("anonymous")
+                  << ", id=" << next_id
+                  << ", tensor_id=" << array->mesh_unique_id();
+
   std::string array_name = [&] {
     if (name.has_value()) {
       return *std::move(name);
@@ -409,10 +507,9 @@ StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
     return std::string("anonymous");
   }();
 
-  StoreHandleImpl impl{.name = std::move(array_name),
-                       .array = std::move(array)};
-  return StoreHandle{.impl = std::make_shared<StoreHandleImpl>(std::move(impl)),
-                     .unique_id = NextStoreId()};
+  return StoreHandle{.impl = std::make_shared<StoreHandleImpl>(
+                         std::move(array_name), std::move(array)),
+                     .unique_id = next_id};
 }
 
 void FenceCompilation() {
@@ -422,11 +519,16 @@ void FenceCompilation() {
   all_compilations.wait();
 }
 
+void FenceExecution() {
+  Realm::Event merged = Realm::Event::merge_events(last_execute_tasks);
+  merged.wait();
+}
+
 void StopLegate() {
-  static std::atomic<bool> stopped{false};
+
   bool is_not_stopped = false;
   bool is_stopped = true;
-  if (stopped.compare_exchange_strong(is_not_stopped, is_stopped)) {
+  if (runtime_stopped.compare_exchange_strong(is_not_stopped, is_stopped)) {
     Realm::Event last_event = Realm::Event::merge_events(last_execute_tasks);
     // explicitly wait for everything to finish
     last_event.wait();
@@ -437,6 +539,8 @@ void StopLegate() {
 
 void StartLegate() {
   std::array argv = {"legate-jax"};
+  keep_from_deleting = new std::vector<zuku::Store<zuku::ShardedArray>>;
+  keep_tiles_from_deleting = new std::vector<zuku::Future<zuku::ArrayTile>>;
   rt = zuku::Init(argv.size(), (char **)argv.data(),
                   {
                       .cpus = startup_config.cpus,
@@ -446,12 +550,14 @@ void StartLegate() {
                       .zcmem = startup_config.zcmem,
                       .network = startup_config.network.value_or("default"),
                       .kthreads = startup_config.kthreads,
+                      .argv = startup_config.argv,
                   });
   const auto &procs = zuku::Processor::DefaultProcs();
   last_execute_tasks.reserve(procs.size());
   for (auto &&proc : procs) {
     last_execute_tasks.push_back(Realm::Event::NO_EVENT);
   }
+
   // This has to come after PyFinalize
   atexit(StopLegate);
 }

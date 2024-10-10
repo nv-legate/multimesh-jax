@@ -11,13 +11,13 @@ void CreateCompileTask(int64_t local_device_id,
                        std::shared_ptr<LegateCompiler> compiler);
 
 void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
-                       zuku::DeviceList mesh,
+                       int64_t global_device_id, zuku::DeviceList mesh,
                        std::shared_ptr<LegateCompiler> compiler,
                        const std::vector<ScalarArgument> &scalars,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
                        const BufferHandle &temp_buffer,
-                       std::vector<std::function<void()>> *on_done);
+                       std::function<void()> on_done = nullptr);
 
 void OffloadDtoH(const StoreHandle &src, const StoreHandle &dst);
 
@@ -44,6 +44,8 @@ struct Shard {
   size_t size;
 };
 
+zuku::ShardedShape GetStoreShardedShape(const StoreHandle &handle);
+
 StoreHandle
 AssembleShards(int64_t local_device_id, int64_t global_device_id,
                zuku::ShardedShape shape, legate_xla::Shard shard,
@@ -57,7 +59,11 @@ bool IsGpu();
 void StoreBufferAction(int64_t local_device_id, BufferAction *actions,
                        const StoreHandle &store, bool blocking);
 
+void Rename(StoreHandle &handle, std::string name);
+
 void FenceCompilation();
+
+void FenceExecution();
 
 void Destroy(StoreHandle &store);
 

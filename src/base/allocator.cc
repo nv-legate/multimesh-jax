@@ -16,6 +16,7 @@
 
 #include "allocator.h"
 #include "legate_xla_common.h"
+#include "xla_task.h"
 #include <realm.h>
 #include <realm/event.h>
 #include <shape.h>
@@ -25,15 +26,26 @@
 namespace legate_xla {
 
 TempBufferAllocator::TempBufferAllocator(const zuku::ArrayTile &array)
-    : size_(array.byte_size()), base_ptr_(array.ptr<char>()), freed_size_(0) {
+    : size_(array.byte_size()),
+      base_ptr_(array.byte_size() > 0 ? array.ptr<char>() : nullptr),
+      freed_size_(0) {
   next_ptr_ = base_ptr_;
 }
 
 void *TempBufferAllocator::Allocate(size_t size) {
   const int64_t size_to_allocate = AlignTempSize(size);
 
+  log_xla.debug() << "Allocating temp of size " << size << " at pointer "
+                  << (void *)next_ptr_;
+
   void *ret_ptr = const_cast<char *>(next_ptr_);
   next_ptr_ += size_to_allocate;
+  if (next_ptr_ > (base_ptr_ + size_)) {
+    std::cerr << "requested size " << size
+              << " exceeds capacity of temp buffer of size " << size_
+              << std::endl;
+    abort();
+  }
 
   return ret_ptr;
 }
@@ -53,6 +65,7 @@ void *DynamicBufferAllocator::Allocate(size_t size) {
       .type = zuku::SupportedType::S8,
       .dims = {(int64_t)size},
   };
+  log_xla.debug() << "Allocating temp of size " << size;
   auto [event, tile] =
       zuku::ArrayTile::Create(std::move(shape), {.processor = proc_});
   // we don't have a good way to be asynchronous with XLA

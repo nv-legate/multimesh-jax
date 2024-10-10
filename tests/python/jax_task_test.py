@@ -241,8 +241,7 @@ class TaskTest(LegateJaxTestCase):
             expected_params = jax.tree_map(lambda x: x - 0.2 * x, params)
             x = params[0]
             expected_loss = 2 * (x * x).sum()
-            with legate.jax.enable_tracing(True):
-                loss, params = step(params)
+            loss, params = step(params)
             self.assertAllClose(expected_loss, loss)
             self.assertAllClose(expected_params, params)
 

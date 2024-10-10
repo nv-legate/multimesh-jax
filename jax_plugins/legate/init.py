@@ -18,6 +18,7 @@ def init(
     profile: Optional[str] = None,
     distributed: bool = False,
     dump: Optional[str] = None,
+    realm_argv: Optional[list[str]] = None,
     coordinator_address: str | None = None,
     num_processes: int = 1,
     process_id: int = 0,
@@ -39,7 +40,8 @@ def init(
         os.environ["XLA_FLAGS"] = (
             " ".join(new_xla_flags) + " " + existing_xla_flags
         )
-
+    if realm_argv is None:
+        realm_argv = []
     if debug is not None:
         realm_debug_levels = {
             "info": 2,
@@ -47,6 +49,8 @@ def init(
             "spew": 0,
         }
         level = realm_debug_levels[debug]
+        realm_argv.append("-level")
+        realm_argv.append(f"legate.xla={level}")
 
         xla_debug_levels = {
             "info": 1,
@@ -92,6 +96,7 @@ def init(
         sysmem=sysmem,
         network=network,
         kthreads=kthreads,
+        argv=realm_argv,
     )
 
     if disable_gc:

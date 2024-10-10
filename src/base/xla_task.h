@@ -22,7 +22,10 @@
 
 namespace legate_xla {
 
-void CopyDeviceToDevice(const void* src, zuku::ShardedArray& array);
-void ApplyStoreBufferAction(int64_t local_device_id, BufferAction* action, zuku::ShardedArray& array);
+void CopyDeviceToDevice(const void *src, zuku::ShardedArray &array);
+void ApplyStoreBufferAction(int64_t local_device_id, BufferAction *action,
+                            zuku::ShardedArray &array);
+
+extern Realm::Logger log_xla;
 
 } // namespace legate_xla

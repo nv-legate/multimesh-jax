@@ -489,7 +489,6 @@ def _context(
     _configurable=None,
     _autoshard: Optional[bool] = None,
     _strict_static_order: Optional[bool] = None,
-    _enable_tracing: Optional[bool] = None,
     _host_offload_min_reuse_distance=None,
     _only_fuse_loop_tasks=None,
     _split_large_traces=None,

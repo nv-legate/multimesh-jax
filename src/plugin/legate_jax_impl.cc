@@ -113,19 +113,21 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       [](std::optional<int> cpus, std::optional<int> gpus,
          std::optional<int64_t> fbmem, std::optional<int64_t> sysmem,
          std::optional<int64_t> zcmem, std::optional<std::string> network,
-         bool kthreads) {
+         bool kthreads, std::vector<std::string> argv) {
         legate_xla::SetStartupConfig({.cpus = cpus,
                                       .gpus = gpus,
                                       .fbmem = fbmem,
                                       .zcmem = zcmem,
                                       .sysmem = sysmem,
                                       .network = std::move(network),
-                                      .kthreads = kthreads});
+                                      .kthreads = kthreads,
+                                      .argv = argv});
       },
       py::arg("cpus") = py::none(), py::arg("gpus") = py::none(),
       py::arg("fbmem") = py::none(), py::arg("sysmem") = py::none(),
       py::arg("zcmem") = py::none(), py::arg("network") = py::none(),
-      py::arg("kthreads") = false);
+      py::arg("kthreads") = false,
+      py::arg("argv") = std::vector<std::string>{});
   m.def(
       "_register_task_factory",
       [](py::str task_regex,
