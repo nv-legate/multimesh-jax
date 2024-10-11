@@ -26,6 +26,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--stage",
+    type=str,
+    default=None,
+    help="the stage to build up to",
+)
+
+parser.add_argument(
     "--cuda-version",
     type=str,
     default="12.4.1",
@@ -82,6 +89,8 @@ if args.cache:
     cmds.append("--network=host")
     cmds.append("--add-host")
     cmds.append(f"host.docker.internal:{args.cache_port}")
+if args.stage:
+    cmds.append(f"--target={args.stage}")
 
 if args.image == "dev":
     dockerfile = "Dockerfile"

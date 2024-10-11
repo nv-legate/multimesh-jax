@@ -2,7 +2,7 @@
 
 LEGATE_BUILD_TYPE=${1:-Release}
 
-pushd /opt/legion
+pushd /opt/realm
 
 conda run --no-capture-out -n legere cmake -S . -B build -DCMAKE_GENERATOR:STRING=Ninja \
   -DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++ -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc \
@@ -20,3 +20,5 @@ conda run --no-capture-out -n legere cmake -S . -B build -DCMAKE_GENERATOR:STRIN
   -DCMAKE_INSTALL_PREFIX:PATH=/opt/install/miniconda/envs/legere
 
 conda run --no-capture-out -n legere cmake --build build
+
+popd

@@ -399,7 +399,7 @@ index ff3d89d..035d1b3 100644
  
  _TASK_HANDLE_RE = re.compile(r'(?:logs\.)?(\d+)\.(.*)\.([^.]+)\.\d+')
 diff --git a/paxml/partitioning.py b/paxml/partitioning.py
-index 7deb362..9d7436f 100644
+index 7deb362..a505fe8 100644
 --- a/paxml/partitioning.py
 +++ b/paxml/partitioning.py
 @@ -20,7 +20,7 @@ import dataclasses
@@ -564,18 +564,15 @@ index 7deb362..9d7436f 100644
    return compiled, compiled.input_shardings[0]
  
  
-@@ -740,7 +866,9 @@ class PmapPartitioner(Partitioner):
+@@ -740,6 +866,7 @@ class PmapPartitioner(Partitioner):
      ):
        if static_args:
          static_args = static_args.replace(unpadded_global_batch_size=None)
--      return partitioned_step_fn(state, prng_key, inputs, static_args)
 +      config = trainer_lib.PaxLegateConfig()
-+      with legate.jax.enable_tracing(config.enable_tracing):
-+        return partitioned_step_fn(state, prng_key, inputs, static_args)
+       return partitioned_step_fn(state, prng_key, inputs, static_args)
  
      return _wrapped_partitioned_step, None  # Input partition spec.
- 
-@@ -782,7 +910,10 @@ class PjitPartitioner(Partitioner):
+@@ -782,7 +909,10 @@ class PjitPartitioner(Partitioner):
      else:
        logging.info('Using provided mesh for PjitPartitioner')
      logging.info('device_mesh: %s', device_mesh)
@@ -587,7 +584,7 @@ index 7deb362..9d7436f 100644
  
      # Pjit'ed function to preprocess the prng key.
      self._broadcast_key_fn = None
-@@ -894,9 +1025,17 @@ class PjitPartitioner(Partitioner):
+@@ -894,9 +1024,17 @@ class PjitPartitioner(Partitioner):
    ) -> NestedJTensor:
      """Preprocess the input batch before using it."""
      if self._reshard_inputs:
@@ -607,7 +604,7 @@ index 7deb362..9d7436f 100644
      return padded_inputs
  
    def get_train_state_metadata(
-@@ -1009,7 +1148,8 @@ class PjitPartitioner(Partitioner):
+@@ -1009,7 +1147,8 @@ class PjitPartitioner(Partitioner):
        # need to keep this resharding, because the resharding is related to the
        # locations of the real data (inputs_split_mapping) and is not visible
        # from HLOs.
@@ -617,7 +614,7 @@ index 7deb362..9d7436f 100644
  
        fn_out = step_fn(
            self._jax_task,
-@@ -1043,18 +1183,14 @@ class PjitPartitioner(Partitioner):
+@@ -1043,18 +1182,14 @@ class PjitPartitioner(Partitioner):
      logging.info('step_fn fn_in_partition_specs=%s', fn_in_partition_specs)
      logging.info('step_fn fn_out_partition_specs=%s', fn_out_partition_specs)
  
@@ -644,7 +641,7 @@ index 7deb362..9d7436f 100644
      extra_kwargs = dict(in_shardings=fn_in_shardings)
      if not use_pspec_on_array_inputs:
        extra_kwargs = {}
-@@ -1172,7 +1308,17 @@ class PjitPartitioner(Partitioner):
+@@ -1172,7 +1307,16 @@ class PjitPartitioner(Partitioner):
          fn_out_partition_specs,
          use_pspec_on_array_inputs=use_pspec_on_array_inputs,
      )
@@ -656,14 +653,13 @@ index 7deb362..9d7436f 100644
 +      static_args: BaseStepFnStaticArgs | None = None,
 +    ):
 +      config = trainer_lib.PaxLegateConfig()
-+      with legate.jax.enable_tracing(config.enable_tracing):
-+        return partitioned_step_fn(state, prng_key, inputs, static_args)
++      return partitioned_step_fn(state, prng_key, inputs, static_args)
 +
 +    return _wrapped_partitioned_step
  
  
  class AutoShardingPjitPartitioner(PjitPartitioner):
-@@ -1296,8 +1442,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1296,8 +1440,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          else pjit.AUTO(self.global_mesh)
      )
  
@@ -678,7 +674,7 @@ index 7deb362..9d7436f 100644
          is_eval,
          fn_in_partition_specs,
          fn_out_partition_specs,
-@@ -1314,22 +1465,28 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1314,22 +1463,28 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          jax.tree.map(jnp.shape, inputs_shape_dtype),
          static_args,
      )
@@ -720,19 +716,16 @@ index 7deb362..9d7436f 100644
        discard_opt_states: bool = False,
        unpadded_global_batch_size: int | None = None,
    ) -> TrainStateMetadata:
-@@ -1408,7 +1565,10 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1408,6 +1563,8 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
                subset=self._auto_sharding_input_spec, superset=inputs
            )
        )
--      return partitioned_step_fn(state, prng_key, subset_extracted_inputs)
 +
 +      config = trainer_lib.PaxLegateConfig()
-+      with legate.jax.enable_tracing(config.enable_tracing):
-+        return partitioned_step_fn(state, prng_key, subset_extracted_inputs)
+       return partitioned_step_fn(state, prng_key, subset_extracted_inputs)
  
      self._auto_sharding_result = (
-         AutoShardingPjitPartitioner._AutoShardingResult(
-@@ -1440,6 +1600,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1440,6 +1597,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
      if not self._auto_sharding_result:
        self.get_train_state_metadata(discard_opt_states=is_eval)
      if step_fn is self._auto_sharding_info.step_fn:
@@ -963,7 +956,7 @@ index cfdc402..e475099 100644
          var_weight_hparams)
      train_state_pspecs = ckpt_task.create_train_state_partition_specs(
 diff --git a/paxml/trainer_lib.py b/paxml/trainer_lib.py
-index 6ec25e8..fb9cd5a 100644
+index 6ec25e8..87fc8e0 100644
 --- a/paxml/trainer_lib.py
 +++ b/paxml/trainer_lib.py
 @@ -19,7 +19,7 @@ import dataclasses
@@ -990,7 +983,7 @@ index 6ec25e8..fb9cd5a 100644
  from praxis import asserts
  from praxis import base_hyperparams
  from praxis import base_input
-@@ -90,6 +92,15 @@ PMAP_PARALLEL_AXIS_NAME = base_layer.PMAP_PARALLEL_AXIS_NAME
+@@ -90,6 +92,14 @@ PMAP_PARALLEL_AXIS_NAME = base_layer.PMAP_PARALLEL_AXIS_NAME
  instantiate = base_hyperparams.instantiate
  
  
@@ -1000,13 +993,12 @@ index 6ec25e8..fb9cd5a 100644
 +@gin.configurable
 +@dataclasses.dataclass
 +class PaxLegateConfig(legate.jax.ClientConfig):
-+  enable_tracing: bool = False
 +  local_mesh: Optional[tuple[int]] = None
 +
  class RunningMode(enum.Flag):
    """Running mode."""
  
-@@ -167,8 +178,7 @@ def create_train_state_metadata(
+@@ -167,8 +177,7 @@ def create_train_state_metadata(
      A TrainStateMetadata instance.
    """
    var_weight_hparams = jax_task.model.abstract_init_with_metadata(
@@ -1016,7 +1008,7 @@ index 6ec25e8..fb9cd5a 100644
    padded_global_shapes = jax_task.create_train_state_padded_shapes(
        var_weight_hparams, discard_opt_states=discard_opt_states
    )
-@@ -217,7 +227,8 @@ def write_post_init_model_hparams_file(
+@@ -217,7 +226,8 @@ def write_post_init_model_hparams_file(
      logging.info('post_init_model_params: %s', params_fpath)
      job_log_dir.mkdir(parents=True, exist_ok=True)
      hyper_params = model.abstract_init_with_mdl_config(
@@ -1026,7 +1018,7 @@ index 6ec25e8..fb9cd5a 100644
      )
      with params_fpath.open('w') as params_file:
        hyper_params_dump = base_hyperparams.nested_struct_to_text(hyper_params)
-@@ -379,7 +390,8 @@ def initialize_model_state(
+@@ -379,7 +389,8 @@ def initialize_model_state(
      is_eval_for_init = is_eval
    if not var_weight_hparams:
      var_weight_hparams = model.abstract_init_with_metadata(
@@ -1036,7 +1028,7 @@ index 6ec25e8..fb9cd5a 100644
      )
    logging.info('init_var prng_seed: %s', init_key)
    logging.info('var_weight_hparams: %s', var_weight_hparams)
-@@ -396,7 +408,7 @@ def initialize_model_state(
+@@ -396,7 +407,7 @@ def initialize_model_state(
        inputs = jax.tree.map(jnp.zeros_like, inputs_shape_dtype)
        if model.hparams.fprop_dtype == jnp.bfloat16:
          inputs = jax.tree.map(_maybe_to_bfloat16, inputs)
@@ -1045,7 +1037,7 @@ index 6ec25e8..fb9cd5a 100644
  
    initial_vars = init_fn(init_key)
    logging.info('initial_vars: %s', jax.tree.map(jnp.shape, initial_vars))
-@@ -809,7 +821,6 @@ class LossFnProtocol(Protocol):
+@@ -809,7 +820,6 @@ class LossFnProtocol(Protocol):
    ) -> tuple[JTensor, sgf.GradAuxInfo]:
      """Produces losses and grad info by passing the inputs through a model."""
  
@@ -1053,7 +1045,7 @@ index 6ec25e8..fb9cd5a 100644
  def _get_default_loss_fn(
      jax_task: tasks_lib.SingleTask,
      context_p: base_layer.JaxContext.HParams,
-@@ -920,6 +931,15 @@ class GradFnProtocol(Protocol):
+@@ -920,6 +930,15 @@ class GradFnProtocol(Protocol):
        A tuple of (values, grads).
      """
  
@@ -1069,7 +1061,7 @@ index 6ec25e8..fb9cd5a 100644
  
  def _get_default_grad_fn(
      excluded_for_grad: NestedMap, excluded_for_opt: NestedMap
-@@ -942,11 +962,11 @@ def _get_default_grad_fn(
+@@ -942,11 +961,11 @@ def _get_default_grad_fn(
  
      def _loss(
          mdl_vars_grad: NestedJTensor,
@@ -1084,7 +1076,7 @@ index 6ec25e8..fb9cd5a 100644
            lambda e, x, y: y if e else x,
            excluded_for_grad,
            mdl_vars_grad,
-@@ -958,8 +978,25 @@ def _get_default_grad_fn(
+@@ -958,8 +977,25 @@ def _get_default_grad_fn(
        g = jax.value_and_grad(_loss, has_aux=True, allow_int=True)
      else:
        g = functools.partial(learner.stochastic_gradient.grad_fn, _loss)
@@ -1112,7 +1104,7 @@ index 6ec25e8..fb9cd5a 100644
          lambda eo, eg, m, g: jnp.zeros_like(m) if eg and not eo else g,
          excluded_for_opt,
          excluded_for_grad,
-@@ -994,6 +1031,7 @@ def get_excluded_var_masks(
+@@ -994,6 +1030,7 @@ def get_excluded_var_masks(
    excluded_for_grad = tasks_lib.get_excluded_var_mask_for_grad(
        var_weight_hparams, learner
    )
@@ -1120,7 +1112,7 @@ index 6ec25e8..fb9cd5a 100644
    _log_bprop_include_exclude_list(var_weight_hparams, excluded_for_grad)
  
    # Excluded for optimizer states.
-@@ -1090,7 +1128,7 @@ def train_step_single_learner(
+@@ -1090,7 +1127,7 @@ def train_step_single_learner(
  
    if not var_weight_hparams:
      with base_layer.JaxContext.new_context(hparams=context_p):
@@ -1129,7 +1121,7 @@ index 6ec25e8..fb9cd5a 100644
    updated_model_vars = jax_task.maybe_adjust_train_state(  # pytype: disable=wrong-arg-types  # jax-ndarray
        step=states.step,
        mdl_vars=states.mdl_vars,
-@@ -1162,6 +1200,7 @@ def train_step_single_learner(
+@@ -1162,6 +1199,7 @@ def train_step_single_learner(
      wps_with_opt = tasks_lib.filter_vars_for_grad_or_opt(
          var_weight_hparams, excluded_for_learner
      )
@@ -1137,7 +1129,7 @@ index 6ec25e8..fb9cd5a 100644
      transformed_grads, new_opt_states = learner.update_states(
          grads, states.opt_states[0], vars_with_opt, wps_with_opt
      )
-@@ -1197,6 +1236,7 @@ def train_step_single_learner(
+@@ -1197,6 +1235,7 @@ def train_step_single_learner(
          states.mdl_vars,
          mdl_vars,
      )
@@ -1145,7 +1137,7 @@ index 6ec25e8..fb9cd5a 100644
      new_states = states.new_state(
          mdl_vars=mdl_vars, opt_states=[new_opt_states], extra_state=()
      )
-@@ -1300,7 +1340,7 @@ def eval_step_single_learner(
+@@ -1300,7 +1339,7 @@ def eval_step_single_learner(
      var_weight_hparams = model.abstract_init_with_metadata(
          inputs,
          do_eval=not jax_task.hparams.train.always_use_train_for_model_init,
@@ -1154,7 +1146,7 @@ index 6ec25e8..fb9cd5a 100644
  
    if fprop_dtype == jnp.float32:
      pass
-@@ -1554,7 +1594,7 @@ def initialize_partitioned_model_states(
+@@ -1554,7 +1593,7 @@ def initialize_partitioned_model_states(
    model = jax_task.model
    if not var_weight_hparams:
      var_weight_hparams = model.abstract_init_with_metadata(
@@ -1163,7 +1155,7 @@ index 6ec25e8..fb9cd5a 100644
      )
  
    train_state_partition_specs = (
-@@ -1601,19 +1641,19 @@ def initialize_partitioned_model_states(
+@@ -1601,19 +1640,19 @@ def initialize_partitioned_model_states(
        lambda p: jax.sharding.NamedSharding(global_mesh, p),
        prng_key_partition_spec,
    )
@@ -1181,7 +1173,7 @@ index 6ec25e8..fb9cd5a 100644
 +  train_state_shardings = train_state_partition_specs
  
 +  config = PaxLegateConfig()
-+  with legate.jax.context(configurable=config.configurable, enable_tracing=False):
++  with legate.jax.context(configurable=config.configurable):
 +    init_fn = pjit.pjit(
 +        init_model_from_seed,
 +        in_shardings=prng_key_shardings,
@@ -1193,7 +1185,7 @@ index 6ec25e8..fb9cd5a 100644
    train_state_provenance = train_states.build_train_state_provenance(
        partitioned_vars
    )
-@@ -1647,7 +1687,9 @@ def shard_on_batch_dim_partition_spec(
+@@ -1647,7 +1686,9 @@ def shard_on_batch_dim_partition_spec(
    sharding = [-1] * x_dim
    # Assume the first dim is batch, and fully shard the batch dim over the entire
    # mesh.

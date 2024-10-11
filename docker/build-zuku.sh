@@ -1,6 +1,7 @@
 #! /usr/bin/env bash
 
-pushd /opt/legate
+pushd /opt/zuku
+
 conda run --no-capture-out -n legere \
   cmake -S . -B build -DCMAKE_GENERATOR:STRING=Ninja \
   -DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++ -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc \
@@ -10,3 +11,7 @@ conda run --no-capture-out -n legere \
   -DCMAKE_INSTALL_RPATH:PATH=/opt/install/miniconda/envs/legere/lib \
   -DCMAKE_INSTALL_PREFIX:PATH=/opt/install/miniconda/envs/legere
 conda run --no-capture-out -n legere cmake --build build
+
+cmake --build build
+
+popd

@@ -36,7 +36,9 @@ conda run --no-capture-out -n legere cmake -S . -B build -DCMAKE_GENERATOR:STRIN
   -DCMAKE_LIBRARY_PATH:STRING=/usr/lib/x86_64-linux-gnu -DCMAKE_CXX_STANDARD:STRING=17 \
   -DLegateJAX_BAZEL_REMOTE_CACHE:STRING="${BAZEL_CACHE}" \
   -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Release \
-  -DCPM_xla_SOURCE:PATH=/opt/xla -Dlegate_core_ROOT:PATH=/opt/legate/build \
+  -DCPM_xla_SOURCE:PATH=/opt/xla \
+  -Dzuku_ROOT:PATH=/opt/zuku/build \
+  -Dzuku_SOURCE_DIR=/opt/zuku \
   -DLegateJAX_ASAN:BOOL=OFF \
   -DCMAKE_INSTALL_RPATH:PATH=/opt/install/miniconda/envs/legere/lib \
   -DCMAKE_INSTALL_PREFIX:PATH=/opt/install/miniconda/envs/legere
