@@ -247,6 +247,7 @@ void CreateCompileTask(int64_t local_device_id,
                   << " on local device " << local_device_id;
   auto token =
       zuku::across(compiler->MachineSlice())
+          .region("Compile " + compiler->Name())
           .if_on(p)
           .defer(
               [=](int64_t run_id, std::shared_ptr<LegateCompiler> compiler) {
@@ -338,6 +339,8 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
       zuku::across(std::move(devices))
           .if_on(p)
           .after(prev_task)
+          .region("Execute " + compiler->Name() + " processor " +
+                  std::to_string(p.global_id()))
           .defer(
               [=](int64_t run_id, std::shared_ptr<LegateCompiler> compiler,
                   std::vector<ScalarArgument> scalars,

@@ -27,6 +27,7 @@
 #include <processor.h>
 #include <type_traits.h>
 #include <type_traits>
+#include <zuku/profile.h>
 
 namespace legate_xla {
 namespace {
@@ -43,6 +44,7 @@ void RunExecutable(int64_t run_id, zuku::DeviceList devices, zuku::Processor p,
                    const zuku::ArrayTile &temp) {
   log_xla.debug() << "Executing " << compiler->Name() << " on "
                   << p.global_id();
+
   TempBufferAllocator allocator{temp};
 
   using max_size_scalar_t = int64_t;
