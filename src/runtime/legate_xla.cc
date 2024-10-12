@@ -3,6 +3,7 @@
 #include "xla_task.h"
 #include "xla_to_legate.h"
 
+#include <chrono>
 #include <mesh.h>
 #include <processor.h>
 #include <realm/logging.h>
@@ -39,6 +40,9 @@ namespace {
 std::vector<zuku::Store<zuku::ShardedArray>> *keep_from_deleting{nullptr};
 std::vector<zuku::Future<zuku::ArrayTile>> *keep_tiles_from_deleting{nullptr};
 std::atomic<bool> runtime_stopped{false};
+
+using std_timer = decltype(std::chrono::steady_clock::now());
+std::unordered_map<std::string, zuku::Future<std_timer>> pending_timers;
 
 } // namespace
 
@@ -234,7 +238,7 @@ void OffloadDtoH(const std::vector<StoreHandle> &to_offload,
 std::set<int> GetLocalDevices() {
   std::set<int> procs;
   for (auto &&p : zuku::Processor::DefaultProcs()) {
-    procs.insert(p.global_id());
+    procs.insert(p.local_id());
   }
   return procs;
 }
@@ -467,11 +471,26 @@ bool IsGpu() {
 }
 
 void StartTimer(const std::string &name) {
-  // TODO: start a timer
+  auto [start_time] = after(last_execute_tasks[0]).defer([]{
+    return std::chrono::steady_clock::now();
+  });
+  pending_timers.emplace(name, std::move(start_time));
 }
 
 void StopTimer(const std::string &name) {
-  // TODO: stop a timer
+  auto iter = pending_timers.find(name);
+  if (iter == pending_timers.end()){
+    log_xla.warning() << "cannot stop timer " << name << ", does not exist";
+    return;
+  }
+
+  after(last_execute_tasks[0]).defer([](std::string name, std_timer start_timer){
+    auto stop_timer = std::chrono::steady_clock::now();
+    std::chrono::duration<double> diff = stop_timer - start_timer;
+    log_xla.info() << name << " finished in " << diff.count() << "s";
+  }, std::move(iter->first), std::move(iter->second));
+
+  pending_timers.erase(iter);
 }
 
 BufferHandle CreateBuffer(int64_t local_device_id, int64_t global_device_id,
