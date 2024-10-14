@@ -42,7 +42,26 @@ FROM mellanox_install AS ucx_install
 RUN --mount=type=cache,from=ucx_build,source=/opt/ucx,target=/opt/ucx \
   cd /opt/ucx && make -j install
 
-FROM ucx_install AS zuku_build
+FROM ucx_install AS te_install
+COPY te /opt/te
+COPY install-te.sh /opt
+RUN conda run -n legere python -m pip install cmake
+RUN /opt/install-te.sh -e
+
+FROM te_install AS pip_install
+COPY chex /opt/chex
+COPY flax /opt/flax
+COPY clu /opt/clu
+COPY optax opt/optax
+COPY seqio /opt/seqio
+COPY orbax /opt/orbax
+COPY requirements.txt /opt
+COPY praxis /opt/praxis
+COPY paxml /opt/paxml
+COPY install-pip-dependencies.sh /opt
+RUN /opt/install-pip-dependencies.sh -e
+
+FROM pip_install AS zuku_build
 ARG LEGATE_BUILD_TYPE=Release
 COPY realm /opt/realm
 COPY build-realm.sh /opt
@@ -68,43 +87,15 @@ ARG BAZEL_CACHE=grpc://host.docker.internal:9092
 ENV PATH=$PATH:/opt/bazel
 COPY jax /opt/jaxlib
 COPY build-jaxlib.sh /opt
+RUN conda run -n legere python -m pip uninstall -y jaxlib
 RUN /opt/build-jaxlib.sh ${BAZEL_CACHE}
 RUN cd /opt/jaxlib && /opt/build-jaxlib.sh  ${BAZEL_CACHE} && \
-  conda run --no-capture-out -n legere python -m pip install dist/*.whl
+  conda run --no-capture-out -n legere python -m pip install dist/*.whl --force-reinstall --no-deps
 
 COPY jax /opt/jax
+RUN conda run -n legere python -m pip uninstall -y jax
 RUN cd /opt/jax && \
-  conda run --no-capture-out -n legere python -m pip install -e .
-
-FROM jax_build AS te_install
-COPY te /opt/te
-COPY install-te.sh /opt
-RUN conda run -n legere python -m pip install cmake
-RUN /opt/install-te.sh -e
-
-FROM te_install AS pip_install
-COPY chex /opt/chex
-COPY flax /opt/flax
-COPY clu /opt/clu
-COPY optax opt/optax
-COPY seqio /opt/seqio
-COPY orbax /opt/orbax
-COPY requirements.txt /opt
-COPY praxis /opt/praxis
-COPY paxml /opt/paxml
-COPY install-pip-dependencies.sh /opt
-RUN /opt/install-pip-dependencies.sh -e
-
-# The dependencies above might thrash jax/jaxlib
-# Force re-install them now
-RUN cd /opt/jaxlib && \
-  python -m pip uninstall jaxlib && \
-  conda run --no-capture-out -n legere \
-    python -m pip install dist/*.whl --force-reinstall --no-deps
-RUN cd /opt/jax && \
-  python -m pip uninstall jax && \
-  conda run --no-capture-out -n legere \
-    python -m pip install -e . --force-reinstall --no-deps
+  conda run --no-capture-out -n legere python -m pip install -e . --force-reinstall --no-deps
 
 COPY tags /opt/tags
 

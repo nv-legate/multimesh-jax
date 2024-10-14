@@ -2,6 +2,8 @@
 
 LEGATE_BUILD_TYPE=${1:-Release}
 
+set -e
+
 pushd /opt/realm
 
 conda run --no-capture-out -n legere cmake -S . -B build -DCMAKE_GENERATOR:STRING=Ninja \

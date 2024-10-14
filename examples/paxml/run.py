@@ -477,6 +477,7 @@ if args.backend == "legate":
     env["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
 xla_flags = [
+    "--xla_disable_hlo_passes=rematerialization",
     "--xla_gpu_enable_latency_hiding_scheduler=true",
     "--xla_gpu_enable_triton_gemm=false",
     "--xla_gpu_enable_highest_priority_async_stream=true",
