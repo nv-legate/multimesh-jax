@@ -10,6 +10,7 @@
 #include <realm/memory.h>
 #include <realm/processor.h>
 #include <shape.h>
+#include <type_traits.h>
 #include <zuku/defer.h>
 #include <zuku/future.h>
 #include <zuku/reshard.h>
@@ -115,14 +116,9 @@ void SetLastExecuteTask(const zuku::Processor &p, Realm::Event ev) {
       Realm::Event::merge_events(last_execute_tasks[p.local_id()], ev);
 }
 
-zuku::View<zuku::ShardedArray> GetView(const StoreHandle &handle) {
-  return handle.impl->array.view();
-}
-
-std::vector<zuku::View<zuku::ShardedArray>>
-GetViews(const std::vector<StoreHandle> &handles,
-         const std::set<int64_t> &output_ids) {
-  std::vector<zuku::View<zuku::ShardedArray>> views;
+zuku::store_variant_vector<zuku::ShardedArray>
+GetStores(const std::vector<StoreHandle>& handles, const std::set<int64_t>& output_ids) {
+  zuku::store_variant_vector<zuku::ShardedArray> views;
   views.reserve(handles.size());
   for (auto &&handle : handles) {
     if (output_ids.find(handle.unique_id) != output_ids.end()) {
@@ -130,22 +126,18 @@ GetViews(const std::vector<StoreHandle> &handles,
       // this will also be passed as an output
       views.push_back(handle.impl->array.unsafe_view());
     } else {
-      views.push_back(GetView(handle));
+      views.push_back(handle.impl->array);
     }
   }
   return views;
 }
 
-zuku::Store<zuku::ShardedArray> GetStore(const StoreHandle &handle) {
-  return handle.impl->array.child();
-}
-
-std::vector<zuku::Store<zuku::ShardedArray>>
+zuku::store_vector<zuku::ShardedArray>
 GetStores(const std::vector<StoreHandle> &handles) {
-  std::vector<zuku::Store<zuku::ShardedArray>> stores;
+  zuku::store_vector<zuku::ShardedArray> stores;
   stores.reserve(handles.size());
   for (auto &&handle : handles) {
-    stores.push_back(GetStore(handle));
+    stores.push_back(handle.impl->array);
   }
   return stores;
 }
@@ -302,7 +294,7 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
   }
 
   Realm::Event prev_task = LastExecuteTask(p);
-  auto view_inputs = GetViews(inputs, output_ids);
+  auto store_inputs = GetStores(inputs, output_ids);
   auto store_outputs = GetStores(outputs);
   zuku::View<zuku::ArrayTile> temp = temp_buffer.impl->tile.view();
 
@@ -355,7 +347,7 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                               std::move(compiler), std::move(scalars),
                               std::move(inputs), std::move(outputs), temp);
               },
-              run_id, compiler, scalars, std::move(view_inputs),
+              run_id, compiler, scalars, std::move(store_inputs),
               std::move(store_outputs), std::move(temp));
 
   if (on_done) {
@@ -380,7 +372,7 @@ void StoreBufferAction(int64_t local_device_id, BufferAction *action,
          zuku::ShardedArray &array) {
         ApplyStoreBufferAction(local_device_id, action, array);
       },
-      local_device_id, action, GetStore(store));
+      local_device_id, action, store.impl->array);
 
   if (blocking) {
     token.Wait();
@@ -393,8 +385,7 @@ void *SliceLocalShard(int64_t local_device_id, const StoreHandle &handle) {
       [](const zuku::ShardedArray &array) {
         // do the slicing
         return array.tile().data();
-      },
-      GetView(handle));
+      }, handle.impl->array);
   return const_cast<void *>(buffer.wait_and_get());
 }
 
@@ -434,7 +425,7 @@ StoreHandle AssembleShards(int64_t local_device_id, int64_t global_device_id,
                                           /*cpu=*/false, shard.local_device_id);
                 }
               },
-              std::move(stream), p, shard, GetStore(output));
+              std::move(stream), p, shard, output.impl->array);
 
   if (!IsGpu()) {
     token.Wait();
@@ -451,19 +442,19 @@ void Rename(StoreHandle &handle, std::string name) {
 
 void Reshard(int64_t local_device_id, int64_t global_device_id,
              const StoreHandle &src, const StoreHandle &dst) {
-  zuku::View<zuku::ShardedArray> input = GetView(src);
-  zuku::Store<zuku::ShardedArray> output = GetStore(dst);
+  //zuku::View<zuku::ShardedArray> input = GetView(src);
+  //zuku::Store<zuku::ShardedArray> output = GetStore(dst);
 
   zuku::Processor p = LocalProcessor(local_device_id);
 
-  log_xla.debug() << "Reshard " << src.impl->name << " from " << input->shape()
-                  << " to " << output->shape()
-                  << " for source=" << input->mesh_unique_id()
-                  << " to dest=" << output->mesh_unique_id() << " on "
+  log_xla.debug() << "Reshard " << src.impl->name << " from " << src.impl->array->shape()
+                  << " to " << dst.impl->array->shape()
+                  << " for source=" << src.impl->array->mesh_unique_id()
+                  << " to dest=" << dst.impl->array->mesh_unique_id() << " on "
                   << global_device_id;
 
   // zuku will create and execute a resharding plan
-  zuku::Reshard(std::move(p), std::move(input), std::move(output));
+  zuku::Reshard(std::move(p), src.impl->array, dst.impl->array);
 }
 
 bool IsGpu() {
