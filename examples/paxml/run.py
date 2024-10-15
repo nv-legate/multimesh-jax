@@ -57,27 +57,6 @@ legion.add_argument(
 )
 
 legion.add_argument(
-    "--eager-sysmem",
-    type=int,
-    default=None,
-    help="The amount in GB of host memory to reserve for eager allocations",  # noqa: E501
-)
-
-legion.add_argument(
-    "--eager-fbmem",
-    type=int,
-    default=None,
-    help="The amount in GB of frame-buffer memory to reserve for eager allocations",  # noqa: E501
-)
-
-legion.add_argument(
-    "--no-physical-tracing",
-    action="store_true",
-    default=False,
-    help="Whether to only perform logical tracing, not full physical tracing",
-)
-
-legion.add_argument(
     "--gpus",
     type=int,
     default=8,
@@ -93,9 +72,9 @@ legion.add_argument(
 
 legion.add_argument(
     "--profile",
-    type=str,
-    default=None,
-    help="The root of the profile file, if Legion profiling should be activated",  # noqa: E501
+    action=argparse.BooleanOptionalAction,
+    default=False,
+    help="whether nsys profiling events should be created",  # noqa: E501
 )
 
 xla = parser.add_argument_group("XLA")
@@ -132,10 +111,8 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
-    "--no-autoshard", dest="autoshard", action="store_false"
+    "--autoshard", default=True, action=argparse.BooleanOptionalAction
 )
-legate_jax.add_argument("--autoshard", dest="autoshard", action="store_true")
-
 
 legate_jax.add_argument(
     "--debug",
@@ -209,20 +186,6 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
-    "--enable-tracing",
-    action="store_true",
-    default=False,
-    help="Whether to enable Legion tracing for the training step",
-)
-
-legate_jax.add_argument(
-    "--split-large-traces",
-    action="store_true",
-    default=False,
-    help="Whether to split large traces into smaller sub-traces",
-)
-
-legate_jax.add_argument(
     "--strict-static-order",
     action="store_true",
     default=False,
@@ -252,21 +215,15 @@ legate_jax.add_argument(
 
 legate_jax.add_argument(
     "--distribute-embeddings",
-    action="store_true",
+    action=argparse.BooleanOptionalAction,
     default=False,
     help="Whether to distribute embeddings computation across all GPUs or include in Layer 0",  # noqa: E501
 )
 
 legate_jax.add_argument(
     "--sequence-parallel",
-    action="store_true",
-    dest="sequence_parallel",
-    help="Whether to use sequence parallelism",  # noqa: E501
-)
-legate_jax.add_argument(
-    "--no-sequence-parallel",
-    action="store_false",
-    dest="sequence_parallel",
+    action=argparse.BooleanOptionalAction,
+    default=False,
     help="Whether to use sequence parallelism",  # noqa: E501
 )
 
@@ -853,15 +810,13 @@ with legate.jax.enable_recomputation(
     True
 ) as A, legate.jax.only_fuse_loop_tasks(
     args.only_fuse_loop_tasks
-) as B, legate.jax.split_large_traces(
-    args.split_large_traces
-) as C, legate.jax.store_cache_min_parallelism(
+) as B, legate.jax.store_cache_min_parallelism(
     args.cache_parallelism
-) as D, legate.jax.strict_static_order(
+) as C, legate.jax.strict_static_order(
     args.strict_static_order
-) as E, legate.jax.host_offload_min_reuse_distance(
+) as D, legate.jax.host_offload_min_reuse_distance(
     args.host_offload_min_reuse_distance
-) as F, legate.jax.enable_task_fusion(
+) as E, legate.jax.enable_task_fusion(
     args.enable_task_fusion
 ):
     legate.jax.replicate_parameters_smaller_than_num_elements(

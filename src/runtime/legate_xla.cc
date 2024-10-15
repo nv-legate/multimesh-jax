@@ -117,7 +117,8 @@ void SetLastExecuteTask(const zuku::Processor &p, Realm::Event ev) {
 }
 
 zuku::store_variant_vector<zuku::ShardedArray>
-GetStores(const std::vector<StoreHandle>& handles, const std::set<int64_t>& output_ids) {
+GetStores(const std::vector<StoreHandle> &handles,
+          const std::set<int64_t> &output_ids) {
   zuku::store_variant_vector<zuku::ShardedArray> views;
   views.reserve(handles.size());
   for (auto &&handle : handles) {
@@ -385,7 +386,8 @@ void *SliceLocalShard(int64_t local_device_id, const StoreHandle &handle) {
       [](const zuku::ShardedArray &array) {
         // do the slicing
         return array.tile().data();
-      }, handle.impl->array);
+      },
+      handle.impl->array);
   return const_cast<void *>(buffer.wait_and_get());
 }
 
@@ -442,13 +444,11 @@ void Rename(StoreHandle &handle, std::string name) {
 
 void Reshard(int64_t local_device_id, int64_t global_device_id,
              const StoreHandle &src, const StoreHandle &dst) {
-  //zuku::View<zuku::ShardedArray> input = GetView(src);
-  //zuku::Store<zuku::ShardedArray> output = GetStore(dst);
-
   zuku::Processor p = LocalProcessor(local_device_id);
 
-  log_xla.debug() << "Reshard " << src.impl->name << " from " << src.impl->array->shape()
-                  << " to " << dst.impl->array->shape()
+  log_xla.debug() << "Reshard " << src.impl->name << " from "
+                  << src.impl->array->shape() << " to "
+                  << dst.impl->array->shape()
                   << " for source=" << src.impl->array->mesh_unique_id()
                   << " to dest=" << dst.impl->array->mesh_unique_id() << " on "
                   << global_device_id;
@@ -462,7 +462,7 @@ bool IsGpu() {
 }
 
 void StartTimer(const std::string &name) {
-  auto [start_time] = after(last_execute_tasks[0]).defer([]{
+  auto [start_time] = after(last_execute_tasks[0]).defer([] {
     return std::chrono::steady_clock::now();
   });
   pending_timers.emplace(name, std::move(start_time));
@@ -470,16 +470,19 @@ void StartTimer(const std::string &name) {
 
 void StopTimer(const std::string &name) {
   auto iter = pending_timers.find(name);
-  if (iter == pending_timers.end()){
+  if (iter == pending_timers.end()) {
     log_xla.warning() << "cannot stop timer " << name << ", does not exist";
     return;
   }
 
-  after(last_execute_tasks[0]).defer([](std::string name, std_timer start_timer){
-    auto stop_timer = std::chrono::steady_clock::now();
-    std::chrono::duration<double> diff = stop_timer - start_timer;
-    log_xla.info() << name << " finished in " << diff.count() << "s";
-  }, std::move(iter->first), std::move(iter->second));
+  after(last_execute_tasks[0])
+      .defer(
+          [](std::string name, std_timer start_timer) {
+            auto stop_timer = std::chrono::steady_clock::now();
+            std::chrono::duration<double> diff = stop_timer - start_timer;
+            log_xla.info() << name << " finished in " << diff.count() << "s";
+          },
+          std::move(iter->first), std::move(iter->second));
 
   pending_timers.erase(iter);
 }
@@ -563,6 +566,7 @@ void StartLegate() {
                       .zcmem = startup_config.zcmem,
                       .network = startup_config.network.value_or("default"),
                       .kthreads = startup_config.kthreads,
+                      .profile = startup_config.profile,
                       .argv = startup_config.argv,
                   });
   const auto &procs = zuku::Processor::DefaultProcs();

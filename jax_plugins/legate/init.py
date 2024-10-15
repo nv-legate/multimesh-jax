@@ -15,7 +15,7 @@ def init(
     debug: Optional[str] = None,
     network: str = "none",
     kthreads: bool = False,
-    profile: Optional[str] = None,
+    profile: bool = False,
     distributed: bool = False,
     dump: Optional[str] = None,
     realm_argv: Optional[list[str]] = None,
@@ -98,6 +98,7 @@ def init(
         network=network,
         kthreads=kthreads,
         argv=realm_argv,
+        profile=profile,
     )
 
     if disable_gc:

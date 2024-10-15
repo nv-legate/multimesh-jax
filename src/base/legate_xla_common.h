@@ -23,6 +23,7 @@ struct StartupConfig {
   std::optional<int64_t> sysmem;
   std::optional<std::string> network;
   bool kthreads{false};
+  bool profile{false};
   std::vector<std::string> argv;
 };
 
