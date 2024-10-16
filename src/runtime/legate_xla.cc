@@ -284,7 +284,8 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
                        const BufferHandle &temp_buffer,
-                       std::function<void()> on_done) {
+                       std::function<void()> on_done,
+                       std::optional<std::string> name) {
   zuku::Processor p = LocalProcessor(local_device_id);
 
   // if any of the outputs overlap with the inputs, then the inputs should be an
@@ -332,12 +333,14 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
     }
   }
 
+  std::string profile_name = name.value_or(compiler->Name()) + " processor " +
+                             std::to_string(p.global_id());
+
   auto token =
       zuku::across(std::move(devices))
           .if_on(p)
           .after(prev_task)
-          .region("Execute " + compiler->Name() + " processor " +
-                  std::to_string(p.global_id()))
+          .region(profile_name)
           .defer(
               [=](int64_t run_id, std::shared_ptr<LegateCompiler> compiler,
                   std::vector<ScalarArgument> scalars,

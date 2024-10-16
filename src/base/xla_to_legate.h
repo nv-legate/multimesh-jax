@@ -17,7 +17,8 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
                        const BufferHandle &temp_buffer,
-                       std::function<void()> on_done = nullptr);
+                       std::function<void()> on_done = nullptr,
+                       std::optional<std::string> name = std::nullopt);
 
 void OffloadDtoH(const StoreHandle &src, const StoreHandle &dst);
 
