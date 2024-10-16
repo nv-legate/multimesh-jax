@@ -510,7 +510,7 @@ StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
 
   zuku::Processor p = LocalProcessor(local_device_id);
   zuku::Store<zuku::ShardedArray> array =
-      zuku::ShardedArray::Create(std::move(shape), {.processor = std::move(p)});
+      zuku::ShardedArray::Create(std::move(shape), {.name = std::move(name), .processor = std::move(p) });
 
   const int64_t next_id = NextStoreId();
   log_xla.debug() << "CreateStore: device=" << local_device_id
