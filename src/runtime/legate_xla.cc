@@ -6,6 +6,7 @@
 #include <chrono>
 #include <mesh.h>
 #include <processor.h>
+#include <realm/event.h>
 #include <realm/logging.h>
 #include <realm/memory.h>
 #include <realm/processor.h>
@@ -94,6 +95,7 @@ StartupConfig startup_config;
 
 Realm::Runtime rt;
 
+std::vector<Realm::UserEvent> last_execute_ordering_triggers;
 std::vector<Realm::Event> last_execute_tasks;
 
 std::set<Realm::Event> pending_compilation_events;
@@ -107,13 +109,16 @@ zuku::Processor LocalProcessor(int64_t local_index) {
   return zuku::Processor::Create({.local = local_index});
 }
 
-Realm::Event LastExecuteTask(const zuku::Processor &p) {
-  return last_execute_tasks[p.local_id()];
+void SetLastExecuteTask(const zuku::Processor &p, Realm::Event ev) {
+  last_execute_tasks[p.local_id()] = std::move(ev);
 }
 
-void SetLastExecuteTask(const zuku::Processor &p, Realm::Event ev) {
-  last_execute_tasks[p.local_id()] =
-      Realm::Event::merge_events(last_execute_tasks[p.local_id()], ev);
+std::pair</*prev=*/Realm::UserEvent, /*next=*/Realm::UserEvent>
+AppendOrderingEvent(const zuku::Processor &p) {
+  Realm::UserEvent next = Realm::UserEvent::create_user_event();
+  Realm::UserEvent prev = last_execute_ordering_triggers[p.local_id()];
+  last_execute_ordering_triggers[p.local_id()] = next;
+  return {prev, next};
 }
 
 zuku::store_variant_vector<zuku::ShardedArray>
@@ -295,7 +300,7 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
     output_ids.insert(output.unique_id);
   }
 
-  Realm::Event prev_task = LastExecuteTask(p);
+  auto [prev_task_trigger, my_task_trigger] = AppendOrderingEvent(p);
   auto store_inputs = GetStores(inputs, output_ids);
   auto store_outputs = GetStores(outputs);
   zuku::View<zuku::ArrayTile> temp = temp_buffer.impl->tile.view();
@@ -339,25 +344,32 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
   auto token =
       zuku::across(std::move(devices))
           .if_on(p)
-          .after(prev_task)
+          .after(prev_task_trigger)
           .region(profile_name)
           .defer(
-              [=](int64_t run_id, std::shared_ptr<LegateCompiler> compiler,
-                  std::vector<ScalarArgument> scalars,
-                  zuku::ro_vector<zuku::ShardedArray> inputs,
-                  zuku::rw_vector<zuku::ShardedArray> outputs,
-                  const zuku::ArrayTile &temp) {
+              [](int64_t run_id, zuku::Processor p, zuku::DeviceList devices,
+                 Realm::UserEvent my_task_trigger,
+                 std::shared_ptr<LegateCompiler> compiler,
+                 std::vector<ScalarArgument> scalars,
+                 zuku::ro_vector<zuku::ShardedArray> inputs,
+                 zuku::rw_vector<zuku::ShardedArray> outputs,
+                 const zuku::ArrayTile &temp) {
+                // once I have started, signal that the next task in the
+                // schedule is free to start getting ready
+                my_task_trigger.trigger();
                 RunExecutable(run_id, std::move(devices), std::move(p),
                               std::move(compiler), std::move(scalars),
                               std::move(inputs), std::move(outputs), temp);
               },
-              run_id, compiler, scalars, std::move(store_inputs),
+              run_id, p, std::move(devices), std::move(my_task_trigger),
+              compiler, scalars, std::move(store_inputs),
               std::move(store_outputs), std::move(temp));
 
   if (on_done) {
     after(token).defer([](std::function<void()> callback) { callback(); },
                        std::move(on_done));
   }
+
   SetLastExecuteTask(p, token.Event());
 }
 
@@ -509,8 +521,8 @@ StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
   const zuku::DeviceList &devices = shape.sharding.devices;
 
   zuku::Processor p = LocalProcessor(local_device_id);
-  zuku::Store<zuku::ShardedArray> array =
-      zuku::ShardedArray::Create(std::move(shape), {.name = std::move(name), .processor = std::move(p) });
+  zuku::Store<zuku::ShardedArray> array = zuku::ShardedArray::Create(
+      std::move(shape), {.name = std::move(name), .processor = std::move(p)});
 
   const int64_t next_id = NextStoreId();
   log_xla.debug() << "CreateStore: device=" << local_device_id
@@ -548,8 +560,8 @@ void StopLegate() {
   bool is_not_stopped = false;
   bool is_stopped = true;
   if (runtime_stopped.compare_exchange_strong(is_not_stopped, is_stopped)) {
-    Realm::Event last_event = Realm::Event::merge_events(last_execute_tasks);
     // explicitly wait for everything to finish
+    Realm::Event last_event = Realm::Event::merge_events(last_execute_tasks);
     last_event.wait();
     ShutdownLegateClient();
     zuku::stop(rt, last_event);
@@ -574,8 +586,10 @@ void StartLegate() {
                   });
   const auto &procs = zuku::Processor::DefaultProcs();
   last_execute_tasks.reserve(procs.size());
+  last_execute_ordering_triggers.reserve(procs.size());
   for (auto &&proc : procs) {
     last_execute_tasks.push_back(Realm::Event::NO_EVENT);
+    last_execute_ordering_triggers.push_back(Realm::UserEvent::NO_USER_EVENT);
   }
 
   // This has to come after PyFinalize
