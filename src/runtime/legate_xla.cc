@@ -110,7 +110,8 @@ zuku::Processor LocalProcessor(int64_t local_index) {
 }
 
 void SetLastExecuteTask(const zuku::Processor &p, Realm::Event ev) {
-  last_execute_tasks[p.local_id()] = std::move(ev);
+  last_execute_tasks[p.local_id()] = Realm::Event::merge_events(
+      last_execute_tasks[p.local_id()], std::move(ev));
 }
 
 std::pair</*prev=*/Realm::UserEvent, /*next=*/Realm::UserEvent>
@@ -300,7 +301,14 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
     output_ids.insert(output.unique_id);
   }
 
-  auto [prev_task_trigger, my_task_trigger] = AppendOrderingEvent(p);
+  auto [prev_task, my_task_trigger] = [&] {
+    if (devices.Contains(p.global_id())) {
+      return AppendOrderingEvent(p);
+    }
+    return std::make_pair(Realm::UserEvent::NO_USER_EVENT,
+                          Realm::UserEvent::NO_USER_EVENT);
+  }();
+
   auto store_inputs = GetStores(inputs, output_ids);
   auto store_outputs = GetStores(outputs);
   zuku::View<zuku::ArrayTile> temp = temp_buffer.impl->tile.view();
@@ -342,9 +350,9 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                              std::to_string(p.global_id());
 
   auto token =
-      zuku::across(std::move(devices))
+      zuku::across(devices)
           .if_on(p)
-          .after(prev_task_trigger)
+          .after(prev_task)
           .region(profile_name)
           .defer(
               [](int64_t run_id, zuku::Processor p, zuku::DeviceList devices,
@@ -356,10 +364,11 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                  const zuku::ArrayTile &temp) {
                 // once I have started, signal that the next task in the
                 // schedule is free to start getting ready
-                my_task_trigger.trigger();
                 RunExecutable(run_id, std::move(devices), std::move(p),
                               std::move(compiler), std::move(scalars),
                               std::move(inputs), std::move(outputs), temp);
+                log_xla.debug() << "triggering " << my_task_trigger;
+                my_task_trigger.trigger();
               },
               run_id, p, std::move(devices), std::move(my_task_trigger),
               compiler, scalars, std::move(store_inputs),
