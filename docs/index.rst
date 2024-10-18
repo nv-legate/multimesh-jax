@@ -35,6 +35,13 @@ based on logical names.
 .. toctree::
    :hidden:
    :maxdepth: 1
+   :caption: PaxML
+
+   paxml
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
    :caption: API Reference
 
    api

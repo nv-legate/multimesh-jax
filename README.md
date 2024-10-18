@@ -54,6 +54,22 @@ docker run \
 ```
 where `<N>` is the number of GPUs.
 
+## Running transformers in PaxML
+
+The first framework integrated with Legate-Jax was PaxML.
+Running and configuring PaxML can be challenging given the number of `fiddle`
+options for specifying the models. To aid in running transformer models,
+a helper script has been added with a basic set of options
+for configuring parallelism. `run.py --help` will give the full set of options.
+Consult the [PaxML user docs](http://sw-mobile-docs/cllr/legate-jax/paxml.html)
+for an explanation of the main options.
+
+### Known Issues
+
+* Checkpointing: PaxML/orbax conflict on when loading checkpoints. While writing
+checkpoints works, the PaxML version in the repo does not load the correct
+metadata and crashes with an inscrutable error.
+
 ## JAX and Jaxlib Compatibility
 
 In the future, a standard JAX and Jaxlib installation should be compatible with Legate-JAX

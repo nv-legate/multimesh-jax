@@ -18,59 +18,59 @@ import gin
 
 parser = argparse.ArgumentParser(allow_abbrev=False)
 
-legion = parser.add_argument_group("Legion")
+realm = parser.add_argument_group("Realm")
 
-legion.add_argument(
+realm.add_argument(
     "--nodes",
     type=int,
     default=None,
     help="The number of nodes to run on",
 )
 
-legion.add_argument(
+realm.add_argument(
     "--network",
     type=str,
     choices=["none", "gasnetex", "ucx"],
-    default="none",
+    default=None,
     help="The Legion network module to use",
 )
 
-legion.add_argument(
+realm.add_argument(
     "--fbmem",
     type=int,
     default=70,
     help="The amount in GB of frame-buffer memory to use",
 )
 
-legion.add_argument(
+realm.add_argument(
     "--zcmem",
     type=int,
     default=4,
     help="The amount in GB of zero-copy (host pinned) memory to use",
 )
 
-legion.add_argument(
+realm.add_argument(
     "--sysmem",
     type=int,
     default=4,
     help="The amount in GB of host memory to use",
 )
 
-legion.add_argument(
+realm.add_argument(
     "--gpus",
     type=int,
     default=8,
     help="The number of GPUs to use per-node.",
 )
 
-legion.add_argument(
+realm.add_argument(
     "--cpus",
     type=int,
     default=4,
     help="The number of CPUs to use per-node.",
 )
 
-legion.add_argument(
+realm.add_argument(
     "--profile",
     action=argparse.BooleanOptionalAction,
     default=False,
@@ -78,6 +78,20 @@ legion.add_argument(
 )
 
 xla = parser.add_argument_group("XLA")
+
+xla.add_argument(
+    "--dump",
+    type=str,
+    default=None,
+    help="A folder for dumping the HLO modules",
+)
+
+xla.add_argument(
+    "--dump-all-passes",
+    action="store_true",
+    default=False,
+    help="Whether to dump all intermediate HLO modules",
+)
 
 xla.add_argument(
     "--debug-nccl",
@@ -138,7 +152,7 @@ legate_jax.add_argument(
 
 legate_jax.add_argument(
     "--load-balance-embeddings",
-    action="store_true",
+    action=argparse.BooleanOptionalAction,
     default=False,
     help="Whether to rotate microbatches across different submeshes for load-balancing",  # noqa: E501
 )
@@ -186,6 +200,13 @@ legate_jax.add_argument(
 )
 
 legate_jax.add_argument(
+    "--dp",
+    type=int,
+    default=1,
+    help="The degree of data parallelism",
+)
+
+legate_jax.add_argument(
     "--strict-static-order",
     action="store_true",
     default=False,
@@ -197,13 +218,6 @@ legate_jax.add_argument(
     type=int,
     default=0,
     help="The minimum reuse distance to trigger host-offload of intermediates. 0 indicates no offloading",  # noqa: E501
-)
-
-legate_jax.add_argument(
-    "--dp",
-    type=int,
-    default=1,
-    help="The degree of data parallelism",
 )
 
 legate_jax.add_argument(
@@ -223,7 +237,7 @@ legate_jax.add_argument(
 legate_jax.add_argument(
     "--sequence-parallel",
     action=argparse.BooleanOptionalAction,
-    default=False,
+    default=True,
     help="Whether to use sequence parallelism",  # noqa: E501
 )
 
@@ -254,7 +268,7 @@ legate_jax.add_argument(
     "--microbatch-size",
     type=int,
     default=None,
-    help="The size of the microbatches to use. Default is to match the global batch size",  # noqa: E501
+    help="The size of the microbatches to use. Default is no microbatching",  # noqa: E501
 )
 
 legate_jax.add_argument(
@@ -276,7 +290,7 @@ paxml = parser.add_argument_group("PaxML")
 paxml.add_argument(
     "--paxml-config",
     type=str,
-    default="paxml.contrib.gpu.scripts_gpu.configs.Lambada126M",
+    default="paxml.tasks.lm.params.nvidia.NVIDIA1_3B",
     help="The PaxML model spec to pass to --fdl_config",
 )
 
@@ -333,7 +347,7 @@ paxml.add_argument(
     type=str,
     choices=["bfloat16", "float32"],
     default="bfloat16",
-    help="The global batch size across all devices. Defaults to max(32, 4 * no. gpus)",  # noqa: E501
+    help="The training precision. Default is bfloat16",
 )
 
 paxml.add_argument(
@@ -370,24 +384,22 @@ paxml.add_argument(
     help="The type of optimizer to use",
 )
 
-
-xla = parser.add_argument_group("XLA")
-
 paxml.add_argument(
-    "--dump",
-    type=str,
-    default=None,
-    help="A folder for dumping the HLO modules",
-)
-
-paxml.add_argument(
-    "--dump-all-passes",
-    action="store_true",
+    "--te",
+    action=argparse.BooleanOptionalAction,
     default=False,
-    help="Whether to dump all intermediate HLO modules",
+    help="Whether to use TransformerEngine",
 )
+
 
 args, realm_argv = parser.parse_known_args()
+
+if args.te:
+  if args.tp == 1:
+    raise Exception("TransformerEngine (--te) requires tensor parallelism (--tp) > 1")
+  os.environ["ENABLE_TE"] = "1"
+  os.environ["ENABLE_TE_SP"] = "1"
+  os.environ["NVTE_FUSED_ATTN"] = "1"
 
 
 if args.host_offload_min_reuse_distance > 0 and args.gpus > args.cpus:
@@ -740,6 +752,14 @@ MicrobatchConfig:
 
 
 gin.parse_config(gin_config)
+
+if args.network is None:
+    if num_nodes > 1:
+        network = "ucx"
+    else:
+        network = "none"
+else:
+    network = args.network
 
 if args.backend == "legate":
     init(
