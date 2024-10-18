@@ -25,6 +25,12 @@ based on logical names.
 
       Legate-JAX adds compiler and runtime functionality via the `jax_plugins` interface
 
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+   :caption: Getting Started
+
+   getting-started
 
 .. toctree::
    :hidden:
