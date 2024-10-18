@@ -384,6 +384,10 @@ void StoreBufferAction(int64_t local_device_id, BufferAction *action,
   }
 }
 
+bool HasLocalShard(const legate_xla::StoreHandle &handle) {
+  return handle.impl->array->HasTile();
+}
+
 void *SliceLocalShard(int64_t local_device_id, const StoreHandle &handle) {
   zuku::Processor p = LocalProcessor(local_device_id);
   auto [buffer] = on(p).defer(

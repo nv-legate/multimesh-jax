@@ -57,6 +57,8 @@ std::set<int> GetLocalDevices();
 
 bool IsGpu();
 
+bool HasLocalShard(const legate_xla::StoreHandle& handle);
+
 void StoreBufferAction(int64_t local_device_id, BufferAction *actions,
                        const StoreHandle &store, bool blocking);
 

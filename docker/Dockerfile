@@ -97,6 +97,8 @@ RUN conda run -n legere python -m pip uninstall -y jax
 RUN cd /opt/jax && \
   conda run --no-capture-out -n legere python -m pip install -e . --force-reinstall --no-deps
 
+RUN conda run --no-capture-out -n legere python -m pip install jupyter
+
 COPY tags /opt/tags
 
 COPY entrypoint.sh /opt/entrypoint.sh

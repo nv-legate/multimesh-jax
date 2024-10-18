@@ -12,7 +12,7 @@ from jax.experimental.pjit import AUTO, pjit
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from ..lib import autoshard, should_ignore_transforms
-from ..task import task as pure_function_task
+from ..task import task as pure_function_task, with_sharding_constraint
 
 
 def _put_to_devices(host_array: np.ndarray, devices) -> list[Any]:
@@ -168,6 +168,7 @@ def parallelize_step(
     mesh: Mesh,
     global_batch: Optional[Any] = None,
     local_batch: Optional[Any] = None,
+    replicate_inputs: bool = True,
 ):
     """Combines model loss function and optimizer into an autosharded step function
 
@@ -239,6 +240,8 @@ def parallelize_step(
         flat_vars = [
             label_sharding(v, s) for v, s in zip(flat_vars, flat_spec)
         ]
+        if replicate_inputs:
+            inputs = jax.tree.map(lambda x: with_sharding_constraint(x, P()), inputs)
         variables = jax.tree_util.tree_unflatten(treedef, flat_vars)
         params = variables.params
         loss, grads = grad_fn(params, inputs)
