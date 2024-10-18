@@ -37,7 +37,5 @@ Compiler contexts
    only_fuse_loop_tasks
    ignore_transforms
    host_offload_min_reuse_distance
-   strict_static_order
-   split_large_traces
    store_cache_min_parallelism
 

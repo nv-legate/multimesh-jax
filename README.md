@@ -16,6 +16,11 @@ To get started, we recommend pulling the development container:
 $ docker pull gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev
 ```
 
+## Docs
+
+User documentation including API reference and Jupyter tutorials can be found
+on the [Nvidia docs page](http://sw-mobile-docs/cllr/legate-jax/). 
+
 
 ## Building a Legate-JAX container
 
@@ -23,13 +28,35 @@ Instructions for building Legate-JAX can be found in the [README](docker/README.
 Included in the `docker` folder are scripts showing how to configure, build, and install
 the various components.
 
-### JAX and Jaxlib Compatibility
+## Running Jupyter tutorials with Docker
 
+The recommended way to run the examples is through Docker.
+To launch a Jupyter notebook in the container for running on CPU 
+that can be loaded in a local browswer:
+
+```bash
+docker run \
+  -w /opt/legate-jax/docs/notebooks \
+  -p 8675:8675 \
+  gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev \
+  jupyter notebook --allow-root --ip 0.0.0.0 --port=8675
+```
+The notebook will then be available at the link shown.  
+If GPUs are available, then docker can be launched as:
+
+```bash
+docker run \
+  -w /opt/legate-jax/docs/notebooks \
+  -p 8675:8675 \
+  --gpus <N> \ 
+  gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev \
+  jupyter notebook --allow-root --ip 0.0.0.0 --port=8675
+```
+where `<N>` is the number of GPUs.
+
+## JAX and Jaxlib Compatibility
 
 In the future, a standard JAX and Jaxlib installation should be compatible with Legate-JAX
 if JAX/Jaxlib are the most recent version and XLA is top-of-tree for the plugin client.
 For now, the Jaxlib will need to be installed from source for the custom XLA fork used to build the Legate-JAX client.
 
-## Development workflows
-
-Until more changes can be upstreamed, Legate-Jax will use a rebase model with the base branch updated regularly from the upstream Jax and XLA repositories.
