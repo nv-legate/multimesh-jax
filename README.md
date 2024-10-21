@@ -5,10 +5,9 @@ The repository can be used in two different modes:
 
 ## Getting Started
 
-The easiest way to get started is by downloading either the development or release image of Legate-JAX
+The easiest way to get started is by downloading either the development of Legate-JAX
 
 * [Development Images](https://gitlab-master.nvidia.com/legate/quickstart.internal/container_registry/69362)
-* [Release Images](https://gitlab-master.nvidia.com/legate/quickstart.internal/container_registry/69363)
 
 To get started, we recommend pulling the development container:
 

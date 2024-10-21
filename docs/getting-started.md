@@ -2,13 +2,11 @@
 
 The simplest way to get started is by downloading one of the Legate-JAX containers.
 There is a full development container which includes all source files and enables
-rebuilding each component. There is also a release container which only contains
-the minimal number of libraries for running Legate-JAX. 
+rebuilding each component.
 
 ## Downloading Images
 
 * [Development Images](https://gitlab-master.nvidia.com/legate/quickstart.internal/container_registry/69362)
-* [Release Images](https://gitlab-master.nvidia.com/legate/quickstart.internal/container_registry/69363)
 
 The simplest way to get started is downloading the conatiner:
 
@@ -20,7 +18,7 @@ docker pull docker pull gitlab-master.nvidia.com:5005/legate/quickstart.internal
 
 The recommended way to run the examples is through Docker.
 To launch a Jupyter notebook in the container for running on CPU 
-that can be loaded in a local browswer:
+that can be loaded in a local browser:
 
 ```bash
 docker run \

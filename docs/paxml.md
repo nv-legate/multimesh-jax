@@ -88,6 +88,10 @@ and no. of nodes to be specified.
 * Checkpointing: PaxML/orbax conflict on when loading checkpoints. While writing
 checkpoints works, the PaxML version in the repo does not load the correct
 metadata and crashes with an inscrutable error.
+* Multi-GPU/process: TransformerEngine currently does not support multiple
+GPUs per process. The cuDNN execution plans are not thread-safe and will
+deadlock or slow down significantly if running multiple threads over
+multiple GPUs.
 
 ## Advanced options
 
