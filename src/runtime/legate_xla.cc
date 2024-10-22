@@ -95,7 +95,8 @@ StartupConfig startup_config;
 
 Realm::Runtime rt;
 
-std::vector<Realm::Event> last_execute_tasks;
+std::vector<Realm::Event> last_execute_events;
+std::vector<Realm::UserEvent> last_control_events;
 
 std::set<Realm::Event> pending_compilation_events;
 
@@ -108,9 +109,15 @@ zuku::Processor LocalProcessor(int64_t local_index) {
   return zuku::Processor::Create({.local = local_index});
 }
 
-void SetLastExecuteTask(const zuku::Processor &p, Realm::Event ev) {
-  last_execute_tasks[p.local_id()] = Realm::Event::merge_events(
-      last_execute_tasks[p.local_id()], std::move(ev));
+void SetLastExecuteEvent(const zuku::Processor &p, Realm::Event ev) {
+  last_execute_events[p.local_id()] = Realm::Event::merge_events(
+      last_execute_events[p.local_id()], std::move(ev));
+}
+
+void SetLastControlEvent(const zuku::Processor& p, Realm::UserEvent ev) {
+  if (ev != Realm::UserEvent::NO_USER_EVENT){
+    last_control_events[p.local_id()] = ev;
+  }
 }
 
 zuku::store_variant_vector<zuku::ShardedArray>
@@ -335,8 +342,9 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
   auto token =
       zuku::across(devices)
           .if_on(p)
-          .after(last_execute_tasks[p.local_id()])
-          .region(profile_name)
+          .after(last_control_events[p.local_id()])
+          .start_region_after(profile_name, last_execute_events[p.local_id()])
+          .split_control_execution()
           .defer(
               [](int64_t run_id, zuku::Processor p, zuku::DeviceList devices,
                  std::shared_ptr<LegateCompiler> compiler,
@@ -359,7 +367,8 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                        std::move(on_done));
   }
 
-  SetLastExecuteTask(p, token.Event());
+  SetLastExecuteEvent(p, token.Event());
+  SetLastControlEvent(p, token.ControlEvent());
 }
 
 void Destroy(StoreHandle &store) {
@@ -470,7 +479,7 @@ bool IsGpu() {
 }
 
 void StartTimer(const std::string &name) {
-  auto [start_time] = after(last_execute_tasks[0]).defer([] {
+  auto [start_time] = after(last_execute_events[0]).defer([] {
     return std::chrono::steady_clock::now();
   });
   pending_timers.emplace(name, std::move(start_time));
@@ -483,7 +492,7 @@ void StopTimer(const std::string &name) {
     return;
   }
 
-  after(last_execute_tasks[0])
+  after(last_execute_events[0])
       .defer(
           [](std::string name, std_timer start_timer) {
             auto stop_timer = std::chrono::steady_clock::now();
@@ -544,7 +553,7 @@ void FenceCompilation() {
 }
 
 void FenceExecution() {
-  Realm::Event merged = Realm::Event::merge_events(last_execute_tasks);
+  Realm::Event merged = Realm::Event::merge_events(last_execute_events);
   merged.wait();
 }
 
@@ -554,7 +563,7 @@ void StopLegate() {
   bool is_stopped = true;
   if (runtime_stopped.compare_exchange_strong(is_not_stopped, is_stopped)) {
     // explicitly wait for everything to finish
-    Realm::Event last_event = Realm::Event::merge_events(last_execute_tasks);
+    Realm::Event last_event = Realm::Event::merge_events(last_execute_events);
     last_event.wait();
     ShutdownLegateClient();
     zuku::stop(rt, last_event);
@@ -578,9 +587,11 @@ void StartLegate() {
                       .argv = startup_config.argv,
                   });
   const auto &procs = zuku::Processor::DefaultProcs();
-  last_execute_tasks.reserve(procs.size());
+  last_execute_events.reserve(procs.size());
+  last_control_events.reserve(procs.size());
   for (auto &&proc : procs) {
-    last_execute_tasks.push_back(Realm::Event::NO_EVENT);
+    last_execute_events.push_back(Realm::Event::NO_EVENT);
+    last_control_events.push_back(Realm::UserEvent::NO_USER_EVENT);
   }
 
   // This has to come after PyFinalize
