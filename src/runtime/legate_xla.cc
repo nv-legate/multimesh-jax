@@ -343,7 +343,7 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
       zuku::across(devices)
           .if_on(p)
           .after(last_control_events[p.local_id()])
-          .start_region_after(profile_name, last_execute_events[p.local_id()])
+          .region(profile_name)
           .split_control_execution()
           .defer(
               [](int64_t run_id, zuku::Processor p, zuku::DeviceList devices,
