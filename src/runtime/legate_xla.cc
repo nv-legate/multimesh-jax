@@ -114,8 +114,8 @@ void SetLastExecuteEvent(const zuku::Processor &p, Realm::Event ev) {
       last_execute_events[p.local_id()], std::move(ev));
 }
 
-void SetLastControlEvent(const zuku::Processor& p, Realm::UserEvent ev) {
-  if (ev != Realm::UserEvent::NO_USER_EVENT){
+void SetLastControlEvent(const zuku::Processor &p, Realm::UserEvent ev) {
+  if (ev != Realm::UserEvent::NO_USER_EVENT) {
     last_control_events[p.local_id()] = ev;
   }
 }
@@ -305,14 +305,21 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
 
   log_xla.debug() << "creating execute task " << compiler->Name()
                   << " across devices " << devices;
-  for (auto &&input : inputs) {
-    log_xla.debug() << compiler->Name() << " has input " << input.impl->name
-                    << ", " << input.impl->array->shape();
-  }
 
-  for (auto &&output : outputs) {
-    log_xla.debug() << compiler->Name() << " has output " << output.impl->name
-                    << ", " << output.impl->array->shape();
+  if (log_xla.want_debug()) {
+    for (auto &&input : inputs) {
+      log_xla.debug() << compiler->Name() << " has input " << input.impl->name
+                      << ", " << input.impl->array->shape()
+                      << " with precondition "
+                      << input.impl->array.Precondition();
+    }
+
+    for (auto &&output : outputs) {
+      log_xla.debug() << compiler->Name() << " has output " << output.impl->name
+                      << ", " << output.impl->array->shape()
+                      << " with precondition "
+                      << output.impl->array.Precondition();
+    }
   }
 
   if (devices.Contains(global_device_id)) {
@@ -344,7 +351,7 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
           .if_on(p)
           .after(last_control_events[p.local_id()])
           .region(profile_name)
-          .split_control_execution()
+          .stream_ordered()
           .defer(
               [](int64_t run_id, zuku::Processor p, zuku::DeviceList devices,
                  std::shared_ptr<LegateCompiler> compiler,
@@ -358,13 +365,29 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                               std::move(compiler), std::move(scalars),
                               std::move(inputs), std::move(outputs), temp);
               },
-              run_id, p, std::move(devices),
-              compiler, scalars, std::move(store_inputs),
-              std::move(store_outputs), std::move(temp));
+              run_id, p, std::move(devices), compiler, scalars,
+              std::move(store_inputs), std::move(store_outputs),
+              std::move(temp));
 
   if (on_done) {
     after(token).defer([](std::function<void()> callback) { callback(); },
                        std::move(on_done));
+  }
+
+  if (log_xla.want_debug()) {
+    for (auto &&input : inputs) {
+      log_xla.debug() << compiler->Name() << " has input " << input.impl->name
+                      << ", " << input.impl->array->shape()
+                      << " with postcondition "
+                      << input.impl->array.Precondition();
+    }
+
+    for (auto &&output : outputs) {
+      log_xla.debug() << compiler->Name() << " has output " << output.impl->name
+                      << ", " << output.impl->array->shape()
+                      << " with postcondition "
+                      << output.impl->array.Precondition();
+    }
   }
 
   SetLastExecuteEvent(p, token.Event());
@@ -445,6 +468,11 @@ StoreHandle AssembleShards(int64_t local_device_id, int64_t global_device_id,
                 }
               },
               std::move(stream), p, shard, output.impl->array);
+
+  log_xla.debug() << (output.impl->array->HasName() ? output.impl->array->name()
+                                                    : "anonymous")
+                  << " has assemble postcondition "
+                  << output.impl->array.Precondition();
 
   if (!IsGpu()) {
     token.Wait();
