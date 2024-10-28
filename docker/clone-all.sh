@@ -36,8 +36,8 @@ checkout clu        main                https://github.com/google/CommonLoopUtil
 checkout flax       main                https://github.com/google/flax.git            5694517 flax.patch
 checkout jax        legate-main         ssh://git@github.com/nv-legate/jax.git        bc414e394
 checkout jaxlib     legate-main         ssh://git@github.com/nv-legate/jax.git        bc414e394
-checkout zuku       main                ssh://git@gitlab-master.nvidia.com:12051/jwilke/realm-poc.git d0bf288d0b
-checkout legate-jax realm-refactor      ssh://git@github.com/nv-legate/legate.jax.git  95be40bb
+checkout zuku       main                ssh://git@gitlab-master.nvidia.com:12051/jwilke/realm-poc.git
+checkout legate-jax realm-refactor      ssh://git@github.com/nv-legate/legate.jax.git d9744be6a6
 checkout realm      master              https://gitlab.com/StanfordLegion/legion.git  6da07108
 checkout optax      main                https://github.com/google-deepmind/optax.git  a49564e
 checkout orbax      main                https://github.com/google/orbax.git           1e06498bfb
@@ -45,9 +45,9 @@ checkout paxml      main                https://github.com/google/paxml.git     
 checkout praxis     main                https://github.com/google/praxis.git          81154d8e       praxis.patch
 checkout seqio      main                https://github.com/google/seqio.git           513d1fe
 checkout te         main                https://github.com/NVIDIA/TransformerEngine.git  0b303dad4c  te.patch
-checkout xla        realm-refactor      ssh://git@github.com/nv-legate/xla.git        1f2fc91c3f
+checkout xla        realm-refactor      ssh://git@github.com/nv-legate/xla.git        8cbf0cc21
 checkout nccl       master              https://github.com/NVIDIA/nccl.git            6203b4c95d71
-checkout maxtext    legate-main         git@github.com:mfoerste4/maxtext_priv.git     dc5c27c4c9f
+checkout maxtext    legate-main         git@github.com:mfoerste4/maxtext_priv.git     6b42eab4
 
 pushd te
 git submodule update --init --recursive

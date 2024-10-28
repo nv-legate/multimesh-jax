@@ -115,6 +115,8 @@ FROM reinstall_custom_jax AS paxml_install
 COPY paxml /opt/paxml
 COPY legate-jax/examples/paxml/run.py /opt
 RUN cd /opt/paxml && conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
+COPY paxml-fixup-pip.sh /opt
+RUN /opt/paxml-fixup-pip.sh
 ENTRYPOINT [ "/opt/entrypoint.sh" ]
 CMD [ "/bin/bash" ]
 

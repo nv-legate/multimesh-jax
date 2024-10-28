@@ -39,10 +39,10 @@ There is a `./build.py` script that starts a docker build with the correct
 arguments for mapping the remote cache on the host network into the container.
 
 ```
-$ ./build.py
+$ ./build.py --framework paxml
 ```
 
-This will produce an image named `legate-jax-dev-release` that can be tagged and pushed where needed.
+This will produce an image named `legate-jax-dev:paxml` that can be tagged and pushed where needed.
 The image will contain all the code from the repos and installs Python libraries in 
 editable mode and enables rebuilds of the C++ libraries. To build without the remote cache,
 use the `--no-cache` option to the build. For a full list of options see `./build.py --help`.

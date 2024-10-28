@@ -744,6 +744,18 @@ index 7deb362..69c4a54 100644
        if trees.is_subset(
            self._auto_sharding_result.inputs_shape_dtype, inputs_shape_dtype
        ):
+diff --git a/paxml/summary_utils.py b/paxml/summary_utils.py
+index 0cc6bdd..4959aa5 100644
+--- a/paxml/summary_utils.py
++++ b/paxml/summary_utils.py
+@@ -821,6 +821,7 @@ class SummaryHandler:
+     Returns:
+       True if the summaries were written, False otherwise.
+     """
++    return False
+     should_accumulate = self.should_accumulate(step)
+     should_write_summary = self.should_write(step)
+     should_log = self.should_log(step)
 diff --git a/paxml/tasks/lm/model_params.py b/paxml/tasks/lm/model_params.py
 index ea54531..1179e76 100644
 --- a/paxml/tasks/lm/model_params.py
