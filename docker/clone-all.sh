@@ -40,13 +40,14 @@ checkout zuku       main                ssh://git@gitlab-master.nvidia.com:12051
 checkout legate-jax realm-refactor      ssh://git@github.com/nv-legate/legate.jax.git  95be40bb
 checkout realm      master              https://gitlab.com/StanfordLegion/legion.git  6da07108
 checkout optax      main                https://github.com/google-deepmind/optax.git  a49564e
-checkout orbax      main                https://github.com/google/orbax.git           6673d0c
+checkout orbax      main                https://github.com/google/orbax.git           1e06498bfb
 checkout paxml      main                https://github.com/google/paxml.git           bd0590f843   paxml.patch
 checkout praxis     main                https://github.com/google/praxis.git          81154d8e       praxis.patch
 checkout seqio      main                https://github.com/google/seqio.git           513d1fe
 checkout te         main                https://github.com/NVIDIA/TransformerEngine.git  0b303dad4c  te.patch
 checkout xla        realm-refactor      ssh://git@github.com/nv-legate/xla.git        1f2fc91c3f
 checkout nccl       master              https://github.com/NVIDIA/nccl.git            6203b4c95d71
+checkout maxtext    legate-main         git@github.com:mfoerste4/maxtext_priv.git     dc5c27c4c9f
 
 pushd te
 git submodule update --init --recursive

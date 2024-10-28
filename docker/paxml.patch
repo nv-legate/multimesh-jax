@@ -1,5 +1,30 @@
+diff --git a/paxml/checkpoint_paths.py b/paxml/checkpoint_paths.py
+index 5e0c343..bd73cc8 100644
+--- a/paxml/checkpoint_paths.py
++++ b/paxml/checkpoint_paths.py
+@@ -339,6 +339,20 @@ class PaxStepNameFormat(ocp.step.NameFormat):
+     step = step or get_step_from_checkpoint_asset(step_path)
+     return ocp.step.Metadata(step=step, path=step_path)
+
++  def find_step(
++      self, base_path: epath.PathLike, step: int
++  ) -> ocp.step.Metadata:
++    """Returns metadata for the given step."""
++    step_path = ocp.step.build_step_path(base_path, self, step)
++    metadata = self.build_metadata(step_path, step=step)
++    if metadata is not None:
++      return metadata
++
++    raise ValueError(
++        f'No step path found with name={self.build_name(step)},'
++        f' NameFormat={self} for step={step} under {base_path}.'
++    )
++
+   def find_metadata(
+       self, base_path: epath.PathLike, step: int
+   ) -> ocp.step.Metadata | None:
 diff --git a/paxml/contrib/gpu/scripts_gpu/configs.py b/paxml/contrib/gpu/scripts_gpu/configs.py
-index 2aceb30..d368ec2 100644
+index 2aceb30..3be6de8 100644
 --- a/paxml/contrib/gpu/scripts_gpu/configs.py
 +++ b/paxml/contrib/gpu/scripts_gpu/configs.py
 @@ -23,6 +23,7 @@ from paxml.contrib.gpu.scripts_gpu.llama_utils import BaseLLaMA
@@ -14,7 +39,7 @@ index 2aceb30..d368ec2 100644
    FPROP_DTYPE = jnp.bfloat16
    MAX_STEPS = 600000
  
-+  USE_ADAFACTOR = True
++  USE_ADAFACTOR = False
 +  USE_SGD = False
 +
    MAX_SEQ_LEN = 2048
@@ -118,18 +143,10 @@ index 2aceb30..d368ec2 100644
  GPT5B = Pile5B
  GPT175B = Pile175B
 diff --git a/paxml/contrib/gpu/scripts_gpu/tasks.py b/paxml/contrib/gpu/scripts_gpu/tasks.py
-index 9c9ec60..0a49f5b 100644
+index 9c9ec60..bdc9b73 100644
 --- a/paxml/contrib/gpu/scripts_gpu/tasks.py
 +++ b/paxml/contrib/gpu/scripts_gpu/tasks.py
-@@ -174,6 +174,7 @@ class LambadaDataset(base_experiment.BaseExperiment):
- 
-   PERCORE_BATCH_SIZE: int = 1
-   MAX_SEQ_LEN: int = 2048
-+  LAMBADA_TRAIN: bool = False
- 
-   def _dataset_common(
-       self, is_training
-@@ -227,8 +228,8 @@ class BoolQDataset(base_experiment.BaseExperiment):
+@@ -227,8 +227,8 @@ class BoolQDataset(base_experiment.BaseExperiment):
    EOS_ID: int = 2
  
    s = seqio.SentencePieceVocabulary(vocab_path)
@@ -140,7 +157,7 @@ index 9c9ec60..0a49f5b 100644
  
    def _dataset_common(
        self, is_training
-@@ -272,4 +273,4 @@ class BoolQDataset(base_experiment.BaseExperiment):
+@@ -272,4 +272,4 @@ class BoolQDataset(base_experiment.BaseExperiment):
  
    def datasets(self) -> list[pax_fiddle.Config[base_input.BaseInput]]:
      """Returns a list of dataset parameters."""
@@ -399,7 +416,7 @@ index ff3d89d..035d1b3 100644
  
  _TASK_HANDLE_RE = re.compile(r'(?:logs\.)?(\d+)\.(.*)\.([^.]+)\.\d+')
 diff --git a/paxml/partitioning.py b/paxml/partitioning.py
-index 7deb362..a505fe8 100644
+index 7deb362..69c4a54 100644
 --- a/paxml/partitioning.py
 +++ b/paxml/partitioning.py
 @@ -20,7 +20,7 @@ import dataclasses
@@ -437,7 +454,7 @@ index 7deb362..a505fe8 100644
 +    COMPILING = 1
 +    NONE = 2
 +  _mode = Mode.NONE
-+    
++
 +  def __init__(self, global_mesh, local_mesh: tuple[int]):
 +    self.global_mesh = global_mesh
 +    self.local_shape = OrderedDict( (name, dim) for name, dim in self.global_mesh.shape.items() )
@@ -475,7 +492,7 @@ index 7deb362..a505fe8 100644
 +    if self.compiling():
 +      return devices[:self.num_local_devices]
 +    return devices
-+  
++
 +  @property
 +  def local_devices(self):
 +    return self.global_mesh.local_devices
@@ -492,7 +509,7 @@ index 7deb362..a505fe8 100644
 +    if self.compiling():
 +      return self._local_devices
 +    return self.global_mesh.devices
-+  
++
 +  @property
 +  def shape(self):
 +    if self.compiling():
@@ -502,17 +519,17 @@ index 7deb362..a505fe8 100644
 +  @property
 +  def _internal_device_list(self):
 +    return self.global_mesh._internal_device_list
-+  
++
 +  @property
 +  def size(self):
 +    if self.compiling():
 +      return self.num_local_devices
 +    return self.global_mesh.size
-+  
++
 +  @property
 +  def empty(self):
 +    return self.global_mesh.empty
-+  
++
 +  def __enter__(self):
 +    new_env = thread_resources.stack[-1].with_mesh(self)
 +    thread_resources.stack.append(new_env)
@@ -532,7 +549,7 @@ index 7deb362..a505fe8 100644
  
  def _identity(x):
    """A helper identity function, defined globally so it is JIT-compiled once."""
-@@ -127,9 +234,28 @@ def compile_for_auto_sharding(
+@@ -127,9 +234,24 @@ def compile_for_auto_sharding(
      return core.ShapedArray(x.shape, dtype)
  
    inputs_shape_dtype = jax.tree.map(_create_aval, inputs_shape_dtype)
@@ -557,14 +574,10 @@ index 7deb362..a505fe8 100644
 +  # is the same across iterations
 +  jax.tree_map(check, train_state, compiled.input_shardings[0][0], compiled.output_shardings[0])
 +
-+  import os
-+  if os.getenv("PAXML_PRINT_SHARDINGS", False):
-+    jax.tree_map(lambda x, x_sharding: print("Input sharding: ", x.shape, x_sharding), train_state, compiled.input_shardings[0][0])
-+
    return compiled, compiled.input_shardings[0]
  
  
-@@ -740,6 +866,7 @@ class PmapPartitioner(Partitioner):
+@@ -740,6 +862,7 @@ class PmapPartitioner(Partitioner):
      ):
        if static_args:
          static_args = static_args.replace(unpadded_global_batch_size=None)
@@ -572,7 +585,7 @@ index 7deb362..a505fe8 100644
        return partitioned_step_fn(state, prng_key, inputs, static_args)
  
      return _wrapped_partitioned_step, None  # Input partition spec.
-@@ -782,7 +909,10 @@ class PjitPartitioner(Partitioner):
+@@ -782,7 +905,10 @@ class PjitPartitioner(Partitioner):
      else:
        logging.info('Using provided mesh for PjitPartitioner')
      logging.info('device_mesh: %s', device_mesh)
@@ -584,7 +597,7 @@ index 7deb362..a505fe8 100644
  
      # Pjit'ed function to preprocess the prng key.
      self._broadcast_key_fn = None
-@@ -894,9 +1024,17 @@ class PjitPartitioner(Partitioner):
+@@ -894,9 +1020,17 @@ class PjitPartitioner(Partitioner):
    ) -> NestedJTensor:
      """Preprocess the input batch before using it."""
      if self._reshard_inputs:
@@ -604,7 +617,7 @@ index 7deb362..a505fe8 100644
      return padded_inputs
  
    def get_train_state_metadata(
-@@ -1009,7 +1147,8 @@ class PjitPartitioner(Partitioner):
+@@ -1009,7 +1143,8 @@ class PjitPartitioner(Partitioner):
        # need to keep this resharding, because the resharding is related to the
        # locations of the real data (inputs_split_mapping) and is not visible
        # from HLOs.
@@ -614,7 +627,7 @@ index 7deb362..a505fe8 100644
  
        fn_out = step_fn(
            self._jax_task,
-@@ -1043,18 +1182,14 @@ class PjitPartitioner(Partitioner):
+@@ -1043,18 +1178,14 @@ class PjitPartitioner(Partitioner):
      logging.info('step_fn fn_in_partition_specs=%s', fn_in_partition_specs)
      logging.info('step_fn fn_out_partition_specs=%s', fn_out_partition_specs)
  
@@ -641,7 +654,7 @@ index 7deb362..a505fe8 100644
      extra_kwargs = dict(in_shardings=fn_in_shardings)
      if not use_pspec_on_array_inputs:
        extra_kwargs = {}
-@@ -1172,7 +1307,16 @@ class PjitPartitioner(Partitioner):
+@@ -1172,7 +1303,15 @@ class PjitPartitioner(Partitioner):
          fn_out_partition_specs,
          use_pspec_on_array_inputs=use_pspec_on_array_inputs,
      )
@@ -652,14 +665,13 @@ index 7deb362..a505fe8 100644
 +      inputs,
 +      static_args: BaseStepFnStaticArgs | None = None,
 +    ):
-+      config = trainer_lib.PaxLegateConfig()
 +      return partitioned_step_fn(state, prng_key, inputs, static_args)
 +
 +    return _wrapped_partitioned_step
  
  
  class AutoShardingPjitPartitioner(PjitPartitioner):
-@@ -1296,8 +1440,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1296,8 +1435,13 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          else pjit.AUTO(self.global_mesh)
      )
  
@@ -674,7 +686,7 @@ index 7deb362..a505fe8 100644
          is_eval,
          fn_in_partition_specs,
          fn_out_partition_specs,
-@@ -1314,22 +1463,28 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1314,18 +1458,24 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
          jax.tree.map(jnp.shape, inputs_shape_dtype),
          static_args,
      )
@@ -711,21 +723,15 @@ index 7deb362..a505fe8 100644
      return auto_sharded_step_fn, new_input_pspec, new_train_state_pspec
  
    def get_train_state_metadata(
--      self,
-+      self, 
-       discard_opt_states: bool = False,
-       unpadded_global_batch_size: int | None = None,
-   ) -> TrainStateMetadata:
-@@ -1408,6 +1563,8 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1408,6 +1558,7 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
                subset=self._auto_sharding_input_spec, superset=inputs
            )
        )
 +
-+      config = trainer_lib.PaxLegateConfig()
        return partitioned_step_fn(state, prng_key, subset_extracted_inputs)
  
      self._auto_sharding_result = (
-@@ -1440,6 +1597,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
+@@ -1440,6 +1591,12 @@ class AutoShardingPjitPartitioner(PjitPartitioner):
      if not self._auto_sharding_result:
        self.get_train_state_metadata(discard_opt_states=is_eval)
      if step_fn is self._auto_sharding_info.step_fn:
@@ -738,35 +744,18 @@ index 7deb362..a505fe8 100644
        if trees.is_subset(
            self._auto_sharding_result.inputs_shape_dtype, inputs_shape_dtype
        ):
-diff --git a/paxml/summary_utils.py b/paxml/summary_utils.py
-index 0cc6bdd..89bb7b1 100644
---- a/paxml/summary_utils.py
-+++ b/paxml/summary_utils.py
-@@ -821,9 +821,9 @@ class SummaryHandler:
-     Returns:
-       True if the summaries were written, False otherwise.
-     """
--    should_accumulate = self.should_accumulate(step)
--    should_write_summary = self.should_write(step)
--    should_log = self.should_log(step)
-+    should_accumulate = False # self.should_accumulate(step)
-+    should_write_summary = False # self.should_write(step)
-+    should_log = False # self.should_log(step)
-     if not (should_log or should_accumulate or should_write_summary):
-       # Nothing to do, return immediately to avoid unnecessary work.
-       return False
 diff --git a/paxml/tasks/lm/model_params.py b/paxml/tasks/lm/model_params.py
-index ea54531..e37e8dc 100644
+index ea54531..1179e76 100644
 --- a/paxml/tasks/lm/model_params.py
 +++ b/paxml/tasks/lm/model_params.py
 @@ -105,13 +105,16 @@ def set_sharding_annotations_v1(
      dcn_mesh_shape: a 3D sequence representing the mesh across slices, or None.
    """
    model_p = task_p.model
-+  #asserts.eq(len(ici_mesh_shape), 3)
++  # asserts.eq(len(ici_mesh_shape), 3)
    model_p.ici_mesh_shape = ici_mesh_shape
    if dcn_mesh_shape is not None:
-+    #asserts.eq(len(dcn_mesh_shape), 3)
++    # asserts.eq(len(dcn_mesh_shape), 3)
      model_p.dcn_mesh_shape = dcn_mesh_shape
    replica_axis = 'replica'
    data_axis = 'data'

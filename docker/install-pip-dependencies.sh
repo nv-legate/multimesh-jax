@@ -24,8 +24,8 @@ pushd /opt/seqio
 conda run -n legere python -m pip install $editable_flag . --no-deps --no-build-isolation --force-reinstall
 popd
 
-pushd /opt/orbax/checkpoint
-conda run -n legere python -m pip install $editable_flag . --no-deps --no-build-isolation --force-reinstall
+pushd /opt/orbax
+conda run -n legere python -m pip install $editable_flag checkpoint --no-deps --no-build-isolation --force-reinstall
 popd
 
 # praxis and paxml must always be installed editable since the
@@ -35,6 +35,3 @@ pushd /opt/praxis
 conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
 popd
 
-pushd /opt/paxml
-conda run -n legere python -m pip install -e . --no-deps --no-build-isolation --force-reinstall
-popd
