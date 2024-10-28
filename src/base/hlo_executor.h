@@ -24,8 +24,8 @@
 
 namespace legate_xla {
 
-void RunExecutable(int64_t run_id, zuku::DeviceList devices, zuku::Processor p,
-                   std::shared_ptr<LegateCompiler> compiler,
+void RunExecutable(zuku::Stream *zs, int64_t run_id, zuku::DeviceList devices,
+                   zuku::Processor p, std::shared_ptr<LegateCompiler> compiler,
                    std::vector<ScalarArgument> scalars,
                    zuku::ro_vector<zuku::ShardedArray> inputs,
                    zuku::rw_vector<zuku::ShardedArray> outputs,

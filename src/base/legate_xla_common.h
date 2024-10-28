@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "src/zuku/shape.h"
+#include "src/zuku/stream.h"
 
 namespace legate_xla {
 
@@ -117,7 +118,8 @@ public:
   * @return Whether the execution ran successfully on the device
   */
   virtual std::optional<std::string>
-  Execute(uint64_t run_id, const std::vector<BufferAllocation> &inputs,
+  Execute(zuku::Stream *stream, uint64_t run_id,
+          const std::vector<BufferAllocation> &inputs,
           const std::vector<BufferAllocation> &outputs,
           TaskMemoryAllocator *allocator,
           const DeviceAssignment &device_assignment, Platform platform,

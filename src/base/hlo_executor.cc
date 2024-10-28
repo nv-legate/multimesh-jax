@@ -36,8 +36,8 @@ constexpr int64_t kMaxScalarArguments = 64;
 
 }
 
-void RunExecutable(int64_t run_id, zuku::DeviceList devices, zuku::Processor p,
-                   std::shared_ptr<LegateCompiler> compiler,
+void RunExecutable(zuku::Stream *zs, int64_t run_id, zuku::DeviceList devices,
+                   zuku::Processor p, std::shared_ptr<LegateCompiler> compiler,
                    std::vector<ScalarArgument> scalars,
                    zuku::ro_vector<zuku::ShardedArray> inputs,
                    zuku::rw_vector<zuku::ShardedArray> outputs,
@@ -130,7 +130,7 @@ void RunExecutable(int64_t run_id, zuku::DeviceList devices, zuku::Processor p,
 
   auto start_clock = std::chrono::steady_clock::now();
   auto error_message =
-      exe->Execute(run_id, input_buffers, output_buffers, &allocator,
+      exe->Execute(zs, run_id, input_buffers, output_buffers, &allocator,
                    device_assignment, platform, blocking);
 
   log_xla.debug() << "Done executing " << compiler->Name();

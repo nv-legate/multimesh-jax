@@ -16,6 +16,7 @@
 #include <zuku/future.h>
 #include <zuku/reshard.h>
 #include <zuku/store.h>
+#include <zuku/stream.h>
 #include <zuku/tiled_array.h>
 
 #include <atomic>
@@ -353,7 +354,8 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
           .region(profile_name)
           .stream_ordered()
           .defer(
-              [](int64_t run_id, zuku::Processor p, zuku::DeviceList devices,
+              [](zuku::Stream *zs, int64_t run_id, zuku::Processor p,
+                 zuku::DeviceList devices,
                  std::shared_ptr<LegateCompiler> compiler,
                  std::vector<ScalarArgument> scalars,
                  zuku::ro_vector<zuku::ShardedArray> inputs,
@@ -361,7 +363,7 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                  const zuku::ArrayTile &temp) {
                 // once I have started, signal that the next task in the
                 // schedule is free to start getting ready
-                RunExecutable(run_id, std::move(devices), std::move(p),
+                RunExecutable(zs, run_id, std::move(devices), std::move(p),
                               std::move(compiler), std::move(scalars),
                               std::move(inputs), std::move(outputs), temp);
               },
