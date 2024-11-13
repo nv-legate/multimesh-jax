@@ -476,10 +476,6 @@ StoreHandle AssembleShards(int64_t local_device_id, int64_t global_device_id,
                   << " has assemble postcondition "
                   << output.impl->array.Precondition();
 
-  if (!IsGpu()) {
-    token.Wait();
-  }
-
   return output;
 }
 
