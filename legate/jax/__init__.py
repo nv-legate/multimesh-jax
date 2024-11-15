@@ -25,7 +25,6 @@ from .lib import (
     strict_static_order,
     ClientConfig,
     tasks,
-    split_large_traces,
     mjit,
 )
 

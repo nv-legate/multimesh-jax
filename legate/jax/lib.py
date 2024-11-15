@@ -21,7 +21,6 @@ from .legate_jax_impl import (
     set_host_offload_min_reuse_distance,
     set_store_cache_min_parallelism,
     set_strict_static_order,
-    split_large_traces as _split_large_traces,
 )
 from .no_op import no_op
 
@@ -138,36 +137,6 @@ def enable_recomputation(enable: Optional[bool] = None, context_value=[True]):
             recomputation is enabled.
     """
     with _set_context_value(enable, _enable_recomputation, context_value):
-        yield
-
-
-@contextmanager
-def split_large_traces(
-    split_large_traces: Optional[bool] = None, context_value=[False]
-):
-    """Sets whether traces should be split into smaller subtraces.
-
-    The runtime performs numerous dependency analyses which can lead to very
-    high overheads for some programs. Tracing records dependencies and events
-    over the first few function calls. Tracing causes extra overhead on the
-    first few calls, but should reduce overhead on future function calls.
-    In some cases, tracing may slow execution for all function calls.
-    For large functions - common in training neural networks - traces
-    may get too large and trace analysis may have too high overhead.
-    This splits a function into smaller subtraces. This lowers tracing
-    overhead, but may decrease trace replay performance.
-
-    Args:
-        enable: optional, whether to cpature traces as smaller subtraces
-            instead of large, global traces
-        context_value: optional, a global variable holding the current context
-            value. The user should never pass this value. The program begins
-            in a context with ``enable`` False, which means that complete
-            functions are traced.
-    """
-    with _set_context_value(
-        split_large_traces, _split_large_traces, context_value
-    ):
         yield
 
 
@@ -428,15 +397,15 @@ class ClientConfig:
 
 @contextmanager
 def tasks(configurable: Optional[Type] = None):
-    clear_tasks()
-
     if configurable is not None:
+        clear_tasks()
         task_configure = configurable()
         task_configure()
 
     yield
 
-    clear_tasks()
+    if configurable is not None:
+        clear_tasks()
 
 
 def mjit(
@@ -489,9 +458,9 @@ def _context(
     _configurable=None,
     _autoshard: Optional[bool] = None,
     _strict_static_order: Optional[bool] = None,
+    _enable_recomputation: Optional[bool] = None,
     _host_offload_min_reuse_distance=None,
     _only_fuse_loop_tasks=None,
-    _split_large_traces=None,
     _enable_task_fusion=None,
     _enable_fast_path=None,
     _ignore_transforms=None,
@@ -502,15 +471,15 @@ def _context(
         _host_offload_min_reuse_distance
     ) as E, only_fuse_loop_tasks(
         _only_fuse_loop_tasks
-    ) as F, split_large_traces(
-        _split_large_traces
     ) as G, enable_task_fusion(
         _enable_task_fusion
     ) as H, enable_fast_path(
         _enable_fast_path
     ) as J, ignore_transforms(
         _ignore_transforms
-    ) as K:  # noqa: F841
+    ) as K, enable_recomputation(
+        _enable_recomputation
+    ) as M:  # noqa: F841
         yield
 
 
@@ -519,9 +488,9 @@ def context(
     configurable=None,
     autoshard: Optional[bool] = None,
     strict_static_order: Optional[bool] = None,
+    enable_recomputation: Optional[bool] = None,
     host_offload_min_reuse_distance: Optional[int] = None,
     only_fuse_loop_tasks: Optional[bool] = None,
-    split_large_traces: Optional[bool] = None,
     enable_task_fusion: Optional[bool] = None,
     enable_fast_path: Optional[bool] = None,
     ignore_transforms: Optional[bool] = None,
@@ -535,7 +504,6 @@ def context(
         strict_static_order: optional, value to configure the :func:`.strict_static_order` context manager.
         host_offload_min_reuse_distance: optional, value to configure the :func:`.host_offload_min_reuse_distance` context manager.
         only_fuse_loop_tasks: optional, value to configure the :func:`.only_fuse_loop_tasks` context manager.
-        split_large_traces: optional, value to configure the :func:`.split_large_traces` context manager.
         enable_task_fusion: optional, value to configure the :func:`.enable_task_fusion` context manager.
         enable_fast_path: optional, value to configure the :func:`.enable_fast_path` context manager.
         ignore_transforms: optional, value to configure the :func:`.ignore_transforms` context manager.
@@ -544,9 +512,9 @@ def context(
         _configurable=configurable,
         _autoshard=autoshard,
         _strict_static_order=strict_static_order,
+        _enable_recomputation=enable_recomputation,
         _host_offload_min_reuse_distance=host_offload_min_reuse_distance,
         _only_fuse_loop_tasks=only_fuse_loop_tasks,
-        _split_large_traces=split_large_traces,
         _enable_task_fusion=enable_task_fusion,
         _enable_fast_path=enable_fast_path,
         _ignore_transforms=ignore_transforms,
