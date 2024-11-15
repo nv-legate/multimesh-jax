@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 from absl.testing import absltest
 from jax import config
+from jax.experimental.custom_partitioning import custom_partitioning
 from jax.experimental.pjit import AUTO
 from jax.lax import with_sharding_constraint
 from jax.sharding import (
@@ -21,6 +22,7 @@ from jax.sharding import (
 )
 
 import legate.jax
+from legate.jax import MeshWrapper
 from legate.jax.test_util import LegateJaxTestCase
 
 config.parse_flags_with_absl()
@@ -797,6 +799,101 @@ class TaskTest(LegateJaxTestCase):
                 arg_shardings=arg_shardings,
                 reference_shardings=reference_shardings,
             )
+
+    def test_mesh_wrapper(self):
+        if jax.device_count() != 8:
+            self.skipTest("need 8 devices")
+
+        logical_axes = [
+            ("batch", "x"),
+            ("seq", "y"),
+            ("embed", "z"),
+        ]
+
+        legate.jax.register_task(
+            "layer0",
+            devices=[0, 1, 2, 3],
+            dims=[2, 1, 2],
+            device_axes=["x", "y", "z"],
+            logical_axes=logical_axes,
+        )
+        legate.jax.register_task(
+            "layer1",
+            devices=[4, 5, 6, 7],
+            dims=[2, 1, 2],
+            device_axes=["x", "y", "z"],
+            logical_axes=logical_axes,
+        )
+
+        def partition(mesh, arg_shapes, result_shape):
+            def lower_fn(x):
+                return x
+
+            out_sharding = NamedSharding(mesh, arg_shapes[0].sharding.spec)
+
+            return (
+                mesh,
+                lower_fn,
+                arg_shapes[0].sharding,
+                (out_sharding,),
+            )
+
+        def infer_sharding_from_operands(mesh, arg_shapes, result_shape):
+            print(mesh)
+            print(arg_shapes)
+            print(result_shape)
+            return arg_shapes[0].sharding
+
+        def propagate_user_sharding(mesh, user_shape):
+            return user_shape.sharding
+
+        @custom_partitioning
+        def layer(x):
+            return x * x
+
+        layer.def_partition(
+            infer_sharding_from_operands=infer_sharding_from_operands,
+            partition=partition,
+            propagate_user_sharding=propagate_user_sharding,
+        )
+
+        def c(x):
+            def f(x):
+                with jax.named_scope("layer0"):
+                    x = legate.jax.with_sharding_constraint(
+                        x, P("batch", "seq", "embed")
+                    )
+                    x = layer(x)
+                with jax.named_scope("layer1"):
+                    x = legate.jax.with_sharding_constraint(
+                        x, P("batch", "seq", "embed")
+                    )
+                    x = layer(x)
+                return x
+
+            return f(x)
+
+        jax_mesh = Mesh(
+            np.array(jax.devices()).reshape(4, 1, 2),
+            ("batch", "seq", "embed"),
+        )
+        legate_mesh = MeshWrapper(jax_mesh, (2, 1, 2))
+
+        batch = 8
+        seq = 10
+        embed = 8
+
+        with legate_mesh, legate.jax.autoshard(True):
+            c = jax.jit(
+                c,
+                in_shardings=(AUTO(legate_mesh),),
+                out_shardings=(AUTO(legate_mesh)),
+            )
+            batch = jax.core.ShapedArray((batch, seq, embed), np.float32)
+            with MeshWrapper.lower_mode():
+                lowered = c.lower(batch)
+            with MeshWrapper.compile_mode():
+                compiled = lowered.compile()  # noqa: F841
 
 
 if __name__ == "__main__":

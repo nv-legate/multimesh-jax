@@ -17,8 +17,7 @@ class LegateJaxTestCase(jtu.JaxTestCase):
         donate_argnums: Optional[Sequence[int]] = None,
         enable_fast_path: bool = False,
     ):
-        device_kind = jax.devices()[0].device_kind
-        reference_backend = "cpu" if device_kind == "cpu" else "cuda"
+        reference_backend = "cpu"
         jax.clear_caches()
 
         if reference_shardings is None:

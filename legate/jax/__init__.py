@@ -31,6 +31,8 @@ from .lib import (
 
 from .task import task, microbatch, parallelize, register_task
 
+from .mesh import MeshWrapper
+
 from . import _version
 
 __version__ = _version.get_versions()["version"]

@@ -82,8 +82,6 @@ def init(
     all_platforms = ["legate"]
     if existing_platforms:
         all_platforms.append(existing_platforms)
-    if gpus is not None and gpus > 0:
-        all_platforms.append("cuda")
     all_platforms.append("cpu")
     os.environ["JAX_PLATFORMS"] = ",".join(all_platforms)
 
