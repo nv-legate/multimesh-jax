@@ -19,6 +19,7 @@ from .legate_jax_impl import (
     enable_recomputation as _enable_recomputation,
     enable_task_fusion as _enable_task_fusion,
     set_host_offload_min_reuse_distance,
+    set_host_offload_min_size,
     set_store_cache_min_parallelism,
     set_strict_static_order,
 )
@@ -253,6 +254,42 @@ def host_offload_min_reuse_distance(
 
 
 @contextmanager
+def host_offload_min_size(
+    size: Optional[int] = None, context_value=[1024 * 1024]
+):
+    """Activates host offloading of intermediates based on cutoff.
+
+    Rather than occupy scarce GPU memory, intermediates can be offloaded
+    to the host in-between tasks.  The reuse distance is the path length
+    in the task graph between uses of variables. A too-small reuse distance
+    may cause too much host-GPU traffic and hurt performance. A too-large
+    reuse distance may cause too much GPU memory to be used since fewer
+    intermediates will be offloaded.
+
+    Args:
+        reuse_distance: optional, the minimum number of intervening tasks
+          between uses of intermediates above which host offloading
+          should be considered beneficial. Higher cutoff values will
+          cause fewer intermediates to offload and may improve performance.
+          Lower cutoff values will cause more intermediates to be offloaded and
+          will reduce GPU memory usage. A value of None or 0 turns off
+          host offloading.
+
+        context_value (list, optional):
+            Global variable holding the current context value. The user
+            should never pass this value. The program begins in a context
+            with a ``reuse_distance`` of 0 and no host offloading.
+    """
+    if size is None:
+        yield
+    else:
+        with _set_context_value(
+            size, set_host_offload_min_size, context_value
+        ):
+            yield
+
+
+@contextmanager
 def autoshard(autoshard: bool = True):
     """Opens a context where shardings constraints become logical shardings.
 
@@ -460,6 +497,7 @@ def _context(
     _strict_static_order: Optional[bool] = None,
     _enable_recomputation: Optional[bool] = None,
     _host_offload_min_reuse_distance=None,
+    _host_offload_min_size=None,
     _only_fuse_loop_tasks=None,
     _enable_task_fusion=None,
     _enable_fast_path=None,
@@ -469,6 +507,8 @@ def _context(
         _autoshard
     ) as D, host_offload_min_reuse_distance(
         _host_offload_min_reuse_distance
+    ) as L, host_offload_min_size(
+        _host_offload_min_size
     ) as E, only_fuse_loop_tasks(
         _only_fuse_loop_tasks
     ) as G, enable_task_fusion(
@@ -490,6 +530,7 @@ def context(
     strict_static_order: Optional[bool] = None,
     enable_recomputation: Optional[bool] = None,
     host_offload_min_reuse_distance: Optional[int] = None,
+    host_offload_min_size: Optional[int] = None,
     only_fuse_loop_tasks: Optional[bool] = None,
     enable_task_fusion: Optional[bool] = None,
     enable_fast_path: Optional[bool] = None,
@@ -514,6 +555,7 @@ def context(
         _strict_static_order=strict_static_order,
         _enable_recomputation=enable_recomputation,
         _host_offload_min_reuse_distance=host_offload_min_reuse_distance,
+        _host_offload_min_size=host_offload_min_size,
         _only_fuse_loop_tasks=only_fuse_loop_tasks,
         _enable_task_fusion=enable_task_fusion,
         _enable_fast_path=enable_fast_path,

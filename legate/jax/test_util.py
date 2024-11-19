@@ -16,6 +16,8 @@ class LegateJaxTestCase(jtu.JaxTestCase):
         reference_shardings: Optional[Sequence[Any]] = None,
         donate_argnums: Optional[Sequence[int]] = None,
         enable_fast_path: bool = False,
+        atol=None,
+        rtol=None,
     ):
         reference_backend = "cpu"
         jax.clear_caches()
@@ -85,4 +87,4 @@ class LegateJaxTestCase(jtu.JaxTestCase):
                 )
 
             legate_res = legate_f(*args)
-        self.assertAllClose(cuda_res, legate_res)
+        self.assertAllClose(cuda_res, legate_res, atol=atol, rtol=rtol)

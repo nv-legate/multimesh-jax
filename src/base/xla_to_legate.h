@@ -20,11 +20,21 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                        std::function<void()> on_done = nullptr,
                        std::optional<std::string> name = std::nullopt);
 
-void OffloadDtoH(const StoreHandle &src, const StoreHandle &dst);
+void Free(int64_t local_device_id, legate_xla::StoreHandle handle);
+
+void OffloadDtoH(int64_t local_device_id,
+                 const std::vector<StoreHandle> &to_offload,
+                 const std::vector<StoreHandle> &pipelined,
+                 const std::string &task_name);
+
+void OffloadHtoD(int64_t local_device_id,
+                 const std::vector<StoreHandle> &to_offload,
+                 const std::string &task_name);
 
 StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
                         zuku::ShardedShape shape,
-                        std::optional<std::string> name = std::nullopt);
+                        std::optional<std::string> name = std::nullopt,
+                        std::optional<int64_t> min_cache_size = std::nullopt);
 
 BufferHandle CreateBuffer(int64_t local_device_id, int64_t global_device_id,
                           int64_t size);
@@ -57,7 +67,7 @@ std::set<int> GetLocalDevices();
 
 bool IsGpu();
 
-bool HasLocalShard(const legate_xla::StoreHandle& handle);
+bool HasLocalShard(const legate_xla::StoreHandle &handle);
 
 void StoreBufferAction(int64_t local_device_id, BufferAction *actions,
                        const StoreHandle &store, bool blocking);

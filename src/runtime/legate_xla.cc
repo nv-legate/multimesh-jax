@@ -47,6 +47,17 @@ std::atomic<bool> runtime_stopped{false};
 using std_timer = decltype(std::chrono::steady_clock::now());
 std::unordered_map<std::string, zuku::Future<std_timer>> pending_timers;
 
+legate_xla::StartupConfig startup_config;
+
+Realm::Runtime rt;
+
+std::vector<Realm::Event> last_execute_events;
+std::vector<Realm::UserEvent> last_control_events;
+std::vector<zuku::ArrayCache> host_caches;
+std::vector<zuku::ArrayCache> device_caches;
+
+std::set<Realm::Event> pending_compilation_events;
+
 } // namespace
 
 namespace legate_xla {
@@ -91,15 +102,6 @@ BufferHandle::~BufferHandle() {}
 Realm::Logger log_xla("legate.xla");
 
 namespace {
-
-StartupConfig startup_config;
-
-Realm::Runtime rt;
-
-std::vector<Realm::Event> last_execute_events;
-std::vector<Realm::UserEvent> last_control_events;
-
-std::set<Realm::Event> pending_compilation_events;
 
 int64_t GetRunId() {
   static std::atomic<int64_t> counter{0};
@@ -153,84 +155,6 @@ static int64_t NextStoreId() {
   return next_id.fetch_add(int64_t(1));
 }
 
-#if 0
-void LocalFence(const std::vector<StoreHandle> &inputs,
-                const std::vector<StoreHandle> &inouts,
-                std::pair<int64_t, int64_t> device_slice, std::string name) {
-  log_xla.debug() << "Fencing " << inputs.size() << " inputs and "
-                  << inouts.size() << " outputs on slice ["
-                  << device_slice.first << "..." << device_slice.second << ")";
-  auto runtime = legate_xla::Runtime::get_runtime();
-  auto core_runtime = legate::Runtime::get_runtime();
-  auto machine = core_runtime->get_machine();
-  const uint64_t launch_size = device_slice.second - device_slice.first;
-  auto scope =
-      legate::Scope("LocalFence" + name)
-          .with_machine(machine.slice(device_slice.first, device_slice.second));
-
-  auto task = runtime->create_task(XlaOpCode::XLA_FENCE_TASK,
-                                   legate::Shape({launch_size}));
-
-  for (const auto &store : inputs) {
-    log_xla.debug() << "Fence input " << store.impl->name();
-    if (store.impl->HasPartition()) {
-      task.add_input(store.impl->partition());
-    } else {
-      task.add_input(store.impl->store());
-    }
-  }
-  for (const auto &store : inouts) {
-    log_xla.debug() << "Fence in/out " << store.impl->name();
-    if (store.impl->HasPartition()) {
-      task.add_input(store.impl->partition());
-      task.add_output(store.impl->partition());
-    } else {
-      task.add_input(store.impl->store());
-      task.add_output(store.impl->store());
-    }
-  }
-  runtime->submit(std::move(task));
-}
-#endif
-
-#if 0
-void OffloadDtoH(const std::vector<StoreHandle> &to_offload,
-                 std::pair<int64_t, int64_t> device_slice, std::string name,
-                 bool save_values) {
-  log_xla.debug() << "Offloading " << to_offload.size() << " stores from task "
-                  << name << " on slice [" << device_slice.first << "..."
-                  << device_slice.second << ")";
-  auto runtime = legate_xla::Runtime::get_runtime();
-  auto core_runtime = legate::Runtime::get_runtime();
-  auto machine = core_runtime->get_machine();
-  const uint64_t launch_size = device_slice.second - device_slice.first;
-  auto scope =
-      legate::Scope("OffloadDtoH" + std::move(name))
-          .with_machine(machine.only(legate::mapping::TaskTarget::CPU)
-                            .slice(device_slice.first, device_slice.second));
-
-  auto task = runtime->create_task(XlaOpCode::XLA_OFFLOAD_TASK,
-                                   legate::Shape({launch_size}));
-
-  for (const auto &store : to_offload) {
-    log_xla.debug() << "OffloadDtoH" << store.impl->name();
-    if (store.impl->HasPartition()) {
-      if (save_values) {
-        task.add_input(store.impl->partition());
-      }
-      task.add_output(store.impl->partition());
-    } else {
-      if (save_values) {
-        task.add_input(store.impl->store());
-      }
-      task.add_output(store.impl->store());
-    }
-  }
-  runtime->submit(std::move(task));
-  core_runtime->issue_mapping_fence();
-}
-#endif
-
 } // namespace
 
 std::set<int> GetLocalDevices() {
@@ -239,6 +163,59 @@ std::set<int> GetLocalDevices() {
     procs.insert(p.local_id());
   }
   return procs;
+}
+
+void OffloadHtoD(int64_t local_device_id,
+                 const std::vector<StoreHandle> &to_offload,
+                 const std::string &task_name) {
+  // there shouldn't be any competing H->D traffic so just run this ASAP
+  log_xla.debug() << "OffloadHtoD " << to_offload.size() << " stores for task "
+                  << task_name << " on device " << local_device_id;
+
+  for (auto &handle : to_offload) {
+    // only move back if the task processor does not match the current array
+    // processor
+    if (handle.impl->array->processor().type() !=
+        LocalProcessor(local_device_id).type()) {
+      handle.impl->array = zuku::ShardedArray::MoveToMemory(
+          std::move(handle.impl->array), host_caches[local_device_id],
+          device_caches[local_device_id]);
+    }
+  }
+}
+
+void OffloadDtoH(int64_t local_device_id,
+                 const std::vector<StoreHandle> &to_offload,
+                 const std::vector<StoreHandle> &pipelined,
+                 const std::string &task_name) {
+
+  log_xla.debug() << "OffloadDtoH " << to_offload.size() << " stores from task "
+                  << task_name << " on device " << local_device_id;
+
+  // don't offload until all the pipelined intermediates have been sent
+  // otherwise you will end up with serious PCI contention
+  const Realm::Event precondition = [&] {
+    if (pipelined.empty()) {
+      return Realm::Event::NO_EVENT;
+    }
+    if (pipelined.size() == 1) {
+      return pipelined.front().impl->array.Precondition();
+    }
+    std::set<Realm::Event> preconditions;
+    for (auto &handle : pipelined) {
+      preconditions.insert(handle.impl->array.Precondition());
+    }
+    return Realm::Event::merge_events(preconditions);
+  }();
+
+  for (auto &handle : to_offload) {
+    // only offload if on the GPU
+    if (handle.impl->array->processor().type() == zuku::Processor::Type::GPU) {
+      handle.impl->array = zuku::ShardedArray::MoveToMemory(
+          std::move(handle.impl->array), device_caches[local_device_id],
+          host_caches[local_device_id], precondition);
+    }
+  }
 }
 
 void CreateCompileTask(int64_t local_device_id,
@@ -259,28 +236,6 @@ void CreateCompileTask(int64_t local_device_id,
 
   pending_compilation_events.insert(token.Event());
 }
-
-#if 0
-void OffloadDtoH(const std::vector<StoreHandle> &blocking_users,
-                 const std::vector<StoreHandle> &to_offload,
-                 std::pair<int64_t, int64_t> device_slice, std::string name) {
-
-  // if there are blocking users, we want to ensure that all copies of the user
-  // have been made before starting any offload tasks we achieve this by doing a
-  // local "fence" which does a dummy read/write on the blocking users while
-  // "reading" the stores to be offloaded
-  if (!blocking_users.empty()) {
-    LocalFence(to_offload, blocking_users, device_slice, name);
-  }
-  OffloadDtoH(to_offload, device_slice, std::move(name), /*save_values=*/true);
-}
-
-void InvalidateDeviceInstances(const std::vector<StoreHandle> &stores,
-                               std::pair<int64_t, int64_t> device_slice,
-                               std::string name) {
-  OffloadDtoH(stores, device_slice, std::move(name), /*save_values=*/false);
-}
-#endif
 
 void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                        int64_t global_device_id, zuku::DeviceList devices,
@@ -543,14 +498,17 @@ BufferHandle CreateBuffer(int64_t local_device_id, int64_t global_device_id,
                           std::make_shared<BufferHandleImpl>(std::move(tile))};
 }
 
+void Free(int64_t local_device_id, legate_xla::StoreHandle handle) {
+  auto shape = handle.impl->array->shape();
+  device_caches[local_device_id].Free(shape, std::move(handle.impl->array));
+}
+
 StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
                         zuku::ShardedShape shape,
-                        std::optional<std::string> name) {
-  const zuku::DeviceList &devices = shape.sharding.devices;
-
-  zuku::Processor p = LocalProcessor(local_device_id);
-  zuku::Store<zuku::ShardedArray> array = zuku::ShardedArray::Create(
-      std::move(shape), {.name = std::move(name), .processor = std::move(p)});
+                        std::optional<std::string> name,
+                        std::optional<int64_t> min_cache_size) {
+  auto array =
+      device_caches[local_device_id].Get(shape, std::move(min_cache_size));
 
   const int64_t next_id = NextStoreId();
   log_xla.debug() << "CreateStore: device=" << local_device_id
@@ -591,6 +549,8 @@ void StopLegate() {
     // explicitly wait for everything to finish
     Realm::Event last_event = Realm::Event::merge_events(last_execute_events);
     last_event.wait();
+    device_caches.clear();
+    host_caches.clear();
     ShutdownLegateClient();
     zuku::stop(rt, last_event);
   }
@@ -613,11 +573,18 @@ void StartLegate() {
                       .argv = startup_config.argv,
                   });
   const auto &procs = zuku::Processor::DefaultProcs();
+  zuku::Processor host = zuku::Processor::Util();
   last_execute_events.reserve(procs.size());
   last_control_events.reserve(procs.size());
+  device_caches.reserve(procs.size());
+  host_caches.reserve(procs.size());
   for (auto &&proc : procs) {
     last_execute_events.push_back(Realm::Event::NO_EVENT);
     last_control_events.push_back(Realm::UserEvent::NO_USER_EVENT);
+    zuku::Processor host =
+        zuku::Processor::Create(proc.id(), zuku::Processor::Type::CPU);
+    host_caches.emplace_back(Realm::Memory::Kind::Z_COPY_MEM, host);
+    device_caches.emplace_back(proc.DefaultMemoryKind(), proc);
   }
 
   // This has to come after PyFinalize

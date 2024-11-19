@@ -41,7 +41,6 @@ function(find_or_configure_xla)
     legate_pjrt_client_test
     legate_pjrt_executable_test
     batch_dim_propagation_test
-    mpmd_sharding_propagation_test
   )
 
 

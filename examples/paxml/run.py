@@ -251,16 +251,15 @@ legate_jax.add_argument(
 
 legate_jax.add_argument(
     "--only-fuse-loop-tasks",
-    action="store_true",
+    action=argparse.BooleanOptionalAction,
     default=False,
     help="Only fuse tasks inside loops",
 )
 
 legate_jax.add_argument(
     "--disable-task-fusion",
-    action="store_false",
-    default=True,
-    dest="enable_task_fusion",
+    action=argparse.BooleanOptionalAction,
+    default=False,
     help="Only fuse tasks inside loops",
 )
 
@@ -395,11 +394,13 @@ paxml.add_argument(
 args, realm_argv = parser.parse_known_args()
 
 if args.te:
-  if args.tp == 1:
-    raise Exception("TransformerEngine (--te) requires tensor parallelism (--tp) > 1")
-  os.environ["ENABLE_TE"] = "1"
-  os.environ["ENABLE_TE_SP"] = "1"
-  os.environ["NVTE_FUSED_ATTN"] = "1"
+    if args.tp == 1:
+        raise Exception(
+            "TransformerEngine (--te) requires tensor parallelism (--tp) > 1"
+        )
+    os.environ["ENABLE_TE"] = "1"
+    os.environ["ENABLE_TE_SP"] = "1"
+    os.environ["NVTE_FUSED_ATTN"] = "1"
 
 
 if args.host_offload_min_reuse_distance > 0 and args.gpus > args.cpus:

@@ -46,6 +46,8 @@ extern "C" void SetStrictStaticOrder(bool order);
 
 extern "C" void SetHostOffloadMinReuseDistance(int64_t reuse_distance);
 
+extern "C" void SetHostOffloadMinSize(int64_t size);
+
 namespace py = pybind11;
 
 template <class To, class From>
@@ -198,4 +200,7 @@ PYBIND11_MODULE(legate_jax_impl, m) {
         SetHostOffloadMinReuseDistance(reuse_distance);
       },
       py::arg("reuse_distance"));
+  m.def(
+      "set_host_offload_min_size",
+      [](int64_t size) { SetHostOffloadMinSize(size); }, py::arg("size"));
 }
