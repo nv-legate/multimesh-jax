@@ -502,6 +502,7 @@ def _context(
     _enable_task_fusion=None,
     _enable_fast_path=None,
     _ignore_transforms=None,
+    _store_cache_min_parallelism=None,
 ):
     with tasks(configurable=_configurable) as A, autoshard(
         _autoshard
@@ -519,7 +520,9 @@ def _context(
         _ignore_transforms
     ) as K, enable_recomputation(
         _enable_recomputation
-    ) as M:  # noqa: F841
+    ) as M, store_cache_min_parallelism(
+        _store_cache_min_parallelism
+    ):  # noqa: F841
         yield
 
 
@@ -535,6 +538,7 @@ def context(
     enable_task_fusion: Optional[bool] = None,
     enable_fast_path: Optional[bool] = None,
     ignore_transforms: Optional[bool] = None,
+    store_cache_min_parallelism: Optional[int] = None,
 ):
     """Helper function to configure multiple contexts in a single manager.
 
@@ -560,5 +564,6 @@ def context(
         _enable_task_fusion=enable_task_fusion,
         _enable_fast_path=enable_fast_path,
         _ignore_transforms=ignore_transforms,
+        _store_cache_min_parallelism=store_cache_min_parallelism,
     ):
         yield
