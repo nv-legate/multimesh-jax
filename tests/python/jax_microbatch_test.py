@@ -73,89 +73,93 @@ class MicrobatchTest(LegateJaxTestCase):
         self._test_against_reference(c, args_maker)
 
     def test_microbatch_1f1b(self):
-        if jax.device_count() != 1:
-            self.skipTest("need 1 device")
+        if jax.device_count() > 2:
+            self.skipTest("need 1 or 2 devices")
 
         logical_axes = [
             ("batch", "x"),
             ("model", "y"),
         ]
 
+        devices = list(range(jax.device_count()))
+        batch_dim = jax.device_count()
+
         register_task(
             "layer0",
-            devices=[0],
-            dims=[1, 1],
+            devices=devices,
+            dims=[batch_dim, 1],
             device_axes=["x", "y"],
             logical_axes=logical_axes,
         )
         register_task(
             "layer1",
-            devices=[0],
-            dims=[1, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
-        )
-        register_task(
-            "layer2",
-            devices=[0],
-            dims=[1, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
-        )
-        register_task(
-            "layer3",
-            devices=[0],
-            dims=[1, 1],
+            devices=devices,
+            dims=[batch_dim, 1],
             device_axes=["x", "y"],
             logical_axes=logical_axes,
         )
         register_task(
             "final",
-            devices=[0],
-            dims=[1, 1],
+            devices=devices,
+            dims=[batch_dim, 1],
             device_axes=["x", "y"],
             logical_axes=logical_axes,
         )
 
         def c(params, batch):
-            def inner_comp(x, y):
-                return jnp.einsum("ac,cb->ab", x, y)
+            def inner_comp(batch, param):
+                x = jnp.einsum("hd,bd->bh", param, batch)
+                return jnp.einsum("hd,bd->bh", param, x)
 
             def m(params, batch):
-                x, y, z, w = params
+                x, y = params
                 with jax.named_scope("layer0"):
                     s = inner_comp(batch, x)
                 with jax.named_scope("layer1"):
                     s = inner_comp(s, y)
-                with jax.named_scope("layer2"):
-                    s = inner_comp(s, z)
-                with jax.named_scope("layer3"):
-                    s = inner_comp(s, w)
-                    return s.sum()
+                return (s * s).sum()
 
             g = value_and_grad(m)
-            g = microbatch(
-                g, dim=0, size=2, argnum=1, schedule="1f1b", num_stages=4
-            )
+            g = microbatch(g, dim=0, size=2, argnum=1, schedule="1f1b")
             return g(params, batch)
+
+        batch = 4
+        model = 4
 
         def args_maker():
             def make_shape(*shape):
                 size = np.prod(shape)
-                return jnp.arange(size, dtype=np.float32).reshape(*shape)
+                return jnp.cos(
+                    jnp.arange(size, dtype=np.float32).reshape(*shape)
+                )
 
             return (
                 (
-                    make_shape(4, 4),
-                    make_shape(4, 4),
-                    make_shape(4, 4),
-                    make_shape(4, 4),
+                    make_shape(model, model),
+                    make_shape(model, model),
                 ),
-                make_shape(12, 4),
+                make_shape(batch, model),
             )
 
+        mesh = jax.sharding.Mesh(np.array(jax.devices()), ("x",))
+        param_sharding = jax.sharding.NamedSharding(mesh, P(None, None))
+        batch_sharding = jax.sharding.NamedSharding(mesh, P("x", None))
+
+        arg_shardings = (
+            (
+                param_sharding,
+                param_sharding,
+            ),
+            batch_sharding,
+        )
+
         with enable_task_fusion(False):
-            self._test_against_reference(c, args_maker)
+            self._test_against_reference(
+                c,
+                args_maker,
+                reference_shardings=arg_shardings,
+                arg_shardings=arg_shardings,
+            )
 
     def test_microbatch_implicit_pre_post_task(self):
         if jax.device_count() != 1:
@@ -430,7 +434,7 @@ class MicrobatchTest(LegateJaxTestCase):
             f = microbatch(value_and_grad(f), argnum=1, dim=0, size=2)
             return f(params, x)
 
-        dim = 1024
+        dim = 8
 
         def args_maker():
             params = [

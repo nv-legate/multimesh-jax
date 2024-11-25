@@ -18,6 +18,7 @@ def init(
     profile: bool = False,
     distributed: bool = False,
     dump: Optional[str] = None,
+    dump_all_passes: bool = False,
     realm_argv: Optional[list[str]] = None,
     coordinator_address: str | None = None,
     num_processes: int = 1,
@@ -35,6 +36,8 @@ def init(
     new_xla_flags = []
     if dump is not None:
         new_xla_flags.append(f"--xla_dump_to={dump}")
+        if dump_all_passes:
+            new_xla_flags.append("--xla_dump_hlo_pass_re=.*")
     existing_xla_flags = os.environ.get("XLA_FLAGS") or ""
     if new_xla_flags:
         os.environ["XLA_FLAGS"] = (
@@ -159,6 +162,12 @@ def init_test():
         default=False,
         help="whether to dump HLO modules from tests",
     )
+    parser.add_argument(
+        "--dump-all-passes",
+        action="store_true",
+        default=False,
+        help="whether to dump all intermediate HLO modules from tests",
+    )
 
     args, remaining = parser.parse_known_args()
     sys.argv = [sys.argv[0]] + remaining
@@ -174,4 +183,5 @@ def init_test():
         debug=args.debug,
         kthreads=args.kthreads,
         dump=dump,
+        dump_all_passes=args.dump_all_passes,
     )
