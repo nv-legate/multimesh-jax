@@ -34,16 +34,24 @@ function(find_or_configure_xla)
 
 
   set(test_names
-    hlo_partition_test
+    mpmd_partition_test
     legate_buffer_action_test
     legate_sharding_test
     loop_scheduler_test
     legate_pjrt_client_test
     legate_pjrt_executable_test
-    batch_dim_propagation_test
     mpmd_sharding_propagation_test
+    mpmd_coloring_test
+    mpmd_cut_size_minimizer_test
+    mpmd_computation_grouper_test
+    mpmd_microbatch_loop_inliner_test
+    mpmd_cross_task_barrier_remover_test
+    mpmd_autosharding_propagation_test
+    mpmd_computation_fusion_test
+    mpmd_autosharding_test
+    mpmd_instruction_delay_recolor_test
+    mpmd_utils_test
   )
-
 
   set(target_names
     "//xla/pjrt/legate:liblegate_xla_client.so"

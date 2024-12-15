@@ -316,8 +316,6 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                  zuku::ro_vector<zuku::ShardedArray> inputs,
                  zuku::rw_vector<zuku::ShardedArray> outputs,
                  const zuku::ArrayTile &temp) {
-                // once I have started, signal that the next task in the
-                // schedule is free to start getting ready
                 RunExecutable(zs, run_id, std::move(devices), std::move(p),
                               std::move(compiler), std::move(scalars),
                               std::move(inputs), std::move(outputs), temp);
