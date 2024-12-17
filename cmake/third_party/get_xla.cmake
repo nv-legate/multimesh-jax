@@ -50,6 +50,7 @@ function(find_or_configure_xla)
     mpmd_computation_fusion_test
     mpmd_autosharding_test
     mpmd_instruction_delay_recolor_test
+    mpmd_argument_recompute_test
     mpmd_utils_test
   )
 

@@ -2,6 +2,7 @@ from .legate_jax_impl import (
     no_op_custom_call,
     shutdown,
     replicate_parameters_smaller_than_num_elements,
+    recompute_from_arguments_if_cost_less_than,
     set_store_cache_min_parallelism,
     unregister_task,
     clear_tasks,

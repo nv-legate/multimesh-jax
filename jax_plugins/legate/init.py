@@ -63,7 +63,10 @@ def init(
         existing_vmodule = os.environ.get("TF_CPP_VMODULE") or ""
         vmods = [
             "legate_ifrt_client",
-            "hlo_partition",
+            "mpmd_partition",
+            "mpmd_autosharding",
+            "mpmd_computation_grouper",
+            "iota_sharding_sanitizer",
             "legate_pjrt_executable",
             "legate_pjrt_buffer",
             "legate_pjrt_client",

@@ -40,6 +40,8 @@ extern "C" void LegateShutdown();
 
 extern "C" void ReplicateParametersSmallerThanNumElements(int64_t num_elements);
 
+extern "C" void RecomputeArgumentsIfCostLessThan(int64_t cost);
+
 extern "C" void SetStoreCacheMinParallelism(int64_t parallelism);
 
 extern "C" void SetStrictStaticOrder(bool order);
@@ -183,6 +185,10 @@ PYBIND11_MODULE(legate_jax_impl, m) {
         ReplicateParametersSmallerThanNumElements(num_elements);
       },
       py::arg("num_elements"));
+  m.def(
+      "recompute_from_arguments_if_cost_less_than",
+      [](int64_t cost) { ReplicateParametersSmallerThanNumElements(cost); },
+      py::arg("cost"));
   m.def(
       "set_store_cache_min_parallelism",
       [](int64_t parallelism) { SetStoreCacheMinParallelism(parallelism); },
