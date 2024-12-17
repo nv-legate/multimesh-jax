@@ -129,9 +129,9 @@ void RunExecutable(zuku::Stream *zs, int64_t run_id, zuku::DeviceList devices,
   static bool blocking = BlockingExecution();
 
   auto start_clock = std::chrono::steady_clock::now();
-  auto error_message =
-      exe->Execute(zs, run_id, input_buffers, output_buffers, &allocator,
-                   device_assignment, platform, blocking);
+  auto error_message = exe->Execute(
+      zs, run_id, input_buffers, output_buffers, &allocator, device_assignment,
+      p.NumLocalInDeviceList(devices, p.type()), platform, blocking);
 
   log_xla.debug() << "Done executing " << compiler->Name();
 

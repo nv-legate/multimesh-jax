@@ -122,8 +122,8 @@ public:
           const std::vector<BufferAllocation> &inputs,
           const std::vector<BufferAllocation> &outputs,
           TaskMemoryAllocator *allocator,
-          const DeviceAssignment &device_assignment, Platform platform,
-          bool blocking) const = 0;
+          const DeviceAssignment &device_assignment, int64_t num_local,
+          Platform platform, bool blocking) const = 0;
 
   virtual size_t LaunchSize() const = 0;
 

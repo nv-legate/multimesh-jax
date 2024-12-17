@@ -39,8 +39,8 @@ public:
   Execute(uint64_t run_id, const std::vector<BufferAllocation> &inputs,
           const std::vector<BufferAllocation> &outputs,
           TaskMemoryAllocator *allocator,
-          const DeviceAssignment &device_assignment, Platform platform,
-          bool blocking) const override {
+          const DeviceAssignment &device_assignment, int64_t num_local,
+          Platform platform, bool blocking) const override {
     fxn_(inputs, outputs);
     return std::nullopt;
   }
@@ -90,9 +90,7 @@ public:
     return std::unique_ptr<LegateExecutable>(new TestExecutable(fxn_));
   }
 
-  std::pair<int64_t, int64_t> MachineSlice() const override {
-    return {0, 1};
-  }
+  std::pair<int64_t, int64_t> MachineSlice() const override { return {0, 1}; }
 
   size_t LaunchSize() const override { return 1; }
 

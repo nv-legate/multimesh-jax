@@ -33,8 +33,8 @@ public:
   Execute(uint64_t run_id, const std::vector<BufferAllocation> &inputs,
           const std::vector<BufferAllocation> &outputs,
           TaskMemoryAllocator *allocator,
-          const DeviceAssignment &device_assignment, Platform platform,
-          bool blocking) const override {
+          const DeviceAssignment &device_assignment, int64_t num_local,
+          Platform platform, bool blocking) const override {
     sleep(2);
     return std::nullopt;
   }
@@ -91,10 +91,10 @@ TEST(TimerTest, BasicTimer) {
   // just validate that this runs without trouble
 
   legate_xla::StartTimer("first");
-  legate_xla::CreateExecuteTask(hold, {}, {}, {}, nullptr, {0,1});
+  legate_xla::CreateExecuteTask(hold, {}, {}, {}, nullptr, {0, 1});
   legate_xla::StopTimer("first");
   legate_xla::StartTimer("second");
-  legate_xla::CreateExecuteTask(hold, {}, {}, {}, nullptr, {0,1});
+  legate_xla::CreateExecuteTask(hold, {}, {}, {}, nullptr, {0, 1});
   legate_xla::StopTimer("second");
 }
 
