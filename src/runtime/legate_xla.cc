@@ -498,6 +498,8 @@ BufferHandle CreateBuffer(int64_t local_device_id, int64_t global_device_id,
 
 void Free(int64_t local_device_id, legate_xla::StoreHandle handle) {
   auto shape = handle.impl->array->shape();
+  log_xla.debug() << "FreeStore: device=" << local_device_id
+                  << ", shape=" << shape;
   device_caches[local_device_id].Free(shape, std::move(handle.impl->array));
 }
 
