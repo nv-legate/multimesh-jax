@@ -49,6 +49,7 @@ struct CompileConfig {
   int replica_count = 1;
   int num_partitions = 1;
   bool run_hlo_passes = true;
+  bool run_backend = true;
   int stream_executor_index = 0;
   TaskMemoryAllocator *allocator = nullptr;
   bool print_stats = false;
