@@ -10,15 +10,21 @@ namespace legate_xla {
 void CreateCompileTask(int64_t local_device_id,
                        std::shared_ptr<LegateCompiler> compiler);
 
+struct ExecuteOptions {
+  std::optional<std::string> name{std::nullopt};
+  bool strict_ordering{true};
+  std::optional<int> priority;
+};
+
 void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                        int64_t global_device_id, zuku::DeviceList mesh,
                        std::shared_ptr<LegateCompiler> compiler,
                        const std::vector<ScalarArgument> &scalars,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
-                       const BufferHandle &temp_buffer,
-                       std::function<void()> on_done = nullptr,
-                       std::optional<std::string> name = std::nullopt);
+                       const BufferHandle &temp_buffer, ExecuteOptions = {});
+
+void RunAfterAllTasks(int64_t local_device_id, std::function<void()> on_done);
 
 void Free(int64_t local_device_id, legate_xla::StoreHandle handle);
 

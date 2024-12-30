@@ -244,8 +244,7 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                        const std::vector<StoreHandle> &inputs,
                        const std::vector<StoreHandle> &outputs,
                        const BufferHandle &temp_buffer,
-                       std::function<void()> on_done,
-                       std::optional<std::string> name) {
+                       ExecuteOptions options) {
   zuku::Processor p = LocalProcessor(local_device_id);
 
   // if any of the outputs overlap with the inputs, then the inputs should be an
@@ -299,14 +298,22 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
     }
   }
 
-  std::string profile_name = name.value_or(compiler->Name()) + " processor " +
-                             std::to_string(p.global_id());
+  std::string profile_name = options.name.value_or(compiler->Name()) +
+                             " processor " + std::to_string(p.global_id());
+
+  const Realm::Event order_event = [&] {
+    if (options.strict_ordering) {
+      return last_control_events[p.local_id()];
+    }
+    return Realm::UserEvent::NO_USER_EVENT;
+  }();
 
   auto token =
       zuku::across(devices)
           .if_on(p)
-          .after(last_control_events[p.local_id()])
+          .after(order_event)
           .region(profile_name)
+          .priority(options.priority.value_or(0))
           .stream_ordered()
           .defer(
               [](zuku::Stream *zs, int64_t run_id, zuku::Processor p,
@@ -323,11 +330,6 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
               run_id, p, std::move(devices), compiler, scalars,
               std::move(store_inputs), std::move(store_outputs),
               std::move(temp));
-
-  if (on_done) {
-    after(token).defer([](std::function<void()> callback) { callback(); },
-                       std::move(on_done));
-  }
 
   if (log_xla.want_debug()) {
     for (auto &&input : inputs) {
@@ -346,7 +348,15 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
   }
 
   SetLastExecuteEvent(p, token.Event());
-  SetLastControlEvent(p, token.ControlEvent());
+  if (options.strict_ordering) {
+    SetLastControlEvent(p, token.ControlEvent());
+  }
+}
+
+void RunAfterAllTasks(int64_t local_device_id, std::function<void()> on_done) {
+  after(last_execute_events[local_device_id])
+      .defer([](std::function<void()> callback) { callback(); },
+             std::move(on_done));
 }
 
 void Destroy(StoreHandle &store) {
