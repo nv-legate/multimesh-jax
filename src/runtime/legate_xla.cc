@@ -259,7 +259,8 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
   zuku::View<zuku::ArrayTile> temp = temp_buffer.impl->tile.view();
 
   log_xla.debug() << "creating execute task " << compiler->Name()
-                  << " across devices " << devices;
+                  << " across devices " << devices
+                  << ", static_order=" << options.strict_ordering;
 
   if (log_xla.want_debug()) {
     for (auto &&input : inputs) {
@@ -354,9 +355,11 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
 }
 
 void RunAfterAllTasks(int64_t local_device_id, std::function<void()> on_done) {
-  after(last_execute_events[local_device_id])
-      .defer([](std::function<void()> callback) { callback(); },
-             std::move(on_done));
+  if (on_done) {
+    after(last_execute_events[local_device_id])
+        .defer([](std::function<void()> callback) { callback(); },
+               std::move(on_done));
+  }
 }
 
 void Destroy(StoreHandle &store) {
