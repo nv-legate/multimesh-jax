@@ -45,11 +45,11 @@ function(find_or_configure_xla)
     mpmd_coloring_test
     mpmd_cut_size_minimizer_test
     mpmd_computation_grouper_test
-    mpmd_microbatch_loop_inliner_test
+    mpmd_microbatch_loop_canonicalizer_test
     mpmd_cross_task_barrier_remover_test
-    mpmd_autosharding_propagation_test
+    mpmd_logical_sharding_propagation_test
     mpmd_computation_fusion_test
-    mpmd_autosharding_test
+    mpmd_logical_to_gspmd_sharding_test
     mpmd_instruction_delay_recolor_test
     mpmd_unused_param_output_remover_test
     mpmd_argument_recompute_test
@@ -147,7 +147,9 @@ function(find_or_configure_xla)
 
   install(IMPORTED_RUNTIME_ARTIFACTS xla)
 
-  if (LegateXla_ENABLE_TESTS)
+  include(GoogleTest)
+
+  if (LegateJAX_ENABLE_TESTS)
     foreach(test ${test_names})
       add_executable(${test} IMPORTED)
       set_target_properties(${test} PROPERTIES IMPORTED_LOCATION ${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${test})
