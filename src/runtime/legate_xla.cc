@@ -498,10 +498,12 @@ void StopTimer(const std::string &name) {
 
 BufferHandle CreateBuffer(int64_t local_device_id, int64_t global_device_id,
                           int64_t size) {
-  zuku::TileShape shape{
-      .type = zuku::SupportedType::S8,
-      .dims = {size},
-  };
+  Realm::Rect<1, long long> bounds;
+  bounds.lo[0] = 0;
+  bounds.hi[0] = std::max<int64_t>(0, size - 1);
+  zuku::TileShape shape{.type = zuku::SupportedType::S8,
+                        .dims = {size},
+                        .bounds = std::move(bounds)};
   zuku::Processor p = LocalProcessor(local_device_id);
   auto tile = zuku::ArrayTile::CreateFuture(std::move(shape),
                                             {.processor = std::move(p)});
@@ -520,15 +522,14 @@ StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
                         zuku::ShardedShape shape,
                         std::optional<std::string> name,
                         std::optional<int64_t> min_cache_size) {
+  log_xla.debug() << "CreateStore: device=" << local_device_id
+                  << ", shape=" << shape
+                  << ", name=" << name.value_or("anonymous");
+
   auto array =
       device_caches[local_device_id].Get(shape, std::move(min_cache_size));
 
   const int64_t next_id = NextStoreId();
-  log_xla.debug() << "CreateStore: device=" << local_device_id
-                  << ", shape=" << shape
-                  << ", name=" << name.value_or("anonymous")
-                  << ", id=" << next_id
-                  << ", tensor_id=" << array->mesh_unique_id();
 
   std::string array_name = [&] {
     if (name.has_value()) {

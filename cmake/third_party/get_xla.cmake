@@ -52,6 +52,7 @@ function(find_or_configure_xla)
     mpmd_logical_to_gspmd_sharding_test
     mpmd_instruction_delay_recolor_test
     mpmd_unused_param_output_remover_test
+    mpmd_unused_loop_output_remover_test
     mpmd_argument_recompute_test
     mpmd_hoist_loop_convert_test
     mpmd_hoist_shard_map_reduce_test
