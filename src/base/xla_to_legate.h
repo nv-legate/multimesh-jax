@@ -7,14 +7,20 @@
 
 namespace legate_xla {
 
-void CreateCompileTask(int64_t local_device_id,
-                       std::shared_ptr<LegateCompiler> compiler);
-
 struct ExecuteOptions {
   std::optional<std::string> name{std::nullopt};
   bool strict_ordering{true};
   std::optional<int> priority;
 };
+
+struct CreateStoreConfig {
+  std::optional<std::string> name{std::nullopt};
+  bool allocate_from_cache{false};
+  std::optional<int64_t> min_cache_size{std::nullopt};
+};
+
+void CreateCompileTask(int64_t local_device_id,
+                       std::shared_ptr<LegateCompiler> compiler);
 
 void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                        int64_t global_device_id, zuku::DeviceList mesh,
@@ -26,7 +32,10 @@ void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
 
 void RunAfterAllTasks(int64_t local_device_id, std::function<void()> on_done);
 
-void Free(int64_t local_device_id, legate_xla::StoreHandle handle);
+void Free(int64_t local_device_id, legate_xla::StoreHandle handle,
+          bool keep_in_cache);
+
+void ClearStoreCache(int64_t local_device_id);
 
 void OffloadDtoH(int64_t local_device_id,
                  const std::vector<StoreHandle> &to_offload,
@@ -39,8 +48,7 @@ void OffloadHtoD(int64_t local_device_id,
 
 StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
                         zuku::ShardedShape shape,
-                        std::optional<std::string> name = std::nullopt,
-                        std::optional<int64_t> min_cache_size = std::nullopt);
+                        CreateStoreConfig config = {});
 
 BufferHandle CreateBuffer(int64_t local_device_id, int64_t global_device_id,
                           int64_t size);

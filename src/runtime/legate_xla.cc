@@ -511,29 +511,42 @@ BufferHandle CreateBuffer(int64_t local_device_id, int64_t global_device_id,
                           std::make_shared<BufferHandleImpl>(std::move(tile))};
 }
 
-void Free(int64_t local_device_id, legate_xla::StoreHandle handle) {
+void Free(int64_t local_device_id, legate_xla::StoreHandle handle,
+          bool keep_in_cache) {
   auto shape = handle.impl->array->shape();
   log_xla.debug() << "FreeStore: device=" << local_device_id
                   << ", shape=" << shape;
-  device_caches[local_device_id].Free(shape, std::move(handle.impl->array));
+  if (keep_in_cache) {
+    device_caches[local_device_id].Free(shape, std::move(handle.impl->array));
+  } else {
+    // release the handle (explicitly done for clarity)
+    handle.impl = nullptr;
+  }
+}
+
+void ClearStoreCache(int64_t local_device_id) {
+  device_caches[local_device_id].Clear();
 }
 
 StoreHandle CreateStore(int64_t local_device_id, int64_t global_device_id,
-                        zuku::ShardedShape shape,
-                        std::optional<std::string> name,
-                        std::optional<int64_t> min_cache_size) {
+                        zuku::ShardedShape shape, CreateStoreConfig config) {
   log_xla.debug() << "CreateStore: device=" << local_device_id
                   << ", shape=" << shape
-                  << ", name=" << name.value_or("anonymous");
+                  << ", name=" << config.name.value_or("anonymous");
 
-  auto array =
-      device_caches[local_device_id].Get(shape, std::move(min_cache_size));
+  auto array = [&] {
+    if (config.allocate_from_cache) {
+      return device_caches[local_device_id].Get(shape, config.min_cache_size);
+    }
+    // use the cache as a store allocator
+    return device_caches[local_device_id].Make(shape);
+  }();
 
   const int64_t next_id = NextStoreId();
 
   std::string array_name = [&] {
-    if (name.has_value()) {
-      return *std::move(name);
+    if (config.name.has_value()) {
+      return *std::move(config.name);
     }
     return std::string("anonymous");
   }();
