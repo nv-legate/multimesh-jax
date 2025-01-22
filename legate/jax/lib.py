@@ -21,7 +21,6 @@ from .legate_jax_impl import (
     set_host_offload_min_reuse_distance,
     set_host_offload_min_size,
     set_store_cache_min_parallelism,
-    set_strict_static_order,
 )
 from .no_op import no_op
 
@@ -188,32 +187,6 @@ def store_cache_min_parallelism(
     with _set_context_value(
         parallelism, set_store_cache_min_parallelism, context_value
     ):
-        yield
-
-
-@contextmanager
-def strict_static_order(order: Optional[bool] = None, context_value=[True]):
-    """Sets whether tasks can be dynamically reordered in the context.
-
-    Tasks will be submitted with an initial statically-derived schedule.
-    Tasks may be able to reorder while still satisfying dependencies.
-    Tasks can be made to run eagerly, starting whenever their dependencies
-    are satisfied rather than waiting for a strict schedule. This dynamic
-    reordering may improve performance.  The dynamic reordering may hurt
-    performance, though, if tasks on the critical path are blocked
-    unexpectedly by reordered tasks.
-
-    Args:
-        order: optional. If True then tasks must follow a strict
-          static schedule. If False then tasks may dynamically
-          reorder.
-
-        context_value: optional, a global variable holding the current context
-            value. The user should never pass this value. The program begins in
-            a context with ``order`` True so that by default tasks are not
-            dynamically reordered.
-    """
-    with _set_context_value(order, set_strict_static_order, context_value):
         yield
 
 
@@ -494,7 +467,6 @@ def mjit(
 def _context(
     _configurable=None,
     _autoshard: Optional[bool] = None,
-    _strict_static_order: Optional[bool] = None,
     _enable_recomputation: Optional[bool] = None,
     _host_offload_min_reuse_distance=None,
     _host_offload_min_size=None,
@@ -530,7 +502,6 @@ def _context(
 def context(
     configurable=None,
     autoshard: Optional[bool] = None,
-    strict_static_order: Optional[bool] = None,
     enable_recomputation: Optional[bool] = None,
     host_offload_min_reuse_distance: Optional[int] = None,
     host_offload_min_size: Optional[int] = None,
@@ -546,7 +517,6 @@ def context(
         configurable: optional, a Callable type that registers tasks for named
           contexts. Useful for injecting user-defined classes with gin/fiddle.
         autoshard: optional, value to configure the :func:`.autoshard` context manager.
-        strict_static_order: optional, value to configure the :func:`.strict_static_order` context manager.
         host_offload_min_reuse_distance: optional, value to configure the :func:`.host_offload_min_reuse_distance` context manager.
         only_fuse_loop_tasks: optional, value to configure the :func:`.only_fuse_loop_tasks` context manager.
         enable_task_fusion: optional, value to configure the :func:`.enable_task_fusion` context manager.
@@ -556,7 +526,6 @@ def context(
     with _context(
         _configurable=configurable,
         _autoshard=autoshard,
-        _strict_static_order=strict_static_order,
         _enable_recomputation=enable_recomputation,
         _host_offload_min_reuse_distance=host_offload_min_reuse_distance,
         _host_offload_min_size=host_offload_min_size,

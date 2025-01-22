@@ -24,7 +24,6 @@ from .lib import (
     store_cache_min_parallelism,
     host_offload_min_reuse_distance,
     host_offload_min_size,
-    strict_static_order,
     ClientConfig,
     tasks,
     mjit,

@@ -5,8 +5,17 @@
 #include <pybind11/stl.h>
 #include <string>
 
-#include "legate_to_xla.h"
-#include "legate_xla_common.h"
+#include "zuku/init.h"
+
+extern "C" void SetStartupConfig(zuku::RealmConfig cfg);
+
+extern "C" void CompileHloModuleFromFile(const std::string &hlo_file,
+                                         const std::string &platform_name,
+                                         int replica_count, int num_partitions,
+                                         bool erase_sharding, bool autoshard,
+                                         std::optional<int64_t> device_mem);
+
+extern "C" void LegateShutdown();
 
 extern "C" void RegisterImplicitTask(
     std::string matcher, std::vector<int64_t> devices,
@@ -36,15 +45,11 @@ extern "C" void ClearImplicitTasks();
 
 extern "C" void EnableLegateRecomputation(bool enable);
 
-extern "C" void LegateShutdown();
-
 extern "C" void ReplicateParametersSmallerThanNumElements(int64_t num_elements);
 
 extern "C" void RecomputeArgumentsIfCostLessThan(int64_t cost);
 
 extern "C" void SetStoreCacheMinParallelism(int64_t parallelism);
-
-extern "C" void SetStrictStaticOrder(bool order);
 
 extern "C" void SetHostOffloadMinReuseDistance(int64_t reuse_distance);
 
@@ -116,15 +121,15 @@ PYBIND11_MODULE(legate_jax_impl, m) {
          std::optional<int64_t> fbmem, std::optional<int64_t> sysmem,
          std::optional<int64_t> zcmem, std::optional<std::string> network,
          bool kthreads, std::vector<std::string> argv, bool profile) {
-        legate_xla::SetStartupConfig({.cpus = cpus,
-                                      .gpus = gpus,
-                                      .fbmem = fbmem,
-                                      .zcmem = zcmem,
-                                      .sysmem = sysmem,
-                                      .network = std::move(network),
-                                      .kthreads = kthreads,
-                                      .profile = profile,
-                                      .argv = argv});
+        SetStartupConfig({.cpus = cpus,
+                          .gpus = gpus,
+                          .sysmem = sysmem,
+                          .fbmem = fbmem,
+                          .zcmem = zcmem,
+                          .network = network.value_or("default"),
+                          .kthreads = kthreads,
+                          .profile = profile,
+                          .argv = argv});
       },
       py::arg("cpus") = py::none(), py::arg("gpus") = py::none(),
       py::arg("fbmem") = py::none(), py::arg("sysmem") = py::none(),
@@ -193,9 +198,6 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       "set_store_cache_min_parallelism",
       [](int64_t parallelism) { SetStoreCacheMinParallelism(parallelism); },
       py::arg("parallelism"));
-  m.def(
-      "set_strict_static_order",
-      [](bool order) { SetStrictStaticOrder(order); }, py::arg("order"));
   m.def(
       "enable_recomputation",
       [](bool enable) { EnableLegateRecomputation(enable); },

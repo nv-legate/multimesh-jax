@@ -1,12 +1,10 @@
-#include "legate_to_xla.h"
-#include "xla_to_legate.h"
+#include "zuku/init.h"
 
 extern "C" {
 
 struct PJRT_Api;
 
-const PJRT_Api *GetPjrtApi() {
-  return GetLegatePjrtApi();
-}
+PJRT_Api *GetLegatePjrtApi();
 
+const PJRT_Api *GetPjrtApi() { return GetLegatePjrtApi(); }
 }

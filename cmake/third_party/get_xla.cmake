@@ -38,8 +38,8 @@ function(find_or_configure_xla)
     legate_buffer_action_test
     legate_sharding_test
     loop_scheduler_test
-    legate_pjrt_client_test
-    legate_pjrt_executable_test
+    #legate_pjrt_client_test
+    #legate_pjrt_executable_test
     mpmd_sharding_propagation_test
     mpmd_simple_loop_increment_coloring_test
     mpmd_coloring_test
@@ -90,6 +90,8 @@ function(find_or_configure_xla)
  if (DEFINED zuku_SOURCE_DIR)
   list(APPEND _bazel_options
     --override_repository=zuku=${zuku_SOURCE_DIR})
+  list(APPEND _bazel_options
+    --override_repository=realm=${zuku_SOURCE_DIR}/realm)
  endif()
 
  add_custom_command(

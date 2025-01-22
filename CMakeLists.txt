@@ -70,10 +70,6 @@ option(LegateJAX_ENABLE_CUDA ON "Whether to build with CUDA")
 
 option(LegateJAX_ASAN OFF "Whether to build with address saniziter")
 
-option(LegateJAX_ENABLE_TESTS "Whether to build the tests" ON)
-
-option(LegateJAX_PLUGIN "Whether to build the full Jaxlib plugin" ON)
-
 if (SKBUILD)
   find_package(LegateJAX)
 else()
@@ -91,7 +87,5 @@ rapids_cmake_install_lib_dir(lib_dir)
 
 if (SKBUILD)
   include(legate_xla_python.cmake)
-elseif(LegateJAX_ENABLE_TESTS)
-#  add_subdirectory(tests)
 endif()
 
