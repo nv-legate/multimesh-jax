@@ -38,8 +38,8 @@ function(find_or_configure_xla)
     legate_buffer_action_test
     legate_sharding_test
     loop_scheduler_test
-    #legate_pjrt_client_test
-    #legate_pjrt_executable_test
+    legate_pjrt_client_test
+    legate_pjrt_executable_test
     mpmd_sharding_propagation_test
     mpmd_simple_loop_increment_coloring_test
     mpmd_coloring_test
@@ -153,11 +153,14 @@ function(find_or_configure_xla)
   include(GoogleTest)
 
   if (LegateJAX_ENABLE_TESTS)
-    foreach(test ${test_names})
-      add_executable(${test} IMPORTED)
-      set_target_properties(${test} PROPERTIES IMPORTED_LOCATION ${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${test})
-      add_dependencies(${test} xla_build)
-      add_test(NAME ${test} COMMAND ${test} WORKING_DIRECTORY ${xla_SOURCE_DIR})
+    foreach(test_exe ${test_names})
+      add_executable(${test_exe} IMPORTED)
+      set_target_properties(${test_exe} PROPERTIES IMPORTED_LOCATION ${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${test_exe})
+      add_dependencies(${test_exe} xla_build)
+      gtest_discover_tests(${test_exe}
+         WORKING_DIRECTORY ${xla_SOURCE_DIR}
+         DISCOVERY_TIMEOUT 10
+         DISCOVERY_MODE PRE_TEST)
     endforeach()
   endif()
 
