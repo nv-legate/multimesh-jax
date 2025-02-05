@@ -9,10 +9,6 @@ add_library(legate_plugin ${_srcs})
 
 target_link_libraries(legate_plugin PUBLIC zuku::zuku xla::xla)
 
-set_target_properties(legate_plugin PROPERTIES
-         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
-         ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
-
 pybind11_add_module(legate_xla_compiler SHARED dummy.cc)
 target_link_libraries(legate_xla_compiler PRIVATE xla::xla_compiler_plugin)
 set_target_properties(legate_xla_compiler PROPERTIES
@@ -26,12 +22,12 @@ set_target_properties(legate_jax_impl PROPERTIES
          ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/legate/jax)
 
 target_link_libraries(legate_jax_impl PRIVATE xla::xla)
-set_target_properties(legate_jax_impl PROPERTIES INSTALL_RPATH "$ORIGIN/../../../..:$ORIGIN/../../build/lib")
+#set_target_properties(legate_jax_impl PROPERTIES INSTALL_RPATH "$ORIGIN/../../../..:$ORIGIN/../../build/lib")
 set_target_properties(legate_jax_impl PROPERTIES SKIP_BUILD_RPATH FALSE)
 
 set_target_properties(legate_plugin PROPERTIES
-         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
-         ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
+         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib
+         ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
 set_target_properties(legate_plugin
     PROPERTIES INSTALL_RPATH "\$ORIGIN")

@@ -18,7 +18,7 @@ def get_libpath():
     exists = os.path.exists
     dirname = os.path.dirname
     lllm_path = dirname(dirname(__file__))
-    cpp_build_root = "@LegateJAX_ROOT@"
+    cpp_build_root = "@PROJECT_SOURCE_DIR@"
     so_ext = {
         "": "",
         "Java": ".jar",

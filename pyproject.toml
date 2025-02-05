@@ -15,7 +15,6 @@
 [build-system]
 requires = [
     "wheel",
-    "ninja",
     "setuptools",
     "numpy",
     "scikit-build>=0.13.1",

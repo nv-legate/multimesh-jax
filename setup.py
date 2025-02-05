@@ -39,6 +39,6 @@ setup(
         "legate.jax": ["*.so"],
     },
     cmdclass=versioneer.get_cmdclass(),
-    install_requires=["numpy>=1.22", "pybind11[global]"],
+    install_requires=["numpy>=1.22", "pybind11[global]", "gin"],
     zip_safe=False,
 )

@@ -98,40 +98,61 @@ function(find_or_configure_xla)
     --override_repository=realm=${zuku_SOURCE_DIR}/realm)
  endif()
 
+ set(_bazel_startup_options 
+ #  --batch
+ )
+ if (LegateJAX_BAZEL_OUTPUT_BASE)
+   list(APPEND _bazel_startup_options
+     --output_base=${LegateJAX_BAZEL_OUTPUT_BASE})
+ endif()
+
+ add_library(xla SHARED IMPORTED GLOBAL)
+ add_library(xla_compiler_plugin SHARED IMPORTED GLOBAL)
+
+ option(LegateJAX_BUILD_XLA ON)
+
+ if (CMAKE_LIBRARY_OUTPUT_DIRECTORY)
+   set(LIB_FOLDER ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+ else()
+   set(LIB_FOLDER ${PROJECT_BINARY_DIR}/lib)
+ endif()
+
+ if (LegateJAX_BUILD_XLA)
+   set(XLA_DEPS DEPENDS ${xla_source_files})
+ endif()
+
+
  add_custom_command(
-    OUTPUT  ${xla_client_library}
-    OUTPUT  ${xla_compiler_library}
-    COMMENT "Building XLA components ${target_names}..."
-    COMMAND rm -rf "${xla_SOURCE_DIR}/bazel-bin" && XLA_LEGATE_SOURCE_DIR=${CMAKE_SOURCE_DIR} bazel --batch build ${_bazel_options} ${target_names} --check_visibility=false
-    WORKING_DIRECTORY ${xla_SOURCE_DIR}
-    DEPENDS ${xla_source_files}
-    USES_TERMINAL
-    VERBATIM
-  )
+   OUTPUT  ${xla_client_library}
+   OUTPUT  ${xla_compiler_library}
+   COMMENT "Building XLA components ${target_names}..."
+   COMMAND rm -rf "${xla_SOURCE_DIR}/bazel-bin" && XLA_LEGATE_SOURCE_DIR=${CMAKE_SOURCE_DIR} bazel ${_bazel_startup_option} build ${_bazel_options} ${target_names} --check_visibility=false
+   WORKING_DIRECTORY ${xla_SOURCE_DIR}
+   #${XLA_DEPS}
+   USES_TERMINAL
+   VERBATIM
+ )
 
-  add_custom_command(
-      OUTPUT  ${PROJECT_BINARY_DIR}/lib/${xla_client_library_name}
-      POST_BUILD
-      DEPENDS ${xla_client_library}
-      COMMAND ${CMAKE_COMMAND} -E copy ${xla_client_library} ${PROJECT_BINARY_DIR}/lib
-      VERBATIM
-  )
+ add_custom_command(
+     OUTPUT  ${LIB_FOLDER}/${xla_client_library_name}
+     POST_BUILD
+     DEPENDS ${xla_client_library}
+     COMMAND ${CMAKE_COMMAND} -E copy ${xla_client_library} ${LIB_FOLDER}
+     VERBATIM
+ )
 
-  add_custom_command(
-      OUTPUT  ${PROJECT_BINARY_DIR}/lib/${xla_compiler_library_name}
-      POST_BUILD
-      DEPENDS ${xla_compiler_library}
-      COMMAND ${CMAKE_COMMAND} -E copy ${xla_compiler_library} ${PROJECT_BINARY_DIR}/lib/libxla_compiler_plugin.so
-      VERBATIM
-  )
-
-  add_library(xla SHARED IMPORTED GLOBAL)
-  add_library(xla_compiler_plugin SHARED IMPORTED GLOBAL)
+ add_custom_command(
+     OUTPUT  ${LIB_FOLDER}/${xla_compiler_library_name}
+     POST_BUILD
+     DEPENDS ${xla_compiler_library}
+     COMMAND ${CMAKE_COMMAND} -E copy ${xla_compiler_library} ${LIB_FOLDER}/libxla_compiler_plugin.so
+     VERBATIM
+ )
 
   add_custom_target(xla_build ALL
     DEPENDS ${xla_library} 
-      ${PROJECT_BINARY_DIR}/lib/${xla_client_library_name}
-      ${PROJECT_BINARY_DIR}/lib/${xla_compiler_library_name}
+      ${LIB_FOLDER}/${xla_client_library_name}
+      ${LIB_FOLDER}/${xla_compiler_library_name}
   )
 
   add_dependencies(xla xla_build)
@@ -142,13 +163,13 @@ function(find_or_configure_xla)
 
   set_target_properties(xla
     PROPERTIES
-      IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/lib/${xla_client_library_name}
+      IMPORTED_LOCATION ${LIB_FOLDER}/${xla_client_library_name}
       IMPORTED_NO_SONAME TRUE
   )
 
   set_target_properties(xla_compiler_plugin
     PROPERTIES
-      IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/lib/libxla_compiler_plugin.so
+      IMPORTED_LOCATION ${LIB_FOLDER}/libxla_compiler_plugin.so
       IMPORTED_NO_SONAME TRUE
   )
 
