@@ -4,7 +4,6 @@ from .legate_jax_impl import (
     replicate_parameters_smaller_than_num_elements,
     recompute_from_arguments_if_cost_less_than,
     set_store_cache_min_parallelism,
-    unregister_task,
     clear_tasks,
     compile_hlo_module,
     set_startup_config,
@@ -24,7 +23,6 @@ from .lib import (
     store_cache_min_parallelism,
     host_offload_min_reuse_distance,
     host_offload_min_size,
-    ClientConfig,
     tasks,
     mjit,
 )

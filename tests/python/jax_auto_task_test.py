@@ -101,56 +101,52 @@ class TaskTest(LegateJaxTestCase):
         if jax.device_count() != 2:
             self.skipTest("need 2 devices")
 
-        class TaskConfigure:
-            def __call__(self):
-                logical_axes = [
-                    ("batch", "x"),
-                    ("model", "y"),
-                ]
-                legate.jax.register_task(
-                    "task0",
-                    devices=[0, 1],
-                    dims=[2, 1],
-                    device_axes=["x", "y"],
-                    logical_axes=logical_axes,
-                )
-                legate.jax.register_task(
-                    "task1",
-                    devices=[0, 1],
-                    dims=[2, 1],
-                    device_axes=["x", "y"],
-                    logical_axes=logical_axes,
-                )
+        with legate.jax.context(autoshard=True):
+            logical_axes = [
+                ("batch", "x"),
+                ("model", "y"),
+            ]
 
-        with legate.jax.context(configurable=TaskConfigure, autoshard=True):
+            legate.jax.register_task(
+                "task0",
+                devices=[0, 1],
+                dims=[2, 1],
+                device_axes=["x", "y"],
+                logical_axes=logical_axes,
+            )
+            legate.jax.register_task(
+                "task1",
+                devices=[0, 1],
+                dims=[2, 1],
+                device_axes=["x", "y"],
+                logical_axes=logical_axes,
+            )
             self._test_register_task()
 
     def test_only_fuse_loop_tasks(self):
         if jax.device_count() != 2:
             self.skipTest("need 2 devices")
 
-        class TaskConfigure:
-            def __call__(self):
-                logical_axes = [
-                    ("batch", "x"),
-                    ("model", "y"),
-                ]
-                legate.jax.register_task(
-                    "task0",
-                    devices=[0, 1],
-                    dims=[2, 1],
-                    device_axes=["x", "y"],
-                    logical_axes=logical_axes,
-                )
-                legate.jax.register_task(
-                    "task1",
-                    devices=[0, 1],
-                    dims=[2, 1],
-                    device_axes=["x", "y"],
-                    logical_axes=logical_axes,
-                )
+        with legate.jax.context(autoshard=True):
+            logical_axes = [
+                ("batch", "x"),
+                ("model", "y"),
+            ]
+            legate.jax.register_task(
+                "task0",
+                devices=[0, 1],
+                dims=[2, 1],
+                device_axes=["x", "y"],
+                logical_axes=logical_axes,
+            )
+            legate.jax.register_task(
+                "task1",
+                devices=[0, 1],
+                dims=[2, 1],
+                device_axes=["x", "y"],
+                logical_axes=logical_axes,
+            )
 
-        with legate.jax.context(configurable=TaskConfigure, autoshard=True):
             with legate.jax.only_fuse_loop_tasks(True):
                 self._test_register_task()
             with legate.jax.only_fuse_loop_tasks(False):
@@ -197,6 +193,7 @@ class TaskTest(LegateJaxTestCase):
             lowered = f.lower(aval).compile()
 
         test_sharding = NamedSharding(mesh, P("batch", "model"))
+
         self.assertTrue(
             test_sharding.is_equivalent_to(lowered.input_shardings[0][0], 2)
         )

@@ -1,4 +1,3 @@
-#include <iostream>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
@@ -32,8 +31,6 @@ extern "C" void RegisterImplicitTaskWithFactory(
     std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes,
     int64_t fusion_color);
-
-extern "C" void UnregisterImplicitTask(std::string matcher);
 
 extern "C" void EnableFastPath(bool enable);
 
@@ -154,9 +151,6 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       py::arg("task_regex"), py::arg("device_callback"), py::arg("dims"),
       py::arg("device_axes"), py::arg("logical_axes"),
       py::arg("fusion_color") = 0);
-  m.def("unregister_task", [](py::str task_regex) {
-    UnregisterImplicitTask(task_regex.cast<std::string>());
-  });
   m.def("clear_tasks", []() { ClearImplicitTasks(); });
   m.def(
       "compile_hlo_module",

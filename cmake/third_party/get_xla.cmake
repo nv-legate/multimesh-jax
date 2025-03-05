@@ -58,6 +58,9 @@ function(find_or_configure_xla)
     mpmd_hoist_shard_map_reduce_test
     mpmd_shard_map_loop_reduce_test
     mpmd_utils_test
+    mpmd_loop_unroll_test
+    mpmd_insert_reshard_test
+    mpmd_buffer_scheduling_name_test
   )
 
   set(target_names

@@ -1,9 +1,7 @@
 import json
 from contextlib import contextmanager
-from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence, Type, TypeAlias, Union
 
-import gin
 import jax
 from jax._src.pjit import flatten_axis_resources
 from jax.experimental.pjit import AUTO, pjit
@@ -399,12 +397,6 @@ def optional_kwargs(**kwargs):
     return subset_kwargs
 
 
-@gin.configurable
-@dataclass
-class ClientConfig:
-    configurable: Optional[Type] = None
-
-
 @contextmanager
 def tasks(configurable: Optional[Type] = None):
     if configurable is not None:
@@ -500,7 +492,6 @@ def _context(
 
 @contextmanager
 def context(
-    configurable=None,
     autoshard: Optional[bool] = None,
     enable_recomputation: Optional[bool] = None,
     host_offload_min_reuse_distance: Optional[int] = None,
@@ -514,8 +505,6 @@ def context(
     """Helper function to configure multiple contexts in a single manager.
 
     Args:
-        configurable: optional, a Callable type that registers tasks for named
-          contexts. Useful for injecting user-defined classes with gin/fiddle.
         autoshard: optional, value to configure the :func:`.autoshard` context manager.
         host_offload_min_reuse_distance: optional, value to configure the :func:`.host_offload_min_reuse_distance` context manager.
         only_fuse_loop_tasks: optional, value to configure the :func:`.only_fuse_loop_tasks` context manager.
@@ -524,7 +513,6 @@ def context(
         ignore_transforms: optional, value to configure the :func:`.ignore_transforms` context manager.
     """  # noqa: E501
     with _context(
-        _configurable=configurable,
         _autoshard=autoshard,
         _enable_recomputation=enable_recomputation,
         _host_offload_min_reuse_distance=host_offload_min_reuse_distance,
