@@ -73,7 +73,6 @@ def init(
             "legate_pjrt_executable",
             "legate_pjrt_buffer",
             "legate_pjrt_client",
-            "legate_store_cache",
             "loop_scheduler",
         ]
         xla_debug = xla_debug_levels[debug]

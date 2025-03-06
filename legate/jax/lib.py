@@ -12,13 +12,12 @@ from jax.tree_util import tree_flatten, tree_unflatten
 from .legate_jax_impl import (
     clear_tasks,
     enable_fast_path as _enable_fast_path,
-    enable_implicit_tasks as _enable_implicit_tasks,
+    enable_metadata_name_tasks as _enable_metadata_name_tasks,
     enable_only_fuse_loop_tasks as _enable_only_fuse_loop_tasks,
     enable_recomputation as _enable_recomputation,
     enable_task_fusion as _enable_task_fusion,
     set_host_offload_min_reuse_distance,
     set_host_offload_min_size,
-    set_store_cache_min_parallelism,
 )
 from .no_op import no_op
 
@@ -66,13 +65,13 @@ def ignore_transforms(ignore: Optional[bool] = True):
     else:
         try:
             if ignore:
-                _enable_implicit_tasks(False)
+                _enable_metadata_name_tasks(False)
                 _ignore_transforms = True
             yield
         finally:
             _ignore_transforms = current
             if not current:
-                _enable_implicit_tasks(True)
+                _enable_metadata_name_tasks(True)
 
 
 @contextmanager
@@ -159,31 +158,6 @@ def only_fuse_loop_tasks(enable: Optional[bool] = None, context_value=[False]):
     """
     with _set_context_value(
         enable, _enable_only_fuse_loop_tasks, context_value
-    ):
-        yield
-
-
-@contextmanager
-def store_cache_min_parallelism(
-    parallelism: Optional[int] = None, context_value=[3]
-):
-    """Sets the minimum number of cache entries active at a time.
-
-    Rather than allocate stores (tensors) fully dynamically, a cache of
-    intermediate tensors is maintained to limit allocations. If parallelism
-    is too low, then false dependencies may be created between tasks because
-    they reuse the same storage, hurting performance. If parallelism is too
-    high, then caches may allocate too much memory.
-
-    Args:
-        parallelism: optional, the minimum number of tensors active in a cache
-          at one time.
-        context_value: optional, a global variable holding the current context
-          value. The user should never pass this value. The program begins in
-          a context with ``parallelism = 3``.
-    """
-    with _set_context_value(
-        parallelism, set_store_cache_min_parallelism, context_value
     ):
         yield
 
@@ -466,7 +440,6 @@ def _context(
     _enable_task_fusion=None,
     _enable_fast_path=None,
     _ignore_transforms=None,
-    _store_cache_min_parallelism=None,
 ):
     with tasks(configurable=_configurable) as A, autoshard(
         _autoshard
@@ -484,8 +457,6 @@ def _context(
         _ignore_transforms
     ) as K, enable_recomputation(
         _enable_recomputation
-    ) as M, store_cache_min_parallelism(
-        _store_cache_min_parallelism
     ):  # noqa: F841
         yield
 
@@ -500,7 +471,6 @@ def context(
     enable_task_fusion: Optional[bool] = None,
     enable_fast_path: Optional[bool] = None,
     ignore_transforms: Optional[bool] = None,
-    store_cache_min_parallelism: Optional[int] = None,
 ):
     """Helper function to configure multiple contexts in a single manager.
 
@@ -521,6 +491,5 @@ def context(
         _enable_task_fusion=enable_task_fusion,
         _enable_fast_path=enable_fast_path,
         _ignore_transforms=ignore_transforms,
-        _store_cache_min_parallelism=store_cache_min_parallelism,
     ):
         yield

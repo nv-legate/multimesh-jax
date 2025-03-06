@@ -14,7 +14,11 @@ from jax.interpreters.mlir import hlo, ir
 from jax.sharding import Mesh, PartitionSpec as P
 from jax.tree_util import tree_map
 
-from .legate_jax_impl import _register_task, _register_task_factory
+from .legate_jax_impl import (
+    _register_metadata_name,
+    _register_task,
+    _register_task_factory,
+)
 from .lib import (
     autoshard,
     optional_kwargs,
@@ -551,6 +555,7 @@ def microbatch(
 def register_task(
     regex: str,
     *,
+    name: Optional[str] = None,
     mesh: Optional[Mesh] = None,
     dims: Optional[Sequence[int]] = None,
     callback: Optional[Callable[[str], list[int]]] = None,
@@ -745,9 +750,10 @@ def register_task(
     if logical_axes is None:
         logical_axes = [(ax, ax) for ax in device_axes]
 
+    _register_metadata_name(regex, name)
     if callback is not None:
         _register_task_factory(
-            regex,
+            name or regex,
             callback,
             list(dims),
             list(device_axes),
@@ -756,7 +762,7 @@ def register_task(
         )
     else:
         _register_task(
-            regex,
+            name or regex,
             device_ids,
             list(dims),
             list(device_axes),

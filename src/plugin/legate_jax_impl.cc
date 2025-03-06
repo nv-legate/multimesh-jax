@@ -16,16 +16,19 @@ extern "C" void CompileHloModuleFromFile(const std::string &hlo_file,
 
 extern "C" void LegateShutdown();
 
-extern "C" void RegisterImplicitTask(
+extern "C" void RegisterMetadataNameMatcher(std::string matcher,
+                                            std::optional<std::string> name);
+
+extern "C" void RegisterMetadataNameTask(
     std::string matcher, std::vector<int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes,
     int64_t fusion_color, std::optional<int64_t> loop_submesh_size,
     bool loop_submesh_reverse);
 
-extern "C" void SetEnableImplicitTasks(bool flag);
+extern "C" void SetEnableMetadataNameTasks(bool flag);
 
-extern "C" void RegisterImplicitTaskWithFactory(
+extern "C" void RegisterMetadataNameTaskWithFactory(
     std::string matcher,
     std::function<std::vector<int64_t>(const std::string &task)> device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
@@ -38,15 +41,13 @@ extern "C" void EnableOnlyFuseLoopTasks(bool enable);
 
 extern "C" void EnableTaskFusion(bool enable);
 
-extern "C" void ClearImplicitTasks();
+extern "C" void ClearMetadataNameTasks();
 
 extern "C" void EnableLegateRecomputation(bool enable);
 
 extern "C" void ReplicateParametersSmallerThanNumElements(int64_t num_elements);
 
 extern "C" void RecomputeArgumentsIfCostLessThan(int64_t cost);
-
-extern "C" void SetStoreCacheMinParallelism(int64_t parallelism);
 
 extern "C" void SetHostOffloadMinReuseDistance(int64_t reuse_distance);
 
@@ -91,15 +92,15 @@ PYBIND11_MODULE(legate_jax_impl, m) {
   });
   m.def("no_op_custom_call",
         []() { return EncapsulateFunction(no_op_entrypoint); });
-  m.def("enable_implicit_tasks",
-        [](bool flag) { SetEnableImplicitTasks(flag); });
+  m.def("enable_metadata_name_tasks",
+        [](bool flag) { SetEnableMetadataNameTasks(flag); });
   m.def(
       "_register_task",
       [](py::str task_regex, py::list py_devices, py::list py_device_dims,
          py::list py_device_axes, py::list py_logical_axes,
          int64_t fusion_color, std::optional<int64_t> loop_submesh_size,
          bool loop_submesh_reverse) {
-        RegisterImplicitTask(
+        RegisterMetadataNameTask(
             task_regex.cast<std::string>(),
             py_devices.cast<std::vector<int64_t>>(),
             py_device_dims.cast<std::vector<int64_t>>(),
@@ -112,6 +113,13 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       py::arg("device_axes"), py::arg("logical_axes"),
       py::arg("fusion_color") = 0, py::arg("loop_submesh_size") = py::none(),
       py::arg("loop_submesh_reverse") = false);
+  m.def(
+      "_register_metadata_name",
+      [](py::str matcher, std::optional<std::string> name) {
+        RegisterMetadataNameMatcher(matcher.cast<std::string>(),
+                                    std::move(name));
+      },
+      py::arg("matcher"), py::arg("name") = py::none());
   m.def(
       "set_startup_config",
       [](std::optional<int> cpus, std::optional<int> gpus,
@@ -140,7 +148,7 @@ PYBIND11_MODULE(legate_jax_impl, m) {
              device_callback,
          py::list py_device_dims, py::list py_device_axes,
          py::list py_logical_axes, int64_t fusion_color) {
-        RegisterImplicitTaskWithFactory(
+        RegisterMetadataNameTaskWithFactory(
             task_regex.cast<std::string>(), device_callback,
             py_device_dims.cast<std::vector<int64_t>>(),
             py_device_axes.cast<std::vector<std::string>>(),
@@ -151,7 +159,7 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       py::arg("task_regex"), py::arg("device_callback"), py::arg("dims"),
       py::arg("device_axes"), py::arg("logical_axes"),
       py::arg("fusion_color") = 0);
-  m.def("clear_tasks", []() { ClearImplicitTasks(); });
+  m.def("clear_tasks", []() { ClearMetadataNameTasks(); });
   m.def(
       "compile_hlo_module",
       [](std::string path, std::string platform, int replica_count,
@@ -188,10 +196,6 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       "recompute_from_arguments_if_cost_less_than",
       [](int64_t cost) { ReplicateParametersSmallerThanNumElements(cost); },
       py::arg("cost"));
-  m.def(
-      "set_store_cache_min_parallelism",
-      [](int64_t parallelism) { SetStoreCacheMinParallelism(parallelism); },
-      py::arg("parallelism"));
   m.def(
       "enable_recomputation",
       [](bool enable) { EnableLegateRecomputation(enable); },
