@@ -1,10 +1,12 @@
 import contextlib
 import enum
+import functools
 from collections import OrderedDict
 
 import numpy as np
 from jax._src import config as jax_config
 from jax._src.mesh import thread_resources
+from jax.sharding import AbstractMesh
 
 
 class MeshWrapper(contextlib.ContextDecorator):
@@ -37,6 +39,10 @@ class MeshWrapper(contextlib.ContextDecorator):
             (name, size)
             for name, size in zip(self.axis_names, self.devices.shape)
         )
+
+    @functools.cached_property
+    def abstract_mesh(self):
+        return AbstractMesh(self.shape_tuple, axis_types=self.axis_types)
 
     @classmethod
     @contextlib.contextmanager
@@ -86,6 +92,20 @@ class MeshWrapper(contextlib.ContextDecorator):
     def axis_names(self):
         return self.global_mesh.axis_names
 
+    @functools.cached_property
+    def _name_to_type(self):
+        return self.global_mesh._name_to_type
+
+    @functools.cached_property
+    def axis_types(self):
+        return self.global_mesh.axis_types
+
+    @property
+    def axis_sizes(self) -> tuple[int, ...]:
+        if self.compiling():
+            return tuple(self.local_shape.values())
+        return self.global_mesh.axis_sizes
+
     @property
     def devices(self):
         if self.compiling():
@@ -117,8 +137,8 @@ class MeshWrapper(contextlib.ContextDecorator):
         new_env = thread_resources.stack[-1].with_mesh(self)
         thread_resources.stack.append(new_env)
         thread_resources.env = new_env
-        jax_config.update_thread_local_jit_state(
-            mesh_context_manager=tuple(
+        jax_config.mesh_context_manager.set_local(
+            tuple(
                 t.physical_mesh
                 for t in thread_resources.stack
                 if not t.physical_mesh.empty
@@ -129,8 +149,8 @@ class MeshWrapper(contextlib.ContextDecorator):
     def __exit__(self, exc_type, exc_value, traceback):
         thread_resources.stack.pop()
         thread_resources.env = thread_resources.stack[-1]
-        jax_config.update_thread_local_jit_state(
-            mesh_context_manager=tuple(
+        jax_config.mesh_context_manager.set_local(
+            tuple(
                 t.physical_mesh
                 for t in thread_resources.stack
                 if not t.physical_mesh.empty

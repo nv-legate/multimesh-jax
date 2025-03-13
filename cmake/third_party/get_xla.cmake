@@ -77,6 +77,7 @@ function(find_or_configure_xla)
  set(_bazel_options
    --define open_source_build=true
    --define framework_shared_object=false
+   --define tsl_protobuf_header_only=false
    --config=cuda
  )
  if (LegateJAX_ASAN)

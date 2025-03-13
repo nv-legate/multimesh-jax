@@ -7,6 +7,7 @@ from jax.tree_util import tree_map
 import legate.jax
 
 
+@jtu.with_config(jax_numpy_rank_promotion="allow")
 class LegateJaxTestCase(jtu.JaxTestCase):
     def _test_against_reference(
         self,

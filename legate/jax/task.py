@@ -750,10 +750,12 @@ def register_task(
     if logical_axes is None:
         logical_axes = [(ax, ax) for ax in device_axes]
 
+    if "(" not in regex and ")" not in regex:
+        regex = f"({regex})"
     _register_metadata_name(regex, name)
     if callback is not None:
         _register_task_factory(
-            name or regex,
+            regex,
             callback,
             list(dims),
             list(device_axes),
