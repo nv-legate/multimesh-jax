@@ -117,18 +117,13 @@ function(find_or_configure_xla)
    set(LIB_FOLDER ${PROJECT_BINARY_DIR}/lib)
  endif()
 
- if (LegateJAX_BUILD_XLA)
-   set(XLA_DEPS DEPENDS ${xla_source_files})
- endif()
-
-
  add_custom_command(
    OUTPUT  ${xla_client_library}
    OUTPUT  ${xla_compiler_library}
    COMMENT "Building XLA components ${target_names}..."
    COMMAND rm -rf "${xla_SOURCE_DIR}/bazel-bin" && XLA_LEGATE_SOURCE_DIR=${CMAKE_SOURCE_DIR} bazel ${_bazel_startup_option} build ${_bazel_options} ${target_names} --check_visibility=false
    WORKING_DIRECTORY ${xla_SOURCE_DIR}
-   #${XLA_DEPS}
+   DEPENDS ${xla_source_files}
    USES_TERMINAL
    VERBATIM
  )
