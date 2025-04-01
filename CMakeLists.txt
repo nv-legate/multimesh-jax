@@ -48,11 +48,21 @@ endif()
 # - Download and initialize RAPIDS CMake helpers -----------------------------
 
 
-if(NOT EXISTS ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
-  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-23.08/RAPIDS.cmake
-       ${CMAKE_BINARY_DIR}/legate-xla-RAPIDS.cmake)
+if (LegateJAX_RAPIDS_DIR)
+  include(${LegateJAX_RAPIDS_DIR}/RAPIDS.cmake)
+else()
+  if(NOT rapids-cmake-version)
+    # default
+    set(rapids-cmake-version 25.06)
+    set(rapids-cmake-sha "365322aca32fd6ecd7027f5d7ec7be50b7f3cc2a")
+  endif()
+  if(NOT EXISTS ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+    file(DOWNLOAD
+         https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-${rapids-cmake-version}/RAPIDS.cmake
+         ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+  endif()
+  include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
 endif()
-include(${CMAKE_BINARY_DIR}/legate-xla-RAPIDS.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
 include(rapids-cuda)
@@ -61,8 +71,6 @@ include(rapids-find)
 
 rapids_cpm_init(OVERRIDE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json)
 
-#add_compile_options("-fsanitize=address")
-#add_link_options("-fsanitize=address")
 
 enable_testing()
 

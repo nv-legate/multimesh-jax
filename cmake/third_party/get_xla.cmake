@@ -4,12 +4,13 @@ function(find_or_configure_xla)
 
   set(LegateJAX_BAZEL_REMOTE_CACHE "" CACHE STRING "An optional remote cache for bazel builds")
 
+
   if (xla_REPOSITORY)
-    set(git_repo ${legate_core_REPOSITORY})
+    set(git_repo ${xla_REPOSITORY})
   endif()
 
   if (xla_BRANCH)
-    set(git_branch ${legate_core_BRANCH})
+    set(git_branch ${xla_BRANCH})
   endif()
 
   rapids_cpm_find(xla ${version}
@@ -28,10 +29,24 @@ function(find_or_configure_xla)
   set(xla_compiler_library "${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${xla_compiler_library_name}")
 
   file(GLOB xla_source_files
-       "${xla_SOURCE_DIR}/xla/pjrt/legate/*.cc"
-       "${xla_SOURCE_DIR}/xla/pjrt/legate/*.h"
-       "${xla_SOURCE_DIR}/xla/pjrt/legate/BUILD")
+       "${PROJECT_SOURCE_DIR}/src/pjrt_client/*.cc"
+       "${PROJECT_SOURCE_DIR}/src/pjrt_client/*.h"
+       "${PROJECT_SOURCE_DIR}/src/pjrt_client/BUILD")
 
+  set(xla_symlink_files)
+  
+  foreach(PATH ${xla_source_files})
+    get_filename_component(FILE_NAME ${PATH} NAME)
+    list(APPEND xla_symlink_files "${xla_SOURCE_DIR}/xla/pjrt/legate/${FILE_NAME}")
+  endforeach()
+
+  add_custom_command(
+      OUTPUT ${xla_symlink_files}
+      COMMAND ${CMAKE_COMMAND} -E create_symlink
+              ${PROJECT_SOURCE_DIR}/src/pjrt_client
+              ${xla_SOURCE_DIR}/xla/pjrt/legate
+      COMMENT "Symlink plugin client code into XLA source tree at ${xla_SOURCE_DIR}"
+  )
 
   set(test_names
     mpmd_partition_test
@@ -123,7 +138,7 @@ function(find_or_configure_xla)
    COMMENT "Building XLA components ${target_names}..."
    COMMAND rm -rf "${xla_SOURCE_DIR}/bazel-bin" && XLA_LEGATE_SOURCE_DIR=${CMAKE_SOURCE_DIR} bazel ${_bazel_startup_option} build ${_bazel_options} ${target_names} --check_visibility=false
    WORKING_DIRECTORY ${xla_SOURCE_DIR}
-   DEPENDS ${xla_source_files}
+   DEPENDS ${xla_symlink_files}
    USES_TERMINAL
    VERBATIM
  )

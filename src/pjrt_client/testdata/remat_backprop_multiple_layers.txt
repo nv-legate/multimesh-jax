@@ -1,0 +1,142 @@
+HloModule jit_c, entry_computation_layout={(f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0})->(f32[], f32[4,4]{1,0}, f32[4,4]{1,0})}, allow_spmd_sharding_propagation_to_output={false,false,false}
+
+region_0.37 {
+  Arg_0.38 = f32[] parameter(0)
+  Arg_1.39 = f32[] parameter(1)
+  ROOT add.40 = f32[] add(Arg_0.38, Arg_1.39)
+}
+
+ENTRY main.137 {
+  Arg_2.3 = f32[4,4]{1,0} parameter(2), sharding={replicated}
+  multiply.7 = f32[4,4]{1,0} multiply(Arg_2.3, Arg_2.3)
+  Arg_0.1 = f32[4,4]{1,0} parameter(0), sharding={replicated}
+  multiply.8 = f32[4,4]{1,0} multiply(Arg_2.3, Arg_0.1)
+  add.9 = f32[4,4]{1,0} add(multiply.7, multiply.8)
+  Arg_1.2 = f32[4,4]{1,0} parameter(1), sharding={replicated}
+  multiply.10 = f32[4,4]{1,0} multiply(Arg_2.3, Arg_1.2)
+  add.11 = f32[4,4]{1,0} add(add.9, multiply.10)
+  multiply.12 = f32[4,4]{1,0} multiply(add.11, add.11)
+  multiply.13 = f32[4,4]{1,0} multiply(add.11, Arg_0.1)
+  add.14 = f32[4,4]{1,0} add(multiply.12, multiply.13)
+  multiply.15 = f32[4,4]{1,0} multiply(add.11, Arg_1.2)
+  add.16 = f32[4,4]{1,0} add(add.14, multiply.15)
+  multiply.17 = f32[4,4]{1,0} multiply(add.16, add.16)
+  multiply.18 = f32[4,4]{1,0} multiply(add.16, Arg_0.1)
+  add.19 = f32[4,4]{1,0} add(multiply.17, multiply.18)
+  multiply.20 = f32[4,4]{1,0} multiply(add.16, Arg_1.2)
+  add.21 = f32[4,4]{1,0} add(add.19, multiply.20)
+  multiply.22 = f32[4,4]{1,0} multiply(add.21, add.21)
+  multiply.23 = f32[4,4]{1,0} multiply(add.21, Arg_0.1)
+  add.24 = f32[4,4]{1,0} add(multiply.22, multiply.23)
+  multiply.25 = f32[4,4]{1,0} multiply(add.21, Arg_1.2)
+  add.26 = f32[4,4]{1,0} add(add.24, multiply.25)
+  multiply.27 = f32[4,4]{1,0} multiply(add.26, add.26)
+  multiply.28 = f32[4,4]{1,0} multiply(add.26, Arg_0.1)
+  add.29 = f32[4,4]{1,0} add(multiply.27, multiply.28)
+  multiply.30 = f32[4,4]{1,0} multiply(add.26, Arg_1.2)
+  add.31 = f32[4,4]{1,0} add(add.29, multiply.30)
+  multiply.32 = f32[4,4]{1,0} multiply(add.31, add.31)
+  multiply.33 = f32[4,4]{1,0} multiply(add.31, Arg_0.1)
+  add.34 = f32[4,4]{1,0} add(multiply.32, multiply.33)
+  multiply.35 = f32[4,4]{1,0} multiply(add.31, Arg_1.2)
+  add.36 = f32[4,4]{1,0} add(add.34, multiply.35)
+  constant.6 = f32[] constant(0)
+  reduce.41 = f32[] reduce(add.36, constant.6), dimensions={0,1}, to_apply=region_0.37
+  reshape.133 = f32[] reshape(reduce.41)
+  constant.4 = f32[] constant(1)
+  broadcast.5 = f32[4,4]{1,0} broadcast(constant.4), dimensions={}
+  tuple.42 = (f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(add.31, Arg_0.1, Arg_1.2, broadcast.5)
+  opt-barrier.43 = (f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}) opt-barrier(tuple.42)
+  get-tuple-element.44 = f32[4,4]{1,0} get-tuple-element(opt-barrier.43), index=0
+  get-tuple-element.47 = f32[4,4]{1,0} get-tuple-element(opt-barrier.43), index=3
+  multiply.50 = f32[4,4]{1,0} multiply(get-tuple-element.44, get-tuple-element.47)
+  get-tuple-element.46 = f32[4,4]{1,0} get-tuple-element(opt-barrier.43), index=2
+  multiply.49 = f32[4,4]{1,0} multiply(get-tuple-element.47, get-tuple-element.46)
+  get-tuple-element.45 = f32[4,4]{1,0} get-tuple-element(opt-barrier.43), index=1
+  multiply.51 = f32[4,4]{1,0} multiply(get-tuple-element.47, get-tuple-element.45)
+  add.52 = f32[4,4]{1,0} add(multiply.49, multiply.51)
+  multiply.53 = f32[4,4]{1,0} multiply(get-tuple-element.44, get-tuple-element.47)
+  add.54 = f32[4,4]{1,0} add(add.52, multiply.53)
+  multiply.55 = f32[4,4]{1,0} multiply(get-tuple-element.47, get-tuple-element.44)
+  add.56 = f32[4,4]{1,0} add(add.54, multiply.55)
+  tuple.57 = (f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(add.26, Arg_0.1, Arg_1.2, add.56)
+  opt-barrier.58 = (f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}) opt-barrier(tuple.57)
+  get-tuple-element.59 = f32[4,4]{1,0} get-tuple-element(opt-barrier.58), index=0
+  get-tuple-element.62 = f32[4,4]{1,0} get-tuple-element(opt-barrier.58), index=3
+  multiply.65 = f32[4,4]{1,0} multiply(get-tuple-element.59, get-tuple-element.62)
+  add.72 = f32[4,4]{1,0} add(multiply.50, multiply.65)
+  get-tuple-element.61 = f32[4,4]{1,0} get-tuple-element(opt-barrier.58), index=2
+  multiply.64 = f32[4,4]{1,0} multiply(get-tuple-element.62, get-tuple-element.61)
+  get-tuple-element.60 = f32[4,4]{1,0} get-tuple-element(opt-barrier.58), index=1
+  multiply.66 = f32[4,4]{1,0} multiply(get-tuple-element.62, get-tuple-element.60)
+  add.67 = f32[4,4]{1,0} add(multiply.64, multiply.66)
+  multiply.68 = f32[4,4]{1,0} multiply(get-tuple-element.59, get-tuple-element.62)
+  add.69 = f32[4,4]{1,0} add(add.67, multiply.68)
+  multiply.70 = f32[4,4]{1,0} multiply(get-tuple-element.62, get-tuple-element.59)
+  add.71 = f32[4,4]{1,0} add(add.69, multiply.70)
+  tuple.74 = (f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(add.21, Arg_0.1, Arg_1.2, add.71)
+  opt-barrier.75 = (f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}) opt-barrier(tuple.74)
+  get-tuple-element.76 = f32[4,4]{1,0} get-tuple-element(opt-barrier.75), index=0
+  get-tuple-element.79 = f32[4,4]{1,0} get-tuple-element(opt-barrier.75), index=3
+  multiply.82 = f32[4,4]{1,0} multiply(get-tuple-element.76, get-tuple-element.79)
+  add.89 = f32[4,4]{1,0} add(add.72, multiply.82)
+  get-tuple-element.78 = f32[4,4]{1,0} get-tuple-element(opt-barrier.75), index=2
+  multiply.81 = f32[4,4]{1,0} multiply(get-tuple-element.79, get-tuple-element.78)
+  get-tuple-element.77 = f32[4,4]{1,0} get-tuple-element(opt-barrier.75), index=1
+  multiply.83 = f32[4,4]{1,0} multiply(get-tuple-element.79, get-tuple-element.77)
+  add.84 = f32[4,4]{1,0} add(multiply.81, multiply.83)
+  multiply.85 = f32[4,4]{1,0} multiply(get-tuple-element.76, get-tuple-element.79)
+  add.86 = f32[4,4]{1,0} add(add.84, multiply.85)
+  multiply.87 = f32[4,4]{1,0} multiply(get-tuple-element.79, get-tuple-element.76)
+  add.88 = f32[4,4]{1,0} add(add.86, multiply.87)
+  tuple.91 = (f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(add.16, Arg_0.1, Arg_1.2, add.88)
+  opt-barrier.92 = (f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}) opt-barrier(tuple.91)
+  get-tuple-element.93 = f32[4,4]{1,0} get-tuple-element(opt-barrier.92), index=0
+  get-tuple-element.96 = f32[4,4]{1,0} get-tuple-element(opt-barrier.92), index=3
+  multiply.99 = f32[4,4]{1,0} multiply(get-tuple-element.93, get-tuple-element.96)
+  add.106 = f32[4,4]{1,0} add(add.89, multiply.99)
+  get-tuple-element.95 = f32[4,4]{1,0} get-tuple-element(opt-barrier.92), index=2
+  multiply.98 = f32[4,4]{1,0} multiply(get-tuple-element.96, get-tuple-element.95)
+  get-tuple-element.94 = f32[4,4]{1,0} get-tuple-element(opt-barrier.92), index=1
+  multiply.100 = f32[4,4]{1,0} multiply(get-tuple-element.96, get-tuple-element.94)
+  add.101 = f32[4,4]{1,0} add(multiply.98, multiply.100)
+  multiply.102 = f32[4,4]{1,0} multiply(get-tuple-element.93, get-tuple-element.96)
+  add.103 = f32[4,4]{1,0} add(add.101, multiply.102)
+  multiply.104 = f32[4,4]{1,0} multiply(get-tuple-element.96, get-tuple-element.93)
+  add.105 = f32[4,4]{1,0} add(add.103, multiply.104)
+  tuple.108 = (f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(add.11, Arg_0.1, Arg_1.2, add.105)
+  opt-barrier.109 = (f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4,4]{1,0}) opt-barrier(tuple.108)
+  get-tuple-element.110 = f32[4,4]{1,0} get-tuple-element(opt-barrier.109), index=0
+  get-tuple-element.113 = f32[4,4]{1,0} get-tuple-element(opt-barrier.109), index=3
+  multiply.116 = f32[4,4]{1,0} multiply(get-tuple-element.110, get-tuple-element.113)
+  add.123 = f32[4,4]{1,0} add(add.106, multiply.116)
+  get-tuple-element.112 = f32[4,4]{1,0} get-tuple-element(opt-barrier.109), index=2
+  multiply.115 = f32[4,4]{1,0} multiply(get-tuple-element.113, get-tuple-element.112)
+  get-tuple-element.111 = f32[4,4]{1,0} get-tuple-element(opt-barrier.109), index=1
+  multiply.117 = f32[4,4]{1,0} multiply(get-tuple-element.113, get-tuple-element.111)
+  add.118 = f32[4,4]{1,0} add(multiply.115, multiply.117)
+  multiply.119 = f32[4,4]{1,0} multiply(get-tuple-element.110, get-tuple-element.113)
+  add.120 = f32[4,4]{1,0} add(add.118, multiply.119)
+  multiply.121 = f32[4,4]{1,0} multiply(get-tuple-element.113, get-tuple-element.110)
+  add.122 = f32[4,4]{1,0} add(add.120, multiply.121)
+  tuple.125 = (f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(Arg_2.3, add.122)
+  opt-barrier.126 = (f32[4,4]{1,0}, f32[4,4]{1,0}) opt-barrier(tuple.125)
+  get-tuple-element.127 = f32[4,4]{1,0} get-tuple-element(opt-barrier.126), index=0
+  get-tuple-element.128 = f32[4,4]{1,0} get-tuple-element(opt-barrier.126), index=1
+  multiply.130 = f32[4,4]{1,0} multiply(get-tuple-element.127, get-tuple-element.128)
+  add.131 = f32[4,4]{1,0} add(add.123, multiply.130)
+  reshape.134 = f32[4,4]{1,0} reshape(add.131)
+  multiply.48 = f32[4,4]{1,0} multiply(get-tuple-element.44, get-tuple-element.47)
+  multiply.63 = f32[4,4]{1,0} multiply(get-tuple-element.59, get-tuple-element.62)
+  add.73 = f32[4,4]{1,0} add(multiply.48, multiply.63)
+  multiply.80 = f32[4,4]{1,0} multiply(get-tuple-element.76, get-tuple-element.79)
+  add.90 = f32[4,4]{1,0} add(add.73, multiply.80)
+  multiply.97 = f32[4,4]{1,0} multiply(get-tuple-element.93, get-tuple-element.96)
+  add.107 = f32[4,4]{1,0} add(add.90, multiply.97)
+  multiply.114 = f32[4,4]{1,0} multiply(get-tuple-element.110, get-tuple-element.113)
+  add.124 = f32[4,4]{1,0} add(add.107, multiply.114)
+  multiply.129 = f32[4,4]{1,0} multiply(get-tuple-element.127, get-tuple-element.128)
+  add.132 = f32[4,4]{1,0} add(add.124, multiply.129)
+  reshape.135 = f32[4,4]{1,0} reshape(add.132)
+  ROOT tuple.136 = (f32[], f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(reshape.133, reshape.134, reshape.135), sharding={{replicated}, {replicated}, {replicated}}
+} // main.137

@@ -1,0 +1,106 @@
+HloModule jit_c, entry_computation_layout={(f32[4,4]{1,0}, f32[4,1]{1,0}, f32[4,1]{1,0})->f32[]}, allow_spmd_sharding_propagation_to_parameters={false,false,false}
+
+%inner_comp.20 (Arg_0.21: f32[2,4], Arg_1.22: f32[2,1]) -> f32[2,4] {
+  %Arg_0.21 = f32[2,4]{1,0} parameter(0)
+  %Arg_1.22 = f32[2,1]{1,0} parameter(1)
+  %broadcast.23 = f32[2,1]{1,0} broadcast(f32[2,1]{1,0} %Arg_1.22), dimensions={0,1}, metadata={op_name=""}
+  %reshape.24 = f32[2]{0} reshape(f32[2,1]{1,0} %broadcast.23), metadata={op_name=""}
+  %broadcast.25 = f32[2,4]{1,0} broadcast(f32[2]{0} %reshape.24), dimensions={0}, metadata={op_name=""}
+  ROOT %add.26 = f32[2,4]{1,0} add(f32[2,4]{1,0} %Arg_0.21, f32[2,4]{1,0} %broadcast.25), metadata={op_name=""}
+}
+
+%region_1.27 (Arg_0.28: f32[], Arg_1.29: f32[]) -> f32[] {
+  %Arg_0.28 = f32[] parameter(0)
+  %Arg_1.29 = f32[] parameter(1)
+  ROOT %add.30 = f32[] add(f32[] %Arg_0.28, f32[] %Arg_1.29), metadata={op_name=""}
+}
+
+%region_0.31 (arg_tuple.32: (s32[], s32[], f32[4], f32[4,4], f32[4,1], /*index=5*/f32[4,1])) -> (s32[], s32[], f32[4], f32[4,4], f32[4,1], /*index=5*/f32[4,1]) {
+  %arg_tuple.32 = (s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) parameter(0)
+  %get-tuple-element.33 = s32[] get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.32), index=0
+  %constant.39 = s32[] constant(1)
+  %add.67 = s32[] add(s32[] %get-tuple-element.33, s32[] %constant.39), metadata={op_name=""}
+  %get-tuple-element.34 = s32[] get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.32), index=1
+  %constant.41 = s32[] constant(2)
+  %add.59 = s32[] add(s32[] %get-tuple-element.34, s32[] %constant.41), metadata={op_name=""}
+  %get-tuple-element.35 = f32[4]{0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.32), index=2
+  %get-tuple-element.36 = f32[4,4]{1,0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.32), index=3
+  %constant.43 = s32[] constant(0)
+  %compare.44 = pred[] compare(s32[] %get-tuple-element.34, s32[] %constant.43), direction=LT, metadata={op_name=""}
+  %constant.42 = s32[] constant(4)
+  %add.45 = s32[] add(s32[] %get-tuple-element.34, s32[] %constant.42), metadata={op_name=""}
+  %select.46 = s32[] select(pred[] %compare.44, s32[] %add.45, s32[] %get-tuple-element.34), metadata={op_name=""}
+  %dynamic-slice.47 = f32[2,4]{1,0} dynamic-slice(f32[4,4]{1,0} %get-tuple-element.36, s32[] %select.46, s32[] %constant.43), dynamic_slice_sizes={2,4}, metadata={op_name=""}
+  %custom-call.48 = f32[2,4]{1,0} custom-call(f32[2,4]{1,0} %dynamic-slice.47), custom_call_target="MicrobatchSlice", metadata={op_name=""}
+  %get-tuple-element.37 = f32[4,1]{1,0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.32), index=4
+  %compare.49 = pred[] compare(s32[] %get-tuple-element.34, s32[] %constant.43), direction=LT, metadata={op_name=""}
+  %add.50 = s32[] add(s32[] %get-tuple-element.34, s32[] %constant.42), metadata={op_name=""}
+  %select.51 = s32[] select(pred[] %compare.49, s32[] %add.50, s32[] %get-tuple-element.34), metadata={op_name=""}
+  %dynamic-slice.52 = f32[2,1]{1,0} dynamic-slice(f32[4,1]{1,0} %get-tuple-element.37, s32[] %select.51, s32[] %constant.43), dynamic_slice_sizes={2,1}, metadata={op_name=""}
+  %custom-call.53 = f32[2,1]{1,0} custom-call(f32[2,1]{1,0} %dynamic-slice.52), custom_call_target="MicrobatchSlice", metadata={op_name=""}
+  %call.60 = f32[2,4]{1,0} call(f32[2,4]{1,0} %custom-call.48, f32[2,1]{1,0} %custom-call.53), to_apply=%inner_comp.20
+  %get-tuple-element.38 = f32[4,1]{1,0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.32), index=5
+  %compare.54 = pred[] compare(s32[] %get-tuple-element.34, s32[] %constant.43), direction=LT, metadata={op_name=""}
+  %add.55 = s32[] add(s32[] %get-tuple-element.34, s32[] %constant.42), metadata={op_name=""}
+  %select.56 = s32[] select(pred[] %compare.54, s32[] %add.55, s32[] %get-tuple-element.34), metadata={op_name=""}
+  %dynamic-slice.57 = f32[2,1]{1,0} dynamic-slice(f32[4,1]{1,0} %get-tuple-element.38, s32[] %select.56, s32[] %constant.43), dynamic_slice_sizes={2,1}, metadata={op_name=""}
+  %custom-call.58 = f32[2,1]{1,0} custom-call(f32[2,1]{1,0} %dynamic-slice.57), custom_call_target="MicrobatchSlice", metadata={op_name=""}
+  %broadcast.61 = f32[2,1]{1,0} broadcast(f32[2,1]{1,0} %custom-call.58), dimensions={0,1}, metadata={op_name=""}
+  %reshape.62 = f32[2]{0} reshape(f32[2,1]{1,0} %broadcast.61), metadata={op_name=""}
+  %broadcast.63 = f32[2,4]{1,0} broadcast(f32[2]{0} %reshape.62), dimensions={0}, metadata={op_name=""}
+  %add.64 = f32[2,4]{1,0} add(f32[2,4]{1,0} %call.60, f32[2,4]{1,0} %broadcast.63), metadata={op_name=""}
+  %constant.40 = f32[] constant(0)
+  %reduce.65 = f32[4]{0} reduce(f32[2,4]{1,0} %add.64, f32[] %constant.40), dimensions={0}, to_apply=%region_1.27, metadata={op_name=""}
+  %add.66 = f32[4]{0} add(f32[4]{0} %get-tuple-element.35, f32[4]{0} %reduce.65), metadata={op_name=""}
+  ROOT %tuple.68 = (s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) tuple(s32[] %add.67, s32[] %add.59, f32[4]{0} %add.66, f32[4,4]{1,0} %get-tuple-element.36, f32[4,1]{1,0} %get-tuple-element.37, /*index=5*/f32[4,1]{1,0} %get-tuple-element.38)
+}
+
+%region_2.69 (arg_tuple.70: (s32[], s32[], f32[4], f32[4,4], f32[4,1], /*index=5*/f32[4,1])) -> pred[] {
+  %arg_tuple.70 = (s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) parameter(0)
+  %get-tuple-element.72 = s32[] get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.70), index=1
+  %get-tuple-element.73 = f32[4]{0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.70), index=2
+  %get-tuple-element.74 = f32[4,4]{1,0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.70), index=3
+  %get-tuple-element.75 = f32[4,1]{1,0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.70), index=4
+  %get-tuple-element.76 = f32[4,1]{1,0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.70), index=5
+  %get-tuple-element.71 = s32[] get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %arg_tuple.70), index=0
+  %constant.77 = s32[] constant(2)
+  ROOT %compare.78 = pred[] compare(s32[] %get-tuple-element.71, s32[] %constant.77), direction=LT, metadata={op_name=""}
+}
+
+%region_3.86 (Arg_0.87: f32[], Arg_1.88: f32[]) -> f32[] {
+  %Arg_0.87 = f32[] parameter(0)
+  %Arg_1.88 = f32[] parameter(1)
+  ROOT %add.89 = f32[] add(f32[] %Arg_0.87, f32[] %Arg_1.88), metadata={op_name=""}
+}
+
+ENTRY %main.93 (Arg_0.1: f32[4,4], Arg_1.2: f32[4,1], Arg_2.3: f32[4,1]) -> f32[] {
+  %constant.8 = s32[] constant(0)
+  %constant.4 = f32[] constant(0)
+  %broadcast.5 = f32[4]{0} broadcast(f32[] %constant.4), dimensions={}
+  %custom-call.15 = f32[4]{0} custom-call(f32[4]{0} %broadcast.5), custom_call_target="MicrobatchInit", metadata={op_name=""}, backend_config={"num_microbatches": 2, "slice_dim": 0, "size": 2, "interleave": 1}
+  %Arg_0.1 = f32[4,4]{1,0} parameter(0), sharding={replicated}
+  %constant.10 = f32[] constant(2)
+  %broadcast.11 = f32[4,4]{1,0} broadcast(f32[] %constant.10), dimensions={}
+  %multiply.12 = f32[4,4]{1,0} multiply(f32[4,4]{1,0} %Arg_0.1, f32[4,4]{1,0} %broadcast.11), metadata={op_name=""}
+  %custom-call.16 = f32[4,4]{1,0} custom-call(f32[4,4]{1,0} %multiply.12), custom_call_target="Microbatch", metadata={op_name=""}, backend_config={"num_microbatches": 2, "slice_dim": 0, "size": 2, "interleave": 1}
+  %Arg_1.2 = f32[4,1]{1,0} parameter(1), sharding={replicated}
+  %constant.6 = f32[] constant(2)
+  %broadcast.7 = f32[4,1]{1,0} broadcast(f32[] %constant.6), dimensions={}
+  %multiply.13 = f32[4,1]{1,0} multiply(f32[4,1]{1,0} %Arg_1.2, f32[4,1]{1,0} %broadcast.7), metadata={op_name=""}
+  %custom-call.17 = f32[4,1]{1,0} custom-call(f32[4,1]{1,0} %multiply.13), custom_call_target="Microbatch", metadata={op_name=""}, backend_config={"num_microbatches": 2, "slice_dim": 0, "size": 2, "interleave": 1}
+  %Arg_2.3 = f32[4,1]{1,0} parameter(2), sharding={replicated}
+  %multiply.14 = f32[4,1]{1,0} multiply(f32[4,1]{1,0} %Arg_2.3, f32[4,1]{1,0} %broadcast.7), metadata={op_name=""}
+  %custom-call.18 = f32[4,1]{1,0} custom-call(f32[4,1]{1,0} %multiply.14), custom_call_target="Microbatch", metadata={op_name=""}, backend_config={"num_microbatches": 2, "slice_dim": 0, "size": 2, "interleave": 1}
+  %tuple.19 = (s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) tuple(s32[] %constant.8, s32[] %constant.8, f32[4]{0} %custom-call.15, f32[4,4]{1,0} %custom-call.16, f32[4,1]{1,0} %custom-call.17, /*index=5*/f32[4,1]{1,0} %custom-call.18), metadata={op_name=""}
+  %while.79 = (s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) while((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %tuple.19), condition=%region_2.69, body=%region_0.31, metadata={op_name=""}
+  %get-tuple-element.80 = s32[] get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %while.79), index=0, metadata={op_name=""}
+  %get-tuple-element.81 = s32[] get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %while.79), index=1, metadata={op_name=""}
+  %get-tuple-element.83 = f32[4,4]{1,0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %while.79), index=3, metadata={op_name=""}
+  %get-tuple-element.84 = f32[4,1]{1,0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %while.79), index=4, metadata={op_name=""}
+  %get-tuple-element.85 = f32[4,1]{1,0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %while.79), index=5, metadata={op_name=""}
+  %get-tuple-element.82 = f32[4]{0} get-tuple-element((s32[], s32[], f32[4]{0}, f32[4,4]{1,0}, f32[4,1]{1,0}, /*index=5*/f32[4,1]{1,0}) %while.79), index=2, metadata={op_name=""}
+  %constant.9 = f32[] constant(0)
+  %reduce.90 = f32[] reduce(f32[4]{0} %get-tuple-element.82, f32[] %constant.9), dimensions={0}, to_apply=%region_3.86, metadata={op_name=""}
+  %tuple.91 = (f32[]) tuple(f32[] %reduce.90)
+  ROOT %get-tuple-element.92 = f32[] get-tuple-element((f32[]) %tuple.91), index=0, sharding={replicated}
+}
