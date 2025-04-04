@@ -1145,6 +1145,7 @@ xla_cc_test(
         "//xla/hlo/parser:hlo_parser",
         "@tsl//tsl/platform:test_main",
         "//xla/service:cpu_plugin",
+        "//xla/service:gpu_plugin",
     ],
 )
 

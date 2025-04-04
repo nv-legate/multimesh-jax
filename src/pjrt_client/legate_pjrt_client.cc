@@ -42,6 +42,7 @@ limitations under the License.
 #include "xla/service/dump.h"
 #include "xla/service/hlo_module_util.h"
 #include "xla/service/platform_util.h"
+#include "xla/service/spmd/spmd_partitioner_util.h"
 #include "xla/shape.h"
 #include "xla/shape_util.h"
 #include "xla/tools/hlo_module_loader.h"
@@ -174,6 +175,17 @@ absl::StatusOr<CompileOutput> CreateTasks(
 
   HloSharding default_replicated = HloSharding::Replicate();
 
+  auto add_root = [&](const Store& output, const Shape& spmd_shape) {
+    VLOG(3) << "Have output root " << output.index << ", shape=" << output.shape
+            << " for " << output.name
+            << " with sharding=" << output.mpmd_sharding;
+    root_tuple_shardings[output.index] = output.mpmd_sharding.ToProto();
+    output_layouts[output.index] = spmd_shape.layout();
+    output_shapes[output.index] = spmd_shape;
+    VLOG(3) << "output " << output.index << " " << output.name << " has shape "
+            << spmd_shape << " and layout " << spmd_shape.layout();
+  };
+
   auto collect_shapes_and_shardings =
       [&](const SpmdHloModuleTask& task) -> absl::Status {
     const HloModule& module = *task.module->module;
@@ -209,45 +221,16 @@ absl::StatusOr<CompileOutput> CreateTasks(
 
     Shape spmd_root_shape = GetSpmdShape(
         task.module->module->entry_computation()->root_instruction());
+
     for (size_t idx = 0; idx < task.outputs.size(); ++idx) {
       const auto& output = task.outputs[idx];
 
       if (output.type == Store::Type::ROOT) {
-        VLOG(3) << "Have output root " << output.index
-                << ", shape=" << output.shape << " for " << output.name
-                << " with sharding=" << output.mpmd_sharding << " over "
-                << task.device_assignment;
-        if (IsSubmeshReplicatedScalar(output, task.device_assignment)) {
-          VLOG(3) << "Forcing global replication of scalar output "
-                  << output.name << ", number=" << output.index;
-          root_tuple_shardings[output.index] = OpSharding{};
-        } else {
-          VLOG(3) << "Assigning sharding to root " << output.index << " "
-                  << output.name << ": " << output.mpmd_sharding.ToString();
-          root_tuple_shardings[output.index] = output.mpmd_sharding.ToProto();
-        }
-
-        if (!output.mpmd_sharding.IsReplicated() &&
-            output.mpmd_sharding.tile_assignment().num_elements() == 0) {
-          return InvalidArgumentStrCat(output.name,
-                                       " has empty device list in sharding: ",
-                                       output.mpmd_sharding.ToString());
-        }
-
         if (spmd_root_shape.IsTuple()) {
-          output_shapes[output.index] = spmd_root_shape.tuple_shapes(idx);
-          output_layouts[output.index] =
-              spmd_root_shape.tuple_shapes(idx).layout();
+          add_root(output, spmd_root_shape.tuple_shapes(idx));
         } else {
-          output_shapes[output.index] = spmd_root_shape;
-          output_layouts[output.index] = spmd_root_shape.layout();
+          add_root(output, spmd_root_shape);
         }
-        VLOG(3) << "output " << output.index << " " << output.name
-                << " has shape " << output_shapes[output.index]
-                << " and layout " << output_layouts[output.index]
-                << " from task " << task.module->module->name() << "."
-                << task.module->module->unique_id() << " for task output "
-                << idx;
       } else {
         VLOG(3) << "Using sharding for temporary output " << output.name << ": "
                 << output.mpmd_sharding.ToString();
@@ -277,29 +260,34 @@ absl::StatusOr<CompileOutput> CreateTasks(
   }
 
   for (auto& op : ops) {
-    std::visit(overloaded{[&](SpmdHloModuleTask& task) {
-                            TF_CHECK_OK(collect_shapes_and_shardings(task));
-                            task.compiler =
-                                module_to_compiler[task.module->module.get()];
-                          },
-                          [&](Reshard& reshard) {
-                            if (reshard.input.type == Store::Type::PARAM) {
-                              parameter_shardings[reshard.input.index] =
-                                  reshard.input.mpmd_sharding.ToProto();
-                              parameter_layouts[reshard.input.index] =
-                                  reshard.input.shape.layout();
-                              VLOG(3)
-                                  << "Assigning layout/sharding to parameter "
-                                  << reshard.input.name
-                                  << ", number=" << reshard.input.index << ": "
-                                  << reshard.input.shape << " "
-                                  << reshard.input.mpmd_sharding.ToString();
-                            }
-                          },
-                          [&](const auto&) {
-                            // no-op for now
-                          }},
-               op.op);
+    std::visit(
+        overloaded{[&](SpmdHloModuleTask& task) {
+                     TF_CHECK_OK(collect_shapes_and_shardings(task));
+                     task.compiler =
+                         module_to_compiler[task.module->module.get()];
+                   },
+                   [&](Reshard& reshard) {
+                     if (reshard.input.type == Store::Type::PARAM) {
+                       parameter_shardings[reshard.input.index] =
+                           reshard.input.mpmd_sharding.ToProto();
+                       parameter_layouts[reshard.input.index] =
+                           reshard.input.shape.layout();
+                       VLOG(3) << "Assigning layout/sharding to parameter "
+                               << reshard.input.name
+                               << ", number=" << reshard.input.index << ": "
+                               << reshard.input.shape << " "
+                               << reshard.input.mpmd_sharding.ToString();
+                     }
+                     if (reshard.output.type == Store::Type::ROOT) {
+                       auto shape = spmd::MakePartitionedShape(
+                           reshard.output.shape, reshard.output.mpmd_sharding);
+                       add_root(reshard.output, shape);
+                     }
+                   },
+                   [&](const auto&) {
+                     // no-op for now
+                   }},
+        op.op);
   }
 
   Shape output_shape = [&] {

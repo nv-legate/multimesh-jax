@@ -75,8 +75,8 @@ rapids_cpm_init(OVERRIDE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json)
 enable_testing()
 
 option(LegateJAX_ENABLE_CUDA ON "Whether to build with CUDA")
-
 option(LegateJAX_ASAN OFF "Whether to build with address saniziter")
+option(LegateJAX_ENABLE_TESTS OFF "Whether to build tests")
 
 if (SKBUILD)
   find_package(LegateJAX)

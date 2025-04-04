@@ -10,6 +10,7 @@
 #include "xla/pjrt/legate/legate_pjrt_buffer.h"
 #include "xla/pjrt/legate/legate_sharding.h"
 #include "xla/pjrt/legate/store_handle_fwd.h"
+#include "xla/service/spmd/spmd_partitioner_util.h"
 #include "xla/pjrt/pjrt_client.h"
 #include "xla/service/buffer_assignment.h"
 #include "xla/util.h"
@@ -526,6 +527,39 @@ LegatePjRtExecutable::Execute(
     return shape;
   };
 
+  auto add_root_store = [&](const Store& output, const ResultShape& shape,
+                            std::optional<int64_t> parameter_number_alias) {
+    // already configured
+    if (root_stores[0][output.index].impl) {
+      return;
+    }
+    out_shapes[output.index] = shape;
+    output_names[output.index] = output.name;
+
+    VLOG(3) << "looking for alias of global=" << output.index
+            << ",local=" << local_index << " " << output.shape;
+    if (parameter_number_alias.has_value()) {
+      VLOG(3) << "root global=" << output.index << ",local=" << local_index
+              << " " << output.name << " " << output.shape
+              << " aliases parameter " << *parameter_number_alias;
+      for (int64_t local_device = 0; local_device < num_local_devices;
+           ++local_device) {
+        root_stores[local_device][output.index] =
+            parameter_stores[local_device][*parameter_number_alias];
+      }
+    } else {
+      for (int64_t local_device = 0; local_device < num_local_devices;
+           ++local_device) {
+        VLOG(3) << "root global=" << output.index << ",local=" << local_index
+                << " " << output.shape << " is new output";
+        root_stores[local_device][output.index] = context_->CreateStore(
+            local_device,
+            addressable_devices_[local_device]->global_device_id().value(),
+            output.sharded_shape, {.name = output.name});
+      }
+    }
+  };
+
   auto setup_root_stores = [&](const SpmdHloModuleTask& task) {
     Shape spmd_root_shape = GetSpmdShape(
         task.module->module->entry_computation()->root_instruction());
@@ -539,54 +573,36 @@ LegatePjRtExecutable::Execute(
     int64_t local_index = 0;
     for (const Store& output : task.outputs) {
       if (output.type == Store::Type::ROOT) {
-        // already configured
-        if (root_stores[0][output.index].impl) {
-          continue;
-        }
-        out_shapes[output.index] = get_root_shape(output.index, local_index);
-        output_names[output.index] = output.name;
-        std::optional<int64_t> parameter_number_alias =
-            task.compiler->OutputAlias(local_index);
-        VLOG(3) << "looking for alias of global=" << output.index
-                << ",local=" << local_index << " " << output.shape;
-        if (parameter_number_alias.has_value() &&
-            task.inputs[*parameter_number_alias].type == Store::Type::PARAM) {
-          for (int64_t local_device = 0; local_device < num_local_devices;
-               ++local_device) {
-            const auto& aliased_input = task.inputs[*parameter_number_alias];
-            VLOG(3) << "root global=" << output.index
-                    << ",local=" << local_index << " " << output.name << " "
-                    << output.shape << " aliases parameter "
-                    << aliased_input.index << " for local device "
-                    << local_device << " for task "
-                    << task.module->module->name();
-            root_stores[local_device][output.index] =
-                parameter_stores[local_device][aliased_input.index];
+        auto parameter_number_alias = [&]() -> std::optional<int64_t> {
+          auto local_alias = task.compiler->OutputAlias(local_index);
+          if (local_alias.has_value() &&
+              task.inputs[*local_alias].type == Store::Type::PARAM) {
+            return task.inputs[*local_alias].index;
           }
-        } else {
-          for (int64_t local_device = 0; local_device < num_local_devices;
-               ++local_device) {
-            VLOG(3) << "root global=" << output.index
-                    << ",local=" << local_index << " " << output.shape
-                    << " is new output for task "
-                    << task.module->module->name();
-            root_stores[local_device][output.index] = context_->CreateStore(
-                local_device,
-                addressable_devices_[local_device]->global_device_id().value(),
-                output.sharded_shape, {.name = output.name});
-          }
-        }
+          return std::nullopt;
+        }();
+        add_root_store(output, get_root_shape(output.index, local_index),
+                       parameter_number_alias);
       }
       ++local_index;
     }
   };
 
   for (const MpmdOperation& op : schedule_) {
-    std::visit(overloaded{[&](const SpmdHloModuleTask& task) {
-                            setup_root_stores(task);
-                          },
-                          [&](const auto&) {}},
-               op.op);
+    std::visit(
+        overloaded{
+            [&](const SpmdHloModuleTask& task) { setup_root_stores(task); },
+            [&](const Reshard& reshard) {
+              if (reshard.output.type == Store::Type::ROOT) {
+                auto spmd_shape = spmd::MakePartitionedShape(
+                    reshard.output.shape, reshard.output.mpmd_sharding);
+                add_root_store(reshard.output,
+                               {reshard.output.shape, spmd_shape},
+                               std::nullopt);
+              }
+            },
+            [&](const auto&) {}},
+        op.op);
   }
 
   // prepare the temporary stores

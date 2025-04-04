@@ -111,6 +111,34 @@ absl::StatusOr<bool> MpmdInsertReshard::Run(
     }
   }
 
+  auto* root = module->entry_computation()->root_instruction();
+  if (root->opcode() == HloOpcode::kTuple) {
+    for (auto* operand : root->mutable_operands()) {
+      if (operand->shape().dimensions().empty()) {
+        auto color = Color(operand);
+        if (!color.has_value()) {
+          return InvalidArgumentStrCat(operand->name(),
+                                       " has no assigned color");
+        }
+        auto devices = partition_->DevicesForColor(*color);
+        if (devices.size() < partition_->TotalDevices()) {
+          VLOG(5) << "Have output scalar " << operand->name() << " with color "
+                  << *color << " sharded over a subset of devices " << devices;
+          // scalars should be blasted out to everyone
+          TF_ASSIGN_OR_RETURN(auto global_color,
+                              partition_->FindOrAllocateGlobalColor("scalars"));
+          HloInstruction* reshard = module->entry_computation()->AddInstruction(
+              HloInstruction::CreateCustomCall(operand->shape(), {operand},
+                                               "Reshard"));
+          reshard->set_sharding(HloSharding::Replicate());
+          AssignColor(reshard, global_color);
+          TF_RETURN_IF_ERROR(operand->ReplaceAllUsesWith(reshard));
+          changed = true;
+        }
+      }
+    }
+  }
+
   return changed;
 }
 

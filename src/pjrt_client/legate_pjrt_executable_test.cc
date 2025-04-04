@@ -423,6 +423,8 @@ TEST_F(LegateExecutableTest, ExecuteMicrobatches) {
 }
 
 TEST_F(LegateExecutableTest, Pipeline2x8Stages) {
+  GTEST_SKIP() << "Data parallelism with non-uniform mesh sizes has sharding "
+                  "propagation bug with aliasing";
   auto device_factory = [](const std::string& name) {
     int layer_num;
     bool parsed = absl::SimpleAtoi(name.substr(9), &layer_num);

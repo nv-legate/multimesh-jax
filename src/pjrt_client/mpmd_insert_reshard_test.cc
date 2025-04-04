@@ -178,7 +178,7 @@ ENTRY main {
 TEST_F(MpmdInsertReshardTest, ShardingChangeSameDevices) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module,
-      GetHloModuleFromPath(kShardingChangeSameDevicesHlo, /*num_devices=*/4));
+      GetHloModuleFromText(kShardingChangeSameDevicesHlo, /*num_devices=*/4));
 
   TF_ASSIGN_OR_RETURN(
       auto f,
@@ -204,6 +204,58 @@ TEST_F(MpmdInsertReshardTest, ShardingChangeSameDevices) {
                 op::Sharding(HloSharding::Replicate()), m::Color("task_f")),
           AllOf(op::CustomCall("Reshard"), op::Sharding(sharding),
                 m::Color("task_g")))));
+}
+
+constexpr absl::string_view kReshardOutputScalar = R"(
+task_f {
+  param.0 = f32[] parameter(0), frontend_attributes={color="task_f"}, sharding={replicated}
+  add.0 = f32[] add(param.0, param.0), frontend_attributes={color="task_f"}, sharding={replicated}
+  ROOT tuple.3 = (f32[]) tuple(add.0)
+}
+ 
+task_g {
+  param.2 = f32[] parameter(0), frontend_attributes={color="task_g"}, sharding={replicated}
+  param.3 = f32[] parameter(1), frontend_attributes={color="task_g"}, sharding={replicated}
+  add.4 = f32[] add(param.2, param.3), frontend_attributes={color="task_g"}, sharding={replicated}
+  ROOT tuple.4 = (f32[]) tuple(add.4)
+}
+
+ENTRY main {
+  Arg_0.1 = f32[] parameter(0), sharding={replicated}
+  call.2 = (f32[]) call(Arg_0.1), to_apply=task_f, frontend_attributes={color="task_f"}
+  get-tuple-element.0 = f32[] get-tuple-element(call.2), index=0, frontend_attributes={color="task_f"}, sharding={replicated}
+  call.3 = (f32[]) call(get-tuple-element.0, Arg_0.1), to_apply=task_g, frontend_attributes={color="task_g"}
+  get-tuple-element.2 = f32[] get-tuple-element(call.3), index=0, frontend_attributes={color="task_g"}, sharding={replicated}
+  ROOT tuple.97 = (f32[]) tuple(get-tuple-element.2)
+}
+)";
+
+TEST_F(MpmdInsertReshardTest, ScalarReshard) {
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto module,
+      GetHloModuleFromText(kReshardOutputScalar, /*num_devices=*/8));
+
+  TF_ASSIGN_OR_RETURN(
+      auto f,
+      partition_->AllocateColor(
+          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
+  TF_ASSIGN_OR_RETURN(
+      auto g,
+      partition_->AllocateColor(
+          "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
+
+  MpmdInsertReshard inserter{partition_.get()};
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, inserter.Run(module.get()));
+
+  TF_ASSERT_OK_AND_ASSIGN(auto global_color,
+                          partition_->FindOrAllocateGlobalColor("scalars"));
+
+  // the parameter should get resharded into both uses
+  // the first is over the same devices, but changes from sharded to replicated
+  // the second has the same sharding, but different devices
+  EXPECT_THAT(
+      module->entry_computation()->root_instruction()->operands(),
+      ElementsAre(AllOf(op::CustomCall("Reshard"), m::Color(global_color))));
 }
 
 }  // namespace
