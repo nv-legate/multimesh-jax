@@ -34,19 +34,14 @@ function(find_or_configure_xla)
        "${PROJECT_SOURCE_DIR}/src/pjrt_client/BUILD")
 
   set(xla_symlink_files)
-  
+
+  file(MAKE_DIRECTORY ${xla_SOURCE_DIR}/xla/pjrt/legate RESULT result)
+
   foreach(PATH ${xla_source_files})
     get_filename_component(FILE_NAME ${PATH} NAME)
     list(APPEND xla_symlink_files "${xla_SOURCE_DIR}/xla/pjrt/legate/${FILE_NAME}")
+    file(CREATE_LINK ${PATH} ${xla_SOURCE_DIR}/xla/pjrt/legate/${FILE_NAME})
   endforeach()
-
-  add_custom_command(
-      OUTPUT ${xla_symlink_files}
-      COMMAND ${CMAKE_COMMAND} -E create_symlink
-              ${PROJECT_SOURCE_DIR}/src/pjrt_client
-              ${xla_SOURCE_DIR}/xla/pjrt/legate
-      COMMENT "Symlink plugin client code into XLA source tree at ${xla_SOURCE_DIR}"
-  )
 
   set(test_names
     mpmd_partition_test

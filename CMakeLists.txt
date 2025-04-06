@@ -47,7 +47,6 @@ endif()
 ##############################################################################
 # - Download and initialize RAPIDS CMake helpers -----------------------------
 
-
 if (LegateJAX_RAPIDS_DIR)
   include(${LegateJAX_RAPIDS_DIR}/RAPIDS.cmake)
 else()
