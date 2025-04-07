@@ -1,3 +1,8 @@
+/* clang-format off
+ * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #ifndef XLA_PJRT_LEGATE_LOOP_SCHEDULER_H_
 #define XLA_PJRT_LEGATE_LOOP_SCHEDULER_H_
 

@@ -1,3 +1,8 @@
+/* clang-format off
+ * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #ifndef XLA_PJRT_LEGATE_MPMD_INSTRUCTION_DELAY_RECOLOR_H_
 #define XLA_PJRT_LEGATE_MPMD_INSTRUCTION_DELAY_RECOLOR_H_
 
@@ -8,6 +13,7 @@
 #include "xla/hlo/pass/hlo_pass_interface.h"
 #include "xla/pjrt/legate/hlo_partition.h"
 #include "xla/pjrt/legate/mpmd_utils.h"
+
 namespace xla {
 
 // Reassigns the partition color of instructions to schedule them

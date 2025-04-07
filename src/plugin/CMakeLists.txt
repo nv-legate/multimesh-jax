@@ -1,3 +1,7 @@
+#=============================================================================
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#=============================================================================
 
 include(${CMAKE_SOURCE_DIR}/cmake/third_party/get_xla.cmake)
 find_package(Python COMPONENTS Interpreter Development)

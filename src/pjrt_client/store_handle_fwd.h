@@ -1,3 +1,8 @@
+/* clang-format off
+ * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #ifndef _XLA_PJRT_LEGATE_STORE_HANDLE_FWD_H
 #define _XLA_PJRT_LEGATE_STORE_HANDLE_FWD_H
 

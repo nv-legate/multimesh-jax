@@ -1,3 +1,8 @@
+/* clang-format off
+ * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include "xla/pjrt/legate/legate_buffer_action.h"
 
 #include "xla/pjrt/gpu/se_gpu_pjrt_client.h"

@@ -1,3 +1,8 @@
+#=============================================================================
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#=============================================================================
+
 function(find_or_configure_xla)
   include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
   rapids_cpm_package_details(OpenXLA version git_repo git_branch shallow exclude_from_all)

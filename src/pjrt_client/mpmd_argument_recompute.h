@@ -1,3 +1,8 @@
+/* clang-format off
+ * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #ifndef XLA_PJRT_LEGATE_MPMD_ARGUMENT_RECOMPUTE_H_
 #define XLA_PJRT_LEGATE_MPMD_ARGUMENT_RECOMPUTE_H_
 
@@ -11,6 +16,7 @@
 #include "xla/pjrt/legate/hlo_partition.h"
 #include "xla/pjrt/legate/mpmd_utils.h"
 #include "xla/util.h"
+
 namespace xla {
 
 // HLO pass that decides whether it is beneficial to compute

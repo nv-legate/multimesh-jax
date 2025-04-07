@@ -1,3 +1,8 @@
+/* clang-format off
+ * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include "xla/pjrt/legate/mpmd_unused_param_output_remover.h"
 
 #include "xla/hlo/ir/hlo_computation.h"

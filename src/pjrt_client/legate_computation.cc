@@ -1,3 +1,8 @@
+/* clang-format off
+ * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) The 2022 OpenXLA Authors.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include "xla/pjrt/legate/legate_computation.h"
 
 #include <chrono>

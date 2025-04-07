@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
+#                         All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import json
 from functools import partial
 from typing import Any, Callable, Literal, Optional, Sequence, Tuple, Type

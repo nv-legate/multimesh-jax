@@ -5,15 +5,8 @@ The repository can be used in two different modes:
 
 ## Getting Started
 
-The easiest way to get started is by downloading either the development of Legate-JAX
-
-* [Development Images](https://gitlab-master.nvidia.com/legate/quickstart.internal/container_registry/69362)
-
-To get started, we recommend pulling the development container:
-
-```bash
-$ docker pull gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev
-```
+The easiest way to get started is by building containers
+using [Legate-Jax workflows](https://github.com/nv-legate/legate-jax-workflows).
 
 ## Docs
 
@@ -53,21 +46,21 @@ docker run \
 ```
 where `<N>` is the number of GPUs.
 
-## Running transformers in PaxML
+## Running transformers in MaxText
 
-The first framework integrated with Legate-Jax was PaxML.
-Running and configuring PaxML can be challenging given the number of `fiddle`
+The main framework integrated with Legate-Jax was MaxText.
+Running and configuring MaxText can be challenging given the number of
 options for specifying the models. To aid in running transformer models,
 a helper script has been added with a basic set of options
-for configuring parallelism. `run.py --help` will give the full set of options.
-Consult the [PaxML user docs](http://sw-mobile-docs/cllr/legate-jax/paxml.html)
-for an explanation of the main options.
+for configuring parallelism in the [Legate-Jax workflows](https://github.com/nv-legate/legate-jax-workflows/maxtext/run.py).
+`run.py --help` will give the full set of options.
 
 ### Known Issues
 
-* Checkpointing: PaxML/orbax conflict on when loading checkpoints. While writing
-checkpoints works, the PaxML version in the repo does not load the correct
-metadata and crashes with an inscrutable error.
+* When running with MPMD sharding, Orbax checkpoints may not work correctly since some
+processes will not have addressable shards.
+* For running with external libraries like TransformerEngine, parallelism is only
+valid when running with process/GPU rather than process/node.
 
 ## JAX and Jaxlib Compatibility
 
