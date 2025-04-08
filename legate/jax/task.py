@@ -566,9 +566,6 @@ def register_task(
     devices: np.ndarray | Sequence[xc.Device] | Sequence[int] | None = None,
     device_axes: Optional[Sequence[str]] = None,
     logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
-    fusion_color: int = 0,
-    loop_submesh_size: Optional[int] = None,
-    loop_submesh_reverse: bool = False,
 ):
     """Registers a name or regex-based task autosharding context
 
@@ -603,16 +600,6 @@ def register_task(
         the device axis names are used directly for autosharding.
         Raises a ``ValueError`` if ``logical_axes`` are given
         but no ``device_axes`` or ``mesh`` are specified.
-      fusion_color: optional, an integer specifying which tasks can
-        be fused together by the compiler. Only tasks with the same
-        ``fusion_color`` can be fused.
-      loop_submesh_size: optional, an integer specifying that each instance
-        of this task inside a loop should be rotate amongst submeshes
-        that are smaller than ``mesh`` or ``devices``. If ``loop_sumbesh_size``
-        is 2 and ``devices`` is [0,1,2,3], then tasks will rotate
-        between submeshes [0,1] and [2,3].
-      loop_submesh_reverse: optional, whether submesh devices should be rotated
-        by counting 0...N or reversed to rotate N...0.
 
     Returns: None
 
@@ -717,20 +704,15 @@ def register_task(
         dims = mesh.devices.shape
         device_axes = mesh.axis_names
         if devices is not None:
-            loop_submesh_size = len(device_ids)
             if isinstance(devices, np.ndarray):
                 device_ids = [_to_device_id(d) for d in devices.flatten()]
             else:
                 device_ids = [_to_device_id(d) for d in devices]
-            loop_submesh_reverse = devices[0] != mesh.devices[0]
     elif devices is not None:
         if isinstance(devices, np.ndarray):
             device_ids = [_to_device_id(d) for d in devices.flatten()]
             if dims is None:
                 dims = devices.shape
-            dim_prod = np.prod(dims)
-            if dim_prod < len(devices):
-                loop_submesh_size = dim_prod
         else:
             if dims is None:
                 dims = (len(devices),)
@@ -764,7 +746,6 @@ def register_task(
             list(dims),
             list(device_axes),
             list(logical_axes),
-            fusion_color,
         )
     else:
         _register_task(
@@ -773,7 +754,4 @@ def register_task(
             list(dims),
             list(device_axes),
             list(logical_axes),
-            fusion_color,
-            loop_submesh_size,
-            loop_submesh_reverse,
         )

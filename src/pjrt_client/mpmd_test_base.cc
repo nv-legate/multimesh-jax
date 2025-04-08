@@ -472,39 +472,30 @@ std::vector<HloComputation*> WhileBodies(HloModule* module) {
 void RegisterNamedTestTask(
     std::string name, std::vector<int64_t> devices, std::vector<int64_t> dims,
     std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color, std::optional<int64_t> loop_submesh_size,
-    bool loop_submesh_reverse) {
+    std::vector<std::pair<std::string, std::string>> logical_axes) {
   RegisterMetadataNameMatcher(absl::StrCat("(", name, ")"), name);
   RegisterMetadataNameTask(name, std::move(devices), std::move(dims),
-                           std::move(axes), std::move(logical_axes),
-                           fusion_color, std::move(loop_submesh_size),
-                           loop_submesh_reverse);
+                           std::move(axes), std::move(logical_axes));
 }
 
 void RegisterMatcherTestTask(
     std::string matcher, std::vector<int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color, std::optional<int64_t> loop_submesh_size,
-    bool loop_submesh_reverse) {
+    std::vector<std::pair<std::string, std::string>> logical_axes) {
   RegisterMetadataNameMatcher(matcher, std::nullopt);
   RegisterMetadataNameTask(matcher, std::move(devices), std::move(dims),
-                           std::move(axes), std::move(logical_axes),
-                           fusion_color, std::move(loop_submesh_size),
-                           loop_submesh_reverse);
+                           std::move(axes), std::move(logical_axes));
 }
 
 void RegisterMatcherTestTaskWithFactory(
     std::string matcher,
     std::function<std::vector<int64_t>(const std::string& task)> device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color) {
+    std::vector<std::pair<std::string, std::string>> logical_axes) {
   RegisterMetadataNameMatcher(matcher, std::nullopt);
   RegisterMetadataNameTaskWithFactory(matcher, std::move(device_factory),
                                       std::move(dims), std::move(axes),
-                                      std::move(logical_axes), fusion_color);
+                                      std::move(logical_axes));
 }
 
 }  // namespace xla

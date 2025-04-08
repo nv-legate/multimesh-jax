@@ -99,7 +99,6 @@ struct NamedTaskContext {
   std::vector<std::string> device_axes;
   std::vector<std::pair</*logical=*/std::string, /*device=*/std::string>>
       logical_axes;
-  int64_t fusion_color{0};
   std::optional<LoopDependentSubmesh> loop_submesh{std::nullopt};
 };
 
@@ -180,7 +179,6 @@ MakeLogicalShardingContext(zuku::DeviceList devices,
           .dims = implicit_task_config.dims,
           .device_axes = implicit_task_config.device_axes,
           .logical_axes = implicit_task_config.logical_axes,
-          .fusion_color = implicit_task_config.fusion_color,
           .loop_submesh = implicit_task_config.loop_submesh,
       });
   return std::move(context);
@@ -562,8 +560,7 @@ extern "C" void RegisterMetadataNameTaskWithFactory(
     std::string matcher,
     std::function<std::vector<int64_t>(const std::string& task)> device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color) {
+    std::vector<std::pair<std::string, std::string>> logical_axes) {
   VLOG(3) << "Registering implicit task with factory " << matcher;
   if (dims.size() != axes.size()) {
     throw std::invalid_argument(
@@ -576,8 +573,7 @@ extern "C" void RegisterMetadataNameTaskWithFactory(
       .devices = std::move(device_factory),
       .dims = std::move(dims),
       .device_axes = std::move(axes),
-      .logical_axes = std::move(logical_axes),
-      .fusion_color = fusion_color};
+      .logical_axes = std::move(logical_axes)};
 }
 
 extern "C" void SetEnableMetadataNameTasks(bool flag) {
@@ -587,9 +583,11 @@ extern "C" void SetEnableMetadataNameTasks(bool flag) {
 extern "C" void RegisterMetadataNameTask(
     std::string matcher, std::vector<int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color, std::optional<int64_t> loop_submesh_size,
-    bool loop_submesh_reverse) {
+    std::vector<std::pair<std::string, std::string>> logical_axes) {
+  // TODO, add an API for this
+  std::optional<int64_t> loop_submesh_size;
+  bool loop_submesh_reverse = false;
+
   VLOG(5) << "Registering implicit task " << matcher;
 
   if (devices.empty()) {
@@ -636,7 +634,6 @@ extern "C" void RegisterMetadataNameTask(
                              .dims = std::move(dims),
                              .device_axes = std::move(axes),
                              .logical_axes = std::move(logical_axes),
-                             .fusion_color = fusion_color,
                              .loop_submesh = std::move(loop_submesh)};
 
   if (matcher == xla::kDefaultTaskMatcher) {

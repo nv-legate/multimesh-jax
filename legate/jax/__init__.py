@@ -22,8 +22,6 @@ from .lib import (
     only_fuse_loop_tasks,
     ignore_transforms,
     with_sharding_constraint,
-    host_offload_min_reuse_distance,
-    host_offload_min_size,
     tasks,
     mjit,
 )

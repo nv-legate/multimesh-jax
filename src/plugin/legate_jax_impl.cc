@@ -6,6 +6,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
+
 #include <string>
 
 #include "zuku/init.h"
@@ -26,9 +27,7 @@ extern "C" void RegisterMetadataNameMatcher(std::string matcher,
 extern "C" void RegisterMetadataNameTask(
     std::string matcher, std::vector<int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color, std::optional<int64_t> loop_submesh_size,
-    bool loop_submesh_reverse);
+    std::vector<std::pair<std::string, std::string>> logical_axes);
 
 extern "C" void SetEnableMetadataNameTasks(bool flag);
 
@@ -36,8 +35,7 @@ extern "C" void RegisterMetadataNameTaskWithFactory(
     std::string matcher,
     std::function<std::vector<int64_t>(const std::string &task)> device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color);
+    std::vector<std::pair<std::string, std::string>> logical_axes);
 
 extern "C" void EnableFastPath(bool enable);
 
@@ -74,11 +72,13 @@ bit_cast(const From &src) noexcept {
   return dst;
 }
 
-template <typename T> pybind11::bytes PackDescriptor(const T &descriptor) {
+template <typename T>
+pybind11::bytes PackDescriptor(const T &descriptor) {
   return pybind11::bytes(PackDescriptorAsString(descriptor));
 }
 
-template <typename T> pybind11::capsule EncapsulateFunction(T *fn) {
+template <typename T>
+pybind11::capsule EncapsulateFunction(T *fn) {
   return pybind11::capsule(bit_cast<void *>(fn), "xla._CUSTOM_CALL_TARGET");
 }
 
@@ -101,22 +101,17 @@ PYBIND11_MODULE(legate_jax_impl, m) {
   m.def(
       "_register_task",
       [](py::str task_regex, py::list py_devices, py::list py_device_dims,
-         py::list py_device_axes, py::list py_logical_axes,
-         int64_t fusion_color, std::optional<int64_t> loop_submesh_size,
-         bool loop_submesh_reverse) {
+         py::list py_device_axes, py::list py_logical_axes) {
         RegisterMetadataNameTask(
             task_regex.cast<std::string>(),
             py_devices.cast<std::vector<int64_t>>(),
             py_device_dims.cast<std::vector<int64_t>>(),
             py_device_axes.cast<std::vector<std::string>>(),
             py_logical_axes
-                .cast<std::vector<std::pair<std::string, std::string>>>(),
-            fusion_color, loop_submesh_size, loop_submesh_reverse);
+                .cast<std::vector<std::pair<std::string, std::string>>>());
       },
       py::arg("task_regex"), py::arg("devices"), py::arg("dims"),
-      py::arg("device_axes"), py::arg("logical_axes"),
-      py::arg("fusion_color") = 0, py::arg("loop_submesh_size") = py::none(),
-      py::arg("loop_submesh_reverse") = false);
+      py::arg("device_axes"), py::arg("logical_axes"));
   m.def(
       "_register_metadata_name",
       [](py::str matcher, std::optional<std::string> name) {
@@ -151,18 +146,16 @@ PYBIND11_MODULE(legate_jax_impl, m) {
          std::function<std::vector<int64_t>(const std::string &)>
              device_callback,
          py::list py_device_dims, py::list py_device_axes,
-         py::list py_logical_axes, int64_t fusion_color) {
+         py::list py_logical_axes) {
         RegisterMetadataNameTaskWithFactory(
             task_regex.cast<std::string>(), device_callback,
             py_device_dims.cast<std::vector<int64_t>>(),
             py_device_axes.cast<std::vector<std::string>>(),
             py_logical_axes
-                .cast<std::vector<std::pair<std::string, std::string>>>(),
-            fusion_color);
+                .cast<std::vector<std::pair<std::string, std::string>>>());
       },
       py::arg("task_regex"), py::arg("device_callback"), py::arg("dims"),
-      py::arg("device_axes"), py::arg("logical_axes"),
-      py::arg("fusion_color") = 0);
+      py::arg("device_axes"), py::arg("logical_axes"));
   m.def("clear_tasks", []() { ClearMetadataNameTasks(); });
   m.def(
       "compile_hlo_module",
@@ -204,13 +197,4 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       "enable_recomputation",
       [](bool enable) { EnableLegateRecomputation(enable); },
       py::arg("enable"));
-  m.def(
-      "set_host_offload_min_reuse_distance",
-      [](int64_t reuse_distance) {
-        SetHostOffloadMinReuseDistance(reuse_distance);
-      },
-      py::arg("reuse_distance"));
-  m.def(
-      "set_host_offload_min_size",
-      [](int64_t size) { SetHostOffloadMinSize(size); }, py::arg("size"));
 }

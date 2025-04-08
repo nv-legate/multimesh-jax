@@ -8,8 +8,8 @@
 
 #include <vector>
 
-#include "src/zuku/mesh.h"
 #include "json/json.h"
+#include "src/zuku/mesh.h"
 #include "xla/pjrt/legate/mpmd_loop.h"
 
 namespace xla {
@@ -37,9 +37,6 @@ struct LogicalShardingContext {
   // (logical,device) pairs mapping logical axis names to physical mesh names
   std::vector<std::pair</*logical=*/std::string, /*device=*/std::string>>
       logical_axes;
-  // A color for allowing fusions. If specified, only allow fusions
-  // with tasks that have the same coloring
-  int64_t fusion_color;
   std::optional<LoopDependentSubmesh> loop_submesh;
 };
 

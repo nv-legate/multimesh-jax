@@ -281,25 +281,18 @@ struct MpmdStoreMatcherConfig {
 void RegisterNamedTestTask(
     std::string name, std::vector<int64_t> devices, std::vector<int64_t> dims,
     std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color = 0,
-    std::optional<int64_t> loop_submesh_size = std::nullopt,
-    bool loop_submesh_reverse = false);
+    std::vector<std::pair<std::string, std::string>> logical_axes);
 
 void RegisterMatcherTestTask(
     std::string matcher, std::vector<int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color = 0,
-    std::optional<int64_t> loop_submesh_size = std::nullopt,
-    bool loop_submesh_reverse = false);
+    std::vector<std::pair<std::string, std::string>> logical_axes);
 
 void RegisterMatcherTestTaskWithFactory(
     std::string matcher,
     std::function<std::vector<int64_t>(const std::string& task)> device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color = 0);
+    std::vector<std::pair<std::string, std::string>> logical_axes);
 
 }  // namespace xla
 

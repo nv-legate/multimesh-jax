@@ -36,5 +36,4 @@ Compiler contexts
    enable_task_fusion
    only_fuse_loop_tasks
    ignore_transforms
-   host_offload_min_reuse_distance
 

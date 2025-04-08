@@ -145,10 +145,7 @@ extern "C" void RegisterMetadataNameMatcher(std::string matcher,
 extern "C" void RegisterMetadataNameTask(
     std::string matcher, std::vector<int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color = 0,
-    std::optional<int64_t> loop_submesh_size = std::nullopt,
-    bool loop_submesh_reverse = false);
+    std::vector<std::pair<std::string, std::string>> logical_axes);
 
 // C/Python binding for registering tasks based on metadata names.
 // Rather than use a fixed device argument,
@@ -161,8 +158,7 @@ extern "C" void RegisterMetadataNameTaskWithFactory(
     std::string matcher,
     std::function<std::vector<int64_t>(const std::string& task)> device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes,
-    int64_t fusion_color = 0);
+    std::vector<std::pair<std::string, std::string>> logical_axes);
 
 // Turn on/off whether implicit tasks should be matched and created
 extern "C" void SetEnableMetadataNameTasks(bool flag);

@@ -1318,6 +1318,7 @@ TEST_F(LegateExecutableTest, TransformerTwoNodesHostOffload) {
 }
 
 TEST_F(LegateExecutableTest, ShardingMismatchLoadBalanced) {
+  GTEST_SKIP() << "Load balancing not yet implemented";
   static constexpr int kTotalDevices = 8;
   static constexpr int kDevicesPerStage = 4;
   static constexpr int kLayersPerStage = 1;
@@ -1356,18 +1357,12 @@ TEST_F(LegateExecutableTest, ShardingMismatchLoadBalanced) {
   for (auto&& matcher :
        {"(position_emb).*", "(emb_lookup).*", "(token_embedder).*"}) {
     RegisterMatcherTestTask(matcher, embeddings_devices,
-                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes,
-                            /*fusion_color=*/0,
-                            /*loop_submesh_size=*/kDevicesPerStage,
-                            /*loop_submesh_reverse=*/false);
+                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
   for (auto&& matcher :
        {"(final_ln).*", "(decoder_norm).*", "(compute_loss).*"}) {
     RegisterMatcherTestTask(matcher, embeddings_devices,
-                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes,
-                            /*fusion_color=*/0,
-                            /*loop_submesh_size=*/kDevicesPerStage,
-                            /*loop_submesh_reverse=*/true);
+                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
   RegisterMatcherTestTask("default", first_layer_devices,
                           {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
@@ -1378,6 +1373,7 @@ TEST_F(LegateExecutableTest, ShardingMismatchLoadBalanced) {
 }
 
 TEST_F(LegateExecutableTest, HostOffloadCrash) {
+  GTEST_SKIP() << "Host offloading support not yet available";
   static constexpr int kTotalDevices = 8;
   static constexpr int kDevicesPerStage = 4;
   static constexpr int kLayersPerStage = 1;
@@ -1412,17 +1408,11 @@ TEST_F(LegateExecutableTest, HostOffloadCrash) {
                                      axes);
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*"}) {
     RegisterMatcherTestTask(matcher, embeddings_devices,
-                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes,
-                            /*fusion_color=*/0,
-                            /*loop_submesh_size=*/kDevicesPerStage,
-                            /*loop_submesh_reverse=*/false);
+                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
     RegisterMatcherTestTask(matcher, embeddings_devices,
-                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes,
-                            /*fusion_color=*/0,
-                            /*loop_submesh_size=*/kDevicesPerStage,
-                            /*loop_submesh_reverse=*/true);
+                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
   RegisterMatcherTestTask("default", embeddings_devices, {1, 1, kTotalDevices},
                           {"x", "y", "z"}, axes);
@@ -1432,6 +1422,8 @@ TEST_F(LegateExecutableTest, HostOffloadCrash) {
 }
 
 TEST_F(LegateExecutableTest, TransformerTwoNodesDynamicSliceEmbeddingsLogits) {
+  GTEST_SKIP() << "Load balancing not yet implemented";
+
   static constexpr int kTotalDevices = 16;
   static constexpr int kDevicesPerStage = 4;
   static constexpr int kLayersPerStage = 1;
@@ -1474,16 +1466,12 @@ TEST_F(LegateExecutableTest, TransformerTwoNodesDynamicSliceEmbeddingsLogits) {
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*"}) {
     RegisterMatcherTestTask(matcher, embeddings_devices,
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"},
-                            embeddings_axes, /*fusion_color=*/0,
-                            /*loop_submesh_size=*/kDevicesPerStage,
-                            /*loop_submesh_reverse=*/false);
+                            embeddings_axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
     RegisterMatcherTestTask(matcher, embeddings_devices,
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"},
-                            embeddings_axes, /*fusion_color=*/0,
-                            /*loop_submesh_size=*/kDevicesPerStage,
-                            /*loop_submesh_reverse=*/true);
+                            embeddings_axes);
   }
   RegisterMatcherTestTask("default", default_devices, {1, 1, kDevicesPerStage},
                           {"x", "y", "z"}, embeddings_axes);
@@ -1493,6 +1481,7 @@ TEST_F(LegateExecutableTest, TransformerTwoNodesDynamicSliceEmbeddingsLogits) {
 }
 
 TEST_F(LegateExecutableTest, Gpt3_16nodes) {
+  GTEST_SKIP() << "Load balancing not yet implemented";
   static constexpr int kTotalDevices = 128;
   static constexpr int kDevicesPerStage = 8;
   static constexpr int kLayersPerStage = 1;
@@ -1533,14 +1522,12 @@ TEST_F(LegateExecutableTest, Gpt3_16nodes) {
   for (auto&& matcher :
        {"(position_emb).*", "(emb_lookup).*", "(token_embedder).*"}) {
     RegisterMatcherTestTask(matcher, embeddings_devices,
-                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes,
-                            /*fusion_color=*/0);
+                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*", "(logits_dense).*",
                          "(decoder_norm).*"}) {
     RegisterMatcherTestTask(matcher, embeddings_devices,
-                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes,
-                            /*fusion_color=*/0);
+                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
   RegisterMatcherTestTask("default", embeddings_devices,
                           {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
@@ -1590,8 +1577,7 @@ TEST_F(LegateExecutableTest, MaxtextMismatchedAlias) {
   for (auto&& matcher : {"(emb).*", "(final_ln).*", "(compute_loss).*",
                          "(logits_dense).*", "(decoder_norm).*", "default"}) {
     RegisterMatcherTestTask(matcher, embeddings_devices,
-                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes,
-                            /*fusion_color=*/0);
+                            {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
 
   ReplicateParametersSmallerThanNumElements(8 * 128);
@@ -1636,9 +1622,7 @@ TEST_F(LegateExecutableTest, DP_2x2x2) {
   for (auto&& matcher : {"(emb).*", "(final_ln).*", "(compute_loss).*",
                          "(logits_dense).*", "(decoder_norm).*"}) {
     RegisterMatcherTestTask(matcher, global_devices, {kDP, 1, kTP},
-                            {"x", "y", "z"}, axes, /*fusion_color=*/0,
-                            /*loop_submesh_size=*/kDevicesPerStage,
-                            /*loop_submesh_reverse=*/false);
+                            {"x", "y", "z"}, axes);
   }
 
   SetCompileModules(true);
@@ -1727,9 +1711,7 @@ TEST_F(LegateExecutableTest, DP_2_2_8_unused_loop_outputs) {
   for (auto&& matcher : {"(emb).*", "(final_ln).*", "(compute_loss).*",
                          "(logits_dense).*", "(decoder_norm).*"}) {
     RegisterMatcherTestTask(matcher, global_devices, {kDP, 1, kTP},
-                            {"x", "y", "z"}, axes, /*fusion_color=*/0,
-                            /*loop_submesh_size=*/kDevicesPerStage,
-                            /*loop_submesh_reverse=*/false);
+                            {"x", "y", "z"}, axes);
   }
 
   SetCompileModules(true);

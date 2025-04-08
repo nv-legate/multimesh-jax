@@ -20,8 +20,6 @@ from .legate_jax_impl import (
     enable_only_fuse_loop_tasks as _enable_only_fuse_loop_tasks,
     enable_recomputation as _enable_recomputation,
     enable_task_fusion as _enable_task_fusion,
-    set_host_offload_min_reuse_distance,
-    set_host_offload_min_size,
 )
 from .no_op import no_op
 
@@ -109,8 +107,7 @@ def enable_task_fusion(enable: Optional[bool] = None, context_value=[True]):
     be allowed to fuse.
 
     Args:
-        parallelism: optional, whether only tasks inside a loop should be
-           allowed to fuse
+        enable: optional, whether to enable task fusion
         context_value: optional, a global variable holding the current
             context value. The user should never pass this value. The program
             begins in a context with ``enable`` True, which means that all
@@ -153,7 +150,7 @@ def only_fuse_loop_tasks(enable: Optional[bool] = None, context_value=[False]):
     to minimize overhead and maximize fusions.
 
     Args:
-        parallelism: optional, whether only tasks inside a loop should be
+        enable: optional, whether only tasks inside a loop should be
             allowed to fuse
         context_value: optional, a global variable holding the current context
             value. The user should never pass this value. The program begins
@@ -164,78 +161,6 @@ def only_fuse_loop_tasks(enable: Optional[bool] = None, context_value=[False]):
         enable, _enable_only_fuse_loop_tasks, context_value
     ):
         yield
-
-
-@contextmanager
-def host_offload_min_reuse_distance(
-    reuse_distance: Optional[int] = None, context_value=[0]
-):
-    """Activates host offloading of intermediates based on cutoff.
-
-    Rather than occupy scarce GPU memory, intermediates can be offloaded
-    to the host in-between tasks.  The reuse distance is the path length
-    in the task graph between uses of variables. A too-small reuse distance
-    may cause too much host-GPU traffic and hurt performance. A too-large
-    reuse distance may cause too much GPU memory to be used since fewer
-    intermediates will be offloaded.
-
-    Args:
-        reuse_distance: optional, the minimum number of intervening tasks
-          between uses of intermediates above which host offloading
-          should be considered beneficial. Higher cutoff values will
-          cause fewer intermediates to offload and may improve performance.
-          Lower cutoff values will cause more intermediates to be offloaded and
-          will reduce GPU memory usage. A value of None or 0 turns off
-          host offloading.
-
-        context_value (list, optional):
-            Global variable holding the current context value. The user
-            should never pass this value. The program begins in a context
-            with a ``reuse_distance`` of 0 and no host offloading.
-    """
-    if reuse_distance is None:
-        yield
-    else:
-        with _set_context_value(
-            reuse_distance, set_host_offload_min_reuse_distance, context_value
-        ):
-            yield
-
-
-@contextmanager
-def host_offload_min_size(
-    size: Optional[int] = None, context_value=[1024 * 1024]
-):
-    """Activates host offloading of intermediates based on cutoff.
-
-    Rather than occupy scarce GPU memory, intermediates can be offloaded
-    to the host in-between tasks.  The reuse distance is the path length
-    in the task graph between uses of variables. A too-small reuse distance
-    may cause too much host-GPU traffic and hurt performance. A too-large
-    reuse distance may cause too much GPU memory to be used since fewer
-    intermediates will be offloaded.
-
-    Args:
-        reuse_distance: optional, the minimum number of intervening tasks
-          between uses of intermediates above which host offloading
-          should be considered beneficial. Higher cutoff values will
-          cause fewer intermediates to offload and may improve performance.
-          Lower cutoff values will cause more intermediates to be offloaded and
-          will reduce GPU memory usage. A value of None or 0 turns off
-          host offloading.
-
-        context_value (list, optional):
-            Global variable holding the current context value. The user
-            should never pass this value. The program begins in a context
-            with a ``reuse_distance`` of 0 and no host offloading.
-    """
-    if size is None:
-        yield
-    else:
-        with _set_context_value(
-            size, set_host_offload_min_size, context_value
-        ):
-            yield
 
 
 @contextmanager
@@ -374,6 +299,7 @@ def optional_kwargs(**kwargs):
             subset_kwargs[key] = value
     return subset_kwargs
 
+
 @contextmanager
 def tasks(configurable: Optional[Type] = None):
     if configurable is not None:
@@ -437,8 +363,6 @@ def _context(
     _configurable=None,
     _autoshard: Optional[bool] = None,
     _enable_recomputation: Optional[bool] = None,
-    _host_offload_min_reuse_distance=None,
-    _host_offload_min_size=None,
     _only_fuse_loop_tasks=None,
     _enable_task_fusion=None,
     _enable_fast_path=None,
@@ -446,19 +370,15 @@ def _context(
 ):
     with tasks(configurable=_configurable) as A, autoshard(
         _autoshard
-    ) as D, host_offload_min_reuse_distance(
-        _host_offload_min_reuse_distance
-    ) as L, host_offload_min_size(
-        _host_offload_min_size
-    ) as E, only_fuse_loop_tasks(
+    ) as B, only_fuse_loop_tasks(
         _only_fuse_loop_tasks
-    ) as G, enable_task_fusion(
+    ) as C, enable_task_fusion(
         _enable_task_fusion
-    ) as H, enable_fast_path(
+    ) as D, enable_fast_path(
         _enable_fast_path
-    ) as J, ignore_transforms(
+    ) as E, ignore_transforms(
         _ignore_transforms
-    ) as K, enable_recomputation(
+    ) as F, enable_recomputation(
         _enable_recomputation
     ):  # noqa: F841
         yield
@@ -468,8 +388,6 @@ def _context(
 def context(
     autoshard: Optional[bool] = None,
     enable_recomputation: Optional[bool] = None,
-    host_offload_min_reuse_distance: Optional[int] = None,
-    host_offload_min_size: Optional[int] = None,
     only_fuse_loop_tasks: Optional[bool] = None,
     enable_task_fusion: Optional[bool] = None,
     enable_fast_path: Optional[bool] = None,
@@ -479,7 +397,6 @@ def context(
 
     Args:
         autoshard: optional, value to configure the :func:`.autoshard` context manager.
-        host_offload_min_reuse_distance: optional, value to configure the :func:`.host_offload_min_reuse_distance` context manager.
         only_fuse_loop_tasks: optional, value to configure the :func:`.only_fuse_loop_tasks` context manager.
         enable_task_fusion: optional, value to configure the :func:`.enable_task_fusion` context manager.
         enable_fast_path: optional, value to configure the :func:`.enable_fast_path` context manager.
@@ -488,8 +405,6 @@ def context(
     with _context(
         _autoshard=autoshard,
         _enable_recomputation=enable_recomputation,
-        _host_offload_min_reuse_distance=host_offload_min_reuse_distance,
-        _host_offload_min_size=host_offload_min_size,
         _only_fuse_loop_tasks=only_fuse_loop_tasks,
         _enable_task_fusion=enable_task_fusion,
         _enable_fast_path=enable_fast_path,
