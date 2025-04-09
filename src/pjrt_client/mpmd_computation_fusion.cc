@@ -7,163 +7,124 @@
 
 #include <algorithm>
 #include <limits>
+#include <memory>
 
+#include "xla/hlo/analysis/hlo_ordering.h"
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
+#include "xla/hlo/transforms/simplifiers/hlo_dce.h"
+#include "xla/pjrt/legate/color_dfs.h"
 #include "xla/pjrt/legate/mpmd_instruction.h"
+#include "xla/tsl/platform/errors.h"
+#include "xla/util.h"
 
 namespace xla {
 
-absl::Status MpmdComputationFusion::FuseComputations(HloComputation* parent,
-                                                     HloInstruction* producer,
-                                                     HloInstruction* consumer) {
-  absl::flat_hash_map<HloInstruction*, int64_t> operands_added;
-  absl::flat_hash_map</*consumer=*/HloInstruction*,
-                      /*producer=*/HloInstruction*>
-      producer_consumer_aliases;
-  absl::flat_hash_map<HloInstruction*, int64_t> producer_output_indices;
-  absl::flat_hash_set<HloInstruction*> producers_used_by_consumer;
-  std::vector<HloInstruction*> fused_call_operands;
-  std::vector<HloInstruction*> fused_params;
-  std::vector<HloInstruction*> fused_roots;
-  std::vector<HloInstruction*> fused_call_outputs;
+absl::Status MpmdComputationFusion::FuseComputations(
+    HloComputation *parent, absl::Span<HloInstruction *> calls) {
+  absl::flat_hash_set<HloInstruction *> produced_by_set;
+  std::vector<HloInstruction *> parameters_needed;
+  std::vector<std::pair<HloInstruction *, HloInstruction *>> roots_needed;
+  absl::flat_hash_set<HloInstruction *> calls_included{calls.begin(),
+                                                       calls.end()};
+  absl::flat_hash_map<HloInstruction *,
+                      absl::InlinedVector<HloInstruction *, 2>>
+      operands_added;
 
-  std::string color = producer->frontend_attributes().map().at("color");
-
-  HloComputation* producer_call = producer->called_computations()[0];
-  HloComputation* consumer_call = consumer->called_computations()[0];
-  HloInstruction* producer_root = producer_call->root_instruction();
-  HloInstruction* consumer_root = consumer_call->root_instruction();
-
-  int64_t producer_param_number = 0;
-  for (auto* operand : producer->mutable_operands()) {
-    fused_params.push_back(
-        producer_call->parameter_instruction(producer_param_number));
-    fused_call_operands.push_back(operand);
-    operands_added[operand] = producer_param_number;
-    ++producer_param_number;
+  VLOG(5) << "fusing " << calls.size() << " calls: " << calls.front()->name()
+          << " ... " << calls.back()->name();
+  for (HloInstruction *call : calls) {
+    VLOG(5) << "  fuse " << call->name();
   }
-
-  for (auto* user : producer->users()) {
-    producer_output_indices[user] = user->tuple_index();
-  }
-
-  int64_t consumer_param_number = 0;
-  std::vector<HloInstruction*> producer_gte_to_delete;
-  for (auto* operand : consumer->mutable_operands()) {
-    if (producer_output_indices.contains(operand)) {
-      if (operand->users().size() == 1) {  // the consumer is the only user,
-                                           // this is no longer a task output
-        VLOG(5) << operand->name() << " " << operand
-                << " is no longer needed as an output";
-        producer_gte_to_delete.push_back(operand);
+  for (HloInstruction *call : calls) {
+    HloComputation *computation = call->called_computations()[0];
+    for (int64_t param = 0; param < call->operand_count(); ++param) {
+      auto *operand = call->mutable_operand(param);
+      if (!produced_by_set.contains(operand)) {
+        if (!operands_added.contains(operand)) {
+          VLOG(5) << "operand " << operand->name() << " of " << call->name()
+                  << " is still an operand";
+          parameters_needed.push_back(operand);
+        }
+        operands_added[operand].push_back(
+            computation->parameter_instruction(param));
       }
-      const int64_t producer_index = producer_output_indices[operand];
-      VLOG(5) << "consumer " << operand->name() << " uses producer output "
-              << producer_index;
-      producer_consumer_aliases[consumer_call->parameter_instruction(
-          consumer_param_number)] =
-          producer_root->mutable_operand(producer_index);
-      producers_used_by_consumer.insert(operand);
-    } else if (operands_added.contains(operand)) {
-      // don't add this twice, we only need a single operand
-      producer_consumer_aliases[consumer_call->parameter_instruction(
-          consumer_param_number)] =
-          producer_call->parameter_instruction(operands_added[operand]);
-    } else {
-      // not shared by anyone
-      fused_params.push_back(
-          consumer_call->parameter_instruction(consumer_param_number));
-      fused_call_operands.push_back(operand);
     }
-    ++consumer_param_number;
-  }
 
-  for (auto* user : producer->users()) {
-    // if someone else besides the consumer uses the output
-    if (user->users().size() > 1 ||
-        !producers_used_by_consumer.contains(user)) {
-      fused_roots.push_back(
-          producer_root->mutable_operand(user->tuple_index()));
-      fused_call_outputs.push_back(user);
-      VLOG(5) << "producer still produces " << user->name() << " : "
-              << fused_roots.back()->name();
+    for (auto *gte : call->users()) {
+      produced_by_set.insert(gte);
+      for (auto *gte_user : gte->users()) {
+        if (!calls_included.contains(gte_user)) {
+          VLOG(5) << "output " << gte->name() << " of " << call->name()
+                  << " is still a root";
+          roots_needed.push_back(
+              {gte, computation->root_instruction()->mutable_operand(
+                        gte->tuple_index())});
+          break;
+        } else {
+          VLOG(5) << "output " << gte->name() << " of " << call->name()
+                  << " is used by " << gte_user->name();
+        }
+      }
     }
-  }
-
-  for (auto* user : consumer->users()) {
-    fused_roots.push_back(consumer_root->mutable_operand(user->tuple_index()));
-    VLOG(5) << "consumer still produces " << user->name() << " : "
-            << fused_roots.back()->name();
-    fused_call_outputs.push_back(user);
   }
 
   HloCloneContext context{parent->parent()};
-  HloComputation::Builder builder{consumer_call->name()};
+  HloComputation::Builder builder{calls[0]->called_computations()[0]->name()};
 
   int64_t fused_param_number = 0;
-  absl::flat_hash_map<HloInstruction*, HloInstruction*> clone_map;
-  for (auto* param : fused_params) {
+  absl::flat_hash_map<HloInstruction *, HloInstruction *> clone_map;
+  absl::flat_hash_map<HloInstruction *, HloInstruction *> cloned_operand_params;
+  for (auto *operand : parameters_needed) {
+    auto *param = operands_added[operand].front();
     TF_ASSIGN_OR_RETURN(
-        auto* new_param,
+        auto *new_param,
         builder.AddParameter(HloInstruction::CreateParameter(
             fused_param_number, param->shape(), param->name())));
     new_param->set_sharding(param->sharding_ptr());
     PropagateProperties(param, new_param);
-    clone_map[param] = new_param;
+    for (auto *param : operands_added[operand]) {
+      clone_map[param] = new_param;
+      VLOG(5) << operand->name() << " input maps to clone of " << param->name();
+    }
+    cloned_operand_params[operand] = new_param;
     ++fused_param_number;
   }
 
-  for (auto* instruction : producer_call->MakeInstructionPostOrder()) {
-    if (instruction->opcode() != HloOpcode::kParameter &&
-        instruction != producer_root) {
-      absl::InlinedVector<HloInstruction*, 2> cloned_operands;
-      for (auto* operand : instruction->operands()) {
-        if (!clone_map.contains(operand)) {
-          return InvalidArgumentStrCat(
-              operand->name(), " was never added to clone map when fusing ",
-              producer->name(), " and ", consumer->name());
-        }
-        cloned_operands.push_back(clone_map[operand]);
-      }
-      auto* new_instruction =
-          builder.AddInstruction(instruction->CloneWithNewOperands(
-              instruction->shape(), cloned_operands, &context));
-      clone_map[instruction] = new_instruction;
-    }
-  }
-
-  for (auto* instruction : consumer_call->MakeInstructionPostOrder()) {
-    if (instruction->opcode() != HloOpcode::kParameter &&
-        instruction != consumer_root) {
-      absl::InlinedVector<HloInstruction*, 2> cloned_operands;
-      for (auto* operand : instruction->operands()) {
-        auto* actual_operand = [&] {
-          if (producer_consumer_aliases.contains(operand)) {
-            VLOG(5) << "consumer operand " << operand->name()
-                    << " is now internal instruction";
-            return producer_consumer_aliases[operand];
+  for (auto *call : calls) {
+    HloComputation *computation = call->called_computations()[0];
+    for (auto *instruction : computation->MakeInstructionPostOrder()) {
+      if (instruction->opcode() == HloOpcode::kParameter) {
+        clone_map[instruction] = cloned_operand_params[call->mutable_operand(
+            instruction->parameter_number())];
+      } else if (instruction != computation->root_instruction()) {
+        absl::InlinedVector<HloInstruction *, 2> cloned_operands;
+        for (auto *operand : instruction->operands()) {
+          if (!clone_map.contains(operand)) {
+            return InvalidArgumentStrCat(
+                operand->name(), " was never added to clone map when fusing ");
           }
-          return operand;
-        }();
-        if (!clone_map.contains(actual_operand)) {
-          return InvalidArgumentStrCat(
-              actual_operand->name(),
-              " was never added to clone map when fusing ", producer->name(),
-              " and ", consumer->name());
+          cloned_operands.push_back(clone_map[operand]);
         }
-        cloned_operands.push_back(clone_map[actual_operand]);
+        auto *new_instruction =
+            builder.AddInstruction(instruction->CloneWithNewOperands(
+                instruction->shape(), cloned_operands, &context));
+        clone_map[instruction] = new_instruction;
       }
-      auto* new_instruction =
-          builder.AddInstruction(instruction->CloneWithNewOperands(
-              instruction->shape(), cloned_operands, &context));
-      clone_map[instruction] = new_instruction;
+    }
+    for (auto *user : call->users()) {
+      auto *original_root =
+          computation->root_instruction()->mutable_operand(user->tuple_index());
+      auto *new_root = clone_map[original_root];
+      cloned_operand_params[user] = new_root;
+      VLOG(5) << user->name() << " output maps to clone of "
+              << original_root->name();
     }
   }
 
-  std::vector<HloInstruction*> fused_root_operands;
-  for (auto* root : fused_roots) {
+  std::vector<HloInstruction *> fused_root_operands;
+  for (auto [gte, root] : roots_needed) {
     auto iter = clone_map.find(root);
     if (iter == clone_map.end()) {
       return InvalidArgumentStrCat("fused root ", root->name(),
@@ -171,46 +132,61 @@ absl::Status MpmdComputationFusion::FuseComputations(HloComputation* parent,
     }
     fused_root_operands.push_back(iter->second);
   }
-  auto* root_tuple =
+  auto *root_tuple =
       builder.AddInstruction(HloInstruction::CreateTuple(fused_root_operands));
 
-  auto* new_comp = parent->parent()->AddComputationAndUnifyNamesAndIds(
+  auto *new_comp = parent->parent()->AddComputationAndUnifyNamesAndIds(
       builder.Build(root_tuple), /*is_entry=*/false);
 
-  auto* new_call = parent->AddInstruction(HloInstruction::CreateCall(
+  std::vector<HloInstruction *> fused_call_operands;
+  for (auto *operand : parameters_needed) {
+    fused_call_operands.push_back(operand);
+  }
+  auto *new_call = parent->AddInstruction(HloInstruction::CreateCall(
       root_tuple->shape(), fused_call_operands, new_comp));
 
-  PropagateColor(producer, new_call);
+  PropagateColor(calls[0], new_call);
 
   // these need to be remapped to new get-tuple-element ops
   int64_t fused_output_tuple_index = 0;
-  for (auto* output : fused_call_outputs) {
-    auto* new_gte =
+  for (auto [gte, root] : roots_needed) {
+    auto *new_gte =
         parent->AddInstruction(HloInstruction::CreateGetTupleElement(
             new_call, fused_output_tuple_index));
-    new_gte->set_sharding(output->sharding_ptr());
-    PropagateProperties(output, new_gte);
-    VLOG(5) << "replacing old output " << output->name() << " with new output "
+    new_gte->set_sharding(gte->sharding_ptr());
+    PropagateProperties(gte, new_gte);
+    VLOG(5) << "replacing old output " << gte->name() << " with new output "
             << new_gte->name();
-    TF_RETURN_IF_ERROR(output->ReplaceAllUsesWith(new_gte));
-    TF_RETURN_IF_ERROR(parent->RemoveInstruction(output));
+    TF_RETURN_IF_ERROR(gte->ReplaceAllUsesWith(new_gte));
+    // TF_RETURN_IF_ERROR(parent->RemoveInstruction(gte));
     ++fused_output_tuple_index;
   }
 
-  TF_RETURN_IF_ERROR(parent->RemoveInstruction(consumer));
-
-  // these instructions are now internal to the fused task
-  // and are no longer needed as outputs from the producer
-  for (auto* instruction : producer_gte_to_delete) {
-    VLOG(5) << "removing unneeded output " << instruction->name();
-    TF_RETURN_IF_ERROR(parent->RemoveInstruction(instruction));
+  for (auto iter = calls.rbegin(); iter != calls.rend(); ++iter) {
+    auto *call = *iter;
+    VLOG(5) << "removing call " << call->name();
+    for (auto *user : call->users()) {
+      if (!user->users().empty()) {
+        return InternalStrCat(user->name(), " still has active user ",
+                              user->users().front()->name());
+      }
+      TF_RETURN_IF_ERROR(parent->RemoveInstruction(user));
+    }
+    auto *computation = call->called_computations()[0];
+    TF_RETURN_IF_ERROR(parent->RemoveInstruction(call));
+    TF_RETURN_IF_ERROR(
+        parent->parent()->RemoveEmbeddedComputation(computation));
   }
 
-  return parent->RemoveInstruction(producer);
+  return absl::OkStatus();
 }
 
-bool MpmdComputationFusion::FusionMatch(const HloInstruction* lhs,
-                                        const HloInstruction* rhs) {
+bool MpmdComputationFusion::FusionMatch(const HloInstruction *lhs,
+                                        const HloInstruction *rhs) {
+  if (lhs->opcode() == HloOpcode::kWhile ||
+      rhs->opcode() == HloOpcode::kWhile) {
+    return false;
+  }
   if (type_ == FusionType::kMatchingColor) {
     auto lhs_color = Color(lhs);
     auto rhs_color = Color(rhs);
@@ -220,144 +196,200 @@ bool MpmdComputationFusion::FusionMatch(const HloInstruction* lhs,
   return partition_->SameMesh(lhs, rhs);
 }
 
-absl::StatusOr<bool> MpmdComputationFusion::Visit(HloComputation* computation) {
+absl::StatusOr<bool> MpmdComputationFusion::Visit(HloComputation *computation) {
   bool changed = false;
   bool found_match = true;
+  int64_t iter = 0;
   while (found_match) {
-    // the fusion removes instructions/computations
-    // and the fused tasks might have new tasks they could fuse with
-    // for now, just do a naive N^2 loop that visits everything again
-    // if a valid fusion was found in the
-    absl::flat_hash_set<HloInstruction*> deleted;
+    VLOG(5) << "computating HLO ordering for fusion iteration";
+    DependencyHloOrdering ordering{computation->parent()};
 
-    auto fuse = [&](HloInstruction* producer, HloInstruction* consumer) {
-      VLOG(5) << producer->name() << ":"
-              << producer->called_computations()[0]->name()
-              << " has task with same color and same loop, "
-                 "will fuse with "
-              << consumer->name() << ":"
-              << consumer->called_computations()[0]->name();
-      // this producer is consumed by a single consumer, we can just fuse
-      // them together to make a single task
-      TF_RETURN_IF_ERROR(FuseComputations(computation, producer, consumer));
-      changed = true;
-      deleted.insert(producer);
-      deleted.insert(consumer);
-
-      return absl::OkStatus();
+    struct FusionSet {
+      absl::InlinedVector<HloInstruction *, 3> calls;
     };
 
-    auto postorder = computation->MakeInstructionPostOrder();
-    absl::flat_hash_map<HloInstruction*, int64_t> depths;
-    std::vector<HloInstruction*> calls;
-    for (auto* instruction : postorder) {
-      int64_t instruction_depth = -1;
-      for (auto* operand : instruction->operands()) {
-        instruction_depth = std::max(instruction_depth, depths[operand]);
-      }
-      depths[instruction] = instruction_depth + 1;
-      if (instruction->opcode() == HloOpcode::kCall) {
-        calls.push_back(instruction);
+    std::vector<std::unique_ptr<FusionSet>> sets;
+    absl::flat_hash_map<HloInstruction *, FusionSet *> fusion_sets;
+
+    auto postorder = ColorSortedPostorder(computation);
+
+    std::vector<HloInstruction *> need_to_visit;
+    absl::flat_hash_map<HloInstruction *, int64_t> postorder_index;
+    for (auto *instruction : postorder) {
+      if (instruction->opcode() == HloOpcode::kCall ||
+          instruction->opcode() == HloOpcode::kWhile) {
+        need_to_visit.push_back(instruction);
+        postorder_index[instruction] = postorder_index.size();
       }
     }
+    sets.reserve(need_to_visit.size());
 
-    // first try to fuse with consumers of this instruction
-    for (auto* instruction : calls) {
-      if (deleted.contains(instruction)) {
+    if (VLOG_IS_ON(5)) {
+      int64_t num_calls = 0;
+      for (auto *instruction : postorder) {
+        if (instruction->opcode() == HloOpcode::kCall) {
+          ++num_calls;
+          VLOG(5) << computation->name() << " has call " << instruction->name()
+                  << " with color " << Color(instruction).value_or("none");
+        }
+      }
+      VLOG(5) << computation->name() << " has a total of " << num_calls
+              << " calls starting fusion iteration";
+    }
+
+    // first try to move instructions forward
+    std::vector<std::pair<HloInstruction *, HloInstruction *>> fusion_pairs;
+    for (int l = 0; l < need_to_visit.size(); ++l) {
+      HloInstruction *lhs = need_to_visit[l];
+      if (lhs->opcode() == HloOpcode::kWhile) {
         continue;
       }
 
-      absl::InlinedVector<HloInstruction*, 4> consumers;
-      for (auto* user : instruction->users()) {
-        CHECK(user->opcode() == HloOpcode::kGetTupleElement);
-        for (auto* maybe_call : user->users()) {
-          if (maybe_call->opcode() == HloOpcode::kCall) {
-            consumers.push_back(maybe_call);
+      absl::InlinedVector<HloInstruction *, 1> self = {lhs};
+
+      auto current_fusion_set =
+          [&]() -> absl::Span<const HloInstruction *const> {
+        if (fusion_sets.contains(lhs)) {
+          // the front of the fusion set determines safety of reordering
+          // due to the DFS use
+          return fusion_sets[lhs]->calls;
+        }
+        return self;
+      }();
+
+      VLOG(5) << "trying to find fusions of " << lhs->name();
+      HloInstruction *match{nullptr};
+      for (int r = l + 1; r < need_to_visit.size(); ++r) {
+        HloInstruction *rhs = need_to_visit[r];
+        if (FusionMatch(lhs, rhs)) {
+          match = rhs;
+          break;
+        }
+        const bool can_reorder = [&]() {
+          for (auto iter = current_fusion_set.rbegin();
+               iter != current_fusion_set.rend(); ++iter) {
+            if (ordering.ExecutesBefore(*iter, rhs)) {
+              VLOG(5) << "" << (*iter)->name() << " executes before "
+                      << rhs->name() << ", stopping search for fusion of "
+                      << lhs->name();
+              return false;
+            };
           }
-        }
-      }
+          return true;
+        }();
 
-      std::stable_sort(consumers.begin(), consumers.end(),
-                       [&](HloInstruction* lhs, HloInstruction* rhs) {
-                         return depths[lhs] < depths[rhs];
-                       });
-
-      if (!consumers.empty()) {
-        auto* candidate = consumers.front();
-        int64_t min_user_depth = std::numeric_limits<int64_t>::max();
-        for (auto* user : instruction->users()) {
-          CHECK(user->opcode() == HloOpcode::kGetTupleElement);
-          for (auto* call : user->users()) {
-            if (call != candidate && call != computation->root_instruction()) {
-              VLOG(5) << "for fusing " << instruction->name() << " user "
-                      << call->name() << " of candidate " << candidate->name()
-                      << " has depth " << depths[call];
-              min_user_depth = std::min(min_user_depth, depths[call]);
-            }
-          }
-        }
-        VLOG(5) << instruction->name() << " requires depth " << min_user_depth
-                << " from consumer " << candidate->name() << " to fuse"
-                << ", actual depth=" << depths[candidate]
-                << ", fusion match=" << std::boolalpha
-                << FusionMatch(instruction, candidate)
-                << ", fusion type=" << type_;
-        if (depths[candidate] < min_user_depth &&
-            FusionMatch(instruction, candidate)) {
-          TF_RETURN_IF_ERROR(fuse(instruction, candidate));
-        }
-      }
-    }
-
-    // now fuse with any task that is later that matches, regardless of
-    // whether they share a producer/consumer relationship
-    for (int64_t lhs = 0; lhs < calls.size(); ++lhs) {
-      HloInstruction* lhs_instruction = calls[lhs];
-      if (deleted.contains(lhs_instruction)) {
-        continue;
-      }
-
-      int64_t min_user_depth = std::numeric_limits<int64_t>::max();
-      for (auto* user : lhs_instruction->users()) {
-        CHECK(user->opcode() == HloOpcode::kGetTupleElement);
-        for (auto* maybe_call : user->users()) {
-          if (maybe_call->opcode() == HloOpcode::kCall ||
-              (maybe_call->opcode() == HloOpcode::kTuple &&
-               maybe_call != computation->root_instruction())) {
-            min_user_depth = std::min(min_user_depth, depths[user]);
-          }
-        }
-      }
-
-      for (int64_t rhs = lhs + 1; rhs < calls.size(); ++rhs) {
-        HloInstruction* rhs_instruction = calls[rhs];
-        if (!deleted.contains(rhs_instruction) &&
-            depths[rhs_instruction] < min_user_depth &&
-            FusionMatch(rhs_instruction, lhs_instruction)) {
-          TF_RETURN_IF_ERROR(fuse(lhs_instruction, rhs_instruction));
+        if (!can_reorder) {
           break;
         }
       }
+      if (match) {
+        VLOG(5) << lhs->name() << " matches " << match->name()
+                << " for forward fusion";
+        if (fusion_sets.contains(match)) {
+          return InvalidArgumentStrCat(match->name(),
+                                       " was already assigned a fusion parner");
+        }
+        auto &set = fusion_sets[lhs];
+        if (set == nullptr) {
+          set = sets.emplace_back(std::make_unique<FusionSet>()).get();
+          set->calls.push_back(lhs);
+        }
+        set->calls.push_back(match);
+        fusion_sets[match] = set;
+      }
     }
-    found_match = !deleted.empty();
+
+    // now try to move instructions backward
+    for (int r = 0; r < need_to_visit.size(); ++r) {
+      HloInstruction *rhs = need_to_visit[r];
+      if (rhs->opcode() == HloOpcode::kWhile) {
+        continue;
+      }
+
+      absl::InlinedVector<HloInstruction *, 1> self = {rhs};
+
+      auto current_fusion_set =
+          [&]() -> absl::Span<const HloInstruction *const> {
+        if (fusion_sets.contains(rhs)) {
+          // the front of the fusion set determines safety of reordering
+          // due to the DFS use
+          return fusion_sets[rhs]->calls;
+        }
+        return self;
+      }();
+
+      VLOG(5) << "trying to find fusions of " << rhs->name();
+
+      HloInstruction *match{nullptr};
+      for (int l = r - 1; l >= 0; --l) {
+        HloInstruction *lhs = need_to_visit[l];
+        if (FusionMatch(lhs, rhs)) {
+          match = lhs;
+          break;
+        }
+        const bool can_reorder = [&]() {
+          for (auto iter = current_fusion_set.rbegin();
+               iter != current_fusion_set.rend(); ++iter) {
+            if (ordering.ExecutesBefore(lhs, *iter)) {
+              VLOG(5) << lhs->name() << " executes before " << (*iter)->name()
+                      << ", stopping search for fusion of " << rhs->name();
+              return false;
+            };
+          }
+          return true;
+        }();
+
+        if (!can_reorder) {
+          break;
+        }
+      }
+      if (match) {
+        VLOG(5) << match->name() << " matches " << rhs->name()
+                << " for backward fusion";
+        auto &set = fusion_sets[match];
+        if (set == nullptr) {
+          set = sets.emplace_back(std::make_unique<FusionSet>()).get();
+          set->calls.push_back(match);
+        }
+        if (!fusion_sets.contains(rhs)) {
+          set->calls.push_back(rhs);
+          fusion_sets[rhs] = set;
+        }
+      }
+    }
+
+    found_match = !fusion_sets.empty();
+    changed |= found_match;
+
+    for (auto &set : sets) {
+      // the fusion requires that these come in DFS order so that producers
+      // are guaranteed to be visited before consumers
+      std::sort(set->calls.begin(), set->calls.end(),
+                [&](HloInstruction *lhs, HloInstruction *rhs) {
+                  return postorder_index[lhs] < postorder_index[rhs];
+                });
+      TF_RETURN_IF_ERROR(FuseComputations(
+          computation, {set->calls.data(), set->calls.size()}));
+    }
+    ++iter;
   }
 
   return changed;
 }
 
 absl::StatusOr<bool> MpmdComputationFusion::Run(
-    HloModule* module,
-    const absl::flat_hash_set<absl::string_view>& execution_threads) {
+    HloModule *module,
+    const absl::flat_hash_set<absl::string_view> &execution_threads) {
   VLOG(5) << "starting fusion pass for type=" << type_
           << " only_fuse_loop=" << std::boolalpha << only_fuse_loop_tasks_
           << " on module " << module->name();
   bool changed = false;
-  std::vector<HloComputation*> to_visit = {module->entry_computation()};
+  std::vector<HloComputation *> to_visit = {module->entry_computation()};
   while (!to_visit.empty()) {
-    HloComputation* computation = to_visit.back();
+    HloComputation *computation = to_visit.back();
     to_visit.pop_back();
 
-    for (auto* instruction : computation->MakeInstructionPostOrder()) {
+    for (auto *instruction : computation->MakeInstructionPostOrder()) {
       if (instruction->opcode() == HloOpcode::kWhile) {
         to_visit.push_back(instruction->called_computations()[0]);
       }
@@ -367,6 +399,11 @@ absl::StatusOr<bool> MpmdComputationFusion::Run(
       TF_ASSIGN_OR_RETURN(bool computation_changed, Visit(computation));
       changed |= computation_changed;
     }
+  }
+
+  if (changed) {
+    HloDCE dce{};
+    TF_ASSIGN_OR_RETURN(bool deleted, dce.Run(module));
   }
 
   return changed;

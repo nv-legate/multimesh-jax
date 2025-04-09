@@ -19,89 +19,88 @@
 namespace xla {
 
 struct LoopInstructionKey {
-  const HloInstruction* instruction;
+  const HloInstruction *instruction;
   int64_t iteration;
 };
 
-bool operator==(const LoopInstructionKey& lhs, const LoopInstructionKey& rhs) {
+bool operator==(const LoopInstructionKey &lhs, const LoopInstructionKey &rhs) {
   return lhs.instruction == rhs.instruction && lhs.iteration == rhs.iteration;
 }
 
 template <typename H>
-H AbslHashValue(H h, const LoopInstructionKey& key) {
+H AbslHashValue(H h, const LoopInstructionKey &key) {
   return H::combine(std::move(h), (intptr_t)key.instruction, key.iteration);
 }
 
 struct LoopCarriedKey {
-  const HloInstruction* call;
+  const HloInstruction *call;
   int64_t tuple_index;
 };
 
-bool operator==(const LoopCarriedKey& lhs, const LoopCarriedKey& rhs) {
+bool operator==(const LoopCarriedKey &lhs, const LoopCarriedKey &rhs) {
   return lhs.call == rhs.call && lhs.tuple_index == rhs.tuple_index;
 }
 
 template <typename H>
-H AbslHashValue(H h, const LoopCarriedKey& key) {
+H AbslHashValue(H h, const LoopCarriedKey &key) {
   return H::combine(std::move(h), (intptr_t)key.call, key.tuple_index);
 }
 
-absl::Status MpmdLoopUnroll::Unroll(HloComputation* parent,
-                                    HloComputation* body,
-                                    HloInstruction* while_loop,
-                                    HloInstruction* input_tuple,
-                                    const InstructionProperties& properties,
-                                    HloPassCleanup& cleanup) {
+absl::Status MpmdLoopUnroll::Unroll(HloComputation *parent,
+                                    HloComputation *body,
+                                    HloInstruction *while_loop,
+                                    HloInstruction *input_tuple,
+                                    const InstructionProperties &properties,
+                                    HloPassCleanup &cleanup) {
   TF_ASSIGN_OR_RETURN(
       auto config,
       GetMicrobatchConfig(std::string(while_loop->name()),
                           while_loop->raw_backend_config_string()));
 
-  absl::flat_hash_map<LoopInstructionKey, HloInstruction*> clone_map;
+  absl::flat_hash_map<LoopInstructionKey, HloInstruction *> clone_map;
 
-  auto get_clone = [&](const HloInstruction* instruction,
-                       int64_t iteration) -> absl::StatusOr<HloInstruction*> {
+  auto get_clone = [&](const HloInstruction *instruction,
+                       int64_t iteration) -> absl::StatusOr<HloInstruction *> {
     auto iter = clone_map.find({instruction, iteration});
     if (iter == clone_map.end()) {
-      abort();
       return InvalidArgumentStrCat(instruction->name(), " for iteration ",
                                    iteration, " has no clone");
     }
     return iter->second;
   };
 
-  std::vector<std::vector<HloInstruction*>> tasks(config.num_iterations);
+  std::vector<std::vector<HloInstruction *>> tasks(config.num_iterations);
 
-  HloInstruction* parameter_tuple = body->parameter_instruction(0);
+  HloInstruction *parameter_tuple = body->parameter_instruction(0);
 
-  HloInstruction* prev_loop_output_tuple = input_tuple;
-  std::vector<HloInstruction*> dummy_tuples;
+  HloInstruction *prev_loop_output_tuple = input_tuple;
+  std::vector<HloInstruction *> dummy_tuples;
   for (int iter = 0; iter < config.num_iterations; ++iter) {
-    for (auto* instruction : body->MakeInstructionPostOrder()) {
+    for (auto *instruction : body->MakeInstructionPostOrder()) {
       switch (instruction->opcode()) {
         case HloOpcode::kParameter:
           break;
         case HloOpcode::kGetTupleElement: {
-          const auto& input_properties =
+          const auto &input_properties =
               properties.Get(input_tuple->operand(instruction->tuple_index()));
           if (instruction->operand(0) == parameter_tuple) {
             if (input_properties.loop_carried_index.has_value()) {
-              HloInstruction* alias = prev_loop_output_tuple->mutable_operand(
+              HloInstruction *alias = prev_loop_output_tuple->mutable_operand(
                   instruction->tuple_index());
               alias->set_metadata_scheduling_name(
                   input_tuple->operand(instruction->tuple_index())->name());
               clone_map[{instruction, iter}] = alias;
             } else {
-              HloInstruction* alias =
+              HloInstruction *alias =
                   input_tuple->mutable_operand(instruction->tuple_index());
               clone_map[{instruction, iter}] = alias;
             }
           } else {
             VLOG(5) << "cloning tuple element " << instruction->name()
                     << " of tuple " << instruction->operand(0)->name();
-            TF_ASSIGN_OR_RETURN(auto* new_operand,
+            TF_ASSIGN_OR_RETURN(auto *new_operand,
                                 get_clone(instruction->operand(0), iter));
-            HloInstruction* clone =
+            HloInstruction *clone =
                 parent->AddInstruction(HloInstruction::CreateGetTupleElement(
                     new_operand, instruction->tuple_index()));
             clone_map[{instruction, iter}] = clone;
@@ -113,15 +112,15 @@ absl::Status MpmdLoopUnroll::Unroll(HloComputation* parent,
           break;
         }
         case HloOpcode::kCall: {
-          std::vector<HloInstruction*> new_operands;
+          std::vector<HloInstruction *> new_operands;
           new_operands.reserve(instruction->operand_count());
-          for (auto* operand : instruction->operands()) {
+          for (auto *operand : instruction->operands()) {
             VLOG(5) << "cloning operand " << operand->name() << " of call "
                     << instruction->name();
-            TF_ASSIGN_OR_RETURN(auto* new_operand, get_clone(operand, iter));
+            TF_ASSIGN_OR_RETURN(auto *new_operand, get_clone(operand, iter));
             new_operands.push_back(new_operand);
           }
-          HloInstruction* clone =
+          HloInstruction *clone =
               parent->AddInstruction(HloInstruction::CreateCall(
                   instruction->shape(), new_operands, instruction->to_apply()));
           PropagateColor(instruction, clone);
@@ -135,22 +134,22 @@ absl::Status MpmdLoopUnroll::Unroll(HloComputation* parent,
                 "loop ", while_loop->name(), " has tuple instruction ",
                 instruction->name(), " that is not a root tuple");
           }
-          std::vector<HloInstruction*> new_operands;
+          std::vector<HloInstruction *> new_operands;
           new_operands.reserve(instruction->operand_count());
           for (int64_t index = 0; index < instruction->operand_count();
                ++index) {
-            auto* operand = instruction->operand(index);
+            auto *operand = instruction->operand(index);
             VLOG(5) << "cloning operand " << operand->name() << " of tuple "
                     << instruction->name();
-            TF_ASSIGN_OR_RETURN(auto* new_operand, get_clone(operand, iter));
-            const auto& operand_properties = properties.Get(operand);
+            TF_ASSIGN_OR_RETURN(auto *new_operand, get_clone(operand, iter));
+            const auto &operand_properties = properties.Get(operand);
             if (operand_properties.loop_carried_index.has_value()) {
               new_operand->set_metadata_scheduling_name(
                   input_tuple->operand(index)->name());
             }
             new_operands.push_back(new_operand);
           }
-          HloInstruction* clone =
+          HloInstruction *clone =
               parent->AddInstruction(HloInstruction::CreateTuple(new_operands));
           clone->set_sharding(instruction->sharding_ptr());
           // clone_map[{instruction,iter}] = clone;
@@ -161,7 +160,7 @@ absl::Status MpmdLoopUnroll::Unroll(HloComputation* parent,
         case HloOpcode::kCustomCall: {
           if (instruction->IsCustomCall("SliceOffset")) {
             if (!clone_map.contains({instruction, iter})) {
-              HloInstruction* clone =
+              HloInstruction *clone =
                   parent->AddInstruction(instruction->Clone());
               int offset = iter * config.microbatch_size;
               AddAttribute(clone, "offset", offset);
@@ -170,7 +169,7 @@ absl::Status MpmdLoopUnroll::Unroll(HloComputation* parent,
             break;
           } else if (instruction->IsCustomCall("DummyLoopOperation")) {
             // pass
-            HloInstruction* clone =
+            HloInstruction *clone =
                 parent->AddInstruction(instruction->Clone());
             clone_map[{instruction, iter}] = clone;
             break;
@@ -185,13 +184,13 @@ absl::Status MpmdLoopUnroll::Unroll(HloComputation* parent,
     }
   }
 
-  for (auto* user : while_loop->users()) {
+  for (auto *user : while_loop->users()) {
     TF_RETURN_IF_ERROR(user->ReplaceAllUsesWith(
         prev_loop_output_tuple->mutable_operand(user->tuple_index())));
     cleanup.RemoveInstruction(user);
   }
 
-  for (auto* tuple : dummy_tuples) {
+  for (auto *tuple : dummy_tuples) {
     cleanup.RemoveInstruction(tuple);
   }
 
@@ -210,32 +209,32 @@ absl::Status MpmdLoopUnroll::Unroll(HloComputation* parent,
 }
 
 absl::StatusOr<bool> MpmdLoopUnroll::Run(
-    HloModule* module,
-    const absl::flat_hash_set<absl::string_view>& execution_threads) {
+    HloModule *module,
+    const absl::flat_hash_set<absl::string_view> &execution_threads) {
   auto properties = InstructionProperties::Create(module);
   HloPassCleanup cleanup;
-  std::vector<HloComputation*> to_visit = {module->entry_computation()};
+  std::vector<HloComputation *> to_visit = {module->entry_computation()};
   bool changed = false;
   while (!to_visit.empty()) {
-    HloComputation* computation = to_visit.back();
+    HloComputation *computation = to_visit.back();
     to_visit.pop_back();
 
-    for (auto* instruction : computation->MakeInstructionPostOrder()) {
+    for (auto *instruction : computation->MakeInstructionPostOrder()) {
       if (instruction->opcode() == HloOpcode::kWhile &&
           instruction->has_backend_config()) {
         changed = true;
-        HloInstruction* input_tuple = instruction->mutable_operand(0);
+        HloInstruction *input_tuple = instruction->mutable_operand(0);
         // tag all the users of the loop with the scheduling name to track
         // loop-carried variables
-        for (auto* user : instruction->users()) {
-          const auto& user_properties = properties.Get(user);
+        for (auto *user : instruction->users()) {
+          const auto &user_properties = properties.Get(user);
           if (user_properties.loop_carried_index.has_value()) {
             user->set_metadata_scheduling_name(
                 input_tuple->operand(user->tuple_index())->name());
           }
         }
-        HloComputation* body = instruction->called_computations()[0];
-        HloComputation* condition = instruction->called_computations()[1];
+        HloComputation *body = instruction->called_computations()[0];
+        HloComputation *condition = instruction->called_computations()[1];
         TF_RETURN_IF_ERROR(
             Unroll(computation, instruction->called_computations()[0],
                    instruction, input_tuple, properties, cleanup));

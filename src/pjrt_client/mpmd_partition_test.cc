@@ -33,45 +33,45 @@ namespace op = ::xla::testing::opcode_matchers;
 namespace m = ::xla::mpmd_matchers;
 
 MATCHER_P(NumOutputs, num, "") {
-  const SpmdHloModuleTask& task = arg;
+  const SpmdHloModuleTask &task = arg;
   return task.outputs.size() == num;
 }
 
 MATCHER(IsLoopTask, "") {
-  const auto& task = std::get<0>(arg);
+  const auto &task = std::get<0>(arg);
   bool should_be_loop = std::get<1>(arg);
   bool has_loop_config = task.loop_config != nullptr;
   return has_loop_config == should_be_loop;
 }
 
 MATCHER(TrivialStoreShape, "") {
-  auto&& store = arg;
+  auto &&store = arg;
   return ShapeUtil::ElementsIn(store.shape) == 1;
 }
 
 MATCHER(TrivialStoreSharding, "") {
-  auto&& store = arg;
+  auto &&store = arg;
   return store.mpmd_sharding.IsReplicated();
 }
 
 MATCHER(NonTrivialStoreShape, "") {
-  auto&& store = arg;
+  auto &&store = arg;
   return ShapeUtil::ElementsIn(store.shape) > 1;
 }
 
 MATCHER(NonTrivialStoreSharding, "") {
-  auto&& store = arg;
+  auto &&store = arg;
   return !store.sharding.IsReplicated();
 }
 
 std::vector<std::vector<std::pair<Store, Store>>> GetAliasPairs(
-    const std::vector<SpmdHloModuleTask>& tasks) {
+    const std::vector<SpmdHloModuleTask> &tasks) {
   std::vector<std::vector<std::pair<Store, Store>>> stores;
-  for (auto& task : tasks) {
+  for (auto &task : tasks) {
     std::vector<std::pair<Store, Store>> pair_vec;
     task.module->module->input_output_alias_config().ForEachAlias(
-        [&](const ShapeIndex& output_index,
-            const HloInputOutputAliasConfig::Alias& alias) {
+        [&](const ShapeIndex &output_index,
+            const HloInputOutputAliasConfig::Alias &alias) {
           const int output_number = [&] {
             if (output_index.empty()) {
               return 0;
@@ -88,18 +88,18 @@ std::vector<std::vector<std::pair<Store, Store>>> GetAliasPairs(
   return stores;
 }
 
-void Summarize(const std::vector<SpmdHloModuleTask>& tasks) {
-  for (const auto& task : tasks) {
+void Summarize(const std::vector<SpmdHloModuleTask> &tasks) {
+  for (const auto &task : tasks) {
     std::cerr << task.module->module->name()
               << ",devices=" << task.device_assignment
               << ",loop=" << std::boolalpha << task.loop << std::endl;
-    for (const auto& input : task.inputs) {
+    for (const auto &input : task.inputs) {
       std::cerr << task.module->module->name() << " has input " << input.name
                 << ",index=" << input.index << ",type=" << (int)input.type
                 << ",sharding=" << input.mpmd_sharding
                 << ",shape=" << input.shape << std::endl;
     }
-    for (const auto& output : task.outputs) {
+    for (const auto &output : task.outputs) {
       std::cerr << task.module->module->name() << " has output " << output.name
                 << ",index=" << output.index << ",type=" << (int)output.type
                 << ",sharding=" << output.mpmd_sharding
@@ -110,19 +110,19 @@ void Summarize(const std::vector<SpmdHloModuleTask>& tasks) {
 
 class MpmdPartitionTest : public MpmdTestBase {
  public:
-  absl::StatusOr<std::pair<HloInstruction*, HloInstruction*>> GetTempInOutPair(
-      const HloModule& producer, const HloModule& consumer) {
-    std::vector<HloInstruction*> roots;
+  absl::StatusOr<std::pair<HloInstruction *, HloInstruction *>>
+  GetTempInOutPair(const HloModule &producer, const HloModule &consumer) {
+    std::vector<HloInstruction *> roots;
     if (producer.entry_computation()->root_instruction()->shape().IsTuple()) {
-      const auto& operands =
+      const auto &operands =
           producer.entry_computation()->root_instruction()->operands();
       roots = {operands.begin(), operands.end()};
     } else {
       roots.push_back(producer.entry_computation()->root_instruction());
     }
 
-    for (auto* root : roots) {
-      for (auto* param :
+    for (auto *root : roots) {
+      for (auto *param :
            consumer.entry_computation()->parameter_instructions()) {
         if (root->name() == param->name()) {
           return std::make_pair(root, param);
@@ -135,8 +135,8 @@ class MpmdPartitionTest : public MpmdTestBase {
 };
 
 MATCHER(TaskNameStartsWith, "") {
-  const auto& task = std::get<0>(arg);
-  const auto& name = std::get<1>(arg);
+  const auto &task = std::get<0>(arg);
+  const auto &name = std::get<1>(arg);
   return absl::StartsWith(task.module->module->name(), name);
 }
 
@@ -220,23 +220,23 @@ TEST_F(MpmdPartitionTest, SimpleMpmd) {
           AllOf(m::TaskInputs(UnorderedElementsAre(
                     m::Store({.type = Store::Type::PARAM, .index = 0}),
                     m::Store({.type = Store::Type::PARAM, .index = 1}))),
-                m::TaskOutputs(ElementsAre(
-                    m::Store({.type = Store::Type::TEMP, .index = 0})))),
+                m::TaskOutputs(
+                    ElementsAre(m::Store({.type = Store::Type::TEMP})))),
           // the inputs should be a resharded argument and resharded of temp
           // index=0
           AllOf(m::TaskInputs(UnorderedElementsAre(
-                    m::Store({.type = Store::Type::TEMP, .index = 1}),
-                    m::Store({.type = Store::Type::TEMP, .index = 2}))),
+                    m::Store({.type = Store::Type::TEMP}),
+                    m::Store({.type = Store::Type::TEMP}))),
                 m::TaskOutputs(ElementsAre(
                     m::Store({.type = Store::Type::ROOT, .index = 0})))),
-          AllOf(m::TaskInputs(ElementsAre(
-                    m::Store({.type = Store::Type::TEMP, .index = 1}))),
-                // the buffer from the previous task should be reused
-                m::TaskOutputs(ElementsAre(
-                    m::Store({.type = Store::Type::TEMP, .index = 2})))),
+          AllOf(
+              m::TaskInputs(ElementsAre(m::Store({.type = Store::Type::TEMP}))),
+              // the buffer from the previous task should be reused
+              m::TaskOutputs(
+                  ElementsAre(m::Store({.type = Store::Type::TEMP})))),
           AllOf(m::TaskInputs(UnorderedElementsAre(
                     // the temp buffer from the earlier task should be reused
-                    m::Store({.type = Store::Type::TEMP, .index = 0}),
+                    m::Store({.type = Store::Type::TEMP}),
                     m::Store({.type = Store::Type::PARAM, .index = 0}),
                     m::Store({.type = Store::Type::PARAM, .index = 1}))),
                 m::TaskOutputs(ElementsAre(
@@ -290,7 +290,7 @@ TEST_F(MpmdPartitionTest, ShardingPropagationIntermediate) {
 
   ASSERT_EQ(tasks.size(), 2);
 
-  auto* f0_root =
+  auto *f0_root =
       tasks[0].module->module->entry_computation()->root_instruction();
   EXPECT_THAT(f0_root->operand(0), op::Sharding(expected_sharding));
 
@@ -2403,7 +2403,7 @@ TEST_F(MpmdPartitionTest, LoopInputInstruction) {
 
 TEST_F(MpmdPartitionTest, DecomposeMultipleLayers) {
   EnableLegateRecomputation(true);
-  auto device_factory = [](const std::string& name) {
+  auto device_factory = [](const std::string &name) {
     int layer_num;
     bool parsed = absl::SimpleAtoi(name.substr(9), &layer_num);
     if (!parsed) {

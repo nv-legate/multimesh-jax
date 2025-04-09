@@ -43,6 +43,23 @@ bool GetEnvOption(absl::string_view name, bool deflt) {
   return deflt;
 }
 
+int GetEnvOption(absl::string_view name, int deflt) {
+  const char* env = getenv(name.data());
+  if (env) {
+    return std::atoi(env);
+  }
+  return deflt;
+}
+
+absl::string_view GetEnvOption(absl::string_view name,
+                               absl::string_view deflt) {
+  const char* env = getenv(name.data());
+  if (env) {
+    return env;
+  }
+  return deflt;
+}
+
 bool IsReplicatedOrNotSharded(const HloInstruction* instruction) {
   return !instruction->has_sharding() || instruction->sharding().IsReplicated();
 }

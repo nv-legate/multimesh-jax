@@ -10,6 +10,7 @@
 #include "xla/hlo/utils/hlo_matchers.h"
 #include "xla/pjrt/legate/hlo_partition.h"
 #include "xla/pjrt/legate/mpmd_coloring.h"
+#include "xla/pjrt/legate/mpmd_computation_fusion.h"
 #include "xla/pjrt/legate/mpmd_computation_inliner.h"
 #include "xla/pjrt/legate/mpmd_test_base.h"
 
@@ -260,7 +261,7 @@ TEST_F(MpmdComputationGrouperTest, NestedWhileColoring) {
   EXPECT_THAT(module->entry_computation()->instructions(),
               Each(AnyOf(m::TrivialOp(), op::Call(), op::While())));
 
-  auto* while_instruction =
+  auto *while_instruction =
       module->entry_computation()->GetInstructionWithName("while.109");
   ASSERT_NE(while_instruction, nullptr);
 
@@ -303,8 +304,8 @@ TEST_F(MpmdComputationGrouperTest, SplitOptBarrier) {
   TF_ASSERT_OK_AND_ASSIGN(auto module, GetHloModuleFromText(kSplitOptBarrierHlo,
                                                             /*num_devices=*/2));
 
-  for (auto* computation : module->computations()) {
-    for (auto* instruction : computation->instructions()) {
+  for (auto *computation : module->computations()) {
+    for (auto *instruction : computation->instructions()) {
       instruction->set_metadata_op_name(std::string(instruction->name()));
     }
   }
@@ -360,6 +361,10 @@ TEST_F(MpmdComputationGrouperTest, MoveAsLateAsPossible) {
   MpmdComputationGrouper grouper{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, grouper.Run(module.get()));
 
+  MpmdComputationFusion fusion{partition_.get(),
+                               MpmdComputationFusion::kMatchingColor, false};
+  TF_ASSERT_OK_AND_ASSIGN(changed, fusion.Run(module.get()));
+
   // the iota should have been moved later to co-locate
   // with its later users
   EXPECT_THAT(m::CalledComputationInstructions(module.get()),
@@ -372,14 +377,18 @@ TEST_F(MpmdComputationGrouperTest, MoveAsLateAsPossible24Layers) {
       auto module, GetHloModuleFromPath("move_to_users_grouping_24layers.txt",
                                         /*num_devices=*/16));
 
-  for (auto* computation : module->computations()) {
-    for (auto* instruction : computation->instructions()) {
+  for (auto *computation : module->computations()) {
+    for (auto *instruction : computation->instructions()) {
       instruction->set_metadata_op_name(std::string(instruction->name()));
     }
   }
 
   MpmdComputationGrouper grouper{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, grouper.Run(module.get()));
+
+  MpmdComputationFusion fusion{partition_.get(),
+                               MpmdComputationFusion::kMatchingColor, false};
+  TF_ASSERT_OK_AND_ASSIGN(changed, fusion.Run(module.get()));
 
   ShapeProto proto;
   proto.set_element_type(PrimitiveType::F32);

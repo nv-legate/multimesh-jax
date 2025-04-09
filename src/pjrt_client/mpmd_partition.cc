@@ -79,6 +79,8 @@ constexpr absl::string_view kArgumentRecomputeEnv =
     "LEGATE_XLA_ARGUMENT_RECOMPUTE";
 constexpr absl::string_view kCutSizeMinimizeEnv =
     "LEGATE_XLA_MINIMIZE_CUT_SIZE";
+constexpr absl::string_view kColorPropagationPriorityEnv =
+    "LEGATE_XLA_COLOR_PROPAGATION_PRIORITY";
 
 absl::StatusOr<HloSharding> ToMpmdSharding(
     const Shape& shape, const HloSharding& iota_sharding,
@@ -783,6 +785,10 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
   const bool remove_hoisted_reduces = GetEnvOption(
       kRemoveHoistedReduce, /*deflt=*/config.remove_hoisted_reduces);
 
+  const MpmdColoring::ColorPropagationPriority color_propagation_priority =
+      MpmdColoring::GetColorPropagationPriorityFromString(GetEnvOption(
+          kColorPropagationPriorityEnv, absl::string_view("WEIGHT")));
+
   std::vector<int64_t> devices = {
       options.executable_build_options.device_assignment().begin(),
       options.executable_build_options.device_assignment().end()};
@@ -805,7 +811,7 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
   if (loop_increment_color) {
     mpmd_pipeline.AddPass<MpmdSimpleLoopIncrementColoring>(&partition);
   }
-  mpmd_pipeline.AddPass<MpmdColoring>(&partition);
+  mpmd_pipeline.AddPass<MpmdColoring>(&partition, color_propagation_priority);
   mpmd_pipeline.AddPass<MpmdConstantOutputCopy>(&partition);
   mpmd_pipeline.AddPass<MpmdUnusedLoopOutputRemover>(&partition);
   mpmd_pipeline.AddPass<MpmdConcatenateGrouper>(&partition);

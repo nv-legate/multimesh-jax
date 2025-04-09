@@ -23,9 +23,23 @@ namespace xla {
 // Partitions (colors) are assigned to instructions as a frontend attribute.
 class MpmdColoring : public HloModulePass {
  public:
+  enum class ColorPropagationPriority {
+    kWeight,
+    kDepth,
+    kTopological,
+  };
+
+  static ColorPropagationPriority GetColorPropagationPriorityFromString(
+      absl::string_view priority_str);
+
   // The `partition` object containing the mapping from partition color
   // to the assigned submesh.
-  explicit MpmdColoring(HloPartition* partition) : partition_(partition) {}
+  explicit MpmdColoring(HloPartition* partition,
+                        ColorPropagationPriority color_propagation_priority =
+                            ColorPropagationPriority::kWeight)
+      : partition_(partition),
+        color_propagation_priority_(color_propagation_priority) {}
+
 
   absl::StatusOr<bool> Run(
       HloModule* module,
@@ -61,7 +75,10 @@ class MpmdColoring : public HloModulePass {
   bool PropagateFromUsersAndOperands(
       HloInstruction* instruction, const InstructionProperties& properties,
       FilterVisitFn if_visit,
-      const absl::flat_hash_map<const HloInstruction*, int64_t>& depth);
+      const absl::flat_hash_map<const HloInstruction*, int64_t>& depth,
+      const absl::flat_hash_map<const HloInstruction*, int64_t>&
+          topological_index);
+
 
   // For a given `computation` and global module `properties`, compute
   // a partition color for the isntruction if it has been directly
@@ -88,6 +105,7 @@ class MpmdColoring : public HloModulePass {
       HloInstruction* instruction, const InstructionProperties& properties);
 
   HloPartition* partition_;
+  ColorPropagationPriority color_propagation_priority_;
 };
 
 }  // namespace xla

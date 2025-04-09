@@ -1,8 +1,3 @@
-/* clang-format off
- * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
- */
-
 #include "xla/pjrt/legate/mpmd_coloring.h"
 
 #include <optional>
@@ -303,13 +298,31 @@ absl::Status MpmdColoring::ComputeAssignedColors(
 bool MpmdColoring::PropagateFromUsersAndOperands(
     HloInstruction* instruction, const InstructionProperties& properties,
     FilterVisitFn if_visit,
-    const absl::flat_hash_map<const HloInstruction*, int64_t>& depth) {
+    const absl::flat_hash_map<const HloInstruction*, int64_t>& depth,
+    const absl::flat_hash_map<const HloInstruction*, int64_t>&
+        topological_index) {
   absl::flat_hash_map<std::string, int64_t>
       color_weights;  // reuse to avoid re-allocating memory
+  absl::flat_hash_map<std::string, int64_t>
+      color_depths;  // reuse to avoid re-allocating memory
+  absl::flat_hash_map<std::string, int64_t>
+      color_topological_indices;  // reuse to avoid re-allocating memory
   auto color = Color(instruction);
   std::optional<std::string> max_operand_color;
+  // Max is a misnomer here for depth and topological index,
+  // it actually refers to the fact that the color has the highest
+  // score.
   int64_t max_color_weight = 0;
-  int64_t max_color_depth = 0;
+  int64_t max_color_depth = std::numeric_limits<int64_t>::max();
+  int64_t max_color_topological_index = std::numeric_limits<int64_t>::max();
+
+  // Needed to get value_or to work with const HloInstruction*
+  const HloInstruction* const_instruction = instruction;
+  const int64_t instruction_depth =
+      value_or(depth, const_instruction, std::numeric_limits<int64_t>::max());
+  const int64_t instruction_topo_index =
+      value_or(topological_index, const_instruction,
+               std::numeric_limits<int64_t>::max());
 
   auto add_user_or_operand = [&](const HloInstruction* i) {
     if (if_visit(i)) {
@@ -322,18 +335,60 @@ bool MpmdColoring::PropagateFromUsersAndOperands(
       if (color.has_value()) {
         const int64_t weight =
             ShapeUtil::ByteSizeOf(i->shape(), /*pointer_size=*/sizeof(void*));
-        const int64_t i_depth = value_or(depth, i, int64_t(0));
+        const int64_t i_depth =
+            value_or(depth, i, std::numeric_limits<int64_t>::max());
+        const int64_t i_topo_index =
+            value_or(topological_index, i, std::numeric_limits<int64_t>::max());
         VLOG(5) << instruction->name() << " has operand " << i->name()
                 << " with color=" << *color << " has weight=" << weight
-                << ",depth=" << i_depth;
-        color_weights[*color] += weight;
-        if (!max_operand_color.has_value() ||
-            color_weights[*color] > max_color_weight ||
-            color_weights[*color] == max_color_weight &&
-                i_depth > max_color_depth) {
+                << ",depth=" << i_depth << ",topo_index=" << i_topo_index;
+        color_weights[*color] =
+            value_or(color_weights, *color, int64_t(0)) + weight;
+        color_depths[*color] = std::min(
+            value_or(color_depths, *color, std::numeric_limits<int64_t>::max()),
+            std::abs(i_depth - instruction_depth));
+        color_topological_indices[*color] =
+            std::min(value_or(color_topological_indices, *color,
+                              std::numeric_limits<int64_t>::max()),
+                     std::abs(i_topo_index - instruction_topo_index));
+        bool update_max_color = false;
+        switch (color_propagation_priority_) {
+          case ColorPropagationPriority::kWeight:
+            // Check weight, then depth, then topological index
+            update_max_color = !max_operand_color.has_value() ||
+                               color_weights[*color] > max_color_weight ||
+                               (color_weights[*color] == max_color_weight &&
+                                (color_depths[*color] < max_color_depth ||
+                                 (color_depths[*color] == max_color_depth &&
+                                  color_topological_indices[*color] <
+                                      max_color_topological_index)));
+            break;
+          case ColorPropagationPriority::kDepth:
+            // Check depth, then weight, then topological index
+            update_max_color = !max_operand_color.has_value() ||
+                               color_depths[*color] < max_color_depth ||
+                               (color_depths[*color] == max_color_depth &&
+                                (color_weights[*color] > max_color_weight ||
+                                 (color_weights[*color] == max_color_weight &&
+                                  color_topological_indices[*color] <
+                                      max_color_topological_index)));
+            break;
+          case ColorPropagationPriority::kTopological:
+            // Check topological index ONLY since it is well ordered.
+            update_max_color =
+                !max_operand_color.has_value() ||
+                color_topological_indices[*color] < max_color_topological_index;
+            break;
+          default:
+            throw std::invalid_argument(
+                "Unknown color propagation priority! It should never be "
+                "possible to reach this point.");
+        }
+        if (update_max_color) {
           max_operand_color = color;
-          max_color_weight = weight;
-          max_color_depth = i_depth;
+          max_color_weight = color_weights[*color];
+          max_color_depth = color_depths[*color];
+          max_color_topological_index = color_topological_indices[*color];
         }
       }
     }
@@ -363,16 +418,54 @@ bool MpmdColoring::PropagateFromUsersAndOperands(
   return false;
 }
 
+MpmdColoring::ColorPropagationPriority
+MpmdColoring::GetColorPropagationPriorityFromString(
+    absl::string_view priority_str) {
+  if (priority_str == "WEIGHT") {
+    VLOG(5) << "using weight priority for color propagation.";
+    return MpmdColoring::ColorPropagationPriority::kWeight;
+  } else if (priority_str == "DEPTH") {
+    VLOG(5) << "using depth priority for color propagation.";
+    return MpmdColoring::ColorPropagationPriority::kDepth;
+  } else if (priority_str == "TOPOLOGICAL") {
+    VLOG(5) << "using topological priority for color propagation.";
+    return MpmdColoring::ColorPropagationPriority::kTopological;
+  } else {
+    VLOG(5) << "invalid priority string, using weight priority for color "
+               "propagation.";
+    return MpmdColoring::ColorPropagationPriority::kWeight;
+  }
+}
+
+static absl::flat_hash_map<const HloInstruction*, int64_t> ComputeDepthMap(
+    const HloComputation* computation) {
+  absl::flat_hash_map<const HloInstruction*, int64_t> depth;
+  for (auto* instruction : computation->MakeInstructionPostOrder()) {
+    depth[instruction] = 0;
+    for (auto* operand : instruction->operands()) {
+      depth[instruction] = std::max(depth[instruction], depth[operand] + 1);
+    }
+  }
+  return depth;
+}
+
+static absl::flat_hash_map<const HloInstruction*, int64_t>
+CreateTopologicalIndexMap(const HloComputation* computation) {
+  absl::flat_hash_map<const HloInstruction*, int64_t> instruction_to_topo_index;
+  const std::vector<HloInstruction*> topological_order =
+      computation->MakeInstructionPostOrder();
+  for (int64_t i = 0; i < topological_order.size(); ++i) {
+    instruction_to_topo_index[topological_order[i]] = i;
+  }
+  return instruction_to_topo_index;
+}
+
 absl::StatusOr<bool> MpmdColoring::PropagateIf(
     HloComputation* computation, const InstructionProperties& properties,
     FilterVisitFn if_visit, bool microbatch_loop) {
   auto postorder = computation->MakeInstructionPostOrder();
-  absl::flat_hash_map<const HloInstruction*, int64_t> depth;
-  for (auto* instruction : postorder) {
-    for (auto* operand : instruction->operands()) {
-      depth[instruction] = std::max(depth[instruction], depth[operand]);
-    }
-  }
+  auto depth = ComputeDepthMap(computation);
+  auto topological_index = CreateTopologicalIndexMap(computation);
 
   bool propagated = true;
   bool changed = false;
@@ -390,8 +483,8 @@ absl::StatusOr<bool> MpmdColoring::PropagateIf(
       if (if_visit(instruction) && !IsAssignedColor(instruction)) {
         VLOG(5) << "visiting " << instruction->name()
                 << " in color propagation from operands/users";
-        propagated |= PropagateFromUsersAndOperands(instruction, properties,
-                                                    if_visit, depth);
+        propagated |= PropagateFromUsersAndOperands(
+            instruction, properties, if_visit, depth, topological_index);
       }
       if (instruction->opcode() == HloOpcode::kWhile) {
         TF_ASSIGN_OR_RETURN(

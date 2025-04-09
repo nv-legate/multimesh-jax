@@ -42,6 +42,9 @@ class HloPassCleanup {
 };
 
 bool GetEnvOption(absl::string_view name, bool deflt);
+int GetEnvOption(absl::string_view name, int deflt);
+absl::string_view GetEnvOption(absl::string_view name, absl::string_view deflt);
+
 HloInstruction* GetTupleElement(HloInstruction* tuple, int64_t index);
 HloInstruction* GetTupleOrComputationAlias(HloInstruction* instruction);
 HloInstruction* GetComputationRootTuplePartner(HloInstruction* gte,

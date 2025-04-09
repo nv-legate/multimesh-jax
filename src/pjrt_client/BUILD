@@ -344,6 +344,7 @@ cc_library(
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass_pipeline",
         "//xla/service:hlo_pass_pipeline",
+        ":color_dfs",
         ":mpmd_instruction",
         ":hlo_partition",
     ],
@@ -362,6 +363,7 @@ cc_library(
         "//xla/service:hlo_pass_pipeline",
         ":mpmd_instruction",
         ":hlo_partition",
+        ":color_dfs",
     ],
 )
 
@@ -555,6 +557,18 @@ cc_library(
 )
 
 cc_library(
+    name = "color_dfs",
+    hdrs = ["color_dfs.h"],
+    srcs = ["color_dfs.cc"],
+    deps = [
+        "@com_google_absl//absl/base:core_headers",
+        "@tsl//tsl/platform:status",
+        "//xla/hlo/ir:hlo",
+        ":mpmd_instruction",
+    ],
+)
+
+cc_library(
     name = "mpmd_utils",
     hdrs = ["mpmd_utils.h"],
     srcs = ["mpmd_utils.cc"],
@@ -563,7 +577,7 @@ cc_library(
         "@tsl//tsl/platform:status",
         "//xla/hlo/ir:hlo",
         "@zuku",
-        ":json_utils"
+        ":json_utils",
     ],
     alwayslink = True,
 )

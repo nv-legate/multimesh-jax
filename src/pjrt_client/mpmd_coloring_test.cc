@@ -268,9 +268,11 @@ TEST_F(MpmdColoringTest, FavorMostRecentOperands) {
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
 
+  std::cerr << "module: " << module->ToString() << std::endl;
+
   // the root should be colored based on the most recent operand
   EXPECT_THAT(module->entry_computation()->instructions(),
-              Contains(AllOf(op::Add(), m::Color("task_g"))).Times(2));
+              Contains(AllOf(op::Add(), m::Color("task_g"))).Times(3));
 }
 
 constexpr absl::string_view kMpmdTaskHlo = R"(
@@ -400,6 +402,108 @@ TEST_F(MpmdColoringTest, TaskWithSplitBarrierHlo) {
                          AllOf(op::Exp(), Not(m::HasColor()))))),
           Contains(op::OptimizationBarrier()).Times(2),
           Contains(AllOf(op::OptimizationBarrier(), m::HasColor())).Times(1)));
+}
+
+constexpr absl::string_view kTaskWithMultiplePropagationChoicesUsers = R"(
+ENTRY main {
+  Arg_0.1 = f32[4,4]{1,0} parameter(0)
+  Arg_1.2 = f32[4,4]{1,0} parameter(1)
+  add.10 = f32[4,4]{1,0} add(Arg_0.1, Arg_0.1)
+  multiply.11 = f32[4,4]{1,0} multiply(Arg_1.2, add.10), frontend_attributes={color="task_f"}
+  multiply.12 = f32[4,4]{1,0} multiply(add.10, multiply.11), frontend_attributes={color="task_g"}
+  multiply.13 = f32[4,4]{1,0} multiply(add.10, multiply.12), frontend_attributes={color="task_g"}
+  ROOT tuple.97 = (f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(multiply.12, multiply.13)
+} // main
+)";
+
+TEST_F(MpmdColoringTest, UsersWeightPriorityColoring) {
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto module,
+      GetHloModuleFromText(kTaskWithMultiplePropagationChoicesUsers,
+                           /*num_devices=*/2));
+  MpmdColoring coloring{partition_.get(),
+                        MpmdColoring::ColorPropagationPriority::kWeight};
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
+
+  EXPECT_THAT(m::FlatInstructions(module.get()),
+              Contains(AllOf(op::Add(), m::Color("task_g"))).Times(1));
+}
+
+TEST_F(MpmdColoringTest, UsersDepthPriorityColoring) {
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto module,
+      GetHloModuleFromText(kTaskWithMultiplePropagationChoicesUsers,
+                           /*num_devices=*/2));
+  MpmdColoring coloring{partition_.get(),
+                        MpmdColoring::ColorPropagationPriority::kDepth};
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
+
+  EXPECT_THAT(m::FlatInstructions(module.get()),
+              Contains(AllOf(op::Add(), m::Color("task_f"))).Times(1));
+}
+
+TEST_F(MpmdColoringTest, UsersTopologicalPriorityColoring) {
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto module,
+      GetHloModuleFromText(kTaskWithMultiplePropagationChoicesUsers,
+                           /*num_devices=*/2));
+  MpmdColoring coloring{partition_.get(),
+                        MpmdColoring::ColorPropagationPriority::kTopological};
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
+
+  EXPECT_THAT(m::FlatInstructions(module.get()),
+              Contains(AllOf(op::Add(), m::Color("task_f"))).Times(1));
+}
+
+constexpr absl::string_view kTaskWithMultiplePropagationChoicesOperands = R"(
+ENTRY main {
+  Arg_0.1 = f32[4,4]{1,0} parameter(0)
+  Arg_1.2 = f32[4,4]{1,0} parameter(1)
+  add.10 = f32[4,4]{1,0} add(Arg_0.1, Arg_0.1), frontend_attributes={color="task_f"}
+  add.11 = f32[4,4]{1,0} add(Arg_1.2, add.10)
+  add.12 = f32[4,4]{1,0} add(add.10, add.11), frontend_attributes={color="task_g"}
+  multiply.13 = f32[4,4]{1,0} multiply(add.10, add.12)
+  ROOT tuple.97 = (f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(add.12, multiply.13)
+} // main
+)";
+
+TEST_F(MpmdColoringTest, OperandsEqualWeightPriorityColoringPreferCloser) {
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto module,
+      GetHloModuleFromText(kTaskWithMultiplePropagationChoicesOperands,
+                           /*num_devices=*/2));
+  MpmdColoring coloring{partition_.get(),
+                        MpmdColoring::ColorPropagationPriority::kWeight};
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
+
+  EXPECT_THAT(m::FlatInstructions(module.get()),
+              Contains(AllOf(op::Multiply(), m::Color("task_g"))).Times(1));
+}
+
+constexpr absl::string_view kTaskWithMultiplePropagationChoicesMixed = R"(
+ENTRY main {
+  Arg_0.1 = f32[4,4]{1,0} parameter(0)
+  Arg_1.2 = f32[4,4]{1,0} parameter(1)
+  add.10 = f32[4,4]{1,0} add(Arg_0.1, Arg_0.1), frontend_attributes={color="task_f"}
+  add.11 = f32[4,4]{1,0} add(Arg_1.2, add.10), frontend_attributes={color="task_h"}
+  multiply.11 = f32[4,4]{1,0} multiply(add.11, add.10)
+  add.12 = f32[4,4]{1,0} add(add.10, multiply.11), frontend_attributes={color="task_g"}
+  add.13 = f32[4,4]{1,0} add(multiply.11, add.12), frontend_attributes={color="task_f"}
+  ROOT tuple.97 = (f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(add.12, add.13)
+} // main
+)";
+
+TEST_F(MpmdColoringTest, MixedDepthPriorityColoringPreferOperands) {
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto module,
+      GetHloModuleFromText(kTaskWithMultiplePropagationChoicesMixed,
+                           /*num_devices=*/2));
+  MpmdColoring coloring{partition_.get(),
+                        MpmdColoring::ColorPropagationPriority::kDepth};
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
+
+  EXPECT_THAT(m::FlatInstructions(module.get()),
+              Contains(AllOf(op::Multiply(), m::Color("task_h"))).Times(1));
 }
 
 }  // namespace

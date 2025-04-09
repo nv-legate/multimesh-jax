@@ -28,15 +28,15 @@ class MpmdComputationFusion : public HloModulePass {
   // or to fuse any partition colos on the ame devices.
   // To increase parallelism or decrease temp buffe required,
   // `only_fuse_loop_tasks` can be set to true.
-  explicit MpmdComputationFusion(HloPartition* partition, FusionType type,
+  explicit MpmdComputationFusion(HloPartition *partition, FusionType type,
                                  bool only_fuse_loop_tasks)
       : partition_(partition),
         type_(type),
         only_fuse_loop_tasks_(only_fuse_loop_tasks) {}
 
   absl::StatusOr<bool> Run(
-      HloModule* module,
-      const absl::flat_hash_set<absl::string_view>& execution_threads) override;
+      HloModule *module,
+      const absl::flat_hash_set<absl::string_view> &execution_threads) override;
 
   ~MpmdComputationFusion() override = default;
 
@@ -49,18 +49,18 @@ class MpmdComputationFusion : public HloModulePass {
   // Recursively visit all instructions in the given `computation` and
   // fuse any matching computations. Returns true if any fusions occurred
   // in this computation or any subcomputations.
-  absl::StatusOr<bool> Visit(HloComputation* computation);
+  absl::StatusOr<bool> Visit(HloComputation *computation);
 
   // Returns true the if `lhs` and `rhs` match according to the
   // given FusionType for the HLO pass and can be fused.
-  bool FusionMatch(const HloInstruction* lhs, const HloInstruction* rhs);
+  bool FusionMatch(const HloInstruction *lhs, const HloInstruction *rhs);
 
   // Fuse the computations from the `producer` and `consumer`
   // call instruction inside the `parent` computation.
-  absl::Status FuseComputations(HloComputation* parent,
-                                HloInstruction* producer,
-                                HloInstruction* consumer);
-  HloPartition* partition_;
+  absl::Status FuseComputations(HloComputation *parent,
+                                absl::Span<HloInstruction *> calls);
+
+  HloPartition *partition_;
   FusionType type_;
   bool only_fuse_loop_tasks_;
 };
