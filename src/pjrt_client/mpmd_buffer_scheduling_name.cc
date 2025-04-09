@@ -63,8 +63,8 @@ class BufferPool {
 
 class BufferAllocator {
  public:
-  void FreeAtTime(const zuku::ShardedShape& shape, int64_t time,
-                  std::string name) {
+  void FreeAtTime(int64_t time, std::string name) {
+    const auto& shape = shapes_[name];
     VLOG(5) << "free " << name << " at t=" << time << ", shape=" << shape;
     pools_[shape].FreeAtTime(time, std::move(name));
   }
@@ -75,14 +75,19 @@ class BufferAllocator {
             << ", shape=" << shape;
     auto& pool = pools_[shape];
     auto buffer = pool.AllocateAtTime(time, shape);
-    if (buffer.has_value()) {
-      return *std::move(buffer);
-    }
-    return std::string(instruction->name());
+    std::string name = [&] {
+      if (buffer.has_value()) {
+        return *std::move(buffer);
+      }
+      return std::string(instruction->name());
+    }();
+    shapes_[name] = shape;
+    return name;
   }
 
  private:
   absl::flat_hash_map<zuku::ShardedShape, BufferPool> pools_;
+  absl::flat_hash_map<std::string, zuku::ShardedShape> shapes_;
 };
 
 absl::StatusOr<bool> MpmdAssignBufferSchedulingName::Run(
@@ -100,8 +105,8 @@ absl::StatusOr<bool> MpmdAssignBufferSchedulingName::Run(
 
   HloSharding replicated = HloSharding::Replicate();
 
-  auto free_operand = [&](int64_t time_done, HloInstruction* operand,
-                          const zuku::DeviceList& devices) -> absl::Status {
+  auto free_operand = [&](int64_t time_done,
+                          HloInstruction* operand) -> absl::Status {
     if (operand->IsCustomCall("SliceOffset")) {
       return absl::OkStatus();
     }
@@ -113,12 +118,7 @@ absl::StatusOr<bool> MpmdAssignBufferSchedulingName::Run(
       }
       const int64_t num_visits = ++times_visited[operand];
       if (num_visits == operand->user_count()) {
-        TF_ASSIGN_OR_RETURN(
-            zuku::ShardedShape operand_shape,
-            XlaShapeToLegateShape(operand->shape(), devices,
-                                  operand->sharding_or_default(replicated)));
-        allocator.FreeAtTime(operand_shape, time_done,
-                             operand->metadata().scheduling_name());
+        allocator.FreeAtTime(time_done, operand->metadata().scheduling_name());
       }
     }
     return absl::OkStatus();
@@ -188,7 +188,7 @@ absl::StatusOr<bool> MpmdAssignBufferSchedulingName::Run(
       for (auto* operand : instruction->operands()) {
         // only free the operand if it is not an output of the call
         if (!output_names.contains(operand->metadata().scheduling_name())) {
-          TF_RETURN_IF_ERROR(free_operand(time_done, operand, devices));
+          TF_RETURN_IF_ERROR(free_operand(time_done, operand));
         }
       }
 
@@ -217,8 +217,7 @@ absl::StatusOr<bool> MpmdAssignBufferSchedulingName::Run(
               "instruction ", operand->name(),
               " was not assigned a color prior to buffer assignment");
         }
-        auto operand_devices = partition_->DevicesForColor(*operand_color);
-        TF_RETURN_IF_ERROR(free_operand(time_done, operand, operand_devices));
+        TF_RETURN_IF_ERROR(free_operand(time_done, operand));
       }
       times_available[instruction] = time_done;
     }

@@ -38,10 +38,10 @@ function(find_or_configure_xla)
        "${PROJECT_SOURCE_DIR}/src/pjrt_client/*.h"
        "${PROJECT_SOURCE_DIR}/src/pjrt_client/BUILD")
 
-  set(xla_symlink_files)
 
   file(MAKE_DIRECTORY ${xla_SOURCE_DIR}/xla/pjrt/legate RESULT result)
 
+  set(xla_symlink_files)
   foreach(PATH ${xla_source_files})
     get_filename_component(FILE_NAME ${PATH} NAME)
     list(APPEND xla_symlink_files "${xla_SOURCE_DIR}/xla/pjrt/legate/${FILE_NAME}")
@@ -145,7 +145,6 @@ function(find_or_configure_xla)
 
  add_custom_command(
      OUTPUT  ${LIB_FOLDER}/${xla_client_library_name}
-     POST_BUILD
      DEPENDS ${xla_client_library}
      COMMAND ${CMAKE_COMMAND} -E copy ${xla_client_library} ${LIB_FOLDER}
      VERBATIM
@@ -153,11 +152,22 @@ function(find_or_configure_xla)
 
  add_custom_command(
      OUTPUT  ${LIB_FOLDER}/${xla_compiler_library_name}
-     POST_BUILD
      DEPENDS ${xla_compiler_library}
      COMMAND ${CMAKE_COMMAND} -E copy ${xla_compiler_library} ${LIB_FOLDER}/libxla_compiler_plugin.so
      VERBATIM
  )
+
+  file(GLOB xla_source_files
+       "${PROJECT_SOURCE_DIR}/src/pjrt_client/*.cc"
+       "${PROJECT_SOURCE_DIR}/src/pjrt_client/*.h"
+       "${PROJECT_SOURCE_DIR}/src/pjrt_client/BUILD")
+
+
+  set(xla_symlink_files)
+  foreach(PATH ${xla_source_files})
+    get_filename_component(FILE_NAME ${PATH} NAME)
+    list(APPEND xla_symlink_files "${xla_SOURCE_DIR}/xla/pjrt/legate/${FILE_NAME}")
+  endforeach()
 
   add_custom_target(xla_build ALL
     DEPENDS ${xla_library} 
@@ -167,6 +177,27 @@ function(find_or_configure_xla)
 
   add_dependencies(xla xla_build)
   add_dependencies(xla_compiler_plugin xla_build)
+
+  if (LegateJAX_ENABLE_TESTS)
+    file(GLOB legate_jax_test_files
+         "${PROJECT_SOURCE_DIR}/src/pjrt_client/testdata/*")
+    set(xla_test_files)
+    foreach(PATH ${legate_jax_test_files})
+      get_filename_component(FILE_NAME ${PATH} NAME)
+      list(APPEND xla_test_files "${xla_SOURCE_DIR}/xla/pjrt/legate/testdata/${FILE_NAME}")
+    endforeach()
+
+    add_custom_command(
+	OUTPUT ${xla_test_files}
+        COMMAND ${CMAKE_COMMAND} -E create_symlink
+                ${PROJECT_SOURCE_DIR}/src/pjrt_client/testdata
+                ${xla_SOURCE_DIR}/xla/pjrt/legate/testdata
+        COMMENT "Symlink testdata into XLA source tree at ${xla_SOURCE_DIR}"
+    )
+    add_custom_target(legate_test_files ALL
+	    DEPENDS ${xla_test_files})
+    add_dependencies(xla_build legate_test_files)
+  endif()
 
   add_library(xla::xla ALIAS xla)
   add_library(xla::xla_compiler_plugin ALIAS xla_compiler_plugin)

@@ -230,5 +230,63 @@ TEST_F(MpmdAssignBufferSchedulingNameTest, AliasBufferAssignment) {
   // same call
 }
 
+constexpr absl::string_view kSubsetDeviceSkipReshardHlo = R"(
+task_g {
+  param.0 = f32[] parameter(0), frontend_attributes={color="task_g"}, sharding={replicated}
+  add.0 = f32[] add(param.0, param.0), frontend_attributes={color="task_g"}, sharding={replicated}
+  ROOT tuple.3 = (f32[4,4]{1,0}) tuple(add.0)
+}
+
+task_f {
+  param.0 = f32[] parameter(0), frontend_attributes={color="task_f"}, sharding={replicated}
+  add.0 = f32[] add(param.0, param.0), frontend_attributes={color="task_f"}, sharding={replicated}
+  ROOT tuple.3 = (f32[4,4]{1,0}) tuple(add.0)
+}
+
+ENTRY main {
+  Arg_0.1 = f32[] parameter(0), sharding={replicated}
+  call.0 = (f32[]) call(Arg_0.1), to_apply=task_f, frontend_attributes={color="task_f"}
+  get-tuple-element.0 = f32[] get-tuple-element(call.0), index=0, frontend_attributes={color="task_f"}, sharding={replicated}
+  call.1 = (f32[]) call(get-tuple-element.0), to_apply=task_g, frontend_attributes={color="task_g"}
+  get-tuple-element.1 = f32[] get-tuple-element(call.1), index=0, frontend_attributes={color="task_g"}, sharding={replicated}
+  call.2 = (f32[]) call(get-tuple-element.1), to_apply=task_g, frontend_attributes={color="task_g"}
+  get-tuple-element.2 = f32[] get-tuple-element(call.2), index=0, frontend_attributes={color="task_g"}, sharding={replicated}
+  call.3 = (f32[]) call(get-tuple-element.2), to_apply=task_g, frontend_attributes={color="task_g"}
+  get-tuple-element.3 = f32[] get-tuple-element(call.3), index=0, frontend_attributes={color="task_g"}, sharding={replicated}
+  ROOT tuple.97 = (f32[]) tuple(get-tuple-element.3)
+}
+)";
+
+TEST_F(MpmdAssignBufferSchedulingNameTest, SubsetDeviceSkipReshard) {
+  TF_ASSERT_OK_AND_ASSIGN(auto module,
+                          GetHloModuleFromText(kSubsetDeviceSkipReshardHlo,
+                                               /*num_devices=*/8));
+
+  TF_ASSIGN_OR_RETURN(
+      auto f,
+      partition_->AllocateColor(
+          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 8}}, nullptr));
+  TF_ASSIGN_OR_RETURN(
+      auto g,
+      partition_->AllocateColor(
+          "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
+
+  MpmdAssignBufferSchedulingName assigner{partition_.get()};
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, assigner.Run(module.get()));
+
+  // we have a replicated array on color task_f sharded over a superset of the
+  // devices in task_g, which means we can directly use the array as input
+  // without resharding make sure that array is not "recolored" to task_g when
+  // freed
+  auto* first_output = module->entry_computation()->GetInstructionWithName(
+      "get-tuple-element.0");
+  ASSERT_NE(first_output, nullptr);
+  auto name = first_output->metadata().scheduling_name();
+  EXPECT_NE(name, "");
+  EXPECT_THAT(module->entry_computation()->instructions(),
+              Not(Contains(AllOf(op::GetTupleElement(), m::Color("task_g"),
+                                 m::MetadataSchedulingNames("name")))));
+}
+
 }  // namespace
 }  // namespace xla
