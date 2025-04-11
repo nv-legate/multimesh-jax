@@ -54,7 +54,8 @@ absl::StatusOr<LoopConfig> GetMicrobatchConfig(const std::string& name,
           {"breadth-first", LoopConfig::Schedule::kFillDrain},
           {"gpipe", LoopConfig::Schedule::kFillDrain},
           {"wavefront", LoopConfig::Schedule::kWavefront},
-          {"prefetch-wavefront", LoopConfig::Schedule::kPrefetchWavefront}};
+          {"prefetch-wavefront", LoopConfig::Schedule::kPrefetchWavefront},
+          {"custom", LoopConfig::Schedule::kCustom}};
 
   if (!schedule_string.empty()) {
     auto iter = kScheduleTypes.find(schedule_string);
@@ -75,6 +76,14 @@ absl::StatusOr<LoopConfig> GetMicrobatchConfig(const std::string& name,
   TF_ASSIGN_OR_RETURN(std::optional<int> num_stages,
                       GetOptionalTaskValue<int>(json, name, "num_stages"));
 
+  TF_ASSIGN_OR_RETURN(
+      std::optional<CustomSchedule> custom_schedule,
+      GetOptionalTaskValue<CustomSchedule>(json, name, "custom_schedule"));
+
+  TF_ASSIGN_OR_RETURN(
+      std::optional<std::string> custom_callback,
+      GetOptionalTaskValue<std::string>(json, name, "custom_callback"));
+
   return LoopConfig{
       .num_iterations = num_microbatches,
       .microbatch_size = size,
@@ -84,6 +93,8 @@ absl::StatusOr<LoopConfig> GetMicrobatchConfig(const std::string& name,
       .interleave = interleave,
       .num_stages = num_stages,
       .unrolling = unrolling,
+      .custom_schedule = std::move(custom_schedule),
+      .custom_callback = std::move(custom_callback),
   };
 }
 

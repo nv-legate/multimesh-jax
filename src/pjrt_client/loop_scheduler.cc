@@ -6,6 +6,8 @@
 #include "xla/pjrt/legate/loop_scheduler.h"
 
 #include "xla/pjrt/legate/mpmd_instruction.h"
+#include "xla/pjrt/legate/mpmd_loop.h"
+#include "xla/pjrt/legate/python_callback.h"
 #include "xla/util.h"
 
 namespace xla {
@@ -104,6 +106,85 @@ absl::StatusOr<std::vector<HloInstruction*>> ScheduleGpipe(
   return schedule;
 }
 
+absl::StatusOr<std::vector<HloInstruction*>> ScheduleCustomCallback(
+    const HloPartition& partition, const LoopConfig& config,
+    const std::vector<std::vector<HloInstruction*>>& tasks) {
+  absl::StatusOr<std::vector<HloInstruction*>> schedule =
+      CallCustomPythonCallback(partition, config, tasks);
+
+  for (auto& task : *schedule) {
+    VLOG(5) << "task: " << task->name();
+  }
+
+  return schedule;
+}
+
+absl::StatusOr<std::vector<HloInstruction*>> ScheduleCustomSchedule(
+    const LoopConfig& config,
+    const std::vector<std::vector<HloInstruction*>>& tasks) {
+  std::vector<HloInstruction*> schedule;
+  const int64_t tasks_per_iter = tasks.front().size();
+  const CustomSchedule custom_schedule = *config.custom_schedule;
+
+  if (config.num_iterations * tasks_per_iter != custom_schedule.size()) {
+    return InvalidArgumentStrCat("Custom schedule has an invalid size");
+  }
+
+  schedule.reserve(config.num_iterations * tasks_per_iter);
+
+  for (auto& [iter, task_index] : custom_schedule) {
+    VLOG(5) << "task, iter: " << task_index << " " << iter;
+    if (iter >= config.num_iterations || task_index >= tasks_per_iter) {
+      return InvalidArgumentStrCat(
+          "Custom schedule invalid due to out-of-bound task access!");
+    }
+    schedule.push_back(tasks[iter][task_index]);
+  }
+
+  return schedule;
+}
+
+absl::StatusOr<std::vector<HloInstruction*>> ScheduleCustom(
+    const HloPartition& partition, const LoopConfig& config,
+    const std::vector<std::vector<HloInstruction*>>& tasks) {
+  auto unroll_task = [&](HloInstruction* call) {
+    auto color = Color(call);
+    return partition.IsLoopIncrementColor(*color);
+  };
+
+  int64_t num_to_unroll = 0;
+  while (num_to_unroll < tasks[0].size() &&
+         unroll_task(tasks[0][num_to_unroll])) {
+    ++num_to_unroll;
+  }
+
+  std::vector<HloInstruction*> schedule;
+  for (int task = 0; task < num_to_unroll; ++task) {
+    VLOG(3) << "fully unrolling first task "
+            << tasks[0][task]->called_computations()[0]->name()
+            << " to prefetch initial activations for all iterations";
+    for (int iter = 0; iter < config.num_iterations; ++iter) {
+      schedule.push_back(tasks[iter][task]);
+    }
+  }
+
+  std::vector<std::vector<HloInstruction*>> remaining_tasks(tasks.size());
+  for (int64_t iter = 0; iter < config.num_iterations; ++iter) {
+    remaining_tasks[iter].reserve(tasks[iter].size() - num_to_unroll);
+    for (int64_t task = num_to_unroll; task < tasks[iter].size(); ++task) {
+      remaining_tasks[iter].push_back(tasks[iter][task]);
+    }
+  }
+
+  if (config.custom_schedule.has_value()) {
+    return ScheduleCustomSchedule(config, remaining_tasks);
+  } else if (config.custom_callback.has_value()) {
+    return ScheduleCustomCallback(partition, config, remaining_tasks);
+  } else {
+    throw std::invalid_argument("Needs custom schedule or callback");
+  }
+}
+
 absl::StatusOr<std::vector<HloInstruction*>> SchedulePrefetchWavefront(
     const HloPartition& partition, const LoopConfig& config, int num_to_unroll,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
@@ -190,6 +271,8 @@ absl::StatusOr<std::vector<HloInstruction*>> ScheduleLoops(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
   switch (config.schedule) {
+    case LoopConfig::Schedule::kCustom:
+      return ScheduleCustom(partition, config, tasks);
     case LoopConfig::Schedule::kFillDrain:
       return ScheduleGpipe(config, tasks);
     case LoopConfig::Schedule::kPrefetchWavefront:

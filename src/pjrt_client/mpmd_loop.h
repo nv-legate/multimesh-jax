@@ -14,10 +14,18 @@
 
 namespace xla {
 
+using CustomSchedule = std::vector<std::pair<int, int>>;
+
 // Encapsulates a Legate-managed loop that slices an input
 // into microbatches and aggregates the results over the microbatch dimension.
 struct LoopConfig {
-  enum class Schedule { kFillDrain, k1F1B, kWavefront, kPrefetchWavefront };
+  enum class Schedule {
+    kFillDrain,
+    k1F1B,
+    kWavefront,
+    kPrefetchWavefront,
+    kCustom
+  };
 
   // The number of iterations
   int64_t num_iterations;
@@ -46,6 +54,12 @@ struct LoopConfig {
   // The number of layers to unroll at a time. Only required for
   // the fill-drain (breadth-first) schedule
   std::optional<int> unrolling{};
+  // The user specified custom pipeline schedule. Only required
+  // for custom schedule option.
+  std::optional<CustomSchedule> custom_schedule{};
+  // The user specified custom callback. Only required for
+  // custom callback option.
+  std::optional<std::string> custom_callback{};
 };
 
 // Encapsulates a device mesh that changes on each iteration.
