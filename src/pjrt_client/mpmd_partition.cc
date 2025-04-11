@@ -85,8 +85,9 @@ constexpr absl::string_view kColorPropagationPriorityEnv =
 absl::StatusOr<HloSharding> ToMpmdSharding(
     const Shape& shape, const HloSharding& iota_sharding,
     const zuku::DeviceList& task_devices,
-    const zuku::DeviceList& global_devices) {
-  if (iota_sharding.IsReplicated() && task_devices == global_devices) {
+    const zuku::DeviceList& global_devices, bool use_submesh_sharding) {
+  if (iota_sharding.IsReplicated() &&
+      (!use_submesh_sharding || task_devices == global_devices)) {
     return HloSharding::Replicate();
   }
 
@@ -139,13 +140,13 @@ bool ShardingEqual(HloInstruction* lhs, const zuku::DeviceList& lhs_devices,
 
 absl::StatusOr<HloSharding> ToMpmdSharding(
     HloInstruction* instruction, const zuku::DeviceList& task_devices,
-    const zuku::DeviceList& global_devices) {
+    const zuku::DeviceList& global_devices, bool use_submesh_sharding) {
   if (instruction->has_sharding()) {
     return ToMpmdSharding(instruction->shape(), instruction->sharding(),
-                          task_devices, global_devices);
+                          task_devices, global_devices, use_submesh_sharding);
   }
   return ToMpmdSharding(instruction->shape(), HloSharding::Replicate(),
-                        task_devices, global_devices);
+                        task_devices, global_devices, use_submesh_sharding);
 }
 
 // 0 is sentinel value indicating no temp offload
@@ -238,16 +239,47 @@ class MpmdScheduler {
                         XlaShapeToLegateShape(instruction->shape(), *devices,
                                               instruction->sharding_or_default(
                                                   default_replicated_)));
-    TF_ASSIGN_OR_RETURN(
-        HloSharding mpmd_sharding,
-        ToMpmdSharding(instruction, *devices, partition_.Devices()));
+
+    auto allow_sharding_override = [](int64_t index,
+                                      absl::Span<const bool> allow) {
+      if (allow.size() > index) {
+        return allow[index];
+      }
+      if (allow.empty()) {
+        return false;
+      }
+      return allow[0];
+    };
 
     if (type == Store::Type::TEMP) {
       index = num_temp_stores_++;
     }
 
+    const bool use_submesh_sharding = [&] {
+      HloModule* module = instruction->parent()->parent();
+      if (type == Store::Type::PARAM) {
+        return allow_sharding_override(
+            *index,
+            module->config().allow_spmd_sharding_propagation_to_parameters());
+      }
+      if (type == Store::Type::ROOT) {
+        return allow_sharding_override(
+            *index,
+            module->config().allow_spmd_sharding_propagation_to_output());
+      }
+      // always allow sharding overrides for temps
+      return true;
+    }();
+
+    TF_ASSIGN_OR_RETURN(
+        HloSharding mpmd_sharding,
+        ToMpmdSharding(instruction, *devices, partition_.Devices(),
+                       use_submesh_sharding));
+
     VLOG(5) << "Adding store for " << instruction->name() << ", type=" << type
-            << ", index=" << *index;
+            << ", index=" << *index << ", mpmd_sharding=" << mpmd_sharding
+            << ", use_submesh_sharding=" << std::boolalpha
+            << use_submesh_sharding << "";
 
     scheduling_name_to_buffer_index_.emplace(
         instruction->metadata().scheduling_name(),
@@ -366,10 +398,6 @@ absl::Status MpmdScheduler::AddHloModuleTask(
     HloInstruction* operand = call->mutable_operand(index);
 
     if (operand->IsCustomCall("SliceOffset")) {
-      TF_ASSIGN_OR_RETURN(
-          HloSharding mpmd_sharding,
-          ToMpmdSharding(operand, devices, partition_.Devices()));
-
       TF_ASSIGN_OR_RETURN(int offset, GetAttribute<int>(operand, "offset"));
       scalars.push_back(ScalarArgument{offset, index});
       VLOG(3) << "pushing back offset " << offset << " for task "
@@ -379,7 +407,7 @@ absl::Status MpmdScheduler::AddHloModuleTask(
                              .index = -1,
                              .name = "slice-offset",
                              .scalar = true,
-                             .mpmd_sharding = std::move(mpmd_sharding),
+                             .mpmd_sharding = HloSharding::Replicate(),
                              .shape = operand->shape()});
       slice_param_number = index;
     } else {

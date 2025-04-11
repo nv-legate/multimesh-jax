@@ -54,18 +54,26 @@ absl::Status MpmdComputationFusion::FuseComputations(
 
     for (auto *gte : call->users()) {
       produced_by_set.insert(gte);
-      for (auto *gte_user : gte->users()) {
-        if (!calls_included.contains(gte_user)) {
-          VLOG(5) << "output " << gte->name() << " of " << call->name()
-                  << " is still a root";
-          roots_needed.push_back(
-              {gte, computation->root_instruction()->mutable_operand(
-                        gte->tuple_index())});
-          break;
-        } else {
-          VLOG(5) << "output " << gte->name() << " of " << call->name()
-                  << " is used by " << gte_user->name();
+      const bool is_root = [&] {
+        if (gte->IsRoot()) {
+          return true;
         }
+        for (auto *gte_user : gte->users()) {
+          if (!calls_included.contains(gte_user) || gte_user->IsRoot()) {
+            return true;
+          } else {
+            VLOG(5) << "output " << gte->name() << " of " << call->name()
+                    << " is used by " << gte_user->name();
+          }
+        }
+        return false;
+      }();
+      if (is_root) {
+        VLOG(5) << "output " << gte->name() << " of " << call->name()
+                << " is still a root";
+        roots_needed.push_back(
+            {gte, computation->root_instruction()->mutable_operand(
+                      gte->tuple_index())});
       }
     }
   }
@@ -158,7 +166,11 @@ absl::Status MpmdComputationFusion::FuseComputations(
     VLOG(5) << "replacing old output " << gte->name() << " with new output "
             << new_gte->name();
     TF_RETURN_IF_ERROR(gte->ReplaceAllUsesWith(new_gte));
-    // TF_RETURN_IF_ERROR(parent->RemoveInstruction(gte));
+    if (gte->IsRoot()) {
+      VLOG(5) << "replacing root " << gte->name() << " with new output "
+              << new_gte->name();
+      parent->set_root_instruction(new_gte);
+    }
     ++fused_output_tuple_index;
   }
 
@@ -170,6 +182,10 @@ absl::Status MpmdComputationFusion::FuseComputations(
         return InternalStrCat(user->name(), " still has active user ",
                               user->users().front()->name());
       }
+      if (user->IsRoot()) {
+        return InternalStrCat(user->name(), " is still the root instruction");
+      }
+      VLOG(5) << "removing call user " << user->name();
       TF_RETURN_IF_ERROR(parent->RemoveInstruction(user));
     }
     auto *computation = call->called_computations()[0];
