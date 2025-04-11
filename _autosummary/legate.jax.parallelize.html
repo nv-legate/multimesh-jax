@@ -372,18 +372,18 @@ batches.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>fun</strong> (<em>Callable</em>) – Function to be parallelized. <code class="docutils literal notranslate"><span class="pre">fun</span></code> should be pure.
+<li><p><strong>fun</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><em>Callable</em></a>) – Function to be parallelized. <code class="docutils literal notranslate"><span class="pre">fun</span></code> should be pure.
 See documentation for <a class="reference external" href="https://jax.readthedocs.io/en/latest/_autosummary/jax.jit.html">jax.jit</a> for requirements for <code class="docutils literal notranslate"><span class="pre">fun</span></code>.</p></li>
-<li><p><strong>init_params</strong> (<em>Callable</em><em>[</em><em>[</em><em>]</em><em>, </em><em>Any</em><em>] </em><em>| </em><em>None</em>) – optional, a function taking no arguments that generates
+<li><p><strong>init_params</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><em>Callable</em></a><em>[</em><em>[</em><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><em>Any</em></a><em>] </em><em>| </em><em>None</em>) – optional, a function taking no arguments that generates
 input parameters without shardings. Optional if <code class="docutils literal notranslate"><span class="pre">fun</span></code> does not take
 parameters as a first argument.</p></li>
-<li><p><strong>get_input_batch</strong> (<em>Callable</em><em>[</em><em>[</em><em>]</em><em>, </em><em>Any</em><em>] </em><em>| </em><em>None</em>) – optional, a function taking no arguments that generates
+<li><p><strong>get_input_batch</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><em>Callable</em></a><em>[</em><em>[</em><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><em>Any</em></a><em>] </em><em>| </em><em>None</em>) – optional, a function taking no arguments that generates
 input batches without shardings. Optional if <code class="docutils literal notranslate"><span class="pre">fun</span></code> does not take
 input batches as a second argument or if <code class="docutils literal notranslate"><span class="pre">initial_batch</span></code> is given
 instead.</p></li>
-<li><p><strong>initial_batch</strong> (<em>Any</em><em> | </em><em>None</em>) – optional, an array or pytree of arrays with shardings
+<li><p><strong>initial_batch</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><em>Any</em></a><em> | </em><em>None</em>) – optional, an array or pytree of arrays with shardings
 valid as input parameters to <code class="docutils literal notranslate"><span class="pre">fun</span></code></p></li>
-<li><p><strong>devices</strong> (<em>Sequence</em><em>[</em><em>Device</em><em>] </em><em>| </em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.2)"><em>ndarray</em></a><em> | </em><em>None</em>) – optional, a numpy array or list of jax devices
+<li><p><strong>devices</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><em>Device</em><em>] </em><em>| </em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.2)"><em>ndarray</em></a><em> | </em><em>None</em>) – optional, a numpy array or list of jax devices
 specifying the devices to parallelize over. If not given,
 the function is parallelized over all devices.</p></li>
 </ul>

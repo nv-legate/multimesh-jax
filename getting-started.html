@@ -341,7 +341,7 @@ document.write(`
             </div>
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#downloading-images">Downloading Images</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#docker-images">Docker Images</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#running-jupyter-tutorials-with-docker">Running Jupyter tutorials with Docker</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#building-images">Building Images</a></li>
 </ul>
@@ -360,15 +360,10 @@ document.write(`
 <p>The simplest way to get started is by downloading one of the Legate-JAX containers.
 There is a full development container which includes all source files and enables
 rebuilding each component.</p>
-<section id="downloading-images">
-<h2>Downloading Images<a class="headerlink" href="#downloading-images" title="Link to this heading">#</a></h2>
-<ul class="simple">
-<li><p><a class="reference external" href="https://gitlab-master.nvidia.com/legate/quickstart.internal/container_registry/69362">Development Images</a></p></li>
-</ul>
-<p>The simplest way to get started is downloading the conatiner:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>pull<span class="w"> </span>docker<span class="w"> </span>pull<span class="w"> </span>gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev
-</pre></div>
-</div>
+<section id="docker-images">
+<h2>Docker Images<a class="headerlink" href="#docker-images" title="Link to this heading">#</a></h2>
+<p>The easiest way to get started is by building images
+using <a class="reference external" href="https://github.com/nv-legate/legate-jax-workflows">Legate-Jax workflows</a>.</p>
 </section>
 <section id="running-jupyter-tutorials-with-docker">
 <h2>Running Jupyter tutorials with Docker<a class="headerlink" href="#running-jupyter-tutorials-with-docker" title="Link to this heading">#</a></h2>
@@ -447,7 +442,7 @@ the various components.</p>
   </div>
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#downloading-images">Downloading Images</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#docker-images">Docker Images</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#running-jupyter-tutorials-with-docker">Running Jupyter tutorials with Docker</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#building-images">Building Images</a></li>
 </ul>

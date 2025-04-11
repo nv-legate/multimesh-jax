@@ -362,16 +362,16 @@ document.write(`
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>regex</strong> (<em>str</em>) – A full name or regular expression with match group.
+<li><p><strong>regex</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – A full name or regular expression with match group.
 This should match the name of a Flax module or a name passed to
 <code class="docutils literal notranslate"><span class="pre">jax.with_named_scope</span></code>.</p></li>
 <li><p><strong>mesh</strong> (<em>Mesh</em><em> | </em><em>None</em>) – optional, a Mesh context defining the devices and mesh shape</p></li>
-<li><p><strong>callback</strong> (<em>Callable</em><em>[</em><em>[</em><em>str</em><em>]</em><em>, </em><em>list</em><em>[</em><em>int</em><em>]</em><em>] </em><em>| </em><em>None</em>) – optional, a function taking the match group from
+<li><p><strong>callback</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><em>Callable</em></a><em>[</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>]</em><em>] </em><em>| </em><em>None</em>) – optional, a function taking the match group from
 the <code class="docutils literal notranslate"><span class="pre">regex</span></code> and returning an integer list
 enumerating the devices to include in the task.</p></li>
-<li><p><strong>dims</strong> (<em>Sequence</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>) – optional, the submesh dimensions for the task. Only one
+<li><p><strong>dims</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>] </em><em>| </em><em>None</em>) – optional, the submesh dimensions for the task. Only one
 of <code class="docutils literal notranslate"><span class="pre">mesh</span></code> or <code class="docutils literal notranslate"><span class="pre">dims</span></code> should be given.</p></li>
-<li><p><strong>devices</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.2)"><em>ndarray</em></a><em> | </em><em>Sequence</em><em>[</em><em>Device</em><em>] </em><em>| </em><em>Sequence</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>) – optional, a numpy array or list of jax devices
+<li><p><strong>devices</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.2)"><em>ndarray</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><em>Device</em><em>] </em><em>| </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>] </em><em>| </em><em>None</em>) – optional, a numpy array or list of jax devices
 specifying the devices to include in the task submesh.
 One of <code class="docutils literal notranslate"><span class="pre">mesh</span></code> or <code class="docutils literal notranslate"><span class="pre">devices</span></code> or <code class="docutils literal notranslate"><span class="pre">callback</span></code> must be given.
 If <code class="docutils literal notranslate"><span class="pre">devices</span></code> is a numpy array, the mesh shape is inferred from the shape
@@ -380,19 +380,19 @@ then <code class="docutils literal notranslate"><span class="pre">mesh</span></c
 for task instances within a loop. The function will then infer
 a <code class="docutils literal notranslate"><span class="pre">loop_submesh_size</span></code>.  Similarly, <code class="docutils literal notranslate"><span class="pre">dims</span></code> can specify
 a submesh smaller than <code class="docutils literal notranslate"><span class="pre">devices</span></code>.</p></li>
-<li><p><strong>device_axes</strong> (<em>Sequence</em><em>[</em><em>str</em><em>] </em><em>| </em><em>None</em>) – optional, a list of names to assign to each device axis.
+<li><p><strong>device_axes</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – optional, a list of names to assign to each device axis.
 The number of names must match the shape of <code class="docutils literal notranslate"><span class="pre">devices</span></code>.
 User must give only one of <code class="docutils literal notranslate"><span class="pre">mesh</span></code> or <code class="docutils literal notranslate"><span class="pre">device_axes</span></code>.
 If this and <code class="docutils literal notranslate"><span class="pre">mesh</span></code> are not given, logical sharding constraints
 will be translated to replicated sharding.</p></li>
-<li><p><strong>logical_axes</strong> (<em>Sequence</em><em>[</em><em>Tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em><em>] </em><em>| </em><em>None</em>) – optional, a list of string pairs (‘logical’, ‘device’)
+<li><p><strong>logical_axes</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>] </em><em>| </em><em>None</em>) – optional, a list of string pairs (‘logical’, ‘device’)
 giving the translation from logical names to physical device names.
 The logical names should match those passed to
 <code class="docutils literal notranslate"><span class="pre">with_sharding_constraint</span></code> calls within the task. If None,
 the device axis names are used directly for autosharding.
 Raises a <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> if <code class="docutils literal notranslate"><span class="pre">logical_axes</span></code> are given
 but no <code class="docutils literal notranslate"><span class="pre">device_axes</span></code> or <code class="docutils literal notranslate"><span class="pre">mesh</span></code> are specified.</p></li>
-<li><p><strong>name</strong> (<em>str</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em> | </em><em>None</em>)</p></li>
 </ul>
 </dd>
 </dl>

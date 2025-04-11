@@ -362,20 +362,20 @@ document.write(`
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>fun</strong> (<em>Callable</em><em> | </em><em>Type</em>) – Function to be encapsulated as a task. <code class="docutils literal notranslate"><span class="pre">fun</span></code> should be pure.
+<li><p><strong>fun</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><em>Callable</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Type" title="(in Python v3.13)"><em>Type</em></a>) – Function to be encapsulated as a task. <code class="docutils literal notranslate"><span class="pre">fun</span></code> should be pure.
 See documentation for <a class="reference external" href="https://jax.readthedocs.io/en/latest/_autosummary/jax.jit.html">jax.jit</a> for requirements for <code class="docutils literal notranslate"><span class="pre">fun</span></code>.</p></li>
-<li><p><strong>name</strong> (<em>str</em><em> | </em><em>None</em>) – optional, a metadata name to assign to the task context</p></li>
+<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em> | </em><em>None</em>) – optional, a metadata name to assign to the task context</p></li>
 <li><p><strong>mesh</strong> (<em>Mesh</em><em> | </em><em>None</em>) – optional, a Mesh context defining the devices and mesh shape</p></li>
-<li><p><strong>devices</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.2)"><em>ndarray</em></a><em> | </em><em>Sequence</em><em>[</em><em>Device</em><em>] </em><em>| </em><em>None</em>) – optional, a numpy array or list of jax devices
+<li><p><strong>devices</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.2)"><em>ndarray</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><em>Device</em><em>] </em><em>| </em><em>None</em>) – optional, a numpy array or list of jax devices
 specifying the devices to include in the task submesh.
 One of <code class="docutils literal notranslate"><span class="pre">mesh</span></code> or <code class="docutils literal notranslate"><span class="pre">devices</span></code> must be given. If <code class="docutils literal notranslate"><span class="pre">devices</span></code>
 is a numpy array, the mesh shape is inferred from the shape
 of the device array.</p></li>
-<li><p><strong>device_axes</strong> (<em>Sequence</em><em>[</em><em>str</em><em>] </em><em>| </em><em>None</em>) – optional, a list of names to assign to each device axis.
+<li><p><strong>device_axes</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – optional, a list of names to assign to each device axis.
 The number of names must match the shape of <code class="docutils literal notranslate"><span class="pre">mesh</span></code> or <code class="docutils literal notranslate"><span class="pre">devices</span></code>.
 If this and <code class="docutils literal notranslate"><span class="pre">mesh</span></code> are not given, logical sharding constraints
 will be translated to replicated sharding.</p></li>
-<li><p><strong>logical_axes</strong> (<em>Sequence</em><em>[</em><em>Tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em><em>] </em><em>| </em><em>None</em>) – optional, a list of string pairs (‘logical’, ‘device’)
+<li><p><strong>logical_axes</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>] </em><em>| </em><em>None</em>) – optional, a list of string pairs (‘logical’, ‘device’)
 giving the translation from logical names to physical device names.
 The logical names should match those passed to
 <code class="docutils literal notranslate"><span class="pre">with_sharding_constraint</span></code> calls within the task. If None,

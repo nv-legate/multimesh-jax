@@ -1,0 +1,707 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Pipeline example with simple MLP layers &#8212; Legate-JAX  documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/plot_directive.css?v=7f9a90b1" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css?v=be8a1c11" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/style.css?v=3cbd6ad6" />
+    <link rel="stylesheet" href="../../../../../_static/style.css" type="text/css" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../../../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_build/jupyter_execute/_build/jupyter_execute/notebooks/flax-mpmd';</script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Legate-JAX  documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../getting-started.html">Getting Started</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../api.html">Public API: legate.jax package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../legate.jax.flax.html">Public API: legate.jax.flax package</a></li>
+</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../tutorials.html">Tutorials</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/hello-world.html">Hello world example with Legate tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/flax-mpmd.html">Pipeline example with simple MLP layers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/implicit-flax-tasks.html">Pipeline example with simple MLP layers</a></li>
+</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+<a href="https://github.com/nv-legate/legate-jax" target="_blank"
+   class="btn btn-sm btn-source-repository-button"
+   title="Source repository"
+   data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+
+</a>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../../../_sources/_build/jupyter_execute/_build/jupyter_execute/notebooks/flax-mpmd.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Pipeline example with simple MLP layers</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#optional-but-helpful-to-know">Optional, but helpful, to know</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-single-layer-with-sharding-annotations">Create single layer with sharding annotations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-full-model-with-pipelined-layers">Create full model with pipelined layers</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-parameters-and-create-parallel-training-function">Initialize parameters and create parallel training function</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#run-training-steps">Run training steps</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#deep-dive-mpmd-sharding-specs">Deep dive: MPMD sharding specs</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="pipeline-example-with-simple-mlp-layers">
+<h1>Pipeline example with simple MLP layers<a class="headerlink" href="#pipeline-example-with-simple-mlp-layers" title="Link to this heading">#</a></h1>
+<section id="what-you-need-to-know-for-this-tutorial">
+<h2>What you need to know for this tutorial<a class="headerlink" href="#what-you-need-to-know-for-this-tutorial" title="Link to this heading">#</a></h2>
+<ol class="arabic simple">
+<li><p>A basic knowledge of Jax and numpy</p></li>
+<li><p>Familiarity with the concepts of tensor sharding and parallelism</p></li>
+<li><p>Familiarity with basic neural network concepts like dense layers, activation functions, and backprop</p></li>
+<li><p>The previous tutorials on SPMD/MPMD autosharding with Legate-Jax</p></li>
+</ol>
+</section>
+<section id="optional-but-helpful-to-know">
+<h2>Optional, but helpful, to know<a class="headerlink" href="#optional-but-helpful-to-know" title="Link to this heading">#</a></h2>
+<ol class="arabic simple">
+<li><p>Flax package for building composable, trainable models in Jax</p></li>
+<li><p>Optax package with different optimizers</p></li>
+</ol>
+</section>
+<section id="initialize-legate-jax">
+<h2>Initialize Legate-Jax<a class="headerlink" href="#initialize-legate-jax" title="Link to this heading">#</a></h2>
+<p>As in the previous examples, the first step in a Legate-Jax program is to initialize the environment.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.legate</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
+
+<span class="n">init</span><span class="p">(</span>
+  <span class="n">cpus</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="import-jax-packages">
+<h2>Import Jax packages<a class="headerlink" href="#import-jax-packages" title="Link to this heading">#</a></h2>
+<p>Once Legate-Jax has been initialized, the standard set of Jax imports can be done. In this case, we are also importing:</p>
+<ol class="arabic simple">
+<li><p>Flax, which is used to define modules with parameters</p></li>
+<li><p>Optax, which provides optimizers for updating parameters</p></li>
+</ol>
+<p>For more details on <a class="reference external" href="https://github.com/google/flax">Flax</a> and <a class="reference external" href="https://github.com/google-deepmind/optax">Optax</a>, the user should consult the docs for these packages. For this tutorial, the usage of these packages should be relatively clear. <em>Note:</em> functions that were previously imported from <code class="docutils literal notranslate"><span class="pre">legate.jax</span></code> must now be imported from <code class="docutils literal notranslate"><span class="pre">legate.jax.flax</span></code>. Jax requires pure functions while Flax uses an “object-oriented” paradigm of modules with state. Flax often requires special wrappers around standard Jax functions that interoperate with the Flax-&gt;Jax functionalization process.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">optax</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mesh</span><span class="p">,</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">legate.jax.flax</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">parallelize_step</span><span class="p">,</span> 
+    <span class="n">shard_axes</span><span class="p">,</span> 
+    <span class="n">task</span><span class="p">,</span> 
+    <span class="n">with_sharding_constraint</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">flax</span><span class="w"> </span><span class="kn">import</span> <span class="n">linen</span> <span class="k">as</span> <span class="n">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">legate.jax</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="create-single-layer-with-sharding-annotations">
+<h2>Create single layer with sharding annotations<a class="headerlink" href="#create-single-layer-with-sharding-annotations" title="Link to this heading">#</a></h2>
+<p>We can now proceed to define a model called <code class="docutils literal notranslate"><span class="pre">Pipeline</span></code>. The building block for this model will be a basic MLP layer which is a <code class="docutils literal notranslate"><span class="pre">nn.Dense</span></code> followed by a <code class="docutils literal notranslate"><span class="pre">nn.relu</span></code>. The dense layer implicitly defines a parameter tensor. Two key observations:</p>
+<ol class="arabic simple">
+<li><p>A sharding constraint is defined for the input activations <code class="docutils literal notranslate"><span class="pre">x</span></code> that names the tensor axes. The input activations are 1D with the axis named <code class="docutils literal notranslate"><span class="pre">batch</span></code>.</p></li>
+<li><p>Sharding is also defined for the 2D tensor in the dense layer. We give these axes the names <code class="docutils literal notranslate"><span class="pre">data</span></code> and <code class="docutils literal notranslate"><span class="pre">model</span></code>.</p></li>
+</ol>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MLPBlock</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="n">features</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="nd">@nn</span><span class="o">.</span><span class="n">compact</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">with_sharding_constraint</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">))</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Dense</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">features</span><span class="p">,</span><span class="n">kernel_init</span><span class="o">=</span><span class="n">shard_axes</span><span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span><span class="s2">&quot;model&quot;</span><span class="p">))(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="create-full-model-with-pipelined-layers">
+<h2>Create full model with pipelined layers<a class="headerlink" href="#create-full-model-with-pipelined-layers" title="Link to this heading">#</a></h2>
+<p>Using the MLP building blocks, we can build up a pipeline parallel model. Each layer of the pipeline will be assigned to a different submesh, which is computed in the <code class="docutils literal notranslate"><span class="pre">submesh</span></code> method.
+For each new layer, the device grid is incremented. An important abstraction here is the <code class="docutils literal notranslate"><span class="pre">axis_map</span></code> used in the <code class="docutils literal notranslate"><span class="pre">Pipeline</span></code>.
+Legate-Jax emphasizes logical autosharding - using descriptive names rather than positional or hardware-specific names. This follows the philosophy used in <a class="reference external" href="https://crfm.stanford.edu/2023/06/16/levanter-1_0-release.html">Levanter</a> outlined in this <a class="reference external" href="https://nlp.seas.harvard.edu/NamedTensor">article</a> - and also followed by <a class="reference external" href="https://github.com/google/maxtext">maxtext</a> and <a class="reference external" href="https://github.com/google-research/t5x">T5x</a> and their use of <a class="reference external" href="https://flax.readthedocs.io/en/v0.8.2/api_reference/flax.linen/_autosummary/flax.linen.logical_to_mesh_axes.html">logical sharding rules</a>.  Flax code is written with logical names (<code class="docutils literal notranslate"><span class="pre">batch</span></code>, <code class="docutils literal notranslate"><span class="pre">data</span></code>, <code class="docutils literal notranslate"><span class="pre">model</span></code>), which then must be bound to physical device axes (<code class="docutils literal notranslate"><span class="pre">x</span></code> and <code class="docutils literal notranslate"><span class="pre">y</span></code>) to fully define the parallelism. This creates a separation between model specification (logical code written with named tensor axes) and model mapping (physical sharding of axes across a device mesh).</p>
+<p>In this particular case, we map the <code class="docutils literal notranslate"><span class="pre">batch</span></code> and <code class="docutils literal notranslate"><span class="pre">data</span></code> logical dimensions to the physical <code class="docutils literal notranslate"><span class="pre">x</span></code> axis and give each submesh a <code class="docutils literal notranslate"><span class="pre">4x1</span></code> shape. Legate-Jax therefore provides the following capabilities:</p>
+<ol class="arabic simple">
+<li><p>The ability to assign computations to a submesh within a larger computation. Jax enforces an SPMD requirement where tensors must be sharded across all devices and every device must participate.</p></li>
+<li><p>Logical sharding rules within a submesh. This provides similar functionality to T5x and Levanter, but allows arbitrary resharding.</p></li>
+</ol>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Pipeline</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="n">n_layers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">axes</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">)</span>
+    <span class="n">axis_map</span> <span class="o">=</span> <span class="p">(</span>
+      <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+      <span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+      <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">submesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">layer</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Mesh</span><span class="p">:</span>
+        <span class="n">devices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">())</span>
+        <span class="n">submesh_size</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">off</span> <span class="o">=</span> <span class="n">layer</span> <span class="o">*</span> <span class="n">submesh_size</span>
+        <span class="n">device_grid</span> <span class="o">=</span> <span class="n">devices</span><span class="p">[</span><span class="n">off</span><span class="p">:</span><span class="n">off</span><span class="o">+</span><span class="n">submesh_size</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Mesh</span><span class="p">(</span><span class="n">device_grid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">axes</span><span class="p">)</span>
+
+    <span class="nd">@nn</span><span class="o">.</span><span class="n">compact</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_layers</span><span class="p">):</span>
+            <span class="n">layer</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">MLPBlock</span><span class="p">,</span> <span class="n">mesh</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">submesh</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;layer_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">logical_axes</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">axis_map</span><span class="p">)()</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">layer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">x</span><span class="o">*</span><span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="initialize-parameters-and-create-parallel-training-function">
+<h2>Initialize parameters and create parallel training function<a class="headerlink" href="#initialize-parameters-and-create-parallel-training-function" title="Link to this heading">#</a></h2>
+<p>So far the code looks almost the same as standard Flax code with a few extra annotations. The full power of Legate-Jax comes from its auto-sharding compiler that reads all the submesh annotations and transforms the global computation into a series of submesh tasks. Managing Jax training state and shardings can be difficult when directly calling <code class="docutils literal notranslate"><span class="pre">jax.jit</span></code>. The Legate-Jax Flax wrappers provides a <code class="docutils literal notranslate"><span class="pre">parallelize_step</span></code> for training that allows users to generate MPMD auto-sharded models for Flax modules, similar to the previous MPMD example. The user simply passes in the <code class="docutils literal notranslate"><span class="pre">model</span></code>, a standard <code class="docutils literal notranslate"><span class="pre">optax</span></code> optimizer, and an example input batch. Legate-Jax does all the work to derive all the shardings, compile the model, and initialize all the sharded training state. <code class="docutils literal notranslate"><span class="pre">parallelize_step</span></code> returns back the four objects necessary to run a training loop:</p>
+<ol class="arabic simple">
+<li><p>A <code class="docutils literal notranslate"><span class="pre">step_fn</span></code> for computing gradients and updating parameters</p></li>
+<li><p>The randomly initialized sharded parameters</p></li>
+<li><p>The mesh context to use for traing steps</p></li>
+<li><p>A function for preprocessing input batches located in host memory into device arrays</p></li>
+</ol>
+<p>This setup is slightly different than the <code class="docutils literal notranslate"><span class="pre">legate.jax.parallelize</span></code> function, but is more idiomatic to Flax and training.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+<span class="n">opt</span> <span class="o">=</span> <span class="n">optax</span><span class="o">.</span><span class="n">sgd</span><span class="p">(</span><span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.02</span><span class="p">)</span>
+<span class="n">mesh</span> <span class="o">=</span> <span class="n">Mesh</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">())</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span><span class="s2">&quot;y&quot;</span><span class="p">))</span>
+<span class="n">step_fn</span><span class="p">,</span> <span class="n">sharded_train_state</span><span class="p">,</span> <span class="n">mesh</span><span class="p">,</span> <span class="n">prepare_batch</span> <span class="o">=</span> <span class="n">parallelize_step</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">Pipeline</span><span class="p">(),</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">opt</span><span class="p">,</span> <span class="n">mesh</span><span class="o">=</span><span class="n">mesh</span><span class="p">,</span> <span class="n">local_batch</span><span class="o">=</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Platform &#39;legate&#39; is experimental and not all JAX functionality may be correctly supported!
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1725909824.322251 2085553 cpu_client.cc:466] TfrtCpuClient created.
+W0000 00:00:1725909825.232108 2085553 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725909825.232123 2085553 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725909825.235610 2085553 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725909825.235621 2085553 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725909825.235911 2085553 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725909825.235920 2085553 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725909825.236348 2085553 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725909825.236361 2085553 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725909825.236881 2085553 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725909825.236890 2085553 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="run-training-steps">
+<h2>Run training steps<a class="headerlink" href="#run-training-steps" title="Link to this heading">#</a></h2>
+<p>Now that we have our initial training state (parameters + optimizer state), we can run training steps to compute the loss and increment parameters.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">mesh</span><span class="p">:</span>
+    <span class="n">batch</span> <span class="o">=</span> <span class="n">prepare_batch</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">loss</span><span class="p">,</span> <span class="n">sharded_train_state</span> <span class="o">=</span> <span class="n">step_fn</span><span class="p">(</span><span class="n">sharded_train_state</span><span class="p">,</span> <span class="n">batch</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Loss = &quot;</span><span class="p">,</span> <span class="n">loss</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Loss =  159.94763
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="deep-dive-mpmd-sharding-specs">
+<h2>Deep dive: MPMD sharding specs<a class="headerlink" href="#deep-dive-mpmd-sharding-specs" title="Link to this heading">#</a></h2>
+<p>To get a glimpse of the underlying details, we can inspect the sharding specs of the training state. There are 5 tensors:</p>
+<ol class="arabic simple">
+<li><p>A single scalar parameter that is not partitioned (empty <code class="docutils literal notranslate"><span class="pre">PartitionSpec()</span></code>). This is the learning rate (optimizer state for SGD).</p></li>
+<li><p>A (4,) tensor replicated across devices 0-3 corresponding to the first layer bias</p></li>
+<li><p>A (16,4) tensor fully sharded across devices 0-3 corresponding to the fully connected weights in the first layer</p></li>
+<li><p>A (4,) tensor replicated across devices 4-7 corresponding to the second layer bias</p></li>
+<li><p>A (16,4) tensor fully sharded across devices 4-7 corresponding to the fully connected weights in the second layer</p></li>
+</ol>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">inspect</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">jax</span><span class="o">.</span><span class="n">debug</span><span class="o">.</span><span class="n">visualize_array_sharding</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">use_color</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;REPLICATED&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">sharding</span><span class="p">)</span>
+<span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">inspect</span><span class="p">,</span> <span class="n">sharded_train_state</span><span class="p">)</span>
+<span class="k">pass</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>()
+REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=PartitionSpec())
+(4,)
+(16, 4)
+(4,)
+(4, 4)
+(16, 4)
+(4,)
+(4, 4)
+(16, 4)
+(4,)
+(4, 4)
+</pre></div>
+</div>
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌──────────────┐
+│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>│
+└──────────────┘
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌────────┐
+│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>│
+├────────┤
+│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>│
+├────────┤
+│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>│
+├────────┤
+│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>│
+└────────┘
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌──────────────┐
+│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>│
+└──────────────┘
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌───────────────────────┐
+│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>        │
+├───────────────────────┤
+│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>        │
+├───────────────────────┤
+│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>        │
+├───────────────────────┤
+│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>        │
+└───────────────────────┘
+</pre>
+</div></div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#optional-but-helpful-to-know">Optional, but helpful, to know</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-single-layer-with-sharding-annotations">Create single layer with sharding annotations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-full-model-with-pipelined-layers">Create full model with pipelined layers</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-parameters-and-create-parallel-training-function">Initialize parameters and create parallel training function</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#run-training-steps">Run training steps</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#deep-dive-mpmd-sharding-specs">Deep dive: MPMD sharding specs</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By The Legate-JAX authors
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2024, The Legate-JAX Authors..
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

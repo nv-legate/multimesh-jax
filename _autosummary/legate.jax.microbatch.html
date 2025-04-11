@@ -405,26 +405,26 @@ compiler/runtime is free to choose the microbatch schedule.</p>
 <li><p><strong>fun</strong> – Function to be transformed into microbatch loops.
 <code class="docutils literal notranslate"><span class="pre">fun</span></code> should be pure.
 See documentation for <a class="reference external" href="https://jax.readthedocs.io/en/latest/_autosummary/jax.jit.html">jax.jit</a> for requirements for <code class="docutils literal notranslate"><span class="pre">fun</span></code>.</p></li>
-<li><p><strong>dim</strong> (<em>int</em>) – an int specifying which dimension of the input tensor(s) should
+<li><p><strong>dim</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a>) – an int specifying which dimension of the input tensor(s) should
 be sliced for each microbatch</p></li>
-<li><p><strong>size</strong> (<em>int</em>) – an int specifying the size of the microbatch dimension
+<li><p><strong>size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a>) – an int specifying the size of the microbatch dimension
 for each microbatch</p></li>
-<li><p><strong>argnum</strong> (<em>int</em>) – optional, the argument number that will be sliced for each
+<li><p><strong>argnum</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a>) – optional, the argument number that will be sliced for each
 microbatch. If the argument is a pytree of tensors rather than a single
 tensor, then all tensors in the tree are sliced along the given <code class="docutils literal notranslate"><span class="pre">dim</span></code>.
 All other arguments to <code class="docutils literal notranslate"><span class="pre">fun</span></code> are unmodified.</p></li>
-<li><p><strong>interleave</strong> (<em>int</em><em> | </em><em>None</em>) – optional, a hint to the microbatch scheduler about how
+<li><p><strong>interleave</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em> | </em><em>None</em>) – optional, a hint to the microbatch scheduler about how
 tasks within the loop should be interleavd.</p></li>
-<li><p><strong>schedule</strong> (<em>Literal</em><em>[</em><em>'1f1b'</em><em>, </em><em>'gpipe'</em><em>, </em><em>'wavefront'</em><em>] </em><em>| </em><em>None</em>) – optional, a string identifying the schedule of microbatch
+<li><p><strong>schedule</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.13)"><em>Literal</em></a><em>[</em><em>'1f1b'</em><em>, </em><em>'gpipe'</em><em>, </em><em>'wavefront'</em><em>] </em><em>| </em><em>None</em>) – optional, a string identifying the schedule of microbatch
 iterations/stages such as ‘gpipe’ or ‘1f1b’.</p></li>
-<li><p><strong>unrolling</strong> (<em>int</em><em> | </em><em>None</em>) – optional, an int specifying the unrolling of the microbatch
+<li><p><strong>unrolling</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em> | </em><em>None</em>) – optional, an int specifying the unrolling of the microbatch
 loop. By default, the microbatch loop is fully unrolled. Only
 relevant for the <cite>gpipe</cite> schedule.</p></li>
-<li><p><strong>arg_shardings</strong> (<em>Any</em><em> | </em><em>None</em>) – optional, an object or (prefix) pytree of objects matching
+<li><p><strong>arg_shardings</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><em>Any</em></a><em> | </em><em>None</em>) – optional, an object or (prefix) pytree of objects matching
 <code class="docutils literal notranslate"><span class="pre">argnum</span></code> with shardings. The shardings can be any sharding-equivalent
 object including partition specs or <code class="docutils literal notranslate"><span class="pre">NamedSharding</span></code>  If specified,
 this applies the sharding annotations to all sliced inputs.</p></li>
-<li><p><strong>num_stages</strong> (<em>int</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>num_stages</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em> | </em><em>None</em>)</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>

@@ -374,9 +374,7 @@ document.write(`
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.legate</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
 
-<span class="n">init</span><span class="p">(</span>
-  <span class="n">cpus</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
-<span class="p">)</span>
+<span class="n">init</span><span class="p">(</span><span class="n">cpus</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -426,7 +424,7 @@ Previously we did an SPMD problem, which used a uniform mesh across the whole mo
 </div>
 </div>
 </div>
-<p>We now moidfy the model to assign the two calls to <code class="docutils literal notranslate"><span class="pre">f</span></code> to different submeshes.</p>
+<p>We now modify the model to assign the two calls to <code class="docutils literal notranslate"><span class="pre">f</span></code> to different submeshes.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">devices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">())</span>
