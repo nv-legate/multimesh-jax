@@ -1,0 +1,614 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Hello world example with Legate tasks &#8212; Legate-JAX  documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="../_static/plot_directive.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../_static/style.css?v=3cbd6ad6" />
+    <link rel="stylesheet" href="../_static/style.css" type="text/css" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'notebooks/hello-world';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Logical autosharding for SPMD" href="spmd-autosharding.html" />
+    <link rel="prev" title="Tutorials" href="../tutorials.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Legate-JAX  documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../getting-started.html">Getting Started</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api.html">Public API: legate.jax package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../legate.jax.flax.html">Public API: legate.jax.flax package</a></li>
+</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../tutorials.html">Tutorials</a><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Hello world example with Legate tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="spmd-autosharding.html">Logical autosharding for SPMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="flax-mpmd.html">Pipeline example with simple MLP layers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="implicit-flax-tasks.html">Pipeline example with simple MLP layers</a></li>
+</ul><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+<a href="https://github.com/nv-legate/legate-jax" target="_blank"
+   class="btn btn-sm btn-source-repository-button"
+   title="Source repository"
+   data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+
+</a>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/notebooks/hello-world.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Hello world example with Legate tasks</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jax-example-with-two-functions">Jax example with two functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jax-example-with-spmd-sharding">Jax example with SPMD sharding</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#legate-jax-example-with-mpmd-execution">Legate-Jax example with MPMD execution</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="hello-world-example-with-legate-tasks">
+<h1>Hello world example with Legate tasks<a class="headerlink" href="#hello-world-example-with-legate-tasks" title="Link to this heading">#</a></h1>
+<section id="what-you-need-to-know-for-this-tutorial">
+<h2>What you need to know for this tutorial<a class="headerlink" href="#what-you-need-to-know-for-this-tutorial" title="Link to this heading">#</a></h2>
+<ol class="arabic simple">
+<li><p>A basic knowledge of Jax and numpy</p></li>
+<li><p>Familiarity with Jax meshes and devices</p></li>
+</ol>
+</section>
+<section id="initialize-legate-jax">
+<h2>Initialize Legate-Jax<a class="headerlink" href="#initialize-legate-jax" title="Link to this heading">#</a></h2>
+<p>The first step in a Legate-Jax program is to initialize the environment. Before any other imports, <code class="docutils literal notranslate"><span class="pre">jax_plugins.legate.init</span></code> should be called with the appropriate arguments for configuring Legate. This does violate the common Python style rule of top-level imports coming before all code. The parameters for Legate must be configured before importing any Jax functions to ensure that backend clients are initialized properly.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.legate</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
+<span class="n">init</span><span class="p">(</span><span class="n">cpus</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">dump</span><span class="o">=</span><span class="s2">&quot;dump&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="import-jax-packages">
+<h2>Import Jax packages<a class="headerlink" href="#import-jax-packages" title="Link to this heading">#</a></h2>
+<p>Once Legate-Jax has been initialized, the standard set of Jax imports can be done. We also import the special Legate-Jax functions.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">legate.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">task</span><span class="p">,</span> <span class="n">mjit</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="jax-example-with-two-functions">
+<h2>Jax example with two functions<a class="headerlink" href="#jax-example-with-two-functions" title="Link to this heading">#</a></h2>
+<p>We show a Jax example executing two functions. We <code class="docutils literal notranslate"><span class="pre">jax.jit</span></code> the composite function into a single callable and pass in an example input. As expected, the result is an array of 1’s (within rounding error).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">g</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">x</span><span class="o">*</span><span class="n">x</span> <span class="o">+</span> <span class="n">y</span><span class="o">*</span><span class="n">y</span>
+
+<span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">g</span><span class="p">(</span><span class="o">*</span><span class="n">f</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+
+<span class="n">batch</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+<span class="n">result</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Platform &#39;legate&#39; is experimental and not all JAX functionality may be correctly supported!
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1725909779.687352 2083386 cpu_client.cc:466] TfrtCpuClient created.
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Array([1.        , 0.99999994, 0.99999994, 1.        , 1.        ,
+       1.        , 0.99999994, 1.        ], dtype=float32)
+</pre></div>
+</div>
+</div>
+</div>
+<p>The computation is not sharded so the computation and result is placed on device 0 by default.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">result</span><span class="o">.</span><span class="n">devices</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>{CpuDevice(id=0)}
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="jax-example-with-spmd-sharding">
+<h2>Jax example with SPMD sharding<a class="headerlink" href="#jax-example-with-spmd-sharding" title="Link to this heading">#</a></h2>
+<p>We can extend the example by passing in a sharded array and producing a sharded array. The result will now be distributed across multiple devices. We define the sharding of the array using partition specs and named shardings, which in this case defines a 1-D array sharding across the axis “x” of size 2. For more details, consult the <a class="reference external" href="https://jax.readthedocs.io/en/latest/notebooks/Distributed_arrays_and_automatic_parallelization.html">Jax documentation on sharding</a>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mesh</span><span class="p">,</span> <span class="n">NamedSharding</span><span class="p">,</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">jax.experimental.mesh_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_device_mesh</span>
+
+<span class="n">mesh</span> <span class="o">=</span> <span class="n">Mesh</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">()),</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,))</span>
+<span class="n">sharding</span> <span class="o">=</span> <span class="n">NamedSharding</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">))</span>
+<span class="n">batch</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">,</span> <span class="n">out_shardings</span><span class="o">=</span><span class="n">sharding</span><span class="p">,</span> <span class="n">static_argnums</span><span class="o">=</span><span class="mi">0</span><span class="p">)(</span><span class="mi">8</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">c</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+<span class="n">result</span><span class="o">.</span><span class="n">devices</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>{CpuDevice(id=0), CpuDevice(id=1)}
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="legate-jax-example-with-mpmd-execution">
+<h2>Legate-Jax example with MPMD execution<a class="headerlink" href="#legate-jax-example-with-mpmd-execution" title="Link to this heading">#</a></h2>
+<p>Jax generally limits computations to SPMD with all devices executing the same computation.  MPMD patterns where different operations are executed on difference devices can be difficult or impossible to express with native Jax idioms.  Legate adds runtime support for MPMD execution, available in user code through the &#64;task decorator. Instead of running <code class="docutils literal notranslate"><span class="pre">f</span></code> and <code class="docutils literal notranslate"><span class="pre">g</span></code> functions across both devices, we run <code class="docutils literal notranslate"><span class="pre">f</span></code> on device 0 and <code class="docutils literal notranslate"><span class="pre">g</span></code> on device 1.  The output is seen being placed on device 1.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">all_devices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">())</span>
+
+<span class="n">legate_f</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">devices</span><span class="o">=</span><span class="n">all_devices</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">legate_g</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">devices</span><span class="o">=</span><span class="n">all_devices</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">2</span><span class="p">])</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">legate_c</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">legate_g</span><span class="p">(</span><span class="o">*</span><span class="n">legate_f</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+<span class="n">legate_c</span> <span class="o">=</span> <span class="n">mjit</span><span class="p">(</span><span class="n">legate_c</span><span class="p">,</span> <span class="n">devices</span><span class="o">=</span><span class="n">all_devices</span><span class="p">)</span>
+
+<span class="n">batch</span> <span class="o">=</span> <span class="n">mjit</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">,</span> <span class="n">devices</span><span class="o">=</span><span class="n">all_devices</span><span class="p">,</span> <span class="n">static_argnums</span><span class="o">=</span><span class="mi">0</span><span class="p">)(</span><span class="mi">8</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">legate_c</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+<span class="n">result</span><span class="o">.</span><span class="n">devices</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>W0000 00:00:1725910019.820146 2083386 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725910019.820163 2083386 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725910019.820787 2083386 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725910019.820794 2083386 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725910019.821372 2083386 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725910019.821378 2083386 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725910020.088336 2083386 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725910020.088354 2083386 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725910020.089547 2083386 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725910020.089555 2083386 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725910020.089787 2083386 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725910020.089793 2083386 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>{CpuDevice(id=1)}
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../tutorials.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Tutorials</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="spmd-autosharding.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Logical autosharding for SPMD</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jax-example-with-two-functions">Jax example with two functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jax-example-with-spmd-sharding">Jax example with SPMD sharding</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#legate-jax-example-with-mpmd-execution">Legate-Jax example with MPMD execution</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By The Legate-JAX authors
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2024, The Legate-JAX Authors..
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

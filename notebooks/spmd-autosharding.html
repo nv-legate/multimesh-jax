@@ -1,0 +1,827 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Logical autosharding for SPMD &#8212; Legate-JAX  documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="../_static/plot_directive.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../_static/style.css?v=3cbd6ad6" />
+    <link rel="stylesheet" href="../_static/style.css" type="text/css" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'notebooks/spmd-autosharding';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Logical autosharding for MPMD" href="mpmd-autosharding.html" />
+    <link rel="prev" title="Hello world example with Legate tasks" href="hello-world.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Legate-JAX  documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../getting-started.html">Getting Started</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api.html">Public API: legate.jax package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../legate.jax.flax.html">Public API: legate.jax.flax package</a></li>
+</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../tutorials.html">Tutorials</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="hello-world.html">Hello world example with Legate tasks</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Logical autosharding for SPMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="flax-mpmd.html">Pipeline example with simple MLP layers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="implicit-flax-tasks.html">Pipeline example with simple MLP layers</a></li>
+</ul><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+<a href="https://github.com/nv-legate/legate-jax" target="_blank"
+   class="btn btn-sm btn-source-repository-button"
+   title="Source repository"
+   data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+
+</a>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/notebooks/spmd-autosharding.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Logical autosharding for SPMD</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#regular-jax-create-layers-with-explicit-spmd-sharding-annotations">Regular Jax: create layers with explicit SPMD sharding annotations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#appendix">Appendix</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#using-an-example-batch-instead-of-a-batch-generator-function">Using an example batch instead of a batch generator function</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#implementation-details-of-parallelize">Implementation details of <code class="docutils literal notranslate"><span class="pre">parallelize</span></code></a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="logical-autosharding-for-spmd">
+<h1>Logical autosharding for SPMD<a class="headerlink" href="#logical-autosharding-for-spmd" title="Link to this heading">#</a></h1>
+<section id="what-you-need-to-know-for-this-tutorial">
+<h2>What you need to know for this tutorial<a class="headerlink" href="#what-you-need-to-know-for-this-tutorial" title="Link to this heading">#</a></h2>
+<ol class="arabic simple">
+<li><p>A basic knowledge of Jax and numpy</p></li>
+<li><p>Familiarity with the concepts of tensor sharding and parallelism</p></li>
+</ol>
+</section>
+<section id="initialize-legate-jax">
+<h2>Initialize Legate-Jax<a class="headerlink" href="#initialize-legate-jax" title="Link to this heading">#</a></h2>
+<p>The first step in a Legate-Jax program is to initialize the environment. Before any other imports, <code class="docutils literal notranslate"><span class="pre">jax_plugins.legate.init</span></code> should be called with the appropriate arguments for configuring Legate. This does violate the common Python style rule of top-level imports coming before all code. It is possible to configure Legate ahead-of-time with environment variables, but the programmatic method here is generally cleaner and easier.  The parameters for Legate must be configured before importing any Jax functions.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.legate</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
+
+<span class="n">init</span><span class="p">(</span>
+  <span class="n">cpus</span><span class="o">=</span><span class="mi">8</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="import-jax-packages">
+<h2>Import Jax packages<a class="headerlink" href="#import-jax-packages" title="Link to this heading">#</a></h2>
+<p>Once Legate-Jax has been initialized, a standard set of Jax imports can be done.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mesh</span><span class="p">,</span> <span class="n">NamedSharding</span><span class="p">,</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">jax.debug</span><span class="w"> </span><span class="kn">import</span> <span class="n">visualize_array_sharding</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">legate.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">with_sharding_constraint</span><span class="p">,</span> <span class="n">parallelize</span><span class="p">,</span> <span class="n">task</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="regular-jax-create-layers-with-explicit-spmd-sharding-annotations">
+<h2>Regular Jax: create layers with explicit SPMD sharding annotations<a class="headerlink" href="#regular-jax-create-layers-with-explicit-spmd-sharding-annotations" title="Link to this heading">#</a></h2>
+<p>In Jax, the usual workflow would be:</p>
+<ol class="arabic simple">
+<li><p>Writing numpy-like code that implements the model</p></li>
+<li><p>Initializing parameters and input batches with explicit shardings</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">jit</span></code> the function with the explicit shardings</p></li>
+<li><p>Executing the jit-compiled function with the initialized parameters</p></li>
+</ol>
+<p>We start with step 1 and implement a basic model with two fully-connected layers:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;bm,mh-&gt;bh&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">param</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">model</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="n">param_1</span><span class="p">,</span> <span class="n">param_2</span> <span class="o">=</span> <span class="n">params</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">param_1</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="n">param_2</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>To run the model, we will need input batches and parameters. We use dummy functions for now:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">get_input_batch</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">8</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">init_params</span><span class="p">():</span>
+    <span class="n">param1</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">8</span><span class="p">)</span>
+    <span class="n">param2</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">8</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">param1</span><span class="p">,</span> <span class="n">param2</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>We use <code class="docutils literal notranslate"><span class="pre">NamedSharding</span></code> objects to define how we want to shard the parameters and input batches.
+We shard over the batch axis for the inputs and over the “x” axis for the parameters. We can then jit-compile
+and run the init function to generate the sharded inputs/parameters.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">mesh</span> <span class="o">=</span> <span class="n">Mesh</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">()),</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,))</span>
+<span class="n">input_sharding</span> <span class="o">=</span> <span class="n">NamedSharding</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span> <span class="c1"># no sharding over model dim</span>
+<span class="n">param_sharding</span> <span class="o">=</span> <span class="n">NamedSharding</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span> <span class="c1"># no sharding over y-axis</span>
+
+<span class="n">get_sharded_batch</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">get_input_batch</span><span class="p">,</span> <span class="n">out_shardings</span><span class="o">=</span><span class="n">input_sharding</span><span class="p">)</span>
+<span class="n">get_sharded_params</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">init_params</span><span class="p">,</span> <span class="n">out_shardings</span><span class="o">=</span><span class="p">(</span><span class="n">param_sharding</span><span class="p">,</span> <span class="n">param_sharding</span><span class="p">))</span>
+
+<span class="n">batch</span> <span class="o">=</span> <span class="n">get_sharded_batch</span><span class="p">()</span>
+<span class="n">params</span> <span class="o">=</span> <span class="n">get_sharded_params</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Platform &#39;legate&#39; is experimental and not all JAX functionality may be correctly supported!
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1725909884.780627 2088951 cpu_client.cc:466] TfrtCpuClient created.
+</pre></div>
+</div>
+</div>
+</div>
+<p>We can inspect the shardings and see a <code class="docutils literal notranslate"><span class="pre">NamedSharding</span></code> that creates a 1D slice along the mesh x-axis.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">inspect</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">sharding</span><span class="p">)</span>
+    
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Input&quot;</span><span class="p">)</span>
+<span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">inspect</span><span class="p">,</span> <span class="n">batch</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Params&quot;</span><span class="p">)</span>
+<span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">inspect</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+
+<span class="n">visualize_array_sharding</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Input
+(8, 8) NamedSharding(mesh=Mesh(&#39;x&#39;: 8), spec=PartitionSpec(&#39;x&#39;, None))
+Params
+(8, 8) NamedSharding(mesh=Mesh(&#39;x&#39;: 8), spec=PartitionSpec(&#39;x&#39;, None))
+(8, 8) NamedSharding(mesh=Mesh(&#39;x&#39;: 8), spec=PartitionSpec(&#39;x&#39;, None))
+</pre></div>
+</div>
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">        LEGATE 0         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #d6616b">        LEGATE 1         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #d6616b">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #8ca252">        LEGATE 2         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #8ca252">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #de9ed6">        LEGATE 3         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #de9ed6">                         </span>
+<span style="color: #000000; text-decoration-color: #000000; background-color: #e7cb94">        LEGATE 4         </span>
+<span style="color: #000000; text-decoration-color: #000000; background-color: #e7cb94">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #6b6ecf">        LEGATE 5         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #6b6ecf">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #a55194">        LEGATE 6         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #a55194">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #8c6d31">        LEGATE 7         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #8c6d31">                         </span>
+</pre>
+</div></div>
+</div>
+<p>We can now jit-compile a sharded model and pass it sharded inputs and parameters.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sharded_model</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">in_shardings</span><span class="o">=</span><span class="p">((</span><span class="n">param_sharding</span><span class="p">,</span> <span class="n">param_sharding</span><span class="p">),</span> <span class="n">input_sharding</span><span class="p">))</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">sharded_model</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">batch</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>Legate-Jax follows a model of <em>logical autosharding</em>, which slighly changes the usual Jax flow.
+The order of steps is now:</p>
+<ol class="arabic simple">
+<li><p>Writing numpy-like code that implements the model</p></li>
+<li><p>Add logical sharding annotations to parameters in the model</p></li>
+<li><p>Ahead-of-time compile the model, which computes the physical shardings</p></li>
+<li><p>Use the computed physical shardings to initialize parameters</p></li>
+</ol>
+<p>We modify the model code above to now include logical sharding constraints.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;bm,mh-&gt;bh&quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">param</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">model</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">with_sharding_constraint</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+    <span class="n">param_1</span><span class="p">,</span> <span class="n">param_2</span> <span class="o">=</span> <span class="n">params</span>
+    <span class="n">param_1</span> <span class="o">=</span> <span class="n">with_sharding_constraint</span><span class="p">(</span><span class="n">param_1</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+    <span class="n">param_2</span> <span class="o">=</span> <span class="n">with_sharding_constraint</span><span class="p">(</span><span class="n">param_2</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;model&quot;</span><span class="p">))</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">param_1</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">param_2</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">with_sharding_constraint</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>Legate-Jax provides a helper function to simplify the workflow.
+The <code class="docutils literal notranslate"><span class="pre">legate.jax.parallelize</span></code> function takes the <code class="docutils literal notranslate"><span class="pre">get_input_batch</span></code> and <code class="docutils literal notranslate"><span class="pre">init_params</span></code> functions as inputs. It executes an ahead-of-time compilation with autosharding and returns the <code class="docutils literal notranslate"><span class="pre">get_sharded_batch</span></code> and <code class="docutils literal notranslate"><span class="pre">get_sharded_params</span></code> functions.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sharded_model</span><span class="p">,</span> <span class="n">init_sharded_params</span><span class="p">,</span> <span class="n">get_sharded_batch</span> <span class="o">=</span> <span class="n">parallelize</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">init_params</span><span class="o">=</span><span class="n">init_params</span><span class="p">,</span> <span class="n">get_input_batch</span><span class="o">=</span><span class="n">get_input_batch</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>W0000 00:00:1725909885.702215 2088951 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725909885.702231 2088951 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725909885.702912 2088951 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725909885.702920 2088951 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+</pre></div>
+</div>
+</div>
+</div>
+<p>We can now generate an initial input batch and initial parameters and inspect the sharding.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">batch</span> <span class="o">=</span> <span class="n">get_sharded_batch</span><span class="p">()</span>
+<span class="n">params</span> <span class="o">=</span> <span class="n">init_sharded_params</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Input&quot;</span><span class="p">)</span>
+<span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">inspect</span><span class="p">,</span> <span class="n">batch</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Params&quot;</span><span class="p">)</span>
+<span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">inspect</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+
+<span class="n">visualize_array_sharding</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Input
+(8, 8) NamedSharding(mesh=Mesh(&#39;x&#39;: 8), spec=PartitionSpec())
+Params
+(8, 8) NamedSharding(mesh=Mesh(&#39;x&#39;: 8), spec=PartitionSpec())
+(8, 8) NamedSharding(mesh=Mesh(&#39;x&#39;: 8), spec=PartitionSpec())
+</pre></div>
+</div>
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79"> LEGATE 0,1,2,3,4,5,6,7  </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+</pre>
+</div></div>
+</div>
+<p>What we see in the debug output and the visualization is replicated sharding - a single block replicated to all CPUs. In the previous compilation, there was no logical task context to define how <em>logical autosharding</em> should be converted to physical shardings. <code class="docutils literal notranslate"><span class="pre">legate.jax</span></code> provides the <code class="docutils literal notranslate"><span class="pre">task</span></code> transformation to create this context. We define a 1-D mesh and map the logical <code class="docutils literal notranslate"><span class="pre">batch</span></code> and <code class="docutils literal notranslate"><span class="pre">model</span></code> axis to the device <code class="docutils literal notranslate"><span class="pre">x</span></code> axis.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">legate_model</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> 
+                    <span class="n">devices</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">()),</span>
+                    <span class="n">device_axes</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,),</span>
+                    <span class="n">logical_axes</span><span class="o">=</span><span class="p">(</span>
+                      <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+                      <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+                    <span class="p">))</span>
+<span class="n">sharded_model</span><span class="p">,</span> <span class="n">init_sharded_params</span><span class="p">,</span> <span class="n">get_sharded_batch</span> <span class="o">=</span> <span class="n">parallelize</span><span class="p">(</span>
+    <span class="n">legate_model</span><span class="p">,</span> <span class="n">init_params</span><span class="o">=</span><span class="n">init_params</span><span class="p">,</span> <span class="n">get_input_batch</span><span class="o">=</span><span class="n">get_input_batch</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>W0000 00:00:1725909886.441730 2088951 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725909886.441747 2088951 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725909886.442591 2088951 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725909886.442598 2088951 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+</pre></div>
+</div>
+</div>
+</div>
+<p>We can again generate example input batches and parameters and inspect the shardings. We now see that the logical autosharding has created a 1-D sharding.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">batch</span> <span class="o">=</span> <span class="n">get_sharded_batch</span><span class="p">()</span>
+<span class="n">params</span> <span class="o">=</span> <span class="n">init_sharded_params</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Input&quot;</span><span class="p">)</span>
+<span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">inspect</span><span class="p">,</span> <span class="n">batch</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Params&quot;</span><span class="p">)</span>
+<span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">inspect</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+
+<span class="n">visualize_array_sharding</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Input
+(8, 8) NamedSharding(mesh=Mesh(&#39;x&#39;: 8), spec=PartitionSpec(&#39;x&#39;,))
+Params
+(8, 8) NamedSharding(mesh=Mesh(&#39;x&#39;: 8), spec=PartitionSpec(&#39;x&#39;,))
+(8, 8) NamedSharding(mesh=Mesh(&#39;x&#39;: 8), spec=PartitionSpec(None, &#39;x&#39;))
+</pre></div>
+</div>
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">        LEGATE 0         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #393b79">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #d6616b">        LEGATE 1         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #d6616b">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #8ca252">        LEGATE 2         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #8ca252">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #de9ed6">        LEGATE 3         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #de9ed6">                         </span>
+<span style="color: #000000; text-decoration-color: #000000; background-color: #e7cb94">        LEGATE 4         </span>
+<span style="color: #000000; text-decoration-color: #000000; background-color: #e7cb94">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #6b6ecf">        LEGATE 5         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #6b6ecf">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #a55194">        LEGATE 6         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #a55194">                         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #8c6d31">        LEGATE 7         </span>
+<span style="color: #ffffff; text-decoration-color: #ffffff; background-color: #8c6d31">                         </span>
+</pre>
+</div></div>
+</div>
+<p>The example here shows a single SPMD task. Further examples show how this can be extended to MPMD tasks across different submeshes.</p>
+</section>
+<section id="appendix">
+<h2>Appendix<a class="headerlink" href="#appendix" title="Link to this heading">#</a></h2>
+<section id="using-an-example-batch-instead-of-a-batch-generator-function">
+<h3>Using an example batch instead of a batch generator function<a class="headerlink" href="#using-an-example-batch-instead-of-a-batch-generator-function" title="Link to this heading">#</a></h3>
+<p>Dataset loaders may produce input batches that are already sharded. In this case, the example above can be modified slightly.  Instead of passing in a batch generator function, an example batch can be passed to <code class="docutils literal notranslate"><span class="pre">parallelize</span></code>. In this case, only 2 functions are returned: the sharded model function and the parameter initialization.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">input_sharding</span> <span class="o">=</span> <span class="n">NamedSharding</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span> <span class="c1"># no sharding over model dim</span>
+<span class="n">data_loader</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">8</span><span class="p">),</span> <span class="n">out_shardings</span><span class="o">=</span><span class="n">input_sharding</span><span class="p">)</span>
+<span class="n">example_batch</span> <span class="o">=</span> <span class="n">data_loader</span><span class="p">()</span>
+<span class="n">sharded_model</span><span class="p">,</span> <span class="n">init_sharded_params</span> <span class="o">=</span> <span class="n">parallelize</span><span class="p">(</span>
+    <span class="n">legate_model</span><span class="p">,</span> <span class="n">init_params</span><span class="o">=</span><span class="n">init_params</span><span class="p">,</span> <span class="n">initial_batch</span><span class="o">=</span><span class="n">example_batch</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>W0000 00:00:1725909887.197451 2088951 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725909887.197467 2088951 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+W0000 00:00:1725909887.198355 2088951 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+I0000 00:00:1725909887.198362 2088951 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="implementation-details-of-parallelize">
+<h3>Implementation details of <code class="docutils literal notranslate"><span class="pre">parallelize</span></code><a class="headerlink" href="#implementation-details-of-parallelize" title="Link to this heading">#</a></h3>
+<p>Jax provides several utilities for abstract evalution of functions to determine output shapes. This is used, e.g. to determine the PyTree of parameter shapes.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">param_shapes</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">eval_shape</span><span class="p">(</span><span class="n">init_params</span><span class="p">)</span>
+<span class="n">abstract_params</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree_map</span><span class="p">(</span>
+    <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">ShapedArray</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span> <span class="n">param_shapes</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Instead of explicit input/output shardings, the shardings are set to <code class="docutils literal notranslate"><span class="pre">AUTO</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">param_shardings</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree_map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">AUTO</span><span class="p">(</span><span class="n">mesh</span><span class="p">),</span> <span class="n">param_shapes</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Once the abstract shapes are know, the function is compiled in a <code class="docutils literal notranslate"><span class="pre">legate.jax</span></code> autosharding context:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">legate</span><span class="o">.</span><span class="n">jax</span><span class="o">.</span><span class="n">autoshard</span><span class="p">(</span><span class="kc">True</span><span class="p">):</span>
+  <span class="n">jit_f</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> 
+          <span class="n">in_shardings</span><span class="o">=</span><span class="p">(</span><span class="n">param_shardings</span><span class="p">,</span> <span class="n">batch_sharding</span><span class="p">),</span> 
+          <span class="n">out_shardings</span><span class="o">=</span><span class="n">out_shardings</span><span class="p">)</span>
+  <span class="n">compiled</span> <span class="o">=</span> <span class="n">jit_f</span><span class="o">.</span><span class="n">lower</span><span class="p">(</span><span class="n">abstract_params</span><span class="p">,</span> <span class="n">initial_batch</span><span class="p">)</span><span class="o">.</span><span class="n">compile</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The derived input and output shardings are available from the compiled function, e.g. <code class="docutils literal notranslate"><span class="pre">compiled.input_shardings</span></code></p>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="hello-world.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Hello world example with Legate tasks</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="mpmd-autosharding.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Logical autosharding for MPMD</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#regular-jax-create-layers-with-explicit-spmd-sharding-annotations">Regular Jax: create layers with explicit SPMD sharding annotations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#appendix">Appendix</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#using-an-example-batch-instead-of-a-batch-generator-function">Using an example batch instead of a batch generator function</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#implementation-details-of-parallelize">Implementation details of <code class="docutils literal notranslate"><span class="pre">parallelize</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By The Legate-JAX authors
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2024, The Legate-JAX Authors..
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

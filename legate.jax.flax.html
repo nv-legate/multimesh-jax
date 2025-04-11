@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Legate-JAX: MPMD auto-sharding for JAX &#8212; Legate-JAX  documentation</title>
+    <title>Public API: legate.jax.flax package &#8212; Legate-JAX  documentation</title>
   
   
   
@@ -49,10 +49,11 @@
     <script src="_static/copybutton.js?v=f281be69"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
     <script src="_static/design-tabs.js?v=f930bc37"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'legate.jax.flax';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Getting Started" href="getting-started.html" />
+    <link rel="next" title="legate.jax.flax.task" href="_autosummary/legate.jax.flax.task.html" />
+    <link rel="prev" title="Public API: legate.jax package" href="api.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -115,8 +116,6 @@
       
       
       
-        
-      
       <div class="bd-sidebar-primary bd-sidebar">
         
 
@@ -135,7 +134,7 @@
     
   
 
-<a class="navbar-brand logo" href="#">
+<a class="navbar-brand logo" href="index.html">
   
   
   
@@ -163,10 +162,10 @@
 <li class="toctree-l1"><a class="reference internal" href="getting-started.html">Getting Started</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="api.html">Public API: legate.jax package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="legate.jax.flax.html">Public API: legate.jax.flax package</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="api.html">Public API: legate.jax package</a><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Public API: legate.jax.flax package</a></li>
+</ul><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
 </details></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
@@ -248,7 +247,7 @@
       
       
       
-      <li><a href="_sources/index.rst" target="_blank"
+      <li><a href="_sources/legate.jax.flax.rst" target="_blank"
    class="btn btn-sm btn-download-source-button dropdown-item"
    title="Download source file"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -319,7 +318,9 @@ document.write(`
   </button>
 `);
 </script>
-
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
 </div></div>
       
     </div>
@@ -330,11 +331,24 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>Legate-JAX: MPMD auto-sharding for JAX</h1>
+    <h1>Public API: legate.jax.flax package</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
             
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#task-transformations">Task transformations</a><ul class="simple visible nav section-nav flex-column">
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#logical-sharding-annotations">Logical sharding annotations</a><ul class="simple visible nav section-nav flex-column">
+</ul>
+</li>
+</ul>
+            </nav>
         </div>
     </div>
 </div>
@@ -344,40 +358,36 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="legate-jax-mpmd-auto-sharding-for-jax">
-<h1>Legate-JAX: MPMD auto-sharding for JAX<a class="headerlink" href="#legate-jax-mpmd-auto-sharding-for-jax" title="Link to this heading">#</a></h1>
-<p>Legate-JAX provides a framework for creating <cite>task</cite> contexts within large computations.
-This allows different subcomputations to be placed on different GPU submeshes to
-implement, e.g. pipeline parallelism. It also enables flexibly resharding tensors
-based on logical names.</p>
-<div class="sd-container-fluid sd-sphinx-override sd-m-0 sd-p-0 docutils">
-<div class="sd-row sd-row-cols-2 sd-row-cols-xs-2 sd-row-cols-sm-2 sd-row-cols-md-2 sd-row-cols-lg-2 sd-g-0 sd-g-xs-0 sd-g-sm-0 sd-g-md-0 sd-g-lg-0 docutils">
-<div class="sd-col sd-d-flex-row sd-col-12 sd-col-xs-12 sd-col-sm-6 sd-col-md-6 sd-col-lg-4 docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-none sd-border-0 docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Familiar Transformation API</div>
-<p class="sd-card-text">Legate-JAX uses idiomatic JAX transforms to assign submesh contexts to functions or Flax modules</p>
+  <section id="public-api-legate-jax-flax-package">
+<h1>Public API: legate.jax.flax package<a class="headerlink" href="#public-api-legate-jax-flax-package" title="Link to this heading">#</a></h1>
+<section id="task-transformations">
+<h2>Task transformations<a class="headerlink" href="#task-transformations" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/legate.jax.flax.task.html#legate.jax.flax.task" title="legate.jax.flax.task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">task</span></code></a>(model[, name, mesh, devices, ...])</p></td>
+<td><p>Wraps a Flax module in an auto-sharding task context</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/legate.jax.flax.parallelize_step.html#legate.jax.flax.parallelize_step" title="legate.jax.flax.parallelize_step"><code class="xref py py-obj docutils literal notranslate"><span class="pre">parallelize_step</span></code></a>(model, optimizer, mesh[, ...])</p></td>
+<td><p>Combines model loss function and optimizer into an autosharded step function</p></td>
+</tr>
+</tbody>
+</table>
 </div>
+</section>
+<section id="logical-sharding-annotations">
+<h2>Logical sharding annotations<a class="headerlink" href="#logical-sharding-annotations" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/legate.jax.flax.shard_axes.html#legate.jax.flax.shard_axes" title="legate.jax.flax.shard_axes"><code class="xref py py-obj docutils literal notranslate"><span class="pre">shard_axes</span></code></a>(*args)</p></td>
+<td><p>Helper function to simplify naming axes of Flax parameters</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/legate.jax.flax.with_sharding_constraint.html#legate.jax.flax.with_sharding_constraint" title="legate.jax.flax.with_sharding_constraint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_sharding_constraint</span></code></a>(x, axis_resources)</p></td>
+<td><p>Applies logical sharding annotations to the input(s)</p></td>
+</tr>
+</tbody>
+</table>
 </div>
-</div>
-<div class="sd-col sd-d-flex-row sd-col-12 sd-col-xs-12 sd-col-sm-6 sd-col-md-6 sd-col-lg-4 docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-none sd-border-0 docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Plugin Installation</div>
-<p class="sd-card-text">Legate-JAX adds compiler and runtime functionality via the <cite>jax_plugins</cite> interface</p>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
+</section>
 </section>
 
 
@@ -391,12 +401,21 @@ Plugin Installation</div>
                 <footer class="prev-next-footer d-print-none">
                   
 <div class="prev-next-area">
+    <a class="left-prev"
+       href="api.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Public API: legate.jax package</p>
+      </div>
+    </a>
     <a class="right-next"
-       href="getting-started.html"
+       href="_autosummary/legate.jax.flax.task.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Getting Started</p>
+        <p class="prev-next-title">legate.jax.flax.task</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -406,6 +425,26 @@ Plugin Installation</div>
             </div>
             
             
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#task-transformations">Task transformations</a><ul class="simple visible nav section-nav flex-column">
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#logical-sharding-annotations">Logical sharding annotations</a><ul class="simple visible nav section-nav flex-column">
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
               
             
           </div>

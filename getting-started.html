@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Legate-JAX: MPMD auto-sharding for JAX &#8212; Legate-JAX  documentation</title>
+    <title>Getting Started &#8212; Legate-JAX  documentation</title>
   
   
   
@@ -49,10 +49,11 @@
     <script src="_static/copybutton.js?v=f281be69"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
     <script src="_static/design-tabs.js?v=f930bc37"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'getting-started';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Getting Started" href="getting-started.html" />
+    <link rel="next" title="Public API: legate.jax package" href="api.html" />
+    <link rel="prev" title="Legate-JAX: MPMD auto-sharding for JAX" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -115,8 +116,6 @@
       
       
       
-        
-      
       <div class="bd-sidebar-primary bd-sidebar">
         
 
@@ -135,7 +134,7 @@
     
   
 
-<a class="navbar-brand logo" href="#">
+<a class="navbar-brand logo" href="index.html">
   
   
   
@@ -159,8 +158,8 @@
         <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
     <div class="bd-toc-item navbar-nav active">
         <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="getting-started.html">Getting Started</a></li>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Getting Started</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
@@ -248,7 +247,7 @@
       
       
       
-      <li><a href="_sources/index.rst" target="_blank"
+      <li><a href="_sources/getting-started.md" target="_blank"
    class="btn btn-sm btn-download-source-button dropdown-item"
    title="Download source file"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -258,7 +257,7 @@
 <span class="btn__icon-container">
   <i class="fas fa-file"></i>
   </span>
-<span class="btn__text-container">.rst</span>
+<span class="btn__text-container">.md</span>
 </a>
 </li>
       
@@ -319,7 +318,9 @@ document.write(`
   </button>
 `);
 </script>
-
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
 </div></div>
       
     </div>
@@ -330,11 +331,21 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>Legate-JAX: MPMD auto-sharding for JAX</h1>
+    <h1>Getting Started</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
             
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#downloading-images">Downloading Images</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#running-jupyter-tutorials-with-docker">Running Jupyter tutorials with Docker</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#building-images">Building Images</a></li>
+</ul>
+            </nav>
         </div>
     </div>
 </div>
@@ -344,40 +355,51 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="legate-jax-mpmd-auto-sharding-for-jax">
-<h1>Legate-JAX: MPMD auto-sharding for JAX<a class="headerlink" href="#legate-jax-mpmd-auto-sharding-for-jax" title="Link to this heading">#</a></h1>
-<p>Legate-JAX provides a framework for creating <cite>task</cite> contexts within large computations.
-This allows different subcomputations to be placed on different GPU submeshes to
-implement, e.g. pipeline parallelism. It also enables flexibly resharding tensors
-based on logical names.</p>
-<div class="sd-container-fluid sd-sphinx-override sd-m-0 sd-p-0 docutils">
-<div class="sd-row sd-row-cols-2 sd-row-cols-xs-2 sd-row-cols-sm-2 sd-row-cols-md-2 sd-row-cols-lg-2 sd-g-0 sd-g-xs-0 sd-g-sm-0 sd-g-md-0 sd-g-lg-0 docutils">
-<div class="sd-col sd-d-flex-row sd-col-12 sd-col-xs-12 sd-col-sm-6 sd-col-md-6 sd-col-lg-4 docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-none sd-border-0 docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Familiar Transformation API</div>
-<p class="sd-card-text">Legate-JAX uses idiomatic JAX transforms to assign submesh contexts to functions or Flax modules</p>
+  <section class="tex2jax_ignore mathjax_ignore" id="getting-started">
+<h1>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading">#</a></h1>
+<p>The simplest way to get started is by downloading one of the Legate-JAX containers.
+There is a full development container which includes all source files and enables
+rebuilding each component.</p>
+<section id="downloading-images">
+<h2>Downloading Images<a class="headerlink" href="#downloading-images" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://gitlab-master.nvidia.com/legate/quickstart.internal/container_registry/69362">Development Images</a></p></li>
+</ul>
+<p>The simplest way to get started is downloading the conatiner:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>pull<span class="w"> </span>docker<span class="w"> </span>pull<span class="w"> </span>gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev
+</pre></div>
 </div>
+</section>
+<section id="running-jupyter-tutorials-with-docker">
+<h2>Running Jupyter tutorials with Docker<a class="headerlink" href="#running-jupyter-tutorials-with-docker" title="Link to this heading">#</a></h2>
+<p>The recommended way to run the examples is through Docker.
+To launch a Jupyter notebook in the container for running on CPU
+that can be loaded in a local browser:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-w<span class="w"> </span>/opt/legate-jax/docs/notebooks<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-p<span class="w"> </span><span class="m">8675</span>:8675<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>jupyter<span class="w"> </span>notebook<span class="w"> </span>--allow-root<span class="w"> </span>--ip<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="o">=</span><span class="m">8675</span>
+</pre></div>
 </div>
+<p>The notebook will then be available at the link shown.<br />
+If GPUs are available, then docker can be launched as:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-w<span class="w"> </span>/opt/legate-jax/docs/notebooks<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-p<span class="w"> </span><span class="m">8675</span>:8675<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--gpus<span class="w"> </span>&lt;N&gt;<span class="w"> </span><span class="se">\ </span>
+<span class="w">  </span>gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>jupyter<span class="w"> </span>notebook<span class="w"> </span>--allow-root<span class="w"> </span>--ip<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="o">=</span><span class="m">8675</span>
+</pre></div>
 </div>
-<div class="sd-col sd-d-flex-row sd-col-12 sd-col-xs-12 sd-col-sm-6 sd-col-md-6 sd-col-lg-4 docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-none sd-border-0 docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Plugin Installation</div>
-<p class="sd-card-text">Legate-JAX adds compiler and runtime functionality via the <cite>jax_plugins</cite> interface</p>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">&lt;N&gt;</span></code> is the number of GPUs.</p>
+</section>
+<section id="building-images">
+<h2>Building Images<a class="headerlink" href="#building-images" title="Link to this heading">#</a></h2>
+<p>Instructions for building Legate-JAX can be found in the <a class="reference external" href="https://github.com/nv-legate/legate.jax/blob/main/docker/README.md">README</a>.
+Included in the <code class="docutils literal notranslate"><span class="pre">docker</span></code> folder are scripts showing how to configure, build, and install
+the various components.</p>
+</section>
 </section>
 
 
@@ -391,12 +413,21 @@ Plugin Installation</div>
                 <footer class="prev-next-footer d-print-none">
                   
 <div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Legate-JAX: MPMD auto-sharding for JAX</p>
+      </div>
+    </a>
     <a class="right-next"
-       href="getting-started.html"
+       href="api.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Getting Started</p>
+        <p class="prev-next-title">Public API: legate.jax package</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -406,6 +437,23 @@ Plugin Installation</div>
             </div>
             
             
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#downloading-images">Downloading Images</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#running-jupyter-tutorials-with-docker">Running Jupyter tutorials with Docker</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#building-images">Building Images</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
               
             
           </div>

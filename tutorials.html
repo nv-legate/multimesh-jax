@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Legate-JAX: MPMD auto-sharding for JAX &#8212; Legate-JAX  documentation</title>
+    <title>Tutorials &#8212; Legate-JAX  documentation</title>
   
   
   
@@ -49,10 +49,11 @@
     <script src="_static/copybutton.js?v=f281be69"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
     <script src="_static/design-tabs.js?v=f930bc37"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Getting Started" href="getting-started.html" />
+    <link rel="next" title="Hello world example with Legate tasks" href="notebooks/hello-world.html" />
+    <link rel="prev" title="legate.jax.ignore_transforms" href="_autosummary/legate.jax.ignore_transforms.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -115,8 +116,6 @@
       
       
       
-        
-      
       <div class="bd-sidebar-primary bd-sidebar">
         
 
@@ -135,7 +134,7 @@
     
   
 
-<a class="navbar-brand logo" href="#">
+<a class="navbar-brand logo" href="index.html">
   
   
   
@@ -170,14 +169,14 @@
 </details></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="tutorials.html">Tutorials</a><ul>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">Tutorials</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/hello-world.html">Hello world example with Legate tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/flax-mpmd.html">Pipeline example with simple MLP layers</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/implicit-flax-tasks.html">Pipeline example with simple MLP layers</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</ul><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
 </details></li>
 </ul>
 
@@ -248,7 +247,7 @@
       
       
       
-      <li><a href="_sources/index.rst" target="_blank"
+      <li><a href="_sources/tutorials.rst" target="_blank"
    class="btn btn-sm btn-download-source-button dropdown-item"
    title="Download source file"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -330,7 +329,7 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>Legate-JAX: MPMD auto-sharding for JAX</h1>
+    <h1>Tutorials</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
@@ -344,39 +343,25 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="legate-jax-mpmd-auto-sharding-for-jax">
-<h1>Legate-JAX: MPMD auto-sharding for JAX<a class="headerlink" href="#legate-jax-mpmd-auto-sharding-for-jax" title="Link to this heading">#</a></h1>
-<p>Legate-JAX provides a framework for creating <cite>task</cite> contexts within large computations.
-This allows different subcomputations to be placed on different GPU submeshes to
-implement, e.g. pipeline parallelism. It also enables flexibly resharding tensors
-based on logical names.</p>
-<div class="sd-container-fluid sd-sphinx-override sd-m-0 sd-p-0 docutils">
-<div class="sd-row sd-row-cols-2 sd-row-cols-xs-2 sd-row-cols-sm-2 sd-row-cols-md-2 sd-row-cols-lg-2 sd-g-0 sd-g-xs-0 sd-g-sm-0 sd-g-md-0 sd-g-lg-0 docutils">
-<div class="sd-col sd-d-flex-row sd-col-12 sd-col-xs-12 sd-col-sm-6 sd-col-md-6 sd-col-lg-4 docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-none sd-border-0 docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Familiar Transformation API</div>
-<p class="sd-card-text">Legate-JAX uses idiomatic JAX transforms to assign submesh contexts to functions or Flax modules</p>
-</div>
-</div>
-</div>
-<div class="sd-col sd-d-flex-row sd-col-12 sd-col-xs-12 sd-col-sm-6 sd-col-md-6 sd-col-lg-4 docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-none sd-border-0 docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Plugin Installation</div>
-<p class="sd-card-text">Legate-JAX adds compiler and runtime functionality via the <cite>jax_plugins</cite> interface</p>
-</div>
-</div>
-</div>
-</div>
+  <section id="tutorials">
+<span id="id1"></span><h1>Tutorials<a class="headerlink" href="#tutorials" title="Link to this heading">#</a></h1>
+<p>User guides are deeper dives into particular topics within JAX
+that become relevant as your JAX project matures into larger
+or deployed codebases.</p>
+<div class="toctree-wrapper compound">
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Task API for pure JAX functions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/hello-world.html">Hello world example with Legate tasks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
+</ul>
 </div>
 <div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Task API for Flax modules</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/flax-mpmd.html">Pipeline example with simple MLP layers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/implicit-flax-tasks.html">Pipeline example with simple MLP layers</a></li>
+</ul>
 </div>
 </section>
 
@@ -391,12 +376,21 @@ Plugin Installation</div>
                 <footer class="prev-next-footer d-print-none">
                   
 <div class="prev-next-area">
+    <a class="left-prev"
+       href="_autosummary/legate.jax.ignore_transforms.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">legate.jax.ignore_transforms</p>
+      </div>
+    </a>
     <a class="right-next"
-       href="getting-started.html"
+       href="notebooks/hello-world.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Getting Started</p>
+        <p class="prev-next-title">Hello world example with Legate tasks</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
