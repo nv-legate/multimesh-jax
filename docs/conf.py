@@ -28,6 +28,7 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_design",
     "sphinxext.rediraffe",
+    "sphinx.ext.githubpages",
 ]
 
 intersphinx_mapping = {

@@ -4,15 +4,10 @@ The simplest way to get started is by downloading one of the Legate-JAX containe
 There is a full development container which includes all source files and enables
 rebuilding each component.
 
-## Downloading Images
+## Docker Images
 
-* [Development Images](https://gitlab-master.nvidia.com/legate/quickstart.internal/container_registry/69362)
-
-The simplest way to get started is downloading the conatiner:
-
-```bash
-docker pull docker pull gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev
-```
+The easiest way to get started is by building images
+using [Legate-Jax workflows](https://github.com/nv-legate/legate-jax-workflows).
 
 ## Running Jupyter tutorials with Docker
 
