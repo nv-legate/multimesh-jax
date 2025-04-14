@@ -608,8 +608,8 @@ absl::Status MpmdShardingPropagation::ShardForward(
 absl::StatusOr<bool> MpmdShardingPropagation::Run(
     HloModule* module,
     const absl::flat_hash_set<absl::string_view>& execution_threads) {
-  ApplyRootTupleShardingsToOperands(
-      module, module->entry_computation()->root_instruction());
+  HloInstruction* root = module->entry_computation()->root_instruction();
+  ApplyRootTupleShardingsToOperands(module, root);
 
   auto properties = InstructionProperties::Create(module);
   HloPassCleanup cleanup;

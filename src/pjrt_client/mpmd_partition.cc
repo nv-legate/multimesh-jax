@@ -86,8 +86,7 @@ absl::StatusOr<HloSharding> ToMpmdSharding(
     const Shape& shape, const HloSharding& iota_sharding,
     const zuku::DeviceList& task_devices,
     const zuku::DeviceList& global_devices, bool use_submesh_sharding) {
-  if (iota_sharding.IsReplicated() &&
-      (!use_submesh_sharding || task_devices == global_devices)) {
+  if (iota_sharding.IsReplicated() && task_devices == global_devices) {
     return HloSharding::Replicate();
   }
 
@@ -319,7 +318,7 @@ class MpmdScheduler {
 
   absl::Status PrioritizeReshardsInSchedule(HloInstruction* source) {
     for (auto* user : source->users()) {
-      if (user->IsCustomCall("Reshard")) {
+      if (user->IsCustomCall(kCustomCallReshard)) {
         TF_RETURN_IF_ERROR(AddReshardTask(user));
       }
     }
@@ -397,7 +396,7 @@ absl::Status MpmdScheduler::AddHloModuleTask(
   for (int64_t index = 0; index < call->operand_count(); ++index) {
     HloInstruction* operand = call->mutable_operand(index);
 
-    if (operand->IsCustomCall("SliceOffset")) {
+    if (operand->IsCustomCall(kCustomCallSliceOffset)) {
       TF_ASSIGN_OR_RETURN(int offset, GetAttribute<int>(operand, "offset"));
       scalars.push_back(ScalarArgument{offset, index});
       VLOG(3) << "pushing back offset " << offset << " for task "
@@ -643,7 +642,7 @@ absl::Status AddTasksFromEntryComputation(
       TF_RETURN_IF_ERROR(scheduler.AddStore(Store::Type::PARAM, instruction,
                                             instruction->parameter_number()));
     } else if (instruction->opcode() == HloOpcode::kGetTupleElement ||
-               instruction->IsCustomCall("Reshard")) {
+               instruction->IsCustomCall(kCustomCallReshard)) {
       std::optional<int64_t> root_index = GetRootIndex(instruction);
       if (root_index.has_value()) {
         TF_RETURN_IF_ERROR(
@@ -654,7 +653,7 @@ absl::Status AddTasksFromEntryComputation(
 
   for (auto* instruction : postorder) {
     if (instruction->opcode() == HloOpcode::kCall ||
-        instruction->IsCustomCall("Reshard")) {
+        instruction->IsCustomCall(kCustomCallReshard)) {
       for (auto* operand : instruction->operands()) {
         scheduler.LogUseOrder(instruction, operand);
       }
@@ -664,7 +663,7 @@ absl::Status AddTasksFromEntryComputation(
   // now go back through and configure all the temporaries
   for (auto* instruction : postorder) {
     if (instruction->opcode() == HloOpcode::kGetTupleElement ||
-        instruction->IsCustomCall("Reshard")) {
+        instruction->IsCustomCall(kCustomCallReshard)) {
       if (!scheduler.AssignedToStore(instruction)) {
         TF_RETURN_IF_ERROR(
             scheduler.AddStore(Store::Type::TEMP, instruction, std::nullopt));
@@ -679,7 +678,7 @@ absl::Status AddTasksFromEntryComputation(
       TF_RETURN_IF_ERROR(scheduler.AddHloModuleTask(instruction, options));
     } else if (instruction->opcode() == HloOpcode::kGetTupleElement) {
       TF_RETURN_IF_ERROR(scheduler.PrioritizeReshardsInSchedule(instruction));
-    } else if (instruction->IsCustomCall("Reshard")) {
+    } else if (instruction->IsCustomCall(kCustomCallReshard)) {
       TF_RETURN_IF_ERROR(scheduler.AddReshardTask(instruction));
     }
   }

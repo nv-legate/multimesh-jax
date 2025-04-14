@@ -158,7 +158,7 @@ absl::Status MpmdLoopUnroll::Unroll(HloComputation *parent,
           break;
         }
         case HloOpcode::kCustomCall: {
-          if (instruction->IsCustomCall("SliceOffset")) {
+          if (instruction->IsCustomCall(kCustomCallSliceOffset)) {
             if (!clone_map.contains({instruction, iter})) {
               HloInstruction *clone =
                   parent->AddInstruction(instruction->Clone());
@@ -167,7 +167,7 @@ absl::Status MpmdLoopUnroll::Unroll(HloComputation *parent,
               clone_map[{instruction, iter}] = clone;
             }
             break;
-          } else if (instruction->IsCustomCall("DummyLoopOperation")) {
+          } else if (instruction->IsCustomCall(kCustomCallDummyOperation)) {
             // pass
             HloInstruction *clone =
                 parent->AddInstruction(instruction->Clone());

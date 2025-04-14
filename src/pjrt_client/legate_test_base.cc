@@ -174,6 +174,11 @@ absl::StatusOr<std::unique_ptr<LegatePjRtExecutable>> LegateTestBase::Compile(
     // if not specified, set to
     // true for all outputs
     allow_sharding_propagation_to_outputs = allow;
+  }
+
+  if (!cfg.use_module_config_auto_param_sharding) {
+    // if not specified, set to
+    // true for all params
     allow_sharding_propagation_to_params = allow;
   }
 

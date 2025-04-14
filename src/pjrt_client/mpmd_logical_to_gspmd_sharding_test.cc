@@ -308,6 +308,7 @@ TEST_F(MpmdLogicalShardingTest, GradientAutoShardParam) {
 }
 
 static constexpr absl::string_view kGradientMultiTaskAutoShardHlo = R"(
+HloModule jit_c, allow_spmd_sharding_propagation_to_parameters={true,true,true}
 ENTRY main.33 {
   Arg_0.1 = f32[4,2]{1,0} parameter(0), sharding={replicated}
   Arg_1.2 = f32[4,2]{1,0} parameter(1), sharding={replicated}
@@ -345,14 +346,15 @@ ENTRY main.33 {
 )";
 
 TEST_F(MpmdLogicalShardingTest, GradientMultiTaskAutoShardHlo) {
-  RegisterMatcherTestTask("task_0", {0, 1}, {2, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(task_0)", {0, 1}, {2, 1}, {"x", "y"},
                           {{"x", "x"}, {"y", "y"}});
-  RegisterMatcherTestTask("task_1", {2, 3}, {2, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(task_1)", {2, 3}, {2, 1}, {"x", "y"},
                           {{"x", "x"}, {"y", "y"}});
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
       RunMpmdOnHloString(kGradientMultiTaskAutoShardHlo, /*num_devices=*/4,
-                         {.use_auto_input_sharding = true}));
+                         {.use_auto_input_sharding = true,
+                          .use_module_config_auto_param_sharding = true}));
   auto [sharded_tasks, sharded_intermediates] = std::move(result);
 
   // make sure that all the inputs and outputs get the correct sharding

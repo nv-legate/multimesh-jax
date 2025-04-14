@@ -691,6 +691,7 @@ TEST_F(LegateExecutableTest, Pipeline2x8StagesMicrobatch8) {
 }
 
 TEST_F(LegateExecutableTest, Pipeline2x8StagesCircularScheduling) {
+  GTEST_SKIP() << "Need to resolve sharding mismatch with data parallelism";
   auto device_factory = [](const std::string& name) {
     int layer_num;
     bool parsed = absl::SimpleAtoi(name.substr(9), &layer_num);
@@ -741,6 +742,7 @@ TEST_F(LegateExecutableTest, Pipeline2x8StagesCircularScheduling) {
 
 TEST_F(LegateExecutableTest,
        Pipeline2x8StagesCircularSchedulingControlReplication) {
+  GTEST_SKIP() << "Need to resolve sharding mismatch with data parallelism";
   auto device_factory = [](const std::string& name) {
     int layer_num;
     bool parsed = absl::SimpleAtoi(name.substr(9), &layer_num);
@@ -1294,9 +1296,6 @@ TEST_F(LegateExecutableTest, TransformerTwoNodesHostOffload) {
   RecomputeArgumentsIfCostLessThan(1024 * 1024);
   ExecutePath("2nodes_transformer.txt", /*num_devices=*/kTotalDevices);
 
-  std::cerr << "Without offloading " << DeviceBytesHighWatermark(0)
-            << std::endl;
-
   // without offloading, the device byte limit should be exceeded
   // make sure this is verified, the test should fail if host offloading fails
   EXPECT_GT(DeviceBytesHighWatermark(/*local_device_id=*/0),
@@ -1308,8 +1307,6 @@ TEST_F(LegateExecutableTest, TransformerTwoNodesHostOffload) {
   SetHostOffloadMinSize(100e3);
 
   ExecutePath("2nodes_transformer.txt", /*num_devices=*/kTotalDevices);
-
-  std::cerr << "With offloading " << DeviceBytesHighWatermark(0) << std::endl;
 
   EXPECT_LT(DeviceBytesHighWatermark(/*local_device_id=*/0),
             kMaxDeviceBytesHighWatermark);

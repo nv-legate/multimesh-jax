@@ -78,6 +78,55 @@ int64_t OperandWeight(const HloInstruction* instruction) {
   return ShapeUtil::ElementsIn(instruction->shape());
 }
 
+bool AllowOverride(int64_t index, absl::Span<const bool> override) {
+  if (override.size() > index) {
+    return override[index];
+  }
+  if (override.empty()) {
+    return false;
+  }
+  return override[0];
+}
+
+absl::Status HandleRootTupleShardings(HloPartition* partition,
+                                      HloModule* module, HloInstruction* root) {
+  if (!root->has_sharding() || !root->shape().IsTuple()) {
+    return absl::OkStatus();
+  }
+
+  for (int64_t index = 0; index < root->operand_count(); ++index) {
+    const HloSharding& sharding = root->sharding().tuple_elements()[index];
+    auto* operand = root->mutable_operand(index);
+    const bool allow_sharding_overwrite = AllowOverride(
+        index, module->config().allow_spmd_sharding_propagation_to_output());
+    if (!sharding.IsReplicated() && !operand->has_sharding()) {
+      operand->set_sharding(sharding);
+    }
+
+    if (!allow_sharding_overwrite) {
+      VLOG(5) << operand->name() << " is root operand " << index
+              << ", which must use fixed sharding " << sharding;
+      // we have to create a coloring here to make sure that the correct output
+      // sharding is used for this
+      HloInstruction* recolor =
+          root->parent()->AddInstruction(HloInstruction::CreateCustomCall(
+              operand->shape(), {operand}, kCustomCallRootTupleRecolor));
+      TF_RETURN_IF_ERROR(root->ReplaceOperandWith(index, recolor));
+      std::string color = [&] {
+        if (sharding.IsReplicated()) {
+          return *partition->FindOrAllocateGlobalColor();
+        }
+        zuku::DeviceList devices =
+            *CreateDeviceList(sharding.tile_assignment());
+        return *partition->FindOrAllocateColor(devices, nullptr);
+      }();
+      recolor->set_sharding(sharding);
+      AssignColor(recolor, color);
+    }
+  }
+  return absl::OkStatus();
+}
+
 // Given a partition assigment `color` for the given `instruction`,
 // propagate colorings backward to aliases in the
 // `properties` map.
@@ -105,7 +154,7 @@ void ColorBackwards(const std::string& color, HloInstruction* instruction,
   while (!to_visit.empty()) {
     HloInstruction* next = to_visit.back();
     to_visit.pop_back();
-    if (instruction->IsCustomCall("SliceOffset")) {
+    if (instruction->IsCustomCall(kCustomCallSliceOffset)) {
       continue;
     }
 
@@ -162,12 +211,34 @@ MpmdColoring::CheckForExplicitShardingColor(
     return std::nullopt;
   }();
 
-  if (!explicit_sharding.has_value() || explicit_sharding->IsReplicated()) {
+  if (!explicit_sharding.has_value()) {
     return std::nullopt;
   }
 
-  TF_ASSIGN_OR_RETURN(zuku::DeviceList devices,
-                      CreateDeviceList(explicit_sharding->tile_assignment()));
+  if (explicit_sharding->IsReplicated()) {
+    // make sure this is not a parameter that has been explicitly assigned
+    // replicated sharding
+    std::optional<int64_t> parameter_number =
+        properties.ParameterNumber(instruction);
+    if (parameter_number.has_value()) {
+      if (AllowOverride(*parameter_number,
+                        instruction->parent()
+                            ->parent()
+                            ->config()
+                            .allow_spmd_sharding_propagation_to_parameters())) {
+        return std::nullopt;
+      }
+    } else {
+      return std::nullopt;
+    }
+  }
+
+  zuku::DeviceList devices = [&] {
+    if (explicit_sharding->IsReplicated()) {
+      return partition_->Devices();
+    }
+    return *CreateDeviceList(explicit_sharding->tile_assignment());
+  }();
 
   auto devices_color = partition_->FindColor(devices);
   if (!devices_color.has_value()) {
@@ -178,7 +249,6 @@ MpmdColoring::CheckForExplicitShardingColor(
           << *explicit_sharding << " to color=" << *devices_color;
 
   return std::move(devices_color);
-  ;
 }
 
 absl::StatusOr<bool> MpmdColoring::InlineExplicitTasks(
@@ -508,7 +578,7 @@ absl::StatusOr<bool> MpmdColoring::Run(
   // we use sharding in the coloring so we do a (tiny) bit of sharding
   // propagation if a root tuple has explicit sharding annotations, propagate
   // them to the tuple operands
-  ApplyRootTupleShardingsToOperands(module, root);
+  TF_RETURN_IF_ERROR(HandleRootTupleShardings(partition_, module, root));
 
   TF_ASSIGN_OR_RETURN(bool changed,
                       InlineExplicitTasks(module->entry_computation()));

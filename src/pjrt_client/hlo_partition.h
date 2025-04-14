@@ -43,6 +43,10 @@ class HloPartition {
   bool HasColor(const std::string& color) const;
 
   absl::StatusOr<std::string> FindOrAllocateColor(
+      zuku::DeviceList devices,
+      std::shared_ptr<LogicalShardingContext> context);
+
+  absl::StatusOr<std::string> FindOrAllocateColor(
       std::string name, zuku::DeviceList devices,
       std::shared_ptr<LogicalShardingContext> context);
 
@@ -61,6 +65,8 @@ class HloPartition {
   int64_t NumDevicesForInstruction(const HloInstruction* instruction) const;
 
   absl::StatusOr<std::string> FindOrAllocateGlobalColor(std::string name);
+
+  absl::StatusOr<std::string> FindOrAllocateGlobalColor();
 
   // Allocates a new color for the unique `name` corresponding to the given
   // `devices` submesh. Multiple colors with different names can be allocated

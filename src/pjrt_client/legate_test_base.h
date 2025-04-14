@@ -20,6 +20,7 @@ namespace xla {
 class LegateTestBase : public HloTestBase {
  public:
   struct Config {
+    bool use_module_config_auto_param_sharding{false};
     bool use_module_config_auto_output_sharding{false};
     bool use_auto_input_sharding{false};
     bool hoist_loop_convert{false};

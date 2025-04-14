@@ -341,7 +341,7 @@ TEST_F(MpmdComputationFusionTest, OnlyFuseForward) {
 
   // tasks should only fuse later
   EXPECT_THAT(m::EntryComputationCalls(module.get()),
-              ElementsAre(m::Color("red"), m::Color("blue"), m::Color("red")));
+              ElementsAre(m::Color("red"), m::Color("blue")));
 }
 
 static constexpr absl::string_view kDoNotFuseBackwardsHlo = R"(

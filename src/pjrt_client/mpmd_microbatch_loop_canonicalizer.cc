@@ -9,6 +9,7 @@
 #include "xla/pjrt/legate/mpmd_instruction.h"
 #include "xla/service/call_inliner.h"
 #include "xla/service/tuple_simplifier.h"
+#include "xla/pjrt/legate/mpmd_utils.h"
 
 namespace xla {
 namespace {
@@ -179,7 +180,7 @@ absl::StatusOr<bool> MpmdMicrobatchLoopCanonicalizer::CanonicalizeSlices(
                 << slice_offset_operand->name();
         auto* copy =
             computation->AddInstruction(HloInstruction::CreateCustomCall(
-                slice_offset_operand->shape(), {}, "SliceOffset"));
+                slice_offset_operand->shape(), {}, kCustomCallSliceOffset));
         copy->SetAndSanitizeName("slice-offset");
         loop_slice = copy;
       }

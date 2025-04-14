@@ -268,8 +268,6 @@ TEST_F(MpmdColoringTest, FavorMostRecentOperands) {
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
 
-  std::cerr << "module: " << module->ToString() << std::endl;
-
   // the root should be colored based on the most recent operand
   EXPECT_THAT(module->entry_computation()->instructions(),
               Contains(AllOf(op::Add(), m::Color("task_g"))).Times(3));
@@ -302,7 +300,7 @@ g.impl.36 {
   ROOT reduce.42 = f32[] reduce(add.41, constant.39), dimensions={0}, to_apply=region_0.32, metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/reduce_sum[axes=(0,)]"}
 } // g.impl.36
 
-f_bwd.impl.56 {
+g_bwd.impl.56 {
   Arg_1.58 = f32[8]{0} parameter(1)
   Arg_2.59 = f32[] parameter(2)
   broadcast.61 = f32[8]{0} broadcast(Arg_2.59), dimensions={}
@@ -311,7 +309,7 @@ f_bwd.impl.56 {
   sine.60 = f32[8]{0} sine(Arg_0.57)
   multiply.63 = f32[8]{0} multiply(negate.62, sine.60)
   ROOT tuple.64 = (f32[8]{0}, f32[8]{0}) tuple(multiply.63, broadcast.61)
-} // f_bwd.impl.56
+} // g_bwd.impl.56
 
 f_bwd.impl_0.83 {
   Arg_2.86 = f32[8]{0} parameter(2)
@@ -333,7 +331,7 @@ ENTRY main.100 {
   custom-call.19 = f32[8]{0} custom-call(Arg_0.1, Arg_1.2), custom_call_target="LegateTask", called_computations={f.impl.12}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   custom-call.43 = f32[] custom-call(custom-call.19, Arg_0.1), custom_call_target="LegateTask", called_computations={g.impl.36}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   constant.3 = f32[] constant(1)
-  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={f_bwd.impl.56}, backend_config={"name": "g.bwd", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={g_bwd.impl.56}, backend_config={"name": "g.bwd", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   get-tuple-element.67 = f32[8]{0} get-tuple-element(custom-call.65), index=1
   get-tuple-element.66 = f32[8]{0} get-tuple-element(custom-call.65), index=0
   custom-call.95 = (f32[8]{0}, pred[]) custom-call(Arg_0.1, Arg_1.2, get-tuple-element.66), custom_call_target="LegateTask", called_computations={f_bwd.impl_0.83}, backend_config={"name": "f.bwd", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
@@ -504,6 +502,99 @@ TEST_F(MpmdColoringTest, MixedDepthPriorityColoringPreferOperands) {
 
   EXPECT_THAT(m::FlatInstructions(module.get()),
               Contains(AllOf(op::Multiply(), m::Color("task_h"))).Times(1));
+}
+
+constexpr absl::string_view kUserSpecifiedShardingsHlo = R"(
+HloModule jit_c, entry_computation_layout={(f32[8]{0}, s32[])->(f32[], f32[8]{0})}, allow_spmd_sharding_propagation_to_parameters={true,false}, allow_spmd_sharding_propagation_to_output={false,true}
+
+f.impl.12 {
+  Arg_0.13 = f32[8]{0} parameter(0), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  multiply.15 = f32[8]{0} multiply(Arg_0.13, Arg_0.13), metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/mul"}
+  Arg_1.14 = s32[] parameter(1), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  convert.16 = f32[] convert(Arg_1.14), metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/convert_element_type[new_dtype=float32 weak_type=False sharding=None]"}
+  broadcast.17 = f32[8]{0} broadcast(convert.16), dimensions={}, metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/mul"}
+  ROOT multiply.18 = f32[8]{0} multiply(multiply.15, broadcast.17), metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/mul"}
+} // f.impl.12
+
+region_0.32 {
+  Arg_0.33 = f32[] parameter(0), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/reduce_sum[axes=(0,)]"}
+  Arg_1.34 = f32[] parameter(1), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/reduce_sum[axes=(0,)]"}
+  ROOT add.35 = f32[] add(Arg_0.33, Arg_1.34), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/reduce_sum[axes=(0,)]"}
+}
+
+g.impl.36 {
+  Arg_0.37 = f32[8]{0} parameter(0), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  exp.40 = f32[8]{0} exponential(Arg_0.37), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/cos"}
+  Arg_1.38 = f32[8]{0} parameter(1), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  add.41 = f32[8]{0} add(exp.40, Arg_1.38), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/add"}
+  constant.39 = f32[] constant(0)
+  ROOT reduce.42 = f32[] reduce(add.41, constant.39), dimensions={0}, to_apply=region_0.32, metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/reduce_sum[axes=(0,)]"}
+} // g.impl.36
+
+g_bwd.impl.56 {
+  Arg_1.58 = f32[8]{0} parameter(1)
+  Arg_2.59 = f32[] parameter(2)
+  broadcast.61 = f32[8]{0} broadcast(Arg_2.59), dimensions={}
+  negate.62 = f32[8]{0} negate(broadcast.61)
+  Arg_0.57 = f32[8]{0} parameter(0)
+  sine.60 = f32[8]{0} sine(Arg_0.57)
+  multiply.63 = f32[8]{0} multiply(negate.62, sine.60)
+  ROOT tuple.64 = (f32[8]{0}, f32[8]{0}) tuple(multiply.63, broadcast.61)
+} // g_bwd.impl.56
+
+f_bwd.impl_0.83 {
+  Arg_2.86 = f32[8]{0} parameter(2)
+  Arg_1.85 = s32[] parameter(1)
+  convert.88 = f32[] convert(Arg_1.85)
+  broadcast.89 = f32[8]{0} broadcast(convert.88), dimensions={}
+  multiply.90 = f32[8]{0} multiply(Arg_2.86, broadcast.89)
+  Arg_0.84 = f32[8]{0} parameter(0)
+  multiply.92 = f32[8]{0} multiply(multiply.90, Arg_0.84)
+  multiply.91 = f32[8]{0} multiply(Arg_0.84, multiply.90)
+  add.93 = f32[8]{0} add(multiply.92, multiply.91)
+  constant.87 = pred[] constant(false)
+  ROOT tuple.94 = (f32[8]{0}, pred[]) tuple(add.93, constant.87)
+} // f_bwd.impl_0.83
+
+ENTRY main.100 {
+  Arg_0.1 = f32[8]{0} parameter(0), sharding={replicated}
+  Arg_1.2 = s32[] parameter(1), sharding={replicated}
+  custom-call.19 = f32[8]{0} custom-call(Arg_0.1, Arg_1.2), custom_call_target="LegateTask", called_computations={f.impl.12}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.43 = f32[] custom-call(custom-call.19, Arg_0.1), custom_call_target="LegateTask", called_computations={g.impl.36}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  constant.3 = f32[] constant(1)
+  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={g_bwd.impl.56}, backend_config={"name": "g.bwd", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  get-tuple-element.67 = f32[8]{0} get-tuple-element(custom-call.65), index=1
+  get-tuple-element.66 = f32[8]{0} get-tuple-element(custom-call.65), index=0
+  custom-call.95 = (f32[8]{0}, pred[]) custom-call(Arg_0.1, Arg_1.2, get-tuple-element.66), custom_call_target="LegateTask", called_computations={f_bwd.impl_0.83}, backend_config={"name": "f.bwd", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  get-tuple-element.96 = f32[8]{0} get-tuple-element(custom-call.95), index=0
+  add.98 = f32[8]{0} add(get-tuple-element.67, get-tuple-element.96)
+  ROOT tuple.99 = (f32[], f32[8]{0}) tuple(custom-call.43, add.98), sharding={{replicated},{devices=[2]<=[2]}}
+} // main.100
+)";
+
+TEST_F(MpmdColoringTest, UserSpecifiedShardings) {
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto module,
+      GetHloModuleFromText(kUserSpecifiedShardingsHlo, /*num_devices=*/2));
+
+  MpmdColoring coloring{partition_.get()};
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
+
+  // the root tuple should have an operand over all devices
+  EXPECT_THAT(
+      module->entry_computation()->root_instruction()->operands(),
+      Contains(
+          AllOf(op::CustomCall(std::string(kCustomCallRootTupleRecolor)),
+                op::Sharding(HloSharding::Replicate()),  // should be replicated
+                                                         // across both devices
+                m::Devices(*partition_, {{.start = 0, .num_devices = 2}}))));
+
+  EXPECT_THAT(
+      module->entry_computation()->parameter_instructions(),
+      Contains(
+          AllOf(op::Sharding(HloSharding::Replicate()),  // should be replicated
+                                                         // across both devices
+                m::Devices(*partition_, {{.start = 0, .num_devices = 2}}))));
 }
 
 }  // namespace

@@ -33,45 +33,45 @@ namespace op = ::xla::testing::opcode_matchers;
 namespace m = ::xla::mpmd_matchers;
 
 MATCHER_P(NumOutputs, num, "") {
-  const SpmdHloModuleTask &task = arg;
+  const SpmdHloModuleTask& task = arg;
   return task.outputs.size() == num;
 }
 
 MATCHER(IsLoopTask, "") {
-  const auto &task = std::get<0>(arg);
+  const auto& task = std::get<0>(arg);
   bool should_be_loop = std::get<1>(arg);
   bool has_loop_config = task.loop_config != nullptr;
   return has_loop_config == should_be_loop;
 }
 
 MATCHER(TrivialStoreShape, "") {
-  auto &&store = arg;
+  auto&& store = arg;
   return ShapeUtil::ElementsIn(store.shape) == 1;
 }
 
 MATCHER(TrivialStoreSharding, "") {
-  auto &&store = arg;
+  auto&& store = arg;
   return store.mpmd_sharding.IsReplicated();
 }
 
 MATCHER(NonTrivialStoreShape, "") {
-  auto &&store = arg;
+  auto&& store = arg;
   return ShapeUtil::ElementsIn(store.shape) > 1;
 }
 
 MATCHER(NonTrivialStoreSharding, "") {
-  auto &&store = arg;
+  auto&& store = arg;
   return !store.sharding.IsReplicated();
 }
 
 std::vector<std::vector<std::pair<Store, Store>>> GetAliasPairs(
-    const std::vector<SpmdHloModuleTask> &tasks) {
+    const std::vector<SpmdHloModuleTask>& tasks) {
   std::vector<std::vector<std::pair<Store, Store>>> stores;
-  for (auto &task : tasks) {
+  for (auto& task : tasks) {
     std::vector<std::pair<Store, Store>> pair_vec;
     task.module->module->input_output_alias_config().ForEachAlias(
-        [&](const ShapeIndex &output_index,
-            const HloInputOutputAliasConfig::Alias &alias) {
+        [&](const ShapeIndex& output_index,
+            const HloInputOutputAliasConfig::Alias& alias) {
           const int output_number = [&] {
             if (output_index.empty()) {
               return 0;
@@ -88,18 +88,18 @@ std::vector<std::vector<std::pair<Store, Store>>> GetAliasPairs(
   return stores;
 }
 
-void Summarize(const std::vector<SpmdHloModuleTask> &tasks) {
-  for (const auto &task : tasks) {
+void Summarize(const std::vector<SpmdHloModuleTask>& tasks) {
+  for (const auto& task : tasks) {
     std::cerr << task.module->module->name()
               << ",devices=" << task.device_assignment
               << ",loop=" << std::boolalpha << task.loop << std::endl;
-    for (const auto &input : task.inputs) {
+    for (const auto& input : task.inputs) {
       std::cerr << task.module->module->name() << " has input " << input.name
                 << ",index=" << input.index << ",type=" << (int)input.type
                 << ",sharding=" << input.mpmd_sharding
                 << ",shape=" << input.shape << std::endl;
     }
-    for (const auto &output : task.outputs) {
+    for (const auto& output : task.outputs) {
       std::cerr << task.module->module->name() << " has output " << output.name
                 << ",index=" << output.index << ",type=" << (int)output.type
                 << ",sharding=" << output.mpmd_sharding
@@ -110,19 +110,19 @@ void Summarize(const std::vector<SpmdHloModuleTask> &tasks) {
 
 class MpmdPartitionTest : public MpmdTestBase {
  public:
-  absl::StatusOr<std::pair<HloInstruction *, HloInstruction *>>
-  GetTempInOutPair(const HloModule &producer, const HloModule &consumer) {
-    std::vector<HloInstruction *> roots;
+  absl::StatusOr<std::pair<HloInstruction*, HloInstruction*>> GetTempInOutPair(
+      const HloModule& producer, const HloModule& consumer) {
+    std::vector<HloInstruction*> roots;
     if (producer.entry_computation()->root_instruction()->shape().IsTuple()) {
-      const auto &operands =
+      const auto& operands =
           producer.entry_computation()->root_instruction()->operands();
       roots = {operands.begin(), operands.end()};
     } else {
       roots.push_back(producer.entry_computation()->root_instruction());
     }
 
-    for (auto *root : roots) {
-      for (auto *param :
+    for (auto* root : roots) {
+      for (auto* param :
            consumer.entry_computation()->parameter_instructions()) {
         if (root->name() == param->name()) {
           return std::make_pair(root, param);
@@ -135,8 +135,8 @@ class MpmdPartitionTest : public MpmdTestBase {
 };
 
 MATCHER(TaskNameStartsWith, "") {
-  const auto &task = std::get<0>(arg);
-  const auto &name = std::get<1>(arg);
+  const auto& task = std::get<0>(arg);
+  const auto& name = std::get<1>(arg);
   return absl::StartsWith(task.module->module->name(), name);
 }
 
@@ -166,7 +166,7 @@ g.impl.36 {
   ROOT reduce.42 = f32[] reduce(add.41, constant.39), dimensions={0}, to_apply=region_0.32
 } // g.impl.36
 
-f_bwd.impl.56 {
+g_bwd.impl.56 {
   Arg_1.58 = f32[8]{0} parameter(1)
   Arg_2.59 = f32[] parameter(2)
   broadcast.61 = f32[8]{0} broadcast(Arg_2.59), dimensions={}
@@ -174,7 +174,7 @@ f_bwd.impl.56 {
   sine.60 = f32[8]{0} sine(Arg_0.57), metadata={op_name="transpose(jvp"}
   multiply.63 = f32[8]{0} multiply(broadcast.61, sine.60)
   ROOT tuple.64 = (f32[8]{0}, f32[8]{0}) tuple(multiply.63, broadcast.61)
-} // f_bwd.impl.56
+} // g_bwd.impl.56
 
 f_bwd.impl_0.83 {
   Arg_2.86 = f32[8]{0} parameter(2)
@@ -196,7 +196,7 @@ ENTRY main.100 {
   custom-call.19 = f32[8]{0} custom-call(Arg_0.1, Arg_1.2), custom_call_target="LegateTask", called_computations={f.impl.12}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   custom-call.43 = f32[] custom-call(custom-call.19, Arg_0.1), custom_call_target="LegateTask", called_computations={g.impl.36}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   constant.3 = f32[] constant(1)
-  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={f_bwd.impl.56}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={g_bwd.impl.56}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   get-tuple-element.67 = f32[8]{0} get-tuple-element(custom-call.65), index=1
   get-tuple-element.66 = f32[8]{0} get-tuple-element(custom-call.65), index=0
   custom-call.95 = (f32[8]{0}, pred[]) custom-call(Arg_0.1, Arg_1.2, get-tuple-element.66), custom_call_target="LegateTask", called_computations={f_bwd.impl_0.83}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
@@ -223,12 +223,12 @@ TEST_F(MpmdPartitionTest, SimpleMpmd) {
                 m::TaskOutputs(
                     ElementsAre(m::Store({.type = Store::Type::TEMP})))),
           // the inputs should be a resharded argument and resharded of temp
-          // index=0
+          // index=0, output should be a temp that gets resharded into root
           AllOf(m::TaskInputs(UnorderedElementsAre(
                     m::Store({.type = Store::Type::TEMP}),
                     m::Store({.type = Store::Type::TEMP}))),
-                m::TaskOutputs(ElementsAre(
-                    m::Store({.type = Store::Type::ROOT, .index = 0})))),
+                m::TaskOutputs(
+                    ElementsAre(m::Store({.type = Store::Type::TEMP})))),
           AllOf(
               m::TaskInputs(ElementsAre(m::Store({.type = Store::Type::TEMP}))),
               // the buffer from the previous task should be reused
@@ -241,6 +241,83 @@ TEST_F(MpmdPartitionTest, SimpleMpmd) {
                     m::Store({.type = Store::Type::PARAM, .index = 1}))),
                 m::TaskOutputs(ElementsAre(
                     m::Store({.type = Store::Type::ROOT, .index = 1}))))));
+}
+
+constexpr absl::string_view kUserSpecifiedShardingsHlo = R"(
+HloModule jit_c, entry_computation_layout={(f32[8]{0}, s32[])->(f32[], f32[8]{0})}, allow_spmd_sharding_propagation_to_parameters={true,false}, allow_spmd_sharding_propagation_to_output={false,true}
+
+f.impl.12 {
+  Arg_0.13 = f32[8]{0} parameter(0), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  multiply.15 = f32[8]{0} multiply(Arg_0.13, Arg_0.13), metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/mul"}
+  Arg_1.14 = s32[] parameter(1), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  convert.16 = f32[] convert(Arg_1.14), metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/convert_element_type[new_dtype=float32 weak_type=False sharding=None]"}
+  broadcast.17 = f32[8]{0} broadcast(convert.16), dimensions={}, metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/mul"}
+  ROOT multiply.18 = f32[8]{0} multiply(multiply.15, broadcast.17), metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/mul"}
+} // f.impl.12
+
+region_0.32 {
+  Arg_0.33 = f32[] parameter(0), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/reduce_sum[axes=(0,)]"}
+  Arg_1.34 = f32[] parameter(1), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/reduce_sum[axes=(0,)]"}
+  ROOT add.35 = f32[] add(Arg_0.33, Arg_1.34), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/reduce_sum[axes=(0,)]"}
+}
+
+g.impl.36 {
+  Arg_0.37 = f32[8]{0} parameter(0), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  exp.40 = f32[8]{0} exponential(Arg_0.37), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/cos"}
+  Arg_1.38 = f32[8]{0} parameter(1), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  add.41 = f32[8]{0} add(exp.40, Arg_1.38), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/add"}
+  constant.39 = f32[] constant(0)
+  ROOT reduce.42 = f32[] reduce(add.41, constant.39), dimensions={0}, to_apply=region_0.32, metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/reduce_sum[axes=(0,)]"}
+} // g.impl.36
+
+g_bwd.impl.56 {
+  Arg_1.58 = f32[8]{0} parameter(1)
+  Arg_2.59 = f32[] parameter(2)
+  broadcast.61 = f32[8]{0} broadcast(Arg_2.59), dimensions={}
+  negate.62 = f32[8]{0} negate(broadcast.61)
+  Arg_0.57 = f32[8]{0} parameter(0)
+  sine.60 = f32[8]{0} sine(Arg_0.57)
+  multiply.63 = f32[8]{0} multiply(negate.62, sine.60)
+  ROOT tuple.64 = (f32[8]{0}, f32[8]{0}) tuple(multiply.63, broadcast.61)
+} // g_bwd.impl.56
+
+f_bwd.impl_0.83 {
+  Arg_2.86 = f32[8]{0} parameter(2)
+  Arg_1.85 = s32[] parameter(1)
+  convert.88 = f32[] convert(Arg_1.85)
+  broadcast.89 = f32[8]{0} broadcast(convert.88), dimensions={}
+  multiply.90 = f32[8]{0} multiply(Arg_2.86, broadcast.89)
+  Arg_0.84 = f32[8]{0} parameter(0)
+  multiply.92 = f32[8]{0} multiply(multiply.90, Arg_0.84)
+  multiply.91 = f32[8]{0} multiply(Arg_0.84, multiply.90)
+  add.93 = f32[8]{0} add(multiply.92, multiply.91)
+  constant.87 = pred[] constant(false)
+  ROOT tuple.94 = (f32[8]{0}, pred[]) tuple(add.93, constant.87)
+} // f_bwd.impl_0.83
+
+ENTRY main.100 {
+  Arg_0.1 = f32[8]{0} parameter(0), sharding={replicated}
+  Arg_1.2 = s32[] parameter(1), sharding={replicated}
+  custom-call.19 = f32[8]{0} custom-call(Arg_0.1, Arg_1.2), custom_call_target="LegateTask", called_computations={f.impl.12}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.43 = f32[] custom-call(custom-call.19, Arg_0.1), custom_call_target="LegateTask", called_computations={g.impl.36}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  constant.3 = f32[] constant(1)
+  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={g_bwd.impl.56}, backend_config={"name": "g.bwd", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  get-tuple-element.67 = f32[8]{0} get-tuple-element(custom-call.65), index=1
+  get-tuple-element.66 = f32[8]{0} get-tuple-element(custom-call.65), index=0
+  custom-call.95 = (f32[8]{0}, pred[]) custom-call(Arg_0.1, Arg_1.2, get-tuple-element.66), custom_call_target="LegateTask", called_computations={f_bwd.impl_0.83}, backend_config={"name": "f.bwd", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  get-tuple-element.96 = f32[8]{0} get-tuple-element(custom-call.95), index=0
+  add.98 = f32[8]{0} add(get-tuple-element.67, get-tuple-element.96)
+  ROOT tuple.99 = (f32[], f32[8]{0}) tuple(custom-call.43, add.98), sharding={{replicated},{devices=[2]<=[2]}}
+} // main.100
+)";
+
+TEST_F(MpmdPartitionTest, UserSpecifiedShardings) {
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto result,
+      RunMpmdOnHloText(kUserSpecifiedShardingsHlo, /*num_devices=*/2,
+                       {.use_module_config_auto_param_sharding = true,
+                        .use_module_config_auto_output_sharding = true}));
+  auto [tasks, intermediates] = std::move(result);
 }
 
 static constexpr absl::string_view kShardingPropagationIntermediateHlo = R"(
@@ -290,7 +367,7 @@ TEST_F(MpmdPartitionTest, ShardingPropagationIntermediate) {
 
   ASSERT_EQ(tasks.size(), 2);
 
-  auto *f0_root =
+  auto* f0_root =
       tasks[0].module->module->entry_computation()->root_instruction();
   EXPECT_THAT(f0_root->operand(0), op::Sharding(expected_sharding));
 
@@ -1779,7 +1856,7 @@ TEST_F(MpmdPartitionTest, MpmdMicrobatch) {
               .Times(4),
           Contains(AllOf(m::TaskDevices(ElementsAre(0, 1, 2, 3)),
                          m::LoopTask(false)))
-              .Times(4)));
+              .Times(2)));
 }
 
 static constexpr absl::string_view kMicrobatchWhileBufferDonorHlo = R"(
@@ -1914,7 +1991,7 @@ TEST_F(MpmdPartitionTest, MicrobatchBufferDonor) {
 }
 
 static constexpr absl::string_view kLoopCarriedShardingHlo = R"(
-HloModule jit_wrapped, allow_spmd_sharding_propagation_to_parameters={true,true}
+HloModule jit_wrapped
 
 region_1.10 {
   Arg_0.11 = s32[] parameter(0)
@@ -1992,9 +2069,11 @@ iota_transpose_perm: 0
 )";
 
 TEST_F(MpmdPartitionTest, LoopCarriedSharding) {
-  TF_ASSERT_OK_AND_ASSIGN(auto result,
-                          RunMpmdOnHloString(kLoopCarriedShardingHlo,
-                                             /*num_devices=*/4));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto result,
+      RunMpmdOnHloString(kLoopCarriedShardingHlo,
+                         /*num_devices=*/4,
+                         {.use_module_config_auto_param_sharding = true}));
   auto [tasks, intermediates] = std::move(result);
 
   TF_ASSERT_OK_AND_ASSIGN(HloSharding sharding,
@@ -2186,7 +2265,7 @@ TEST_F(MpmdPartitionTest, RootParameterReplicatedSubmesh) {
 }
 
 static constexpr absl::string_view kShardedDynamicSliceHlo = R"(
-HloModule jit_wrapped, entry_computation_layout={(s32[4,4]{1,0}, s32[4,4]{1,0}, s32[4,4]{1,0}, s32[4,4]{1,0})->(s32[], s32[4,4]{1,0}, s32[4,4]{1,0}, s32[4,4]{1,0})}, allow_spmd_sharding_propagation_to_output={true,true,true,true}
+HloModule jit_wrapped, entry_computation_layout={(s32[4,4]{1,0}, s32[4,4]{1,0}, s32[4,4]{1,0}, s32[4,4]{1,0})->(s32[], s32[4,4]{1,0}, s32[4,4]{1,0}, s32[4,4]{1,0})}, allow_spmd_sharding_propagation_to_output={true,true,true,true}, allow_spmd_sharding_propagation_to_parameters={true,true,true,true}
 
 region_1.14 {
   Arg_0.15 = s32[] parameter(0)
@@ -2287,8 +2366,12 @@ TEST_F(MpmdPartitionTest, ShardedDynamicSlice) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
       RunMpmdOnHloString(kShardedDynamicSliceHlo,
-                         /*num_devices=*/4, {.use_auto_input_sharding = true}));
+                         /*num_devices=*/4,
+                         {.use_module_config_auto_param_sharding = true,
+                          .use_auto_input_sharding = true}));
   auto [tasks, intermediates] = std::move(result);
+
+  Summarize(tasks);
 
   EXPECT_THAT(tasks,
               Each(AllOf(
@@ -2403,7 +2486,7 @@ TEST_F(MpmdPartitionTest, LoopInputInstruction) {
 
 TEST_F(MpmdPartitionTest, DecomposeMultipleLayers) {
   EnableLegateRecomputation(true);
-  auto device_factory = [](const std::string &name) {
+  auto device_factory = [](const std::string& name) {
     int layer_num;
     bool parsed = absl::SimpleAtoi(name.substr(9), &layer_num);
     if (!parsed) {

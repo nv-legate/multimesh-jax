@@ -326,6 +326,22 @@ absl::StatusOr<HloPartition> HloPartition::Create(HloModule* module,
 }
 
 absl::StatusOr<std::string> HloPartition::FindOrAllocateColor(
+    zuku::DeviceList devices, std::shared_ptr<LogicalShardingContext> context) {
+  // we have to match the name
+  auto iter = device_list_to_colors_.find(devices);
+  if (iter == device_list_to_colors_.end()) {
+    return AllocateColor(
+        absl::StrCat("devices_", devices.start(), "-", devices.stop()), devices,
+        std::move(context));
+  }
+  if (iter->second.empty()) {
+    return InternalStrCat(
+        "device list added to map, but has no assigned colors");
+  }
+  return iter->second.front();
+}
+
+absl::StatusOr<std::string> HloPartition::FindOrAllocateColor(
     std::string name, zuku::DeviceList devices,
     std::shared_ptr<LogicalShardingContext> context) {
   // we have to match the name
@@ -341,6 +357,11 @@ absl::StatusOr<std::string> HloPartition::FindOrAllocateColor(
   }
 
   return std::move(name);
+}
+
+absl::StatusOr<std::string> HloPartition::FindOrAllocateGlobalColor() {
+  // no autosharding on the global context for now
+  return FindOrAllocateColor(devices_, nullptr);
 }
 
 absl::StatusOr<std::string> HloPartition::FindOrAllocateGlobalColor(

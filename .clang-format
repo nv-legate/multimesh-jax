@@ -1,4 +1,5 @@
 BasedOnStyle: Google
+DerivePointerAlignment: false
 Language: Cpp
 PointerBindsToType: true
 SortIncludes: Never

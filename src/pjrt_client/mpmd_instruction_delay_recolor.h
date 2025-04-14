@@ -20,7 +20,7 @@ namespace xla {
 // later.  If an instruction that is not part of the critical path
 // is iniitally scheduled early, it may delay other instructions
 // on the critical path unnecessarily. This moves instructions
-// as late as possible by find partition colors later in the schedule
+// as late as possible by finding partition colors later in the schedule
 // and reassigning instructions, when allowed and beneficial,
 // to that partition color. Consider the case:
 //

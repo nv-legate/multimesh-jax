@@ -1164,6 +1164,7 @@ xla_cc_test(
         "//xla/hlo/utils:hlo_matchers",
         "@tsl//tsl/platform:test_main",
         "//xla/service:cpu_plugin",
+        "//xla/service:gpu_plugin",
     ],
 )
 

@@ -21,6 +21,17 @@ bool IsParameterOrParameterCopy(HloInstruction* instruction) {
           instruction->operand(0)->opcode() == HloOpcode::kParameter);
 }
 
+// Returns any user of `instruction` that is a call or
+// nullptr if no users are call instructions.
+HloInstruction* GetAnyUserCall(HloInstruction* instruction) {
+  for (auto* user : instruction->users()) {
+    if (user->opcode() == HloOpcode::kCall) {
+      return user;
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 absl::StatusOr<std::vector<HloInstruction*>>
@@ -125,8 +136,7 @@ absl::StatusOr<bool> MpmdInstructionDelayRecolor::Run(
       if (instruction->opcode() == HloOpcode::kWhile) {
         to_visit.push_back(instruction->called_computations()[0]);
         depth[instruction] = depth.size();
-      } else if (instruction->opcode() == HloOpcode::kCall ||
-                 instruction->opcode() == HloOpcode::kTuple) {
+      } else if (instruction->opcode() != HloOpcode::kGetTupleElement) {
         depth[instruction] = depth.size();
       }
     }
@@ -154,18 +164,22 @@ absl::StatusOr<bool> MpmdInstructionDelayRecolor::Run(
             outputs_to_visit;
 
         for (auto* output : instruction->users()) {
+          auto* user_call = GetAnyUserCall(output);
+          // there are no calls that use this output
+          if (user_call == nullptr) {
+            continue;
+          }
+
           TF_ASSIGN_OR_RETURN(
               std::vector<HloInstruction*> to_move,
               MaybeRecolorOutput(output, instruction, computation, depth,
                                  properties));
 
           if (!to_move.empty()) {
-            auto* user_call = output->users().front();
             VLOG(5) << "fusing " << to_move.size() << " instructions into "
                     << user_call->name() << ", removing from "
                     << instruction->name();
-            // the tree is lastest first (pre-order) and should be reversed to
-            // postorder
+            // the tree is latest first and should be reversed
             for (auto iter = to_move.rbegin(); iter != to_move.rend(); ++iter) {
               to_fuse[user_call].emplace_back(*iter, instruction);
             }

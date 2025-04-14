@@ -9,6 +9,7 @@
 #include "xla/hlo/utils/hlo_matchers.h"
 #include "xla/pjrt/legate/mpmd_test_base.h"
 #include "xla/service/call_inliner.h"
+#include "xla/pjrt/legate/mpmd_utils.h"
 
 namespace xla {
 namespace {
@@ -178,7 +179,7 @@ TEST_F(MpmdMicrobatchLoopCanonicalizerTest, BasicLoop) {
       m::WhileBodies(module.get()),
       Each(Property(
           &HloComputation::instructions,
-          AllOf(Contains(op::CustomCall("SliceOffset"))
+          AllOf(Contains(op::CustomCall(std::string(kCustomCallSliceOffset)))
                     .Times(1),  // and replaced with a common slice offset
                 Each(Not(op::CustomCall(
                     "MicrobatchSlice")))  // all slices should have been removed

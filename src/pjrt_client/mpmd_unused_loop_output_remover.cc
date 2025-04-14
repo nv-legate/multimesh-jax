@@ -14,8 +14,6 @@
 namespace xla {
 namespace {
 
-constexpr char kDummyOpCustomCallTarget[] = "DummyLoopOperation";
-
 const HloInstruction* Dealias(const HloInstruction* instruction) {
   switch (instruction->opcode()) {
     case HloOpcode::kGetTupleElement: {
@@ -92,7 +90,7 @@ absl::StatusOr<bool> MpmdUnusedLoopOutputRemover::Run(
         HloInstruction* dummy =
             body->AddInstruction(HloInstruction::CreateCustomCall(
                 input_tuple->operand(index)->shape(), {},
-                kDummyOpCustomCallTarget));
+                kCustomCallDummyOperation));
 
         VLOG(5) << unused_root->name() << " " << unused_root->shape()
                 << " is an unused loop output at index " << index;
@@ -126,7 +124,7 @@ absl::StatusOr<bool> MpmdUnusedLoopOutputRemover::Run(
         HloInstruction* dummy =
             loop->parent()->AddInstruction(HloInstruction::CreateCustomCall(
                 input_tuple->operand(index)->shape(), {},
-                kDummyOpCustomCallTarget));
+                kCustomCallDummyOperation));
         auto* original_operand = input_tuple->mutable_operand(index);
         VLOG(5) << original_operand->name() << " " << original_operand->shape()
                 << " is an unused while input at index " << index;

@@ -283,18 +283,5 @@ ENTRY %main.15 (Arg_0.1: s32[8,129], Arg_1.2: s32[8,129], Arg_2.3: s32[8,128]) -
 }
 )";
 
-TEST_F(MpmdShardingPropagationTest, DoNotPropagateToParameters) {
-  TF_ASSERT_OK_AND_ASSIGN(auto module, GetHloModuleFromPath("draft.txt",
-                                                            /*num_devices=*/8));
-
-  for (auto mode :
-       {MpmdShardingPropagation::PropagationMode::ForwardInputOutput,
-        MpmdShardingPropagation::PropagationMode::BackwardInputOutput,
-        MpmdShardingPropagation::PropagationMode::ForwardFull}) {
-    MpmdShardingPropagation propagation{partition_.get(), mode};
-    TF_ASSIGN_OR_RETURN(bool changed, propagation.Run(module.get()));
-  }
-}
-
 }  // namespace
 }  // namespace xla

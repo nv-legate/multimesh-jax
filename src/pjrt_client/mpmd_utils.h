@@ -1,4 +1,4 @@
-/*
+/* clang-format off
  * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -190,6 +190,13 @@ absl::Status RemoveUnusedInstructions(HloComputation* computation);
 
 absl::Status RemoveInstructionBackToParameters(HloComputation* computation,
                                                HloInstruction* instruction);
+
+constexpr absl::string_view kCustomCallArgumentRecolor = "ArgumentRecolor";
+constexpr absl::string_view kCustomCallReshard = "Reshard";
+constexpr absl::string_view kCustomCallSliceOffset = "SliceOffset";
+constexpr absl::string_view kCustomCallRootTupleRecolor = "RootTupleRecolor";
+constexpr absl::string_view kCustomCallDummyOperation = "DummyOperation";
+constexpr absl::string_view kCustomCallSharding = "Sharding";
 
 }  // namespace xla
 

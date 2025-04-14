@@ -9,6 +9,7 @@
 #include "gtest/gtest.h"
 #include "xla/hlo/utils/hlo_matchers.h"
 #include "xla/pjrt/legate/mpmd_test_base.h"
+#include "xla/pjrt/legate/mpmd_utils.h"
 
 namespace xla {
 namespace {
@@ -151,10 +152,11 @@ TEST_F(MpmdAssignBufferSchedulingNameTest, ScheduleReshard) {
   TF_ASSERT_OK_AND_ASSIGN(bool changed, assigner.Run(module.get()));
 
   // every task output or reshard op should have a buffer name assigned
-  EXPECT_THAT(module->entry_computation()->instructions(),
-              Not(Contains(
-                  AllOf(AnyOf(op::GetTupleElement(), op::CustomCall("Reshard")),
-                        m::MetadataSchedulingNames("")))));
+  EXPECT_THAT(
+      module->entry_computation()->instructions(),
+      Not(Contains(AllOf(AnyOf(op::GetTupleElement(),
+                               op::CustomCall(std::string(kCustomCallReshard))),
+                         m::MetadataSchedulingNames("")))));
 
   // a variable that has been explicitly assigned a scheduling name should not
   // be changed or re-used, 5 = init + 4 updates

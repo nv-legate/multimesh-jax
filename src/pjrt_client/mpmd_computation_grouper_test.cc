@@ -113,7 +113,7 @@ g.impl.36 {
   ROOT reduce.42 = f32[] reduce(add.41, constant.39), dimensions={0}, to_apply=region_0.32, metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/reduce_sum[axes=(0,)]"}
 } // g.impl.36
 
-f_bwd.impl.56 {
+g_bwd.impl.56 {
   Arg_1.58 = f32[8]{0} parameter(1)
   Arg_2.59 = f32[] parameter(2)
   broadcast.61 = f32[8]{0} broadcast(Arg_2.59), dimensions={}
@@ -122,7 +122,7 @@ f_bwd.impl.56 {
   sine.60 = f32[8]{0} sine(Arg_0.57)
   multiply.63 = f32[8]{0} multiply(negate.62, sine.60)
   ROOT tuple.64 = (f32[8]{0}, f32[8]{0}) tuple(multiply.63, broadcast.61)
-} // f_bwd.impl.56
+} // g_bwd.impl.56
 
 f_bwd.impl_0.83 {
   Arg_2.86 = f32[8]{0} parameter(2)
@@ -144,7 +144,7 @@ ENTRY main.100 {
   custom-call.19 = f32[8]{0} custom-call(Arg_0.1, Arg_1.2), custom_call_target="LegateTask", called_computations={f.impl.12}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   custom-call.43 = f32[] custom-call(custom-call.19, Arg_0.1), custom_call_target="LegateTask", called_computations={g.impl.36}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   constant.3 = f32[] constant(1)
-  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={f_bwd.impl.56}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={g_bwd.impl.56}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   get-tuple-element.67 = f32[8]{0} get-tuple-element(custom-call.65), index=1
   get-tuple-element.66 = f32[8]{0} get-tuple-element(custom-call.65), index=0
   custom-call.95 = (f32[8]{0}, pred[]) custom-call(Arg_0.1, Arg_1.2, get-tuple-element.66), custom_call_target="LegateTask", called_computations={f_bwd.impl_0.83}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
@@ -261,7 +261,7 @@ TEST_F(MpmdComputationGrouperTest, NestedWhileColoring) {
   EXPECT_THAT(module->entry_computation()->instructions(),
               Each(AnyOf(m::TrivialOp(), op::Call(), op::While())));
 
-  auto *while_instruction =
+  auto* while_instruction =
       module->entry_computation()->GetInstructionWithName("while.109");
   ASSERT_NE(while_instruction, nullptr);
 
@@ -304,8 +304,8 @@ TEST_F(MpmdComputationGrouperTest, SplitOptBarrier) {
   TF_ASSERT_OK_AND_ASSIGN(auto module, GetHloModuleFromText(kSplitOptBarrierHlo,
                                                             /*num_devices=*/2));
 
-  for (auto *computation : module->computations()) {
-    for (auto *instruction : computation->instructions()) {
+  for (auto* computation : module->computations()) {
+    for (auto* instruction : computation->instructions()) {
       instruction->set_metadata_op_name(std::string(instruction->name()));
     }
   }
@@ -377,8 +377,8 @@ TEST_F(MpmdComputationGrouperTest, MoveAsLateAsPossible24Layers) {
       auto module, GetHloModuleFromPath("move_to_users_grouping_24layers.txt",
                                         /*num_devices=*/16));
 
-  for (auto *computation : module->computations()) {
-    for (auto *instruction : computation->instructions()) {
+  for (auto* computation : module->computations()) {
+    for (auto* instruction : computation->instructions()) {
       instruction->set_metadata_op_name(std::string(instruction->name()));
     }
   }

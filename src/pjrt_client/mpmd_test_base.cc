@@ -144,20 +144,30 @@ MpmdTestBase::RunMpmdOnHloModule(std::unique_ptr<HloModule> module,
   size_t num_outputs =
       root->shape().IsTuple() ? root->shape().tuple_shapes_size() : 1;
 
-  absl::Span<const bool> allow_sharding_propagation =
+  absl::Span<const bool> allow_output_sharding_propagation =
       module->config().allow_spmd_sharding_propagation_to_output();
   bool allow[] = {true};
   if (!cfg.use_module_config_auto_output_sharding) {
     // if not specified, set to
     // true for all outputs
-    allow_sharding_propagation = allow;
+    allow_output_sharding_propagation = allow;
+  }
+
+  absl::Span<const bool> allow_param_sharding_propagation =
+      module->config().allow_spmd_sharding_propagation_to_parameters();
+  if (!cfg.use_module_config_auto_param_sharding) {
+    // if not specified, set to
+    // true for all outputs
+    allow_param_sharding_propagation = allow;
   }
 
   CompileOptions options{
       .executable_build_options =
           ExecutableBuildOptions()
               .set_allow_spmd_sharding_propagation_to_output(
-                  allow_sharding_propagation)
+                  allow_output_sharding_propagation)
+              .set_allow_spmd_sharding_propagation_to_parameters(
+                  allow_param_sharding_propagation)
               .set_use_auto_spmd_partitioning(cfg.use_auto_input_sharding)};
 
   options.executable_build_options.set_device_assignment(
@@ -220,6 +230,7 @@ MpmdTestBase::RunMpmdOnHloString(absl::string_view hlo_string, int num_devices,
                                  MpmdTestConfig cfg) {
   TF_ASSIGN_OR_RETURN(auto module,
                       GetHloModuleFromText(hlo_string, num_devices));
+
   return RunMpmdOnHloModule(std::move(module), num_devices, cfg);
 }
 
@@ -352,6 +363,29 @@ std::vector<HloComputation*> WhileBodies(HloModule* module) {
       [=](const HloInstruction* instruction,
           ::testing::MatchResultListener* listener) {
         return ShapeUtil::ElementsIn(instruction->shape()) > elements;
+      }));
+}
+
+::testing::Matcher<const ::xla::HloInstruction*> Devices(
+    const HloPartition& partition, zuku::DeviceList devices) {
+  std::stringstream sstr;
+  sstr << "instruction has devices " << devices;
+  return ::testing::MakeMatcher(new MpmdHloInstructionMatcher(
+      sstr.str(), [=](const HloInstruction* instruction,
+                      ::testing::MatchResultListener* listener) {
+        auto test_color = Color(instruction);
+        if (!test_color.has_value()) {
+          *listener << instruction->name() << " does not have color";
+          return false;
+        }
+        zuku::DeviceList actual_devices =
+            partition.DevicesForColor(*test_color);
+        if (devices != actual_devices) {
+          *listener << instruction->name() << " has devices " << actual_devices
+                    << ", expected " << devices;
+          return false;
+        }
+        return true;
       }));
 }
 

@@ -13,6 +13,7 @@
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/pjrt/legate/legate_sharding.h"
 #include "xla/pjrt/legate/mpmd_instruction.h"
+#include "xla/pjrt/legate/mpmd_utils.h"
 
 namespace xla {
 
@@ -107,7 +108,7 @@ absl::StatusOr<bool> MpmdAssignBufferSchedulingName::Run(
 
   auto free_operand = [&](int64_t time_done,
                           HloInstruction* operand) -> absl::Status {
-    if (operand->IsCustomCall("SliceOffset")) {
+    if (operand->IsCustomCall(kCustomCallSliceOffset)) {
       return absl::OkStatus();
     }
     if (operand->opcode() != HloOpcode::kParameter) {
@@ -195,7 +196,7 @@ absl::StatusOr<bool> MpmdAssignBufferSchedulingName::Run(
       VLOG(5) << instruction->name() << " started at " << max_operand_time
               << " and advanced time to t=" << time_done << " on " << devices;
       time_on_mesh[devices] = time_done;
-    } else if (instruction->IsCustomCall("Reshard")) {
+    } else if (instruction->IsCustomCall(kCustomCallReshard)) {
       auto color = Color(instruction);
       if (!color.has_value()) {
         return InvalidArgumentStrCat(

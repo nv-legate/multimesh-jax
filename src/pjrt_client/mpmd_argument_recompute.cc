@@ -129,7 +129,7 @@ absl::StatusOr<bool> MpmdArgumentRecompute::MaybeRecomputeOperandFromArguments(
     }
 
     visiting[next] = false;  // visiting, not done
-    if (next->IsCustomCall("SliceOffset")) {
+    if (next->IsCustomCall(kCustomCallSliceOffset)) {
       // consider the visit already done and don't push back
       // on the DFS tree
       visiting[next] = true;
@@ -139,7 +139,8 @@ absl::StatusOr<bool> MpmdArgumentRecompute::MaybeRecomputeOperandFromArguments(
     switch (next->opcode()) {
       case HloOpcode::kDot:
       case HloOpcode::kCustomCall:
-        if (next->IsCustomCall("Reshard") || next->IsCustomCall("Sharding")) {
+        if (next->IsCustomCall(kCustomCallArgumentRecolor) ||
+            next->IsCustomCall(kCustomCallSharding)) {
           auto* operand = next->mutable_operand(0);
           if (!clone_map.contains(operand) &&
               !input_or_replicated_input_copy(operand)) {
@@ -286,7 +287,7 @@ absl::StatusOr<bool> MpmdArgumentRecompute::Run(
         auto* operand = instruction->mutable_operand(index);
         auto operand_color = Color(operand);
         if (operand_color.has_value() && *color != *operand_color &&
-            !operand->IsCustomCall("SliceOffset")) {
+            !operand->IsCustomCall(kCustomCallSliceOffset)) {
           TF_ASSIGN_OR_RETURN(bool cloned_operand,
                               MaybeRecomputeOperandFromArguments(
                                   *color, instruction, operand, computation,
@@ -296,9 +297,10 @@ absl::StatusOr<bool> MpmdArgumentRecompute::Run(
             VLOG(5) << instruction->name() << " cloned operand tree for "
                     << operand->name() << ": " << operand->shape() << "%"
                     << operand->sharding_or_default(HloSharding::Replicate());
-            if (instruction->IsCustomCall("Reshard")) {
-              // we no longer need to mark a reshard here on the instruction, it
-              // now has an entire operand tree with the same color beneath it
+            if (instruction->IsCustomCall(kCustomCallArgumentRecolor)) {
+              // we no longer need to mark an argument recolor here on the
+              // instruction, it now has an entire operand tree with the same
+              // color beneath it
               TF_RETURN_IF_ERROR(instruction->ReplaceAllUsesWith(
                   instruction->mutable_operand(0)));
 

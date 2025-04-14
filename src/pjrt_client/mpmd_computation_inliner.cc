@@ -11,6 +11,7 @@
 #include "xla/pjrt/legate/mpmd_instruction.h"
 #include "xla/service/call_inliner.h"
 #include "xla/service/tuple_simplifier.h"
+#include "xla/pjrt/legate/mpmd_utils.h"
 
 namespace xla {
 
@@ -44,7 +45,7 @@ absl::StatusOr<bool> MpmdComputationInliner::Run(
           } else if (param->has_sharding()) {
             auto *reshard =
                 comp->AddInstruction(HloInstruction::CreateCustomCall(
-                    param->shape(), {param}, "Reshard"));
+                    param->shape(), {param}, kCustomCallArgumentRecolor));
             reshard->set_sharding(param->sharding_ptr());
             AssignColor(reshard, *color);
             TF_RETURN_IF_ERROR(param->ReplaceAllUsesWith(reshard));

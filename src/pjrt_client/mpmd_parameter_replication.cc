@@ -32,9 +32,8 @@ absl::StatusOr<bool> MpmdParameterReplication::Run(
           replicated_copy->set_sharding(HloSharding::Replicate());
           TF_RETURN_IF_ERROR(instruction->ReplaceAllUsesWith(replicated_copy));
 
-          TF_ASSIGN_OR_RETURN(
-              std::string color,
-              partition_->FindOrAllocateGlobalColor("replicated-params"));
+          TF_ASSIGN_OR_RETURN(std::string color,
+                              partition_->FindOrAllocateGlobalColor());
           // Assign the argument to the same color
           VLOG(5) << "created replicated copy of " << instruction->name() << " "
                   << instruction->shape() << " with color=" << color;

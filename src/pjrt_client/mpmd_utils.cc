@@ -13,8 +13,9 @@ namespace xla {
 namespace {
 
 static absl::flat_hash_set<std::string> kNoOpCustomCalls = {
-    "Reshard",
-    "Sharding",
+    std::string(kCustomCallReshard),
+    std::string(kCustomCallSharding),
+    std::string(kCustomCallArgumentRecolor),
     "SPMDFullToShardShape",
     "SPMDShardToFullShape",
 };
@@ -299,7 +300,7 @@ void InstructionProperties::AddDefaultProperties(
 HloInstruction* DealiasLoopInput(HloInstruction* instruction) {
   auto* operand = instruction;
   while (operand) {
-    if (operand->IsCustomCall("Reshard")) {
+    if (operand->IsCustomCall(kCustomCallReshard)) {
       operand = operand->mutable_operand(0);
     } else if (operand->opcode() == HloOpcode::kGetTupleElement &&
                operand->operand(0)->opcode() == HloOpcode::kParameter) {
@@ -606,7 +607,7 @@ void InstructionProperties::AddForwardProperties(HloComputation* computation) {
         break;
       }
       case HloOpcode::kCustomCall: {
-        if (instruction->IsCustomCall("Reshard")) {
+        if (instruction->IsCustomCall(kCustomCallReshard)) {
           auto& reshard_props = entries_[instruction];
           const auto& operand_props = entries_[instruction->operand(0)];
           reshard_props.derived_parameter = operand_props.derived_parameter;

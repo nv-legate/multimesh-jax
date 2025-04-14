@@ -20,6 +20,7 @@ namespace xla {
 
 struct MpmdTestConfig {
   bool use_module_config_auto_output_sharding = false;
+  bool use_module_config_auto_param_sharding = false;
   bool use_auto_input_sharding = false;
   std::optional<int64_t> replicated_parameter_num_elements_cutoff{std::nullopt};
   std::optional<int64_t> recompute_from_arguments_if_cost_less_than{
@@ -255,6 +256,9 @@ auto MetadataSchedulingNames(const Matcher& matcher) {
 ::testing::Matcher<const ::xla::HloInstruction*> HasColor();
 
 ::testing::Matcher<const ::xla::HloInstruction*> Color(std::string color);
+
+::testing::Matcher<const ::xla::HloInstruction*> Devices(
+    const HloPartition& partition, zuku::DeviceList devices);
 
 template <class Matcher>
 auto Users(const Matcher& matcher) {

@@ -289,7 +289,9 @@ def parallelize_step(
 
         initial_batch = prepare_batch(local_batch)
         with mesh, autoshard(True):
-            init_fn = pjit(init_fn, out_shardings=variable_shardings)
+            # make sure the key is replicated over the whole mesh
+
+            init_fn = pjit(init_fn, out_shardings=variable_shardings, in_shardings=NamedSharding(mesh, P()))
             init_variables = init_fn(random.key(42), initial_batch)
 
         return compiled_step, init_variables, mesh, prepare_batch
