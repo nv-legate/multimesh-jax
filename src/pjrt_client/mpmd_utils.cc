@@ -300,7 +300,8 @@ void InstructionProperties::AddDefaultProperties(
 HloInstruction* DealiasLoopInput(HloInstruction* instruction) {
   auto* operand = instruction;
   while (operand) {
-    if (operand->IsCustomCall(kCustomCallReshard)) {
+    if (operand->opcode() == HloOpcode::kCustomCall && 
+        kNoOpCustomCalls.contains(instruction->custom_call_target())) {
       operand = operand->mutable_operand(0);
     } else if (operand->opcode() == HloOpcode::kGetTupleElement &&
                operand->operand(0)->opcode() == HloOpcode::kParameter) {
