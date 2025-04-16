@@ -2,8 +2,8 @@
  * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
-
-#pragma once
+#ifndef XLA_PJRT_HLO_LOADER_H_
+#define XLA_PJRT_HLO_LOADER_H_
 
 #include <cstdint>
 #include <memory>
@@ -24,3 +24,5 @@ void LoadAndCompile(int64_t run_id, zuku::Processor p,
                     const std::shared_ptr<LegateCompiler> &compiler);
 
 }  // namespace xla
+
+#endif // HLO_LOADER_H_
