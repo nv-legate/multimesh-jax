@@ -1034,6 +1034,7 @@ tsl_pybind_extension(
         "@tsl//tsl/platform:bfloat16",
         "//xla:xla_data_proto_cc_impl",
         "//xla/python:config",
+        "//xla/python:custom_call_sharding",
         "//xla/python:dlpack",
         "//xla/python:guard_lib",
         "//xla/python:jax_jit",
