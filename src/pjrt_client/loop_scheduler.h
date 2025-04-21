@@ -14,7 +14,9 @@
 
 namespace xla {
 
-absl::StatusOr<std::vector<HloInstruction*>> ScheduleLoops(
+using Schedule = std::vector<std::vector<HloInstruction*>>;
+
+absl::StatusOr<Schedule> ScheduleLoops(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks);
 

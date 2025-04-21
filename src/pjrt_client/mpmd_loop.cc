@@ -80,10 +80,6 @@ absl::StatusOr<LoopConfig> GetMicrobatchConfig(const std::string& name,
       std::optional<CustomSchedule> custom_schedule,
       GetOptionalTaskValue<CustomSchedule>(json, name, "custom_schedule"));
 
-  TF_ASSIGN_OR_RETURN(
-      std::optional<std::string> custom_callback,
-      GetOptionalTaskValue<std::string>(json, name, "custom_callback"));
-
   return LoopConfig{
       .num_iterations = num_microbatches,
       .microbatch_size = size,
@@ -94,7 +90,6 @@ absl::StatusOr<LoopConfig> GetMicrobatchConfig(const std::string& name,
       .num_stages = num_stages,
       .unrolling = unrolling,
       .custom_schedule = std::move(custom_schedule),
-      .custom_callback = std::move(custom_callback),
   };
 }
 

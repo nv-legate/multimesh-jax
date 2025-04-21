@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import collections
 from functools import partial
 from typing import Any, Callable, Literal, Optional, Sequence, Tuple, Type
 
@@ -374,8 +375,7 @@ def microbatch(
     schedule: Optional[Literal["1f1b", "gpipe", "wavefront", "custom"]] = None,
     unrolling: Optional[int] = None,
     arg_shardings: Optional[Any] = None,
-    custom_schedule: Optional[Any] = None,
-    custom_callback: Optional[Any] = None,
+    custom_schedule: Optional[list[list[str]] | list[list[tuple[str, int]]]] = None,
 ):
     """Unrolls a function along an axis into a microbatch loop.
 
@@ -457,18 +457,13 @@ def microbatch(
     .. _jax.jit: https://jax.readthedocs.io/en/latest/_autosummary/jax.jit.html
     """  # noqa: E501
 
-    if custom_schedule is not None or custom_callback is not None:
+    if custom_schedule is not None:
         if schedule is not None and schedule != "custom":
             raise ValueError(
                 f"When custom_schedule is provided, schedule must be 'custom' or None, but got '{schedule}'"
             )
         # Set schedule to "custom" by default when custom_schedule is provided
         schedule = "custom"
-
-    if custom_schedule is not None and custom_callback is not None:
-        raise ValueError(
-            "custom_schedule and custom_callback cannot both be provided"
-        )
 
     if should_ignore_transforms():
         return fun
@@ -488,6 +483,23 @@ def microbatch(
         if num_microbatches == 1:
             return fun(*args, **kwargs)
 
+        def is_list_of_list_of_strings(l: list[Any]) -> bool:
+            return isinstance(l, list) and all(isinstance(i, list) and all(isinstance(j, str) for j in i) for i in l)
+
+        nonlocal custom_schedule
+        if custom_schedule is not None and is_list_of_list_of_strings(custom_schedule):
+            new_custom_schedule = []
+            for device_row in custom_schedule:
+                task_counter = collections.defaultdict(int)
+                new_custom_schedule.append([])
+                for task_id in device_row:
+                    new_custom_schedule[-1].append((task_counter[task_id], task_id))
+                    task_counter[task_id] += 1
+                for task_id, count in task_counter.items():
+                    if (count != num_microbatches):
+                        raise ValueError(f"task {task_id} has {count} microbatches, but there are {num_microbatches} microbatches")
+            custom_schedule = new_custom_schedule
+
         json_args = optional_kwargs(
             num_microbatches=num_microbatches,
             slice_dim=dim,
@@ -498,7 +510,6 @@ def microbatch(
             num_stages=num_stages,
             schedule=schedule,
             custom_schedule=custom_schedule,
-            custom_callback=custom_callback,
         )
 
         mark_microbatch = no_op(
@@ -587,6 +598,7 @@ def register_task(
       regex: A full name or regular expression with match group.
         This should match the name of a Flax module or a name passed to
         ``jax.with_named_scope``.
+      name: optional, a metadata name to assign to the task context
       mesh: optional, a Mesh context defining the devices and mesh shape
       callback: optional, a function that takes are arguments the match group from
         the ``regex`` and a boolean indicating whether the task is
@@ -735,15 +747,9 @@ def register_task(
             if dims is None:
                 dims = (len(devices),)
             device_ids = [_to_device_id(d) for d in devices]
-    elif callback is not None:
-        if dims is None:
-            raise ValueError(
-                f"in register_task({regex}), when callback is used, you must "
-                "specify mesh, devices, or dims to define mesh shape"
-            )
     else:
         raise ValueError(
-            f"in register_task({regex}), must give mesh, devices, or callback"
+            f"in register_task({regex}), must give mesh, devices, or devices_callback"
         )
 
     if device_axes is None and mesh is None:
