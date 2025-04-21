@@ -39,9 +39,8 @@ UnrollLoopIncrementTasks(const std::vector<std::vector<HloInstruction*>>& tasks,
   // This function unrolls the loop increment tasks for the unrollable tasks
   // (side effect) tasks and returns the remaining tasks (return value)
   for (int64_t task_index : indices_to_unroll) {
-    VLOG(3) << "fully unrolling first task "
-            << tasks[0][task_index]->called_computations()[0]->name()
-            << " to prefetch initial activations for all iterations";
+    VLOG(3) << "fully unrolling task "
+            << tasks[0][task_index]->called_computations()[0]->name();
     for (int iter = 0; iter < num_iterations; ++iter) {
       schedule[0].push_back(tasks[iter][task_index]);
     }
@@ -168,8 +167,6 @@ absl::StatusOr<Schedule> ScheduleCustomSchedule(
     const CustomSchedule& custom_schedule,
     const std::vector<std::vector<HloInstruction*>>& tasks,
     Schedule& schedule) {
-  VLOG(5) << "ScheduleCustomSchedule";
-
   const int64_t num_microbatches = tasks.size();
   const int64_t num_custom_schedule_rows = custom_schedule.size();
   const int64_t tasks_per_iter = tasks.front().size();
@@ -247,8 +244,6 @@ absl::StatusOr<Schedule> ScheduleCustomSchedule(
 absl::StatusOr<Schedule> ScheduleCustom(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
-  VLOG(5) << "ScheduleCustom";
-
   if (!config.custom_schedule.has_value()) {
     throw std::invalid_argument("Needs custom schedule or callback");
   }
@@ -331,21 +326,15 @@ absl::StatusOr<Schedule> SchedulePrefetchWavefront(
 absl::StatusOr<Schedule> ScheduleLoops(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
-  VLOG(5) << "ScheduleLoops";
   switch (config.schedule) {
     case LoopConfig::Schedule::kCustom:
-      VLOG(5) << "ScheduleLoops custom";
       return ScheduleCustom(partition, config, tasks);
     case LoopConfig::Schedule::kFillDrain:
-      VLOG(5) << "ScheduleLoops fill drain";
       return ScheduleGpipe(config, tasks);
     case LoopConfig::Schedule::kPrefetchWavefront:
-      VLOG(5) << "ScheduleLoops prefetch wavefront";
       return SchedulePrefetchWavefront(partition, config, tasks);
     case LoopConfig::Schedule::k1F1B:
-      VLOG(5) << "ScheduleLoops 1f1b";
     case LoopConfig::Schedule::kWavefront:
-      VLOG(5) << "ScheduleLoops wavefront";
       return ScheduleWavefront(partition, config, tasks);
   }
 }
