@@ -375,7 +375,7 @@ def microbatch(
     schedule: Optional[Literal["1f1b", "gpipe", "wavefront", "custom"]] = None,
     unrolling: Optional[int] = None,
     arg_shardings: Optional[Any] = None,
-    custom_schedule: Optional[list[list[str]] | list[list[tuple[str, int]]]] = None,
+    custom_schedule: Optional[list[list[str]] | list[list[tuple[int, str]]]] = None,
 ):
     """Unrolls a function along an axis into a microbatch loop.
 
@@ -450,6 +450,14 @@ def microbatch(
         ``argnum`` with shardings. The shardings can be any sharding-equivalent
         object including partition specs or ``NamedSharding``  If specified,
         this applies the sharding annotations to all sliced inputs.
+      custom_schedule: optional, a list of lists of strings or tuples of
+        (int, string) specifying the custom pipeline schedule of microbatch
+        iterations/stages when ``schedule`` is 'custom'. The custom schedule
+        Each list in custom_schedule corresponds to a device mesh, and each
+        element in that list is a task name, optionally associated with a
+        specific microbatch. There must be exactly `pipeline_depth` device
+        meshes in the custom schedule, with each task appearing exactly
+        `microbatch_size` times in the schedule.
 
     Returns:
       A wrapped version of ``fun`` that executes as a microbatch loop.
