@@ -14,7 +14,8 @@
 
 namespace xla {
 
-using CustomSchedule = std::vector<std::vector<std::pair<int64_t, std::string>>>;
+using CustomSchedule =
+    std::vector<std::vector<std::pair<int64_t, std::string>>>;
 
 // Encapsulates a Legate-managed loop that slices an input
 // into microbatches and aggregates the results over the microbatch dimension.

@@ -11,7 +11,9 @@
 
 namespace xla {
 
-static inline std::vector<int64_t> GetIndicesToUnroll(const HloPartition& partition, const std::vector<std::vector<HloInstruction*>>& tasks) {
+static inline std::vector<int64_t> GetIndicesToUnroll(
+    const HloPartition& partition,
+    const std::vector<std::vector<HloInstruction*>>& tasks) {
   std::vector<int64_t> indices_to_unroll;
 
   auto unroll_task = [&](HloInstruction* call) {
@@ -28,13 +30,14 @@ static inline std::vector<int64_t> GetIndicesToUnroll(const HloPartition& partit
   return indices_to_unroll;
 }
 
-static inline std::vector<std::vector<HloInstruction*>> UnrollLoopIncrementTasks(const std::vector<std::vector<HloInstruction*>>& tasks,
-                                            Schedule& schedule,
-                                            const std::vector<int64_t>& indices_to_unroll,
-                                            int64_t num_iterations) {
+static inline std::vector<std::vector<HloInstruction*>>
+UnrollLoopIncrementTasks(const std::vector<std::vector<HloInstruction*>>& tasks,
+                         Schedule& schedule,
+                         const std::vector<int64_t>& indices_to_unroll,
+                         int64_t num_iterations) {
   const int64_t num_to_unroll = indices_to_unroll.size();
-  // This function unrolls the loop increment tasks for the unrollable tasks (side effect)
-  // tasks and returns the remaining tasks (return value)
+  // This function unrolls the loop increment tasks for the unrollable tasks
+  // (side effect) tasks and returns the remaining tasks (return value)
   for (int64_t task_index : indices_to_unroll) {
     VLOG(3) << "fully unrolling first task "
             << tasks[0][task_index]->called_computations()[0]->name()
@@ -165,7 +168,6 @@ absl::StatusOr<Schedule> ScheduleCustomSchedule(
     const CustomSchedule& custom_schedule,
     const std::vector<std::vector<HloInstruction*>>& tasks,
     Schedule& schedule) {
-  
   VLOG(5) << "ScheduleCustomSchedule";
 
   const int64_t num_microbatches = tasks.size();
@@ -179,27 +181,41 @@ absl::StatusOr<Schedule> ScheduleCustomSchedule(
     }
   }
 
-  // Check 1: Check that each task appears in each custom schedule device row exactly microbatch times
+  // Check 1: Check that each task appears in each custom schedule device row
+  // exactly microbatch times
   for (const auto& [task_name, count] : custom_schedule_task_counts) {
     if (count != num_microbatches) {
-      return InvalidArgumentStrCat("Task ", task_name, " appears ", count, " times in custom schedule, expected ", num_microbatches);
+      return InvalidArgumentStrCat("Task ", task_name, " appears ", count,
+                                   " times in custom schedule, expected ",
+                                   num_microbatches);
     }
   }
 
-  // AND construct a map from (microbatch iter, task_name) to the task HloInstruction* in the schedule
-  absl::flat_hash_map<std::pair<int64_t, std::string>, HloInstruction*> task_map;
+  // AND construct a map from (microbatch iter, task_name) to the task
+  // HloInstruction* in the schedule
+  absl::flat_hash_map<std::pair<int64_t, std::string>, HloInstruction*>
+      task_map;
   for (int64_t iter = 0; iter < num_microbatches; ++iter) {
     // O(n2). Could be more efficient if we know the names match exactly.
     for (const auto& [task_name, count] : custom_schedule_task_counts) {
-      for (int64_t mb_task_index = 0; mb_task_index < tasks_per_iter; ++mb_task_index) {
-        if (absl::StrContains(ColorOrDefault(tasks[iter][mb_task_index]), task_name)) {
+      for (int64_t mb_task_index = 0; mb_task_index < tasks_per_iter;
+           ++mb_task_index) {
+        if (absl::StrContains(ColorOrDefault(tasks[iter][mb_task_index]),
+                              task_name)) {
           if (task_map.contains({iter, task_name})) {
-            // Check 2: Check that each color we expect appears AT MOST ONCE in the task row for each microbatch.
-            // This is the first half of checking if coloring + grouping + fusion was done correctly.
+            // Check 2: Check that each color we expect appears AT MOST ONCE in
+            // the task row for each microbatch. This is the first half of
+            // checking if coloring + grouping + fusion was done correctly.
             // Checking each row is fairly redundant, but we do it anyway.
-            return InvalidArgumentStrCat("Task ", task_name, " appears multiple times in microbatch row ", iter);
+            return InvalidArgumentStrCat(
+                "Task ", task_name,
+                " appears multiple times in microbatch row ", iter);
           }
-          VLOG(5) << "Adding task " << tasks[iter][mb_task_index]->called_computations()[0]->name() << " with color " << ColorOrDefault(tasks[iter][mb_task_index]) << " at iter " << iter << " and task_index " << mb_task_index;
+          VLOG(5)
+              << "Adding task "
+              << tasks[iter][mb_task_index]->called_computations()[0]->name()
+              << " with color " << ColorOrDefault(tasks[iter][mb_task_index])
+              << " at iter " << iter << " and task_index " << mb_task_index;
           task_map[{iter, task_name}] = tasks[iter][mb_task_index];
         }
       }
@@ -208,12 +224,19 @@ absl::StatusOr<Schedule> ScheduleCustomSchedule(
 
   // Populate the schedule
   for (int64_t mesh_id = 0; mesh_id < num_custom_schedule_rows; ++mesh_id) {
-    const std::vector<std::pair<int64_t, std::string>>& schedule_for_mesh = custom_schedule[mesh_id];
+    const std::vector<std::pair<int64_t, std::string>>& schedule_for_mesh =
+        custom_schedule[mesh_id];
     for (const auto& [iter, task_name] : schedule_for_mesh) {
       HloInstruction* task_inst = task_map[{iter, task_name}];
-      // Check 3: Check that each task appears in the schedule AT LEAST ONCE. This is the other half of checking if coloring + grouping + fusion was done correctly.
-      if (task_inst == nullptr) return InvalidArgumentStrCat("Task ", task_name, " not found in task map!");
-      VLOG(5) << "Scheduling task " << task_inst->called_computations()[0]->name() << " at mesh_id " << mesh_id << " and iter " << iter;
+      // Check 3: Check that each task appears in the schedule AT LEAST ONCE.
+      // This is the other half of checking if coloring + grouping + fusion was
+      // done correctly.
+      if (task_inst == nullptr)
+        return InvalidArgumentStrCat("Task ", task_name,
+                                     " not found in task map!");
+      VLOG(5) << "Scheduling task "
+              << task_inst->called_computations()[0]->name() << " at mesh_id "
+              << mesh_id << " and iter " << iter;
       schedule[mesh_id].push_back(task_inst);
     }
   }
@@ -224,7 +247,6 @@ absl::StatusOr<Schedule> ScheduleCustomSchedule(
 absl::StatusOr<Schedule> ScheduleCustom(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
-
   VLOG(5) << "ScheduleCustom";
 
   if (!config.custom_schedule.has_value()) {
@@ -234,24 +256,31 @@ absl::StatusOr<Schedule> ScheduleCustom(
   const CustomSchedule custom_schedule = *config.custom_schedule;
   Schedule schedule(custom_schedule.size());
 
-  const std::vector<int64_t> indices_to_unroll = GetIndicesToUnroll(partition, tasks);
-  const std::vector<std::vector<HloInstruction*>> remaining_tasks = UnrollLoopIncrementTasks(tasks, schedule, indices_to_unroll, config.num_iterations);
+  const std::vector<int64_t> indices_to_unroll =
+      GetIndicesToUnroll(partition, tasks);
+  const std::vector<std::vector<HloInstruction*>> remaining_tasks =
+      UnrollLoopIncrementTasks(tasks, schedule, indices_to_unroll,
+                               config.num_iterations);
 
   for (int64_t stage = 0; stage < custom_schedule.size(); ++stage) {
-    schedule[stage].reserve(custom_schedule[stage].size() + schedule[stage].size());
+    schedule[stage].reserve(custom_schedule[stage].size() +
+                            schedule[stage].size());
   }
 
   return ScheduleCustomSchedule(custom_schedule, remaining_tasks, schedule);
 }
 
 absl::StatusOr<Schedule> SchedulePrefetchWavefront(
-    const HloPartition& partition, const LoopConfig& config, const std::vector<int64_t>& indices_to_unroll,
+    const HloPartition& partition, const LoopConfig& config,
+    const std::vector<int64_t>& indices_to_unroll,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
   // gpipe schedule the first tasks to get everyone started and to avoid
   // delays later in the pipeline
   Schedule schedule(1);
 
-  const std::vector<std::vector<HloInstruction*>> remaining_tasks = UnrollLoopIncrementTasks(tasks, schedule, indices_to_unroll, config.num_iterations);
+  const std::vector<std::vector<HloInstruction*>> remaining_tasks =
+      UnrollLoopIncrementTasks(tasks, schedule, indices_to_unroll,
+                               config.num_iterations);
 
   TF_RETURN_IF_ERROR(
       ScheduleWavefront(partition, remaining_tasks, config, schedule));
@@ -270,7 +299,8 @@ absl::StatusOr<Schedule> ScheduleWavefront(
     return ScheduleGpipe(config, tasks);
   }
 
-  const std::vector<int64_t> indices_to_unroll = GetIndicesToUnroll(partition, tasks);
+  const std::vector<int64_t> indices_to_unroll =
+      GetIndicesToUnroll(partition, tasks);
 
   return SchedulePrefetchWavefront(partition, config, indices_to_unroll, tasks);
 }
@@ -279,7 +309,8 @@ absl::StatusOr<Schedule> SchedulePrefetchWavefront(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
   if (tasks.empty() || tasks[0].empty()) {
-    return std::vector<std::vector<HloInstruction*>>{std::vector<HloInstruction*>{}};
+    return std::vector<std::vector<HloInstruction*>>{
+        std::vector<HloInstruction*>{}};
   }
 
   if (tasks[0].size() == 1) {
@@ -287,10 +318,12 @@ absl::StatusOr<Schedule> SchedulePrefetchWavefront(
     return ScheduleGpipe(config, tasks);
   }
 
-  const std::vector<int64_t> indices_to_unroll = GetIndicesToUnroll(partition, tasks);
+  const std::vector<int64_t> indices_to_unroll =
+      GetIndicesToUnroll(partition, tasks);
 
   if (indices_to_unroll.size() > 0) {
-    return SchedulePrefetchWavefront(partition, config, indices_to_unroll, tasks);
+    return SchedulePrefetchWavefront(partition, config, indices_to_unroll,
+                                     tasks);
   }
   return ScheduleWavefront(partition, config, tasks);
 }

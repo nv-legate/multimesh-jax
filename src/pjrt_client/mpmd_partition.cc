@@ -880,9 +880,9 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
   mpmd_pipeline.AddPass<MpmdComputationFusion>(
       &partition, MpmdComputationFusion::FusionType::kMatchingColor,
       /*only_fuse_loop_tasks=*/false);
-  mpmd_pipeline.AddPass<MpmdComputationFusion>(
-      &partition, MpmdComputationFusion::FusionType::kMatchingDevices,
-      /*only_fuse_loop_tasks=*/true);
+//  mpmd_pipeline.AddPass<MpmdComputationFusion>(
+//       &partition, MpmdComputationFusion::FusionType::kMatchingDevices,
+//       /*only_fuse_loop_tasks=*/true);
   mpmd_pipeline.AddPass<HloDCE>();
   mpmd_pipeline.AddPass<MpmdLoopUnroll>(&partition);
   mpmd_pipeline.AddPass<MpmdInsertReshard>(&partition);

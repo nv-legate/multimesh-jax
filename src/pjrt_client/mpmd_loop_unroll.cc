@@ -199,8 +199,8 @@ absl::Status MpmdLoopUnroll::Unroll(HloComputation* parent,
   // add control dependencies across the schedule
   for (int64_t stage = 0; stage < schedule.size(); ++stage) {
     for (int64_t order = 1; order < schedule[stage].size(); ++order) {
-      TF_RETURN_IF_ERROR(
-          schedule[stage][order - 1]->AddControlDependencyTo(schedule[stage][order]));
+      TF_RETURN_IF_ERROR(schedule[stage][order - 1]->AddControlDependencyTo(
+          schedule[stage][order]));
     }
   }
 
