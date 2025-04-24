@@ -12,13 +12,13 @@
 
 namespace xla {
 
-void RunExecutable(zuku::Stream *zs, int64_t run_id, zuku::DeviceList devices,
+void RunExecutable(zuku::Stream* zs, int64_t run_id, zuku::DeviceList devices,
                    zuku::Processor p, std::shared_ptr<LegateCompiler> compiler,
                    std::vector<ScalarArgument> scalars,
                    zuku::ro_vector<zuku::ShardedArray> inputs,
                    zuku::rw_vector<zuku::ShardedArray> outputs,
-                   const zuku::ArrayTile &temp);
+                   const zuku::ArrayTile& temp);
 
 }  // namespace xla
 
-#endif // XLA_PJRT_HLO_EXECUTOR_H_
+#endif  // XLA_PJRT_HLO_EXECUTOR_H_

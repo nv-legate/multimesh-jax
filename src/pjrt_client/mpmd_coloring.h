@@ -40,7 +40,6 @@ class MpmdColoring : public HloModulePass {
       : partition_(partition),
         color_propagation_priority_(color_propagation_priority) {}
 
-
   absl::StatusOr<bool> Run(
       HloModule* module,
       const absl::flat_hash_set<absl::string_view>& execution_threads) override;
@@ -78,7 +77,6 @@ class MpmdColoring : public HloModulePass {
       const absl::flat_hash_map<const HloInstruction*, int64_t>& depth,
       const absl::flat_hash_map<const HloInstruction*, int64_t>&
           topological_index);
-
 
   // For a given `computation` and global module `properties`, compute
   // a partition color for the isntruction if it has been directly

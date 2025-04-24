@@ -26,7 +26,7 @@ class ExecutableCache {
   bool compile_executable(
       uint64_t hlo_id,
       std::function<std::unique_ptr<LegateExecutable>()> invoke);
-  LegateExecutable *find_executable(uint64_t hlo_id);
+  LegateExecutable* find_executable(uint64_t hlo_id);
 
  private:
   std::unordered_map<uint64_t, Entry> executables_;
@@ -35,6 +35,6 @@ class ExecutableCache {
 bool compile_executable(
     uint64_t hlo_id, std::function<std::unique_ptr<LegateExecutable>()> invoke);
 
-LegateExecutable *find_executable(uint64_t hlo_id);
+LegateExecutable* find_executable(uint64_t hlo_id);
 
 }  // namespace xla

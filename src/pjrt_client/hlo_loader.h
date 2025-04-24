@@ -21,8 +21,8 @@ struct HloLoaderOptions {
 };
 
 void LoadAndCompile(int64_t run_id, zuku::Processor p,
-                    const std::shared_ptr<LegateCompiler> &compiler);
+                    const std::shared_ptr<LegateCompiler>& compiler);
 
 }  // namespace xla
 
-#endif // HLO_LOADER_H_
+#endif  // HLO_LOADER_H_

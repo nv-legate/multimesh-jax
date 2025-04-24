@@ -10,10 +10,10 @@
 
 namespace xla {
 
-absl::Status ScheduleWavefront(const HloPartition& partition,
-                               const std::vector<std::vector<HloInstruction*>>& tasks,
-                               const LoopConfig& loop_config,
-                               std::vector<HloInstruction*>& schedule) {
+absl::Status ScheduleWavefront(
+    const HloPartition& partition,
+    const std::vector<std::vector<HloInstruction*>>& tasks,
+    const LoopConfig& loop_config, std::vector<HloInstruction*>& schedule) {
   if (tasks.empty()) {
     return;
   }
@@ -28,7 +28,7 @@ absl::Status ScheduleWavefront(const HloPartition& partition,
   const auto [num_groups, num_pipeline_tasks] = [&] {
     absl::flat_hash_map<zuku::DeviceList, int64_t> unique_groups;
     int num_pipeline_tasks = 0;
-    for (auto&& task : tasks[0]){
+    for (auto&& task : tasks[0]) {
       auto color = Color(task);
       auto devices = partition.DevicesForColor(*color);
       if (devices.size() != total_num_devices) {
@@ -75,11 +75,12 @@ absl::Status ScheduleWavefront(const HloPartition& partition,
         const int microbatch = minibatch * minibatch_size + minibatch_offset;
         if (microbatch < num_microbatches) {
           schedule.push_back(tasks[microbatch][stage]);
-          if (VLOG_IS_ON(3)){
+          if (VLOG_IS_ON(3)) {
             auto color = Color(schedule.back());
             auto devices = partition.DevicesForColor(*color);
             VLOG(3) << "Adding wf=" << wf << " microbatch=" << microbatch
-                    << " to stage=" << stage << ", " << schedule.back()->called_computations()[0]->name()
+                    << " to stage=" << stage << ", "
+                    << schedule.back()->called_computations()[0]->name()
                     << " across " << devices;
           }
         }
@@ -89,8 +90,9 @@ absl::Status ScheduleWavefront(const HloPartition& partition,
   return absl::OkStatus();
 }
 
-absl::StatusOr<std::vector<HloInstruction*>> ScheduleGpipe(const LoopConfig& config, const std::vector<std::vector<HloInstruction*>>& tasks)
-{
+absl::StatusOr<std::vector<HloInstruction*>> ScheduleGpipe(
+    const LoopConfig& config,
+    const std::vector<std::vector<HloInstruction*>>& tasks) {
   std::vector<HloInstruction*> schedule;
   schedule.reserve(config.num_iterations * tasks[0].size());
   const int64_t tasks_per_iter = tasks[0].size();
@@ -102,15 +104,15 @@ absl::StatusOr<std::vector<HloInstruction*>> ScheduleGpipe(const LoopConfig& con
   return schedule;
 }
 
-absl::StatusOr<std::vector<HloInstruction*>> SchedulePrefetchWavefront(const HloPartition& partition,
-                                       const LoopConfig& config,
-                                       int num_to_unroll,
-                                       const std::vector<std::vector<HloInstruction*>>& tasks) {
+absl::StatusOr<std::vector<HloInstruction*>> SchedulePrefetchWavefront(
+    const HloPartition& partition, const LoopConfig& config, int num_to_unroll,
+    const std::vector<std::vector<HloInstruction*>>& tasks) {
   // gpipe schedule the first tasks to get everyone started and to avoid
   // delays later in the pipeline
   std::vector<HloInstruction*> schedule;
   for (int task = 0; task < num_to_unroll; ++task) {
-    VLOG(3) << "fully unrolling first task " << tasks[0][task]->called_computations()[0]->name()
+    VLOG(3) << "fully unrolling first task "
+            << tasks[0][task]->called_computations()[0]->name()
             << " to prefetch initial activations for all iterations";
     for (int iter = 0; iter < config.num_iterations; ++iter) {
       schedule.push_back(tasks[iter][task]);
@@ -118,31 +120,29 @@ absl::StatusOr<std::vector<HloInstruction*>> SchedulePrefetchWavefront(const Hlo
   }
 
   std::vector<std::vector<HloInstruction*>> remaining_tasks(tasks.size());
-  for (int64_t iter=0; iter < config.num_iterations; ++iter){
+  for (int64_t iter = 0; iter < config.num_iterations; ++iter) {
     remaining_tasks[iter].reserve(tasks[iter].size() - num_to_unroll);
-    for (int64_t task=num_to_unroll; task < tasks[iter].size(); ++task){
+    for (int64_t task = num_to_unroll; task < tasks[iter].size(); ++task) {
       remaining_tasks[iter].push_back(tasks[iter][task]);
     }
   }
 
-  TF_RETURN_IF_ERROR(ScheduleWavefront(
-    partition,
-    remaining_tasks, config, schedule));
+  TF_RETURN_IF_ERROR(
+      ScheduleWavefront(partition, remaining_tasks, config, schedule));
 
   return schedule;
 }
 
 absl::StatusOr<std::vector<HloInstruction*>> ScheduleWavefront(
-  const HloPartition& partition, const LoopConfig& config, const std::vector<std::vector<HloInstruction*>>& tasks)
-{
-  if (tasks.empty() || tasks[0].empty()){
+    const HloPartition& partition, const LoopConfig& config,
+    const std::vector<std::vector<HloInstruction*>>& tasks) {
+  if (tasks.empty() || tasks[0].empty()) {
     return std::vector<HloInstruction*>{};
   }
 
-  if (tasks[0].size() == 1){
+  if (tasks[0].size() == 1) {
     return ScheduleGpipe(config, tasks);
   }
-
 
   auto unroll_task = [&](HloInstruction* call) {
     auto color = Color(call);
@@ -154,12 +154,12 @@ absl::StatusOr<std::vector<HloInstruction*>> ScheduleWavefront(
     ++num_to_unroll;
   }
 
-  return SchedulePrefetchWavefront(partition, config,
-                                    num_to_unroll, tasks);
+  return SchedulePrefetchWavefront(partition, config, num_to_unroll, tasks);
 }
 
-absl::StatusOr<std::vector<HloInstruction*>> SchedulePrefetchWavefront(const HloPartition& partition, const LoopConfig& config, const std::vector<std::vector<HloInstruction*>>& tasks){
-
+absl::StatusOr<std::vector<HloInstruction*>> SchedulePrefetchWavefront(
+    const HloPartition& partition, const LoopConfig& config,
+    const std::vector<std::vector<HloInstruction*>>& tasks) {
   if (tasks.empty() || tasks[0].empty()) {
     return std::vector<HloInstruction*>{};
   }
@@ -181,15 +181,14 @@ absl::StatusOr<std::vector<HloInstruction*>> SchedulePrefetchWavefront(const Hlo
   }
 
   if (num_to_unroll > 0) {
-    return SchedulePrefetchWavefront(partition, config, num_to_unroll,
-                                     tasks);
+    return SchedulePrefetchWavefront(partition, config, num_to_unroll, tasks);
   }
   return ScheduleWavefront(partition, config, tasks);
 }
 
 absl::StatusOr<std::vector<HloInstruction*>> ScheduleLoops(
-  const HloPartition& partition, const LoopConfig& config, const std::vector<std::vector<HloInstruction*>>& tasks)
-{
+    const HloPartition& partition, const LoopConfig& config,
+    const std::vector<std::vector<HloInstruction*>>& tasks) {
   switch (config.schedule) {
     case LoopConfig::Schedule::kFillDrain:
       return ScheduleGpipe(config, tasks);
@@ -200,7 +199,5 @@ absl::StatusOr<std::vector<HloInstruction*>> ScheduleLoops(
       return ScheduleWavefront(partition, config, tasks);
   }
 }
-
-
 
 }  // namespace xla

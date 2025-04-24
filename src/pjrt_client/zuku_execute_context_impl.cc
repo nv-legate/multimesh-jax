@@ -37,8 +37,8 @@ using zuku::on;
 
 namespace {
 
-std::vector<zuku::Store<zuku::ShardedArray>> *keep_from_deleting{nullptr};
-std::vector<zuku::Future<zuku::ArrayTile>> *keep_tiles_from_deleting{nullptr};
+std::vector<zuku::Store<zuku::ShardedArray>>* keep_from_deleting{nullptr};
+std::vector<zuku::Future<zuku::ArrayTile>>* keep_tiles_from_deleting{nullptr};
 std::atomic<bool> runtime_stopped{false};
 std::optional<Realm::Runtime> rt;
 Realm::Event sync_all_execution_event{Realm::Event::NO_EVENT};
@@ -90,7 +90,7 @@ int64_t NextStoreId() {
 
 std::set<int> ZukuExecuteContextImpl::GetLocalDevices() {
   std::set<int> procs;
-  for (auto &&p : zuku::Processor::DefaultProcs()) {
+  for (auto&& p : zuku::Processor::DefaultProcs()) {
     procs.insert(p.local_id());
   }
   return procs;
@@ -100,13 +100,13 @@ zuku::Processor ZukuExecuteContextImpl::LocalProcessor(int64_t local_index) {
   return zuku::Processor::Create({.local = local_index});
 }
 
-void ZukuExecuteContextImpl::SetLastExecuteEvent(const zuku::Processor &p,
+void ZukuExecuteContextImpl::SetLastExecuteEvent(const zuku::Processor& p,
                                                  Realm::Event ev) {
   last_execute_events_[p.local_id()] = Realm::Event::merge_events(
       last_execute_events_[p.local_id()], std::move(ev));
 }
 
-void ZukuExecuteContextImpl::SetLastControlEvent(const zuku::Processor &p,
+void ZukuExecuteContextImpl::SetLastControlEvent(const zuku::Processor& p,
                                                  Realm::UserEvent ev) {
   if (ev != Realm::UserEvent::NO_USER_EVENT) {
     last_control_events_[p.local_id()] = ev;
@@ -114,10 +114,10 @@ void ZukuExecuteContextImpl::SetLastControlEvent(const zuku::Processor &p,
 }
 
 zuku::store_vector<zuku::ShardedArray> ZukuExecuteContextImpl::GetStores(
-    const std::vector<StoreHandle> &handles) {
+    const std::vector<StoreHandle>& handles) {
   zuku::store_vector<zuku::ShardedArray> stores;
   stores.reserve(handles.size());
-  for (auto &&handle : handles) {
+  for (auto&& handle : handles) {
     stores.push_back(handle.impl->array);
   }
   return stores;
@@ -142,11 +142,11 @@ void ZukuExecuteContextImpl::CloseWindow() {
 }
 
 zuku::store_variant_vector<zuku::ShardedArray>
-ZukuExecuteContextImpl::GetStores(const std::vector<StoreHandle> &handles,
-                                  const std::set<int64_t> &output_ids) {
+ZukuExecuteContextImpl::GetStores(const std::vector<StoreHandle>& handles,
+                                  const std::set<int64_t>& output_ids) {
   zuku::store_variant_vector<zuku::ShardedArray> views;
   views.reserve(handles.size());
-  for (auto &&handle : handles) {
+  for (auto&& handle : handles) {
     if (output_ids.find(handle.unique_id) != output_ids.end()) {
       // create a view outside the dependency analysis
       // this will also be passed as an output
@@ -159,13 +159,13 @@ ZukuExecuteContextImpl::GetStores(const std::vector<StoreHandle> &handles,
 }
 
 void ZukuExecuteContextImpl::OffloadHtoD(
-    int64_t local_device_id, const std::vector<StoreHandle> &to_offload,
-    const std::string &task_name) {
+    int64_t local_device_id, const std::vector<StoreHandle>& to_offload,
+    const std::string& task_name) {
   // there shouldn't be any competing H->D traffic so just run this ASAP
   log_xla.debug() << "OffloadHtoD " << to_offload.size() << " stores for task "
                   << task_name << " on device " << local_device_id;
 
-  for (auto &handle : to_offload) {
+  for (auto& handle : to_offload) {
     // only move back if the task processor does not match the current array
     // processor
     if (handle.impl->array->processor().type() !=
@@ -178,8 +178,8 @@ void ZukuExecuteContextImpl::OffloadHtoD(
 }
 
 void ZukuExecuteContextImpl::OffloadDtoH(
-    int64_t local_device_id, const std::vector<StoreHandle> &to_offload,
-    const std::vector<StoreHandle> &pipelined, const std::string &task_name) {
+    int64_t local_device_id, const std::vector<StoreHandle>& to_offload,
+    const std::vector<StoreHandle>& pipelined, const std::string& task_name) {
   log_xla.debug() << "OffloadDtoH " << to_offload.size() << " stores from task "
                   << task_name << " on device " << local_device_id;
 
@@ -193,13 +193,13 @@ void ZukuExecuteContextImpl::OffloadDtoH(
       return pipelined.front().impl->array.Precondition();
     }
     std::set<Realm::Event> preconditions;
-    for (auto &handle : pipelined) {
+    for (auto& handle : pipelined) {
       preconditions.insert(handle.impl->array.Precondition());
     }
     return Realm::Event::merge_events(preconditions);
   }();
 
-  for (auto &handle : to_offload) {
+  for (auto& handle : to_offload) {
     // only offload if on the GPU
     if (handle.impl->array->processor().type() == zuku::Processor::Type::GPU) {
       handle.impl->array = zuku::ShardedArray::MoveToMemory(
@@ -230,16 +230,16 @@ void ZukuExecuteContextImpl::CreateCompileTask(
 void ZukuExecuteContextImpl::CreateExecuteTask(
     int64_t run_id, int64_t local_device_id, int64_t global_device_id,
     zuku::DeviceList devices, std::shared_ptr<LegateCompiler> compiler,
-    const std::vector<ScalarArgument> &scalars,
-    const std::vector<StoreHandle> &inputs,
-    const std::vector<StoreHandle> &outputs,
-    zuku::Future<zuku::ArrayTile> &temp_buffer, LegateExecuteOptions options) {
+    const std::vector<ScalarArgument>& scalars,
+    const std::vector<StoreHandle>& inputs,
+    const std::vector<StoreHandle>& outputs,
+    zuku::Future<zuku::ArrayTile>& temp_buffer, LegateExecuteOptions options) {
   zuku::Processor p = LocalProcessor(local_device_id);
 
   // if any of the outputs overlap with the inputs, then the inputs should be an
   // unsafe view
   std::set<int64_t> output_ids;
-  for (auto &&output : outputs) {
+  for (auto&& output : outputs) {
     output_ids.insert(output.unique_id);
   }
 
@@ -251,14 +251,14 @@ void ZukuExecuteContextImpl::CreateExecuteTask(
                   << ", static_order=" << options.strict_ordering;
 
   if (log_xla.want_debug()) {
-    for (auto &&input : inputs) {
+    for (auto&& input : inputs) {
       log_xla.debug() << compiler->Name() << " has input " << input.impl->name
                       << ", " << input.impl->array->shape()
                       << " with precondition "
                       << input.impl->array.Precondition();
     }
 
-    for (auto &&output : outputs) {
+    for (auto&& output : outputs) {
       log_xla.debug() << compiler->Name() << " has output " << output.impl->name
                       << ", " << output.impl->array->shape()
                       << " with precondition "
@@ -267,7 +267,7 @@ void ZukuExecuteContextImpl::CreateExecuteTask(
   }
 
   if (devices.Contains(global_device_id)) {
-    for (auto &&output : outputs) {
+    for (auto&& output : outputs) {
       if (!output.impl->array->HasTile()) {
         std::cerr << "ouput " << output.impl->name << " has no tile on "
                   << global_device_id
@@ -276,7 +276,7 @@ void ZukuExecuteContextImpl::CreateExecuteTask(
         abort();
       }
     }
-    for (auto &&input : inputs) {
+    for (auto&& input : inputs) {
       if (!input.impl->array->HasTile()) {
         std::cerr << "input " << input.impl->name << " has no tile on "
                   << global_device_id
@@ -305,13 +305,13 @@ void ZukuExecuteContextImpl::CreateExecuteTask(
           .priority(options.priority.value_or(0))
           .stream_ordered()
           .defer(
-              [](zuku::Stream *zs, int64_t run_id, zuku::Processor p,
+              [](zuku::Stream* zs, int64_t run_id, zuku::Processor p,
                  zuku::DeviceList devices,
                  std::shared_ptr<LegateCompiler> compiler,
                  std::vector<ScalarArgument> scalars,
                  zuku::ro_vector<zuku::ShardedArray> inputs,
                  zuku::rw_vector<zuku::ShardedArray> outputs,
-                 const zuku::ArrayTile &temp) {
+                 const zuku::ArrayTile& temp) {
                 RunExecutable(zs, run_id, std::move(devices), std::move(p),
                               std::move(compiler), std::move(scalars),
                               std::move(inputs), std::move(outputs), temp);
@@ -321,14 +321,14 @@ void ZukuExecuteContextImpl::CreateExecuteTask(
               temp_buffer.view());
 
   if (log_xla.want_debug()) {
-    for (auto &&input : inputs) {
+    for (auto&& input : inputs) {
       log_xla.debug() << compiler->Name() << " has input " << input.impl->name
                       << ", " << input.impl->array->shape()
                       << " with postcondition "
                       << input.impl->array.Precondition();
     }
 
-    for (auto &&output : outputs) {
+    for (auto&& output : outputs) {
       log_xla.debug() << compiler->Name() << " has output " << output.impl->name
                       << ", " << output.impl->array->shape()
                       << " with postcondition "
@@ -351,7 +351,7 @@ void ZukuExecuteContextImpl::RunAfterAllTasks(int64_t local_device_id,
   }
 }
 
-void ZukuExecuteContextImpl::Destroy(StoreHandle &store) {
+void ZukuExecuteContextImpl::Destroy(StoreHandle& store) {
   if (runtime_stopped.load() == false) {
     // no need to synchronize -- just removing the reference
     store.impl = nullptr;
@@ -359,13 +359,13 @@ void ZukuExecuteContextImpl::Destroy(StoreHandle &store) {
 }
 
 void ZukuExecuteContextImpl::StoreBufferAction(int64_t local_device_id,
-                                               BufferAction *action,
-                                               const StoreHandle &store,
+                                               BufferAction* action,
+                                               const StoreHandle& store,
                                                bool blocking) {
   zuku::Processor p = LocalProcessor(local_device_id);
   auto token = on(p).defer(
-      [](int64_t local_device_id, BufferAction *action,
-         zuku::ShardedArray &array) {
+      [](int64_t local_device_id, BufferAction* action,
+         zuku::ShardedArray& array) {
         // ApplyStoreBufferAction(local_device_id, action, array);
       },
       local_device_id, action, store.impl->array);
@@ -375,24 +375,24 @@ void ZukuExecuteContextImpl::StoreBufferAction(int64_t local_device_id,
   }
 }
 
-bool ZukuExecuteContextImpl::HasLocalShard(const StoreHandle &handle) {
+bool ZukuExecuteContextImpl::HasLocalShard(const StoreHandle& handle) {
   return handle.impl->array->HasTile();
 }
 
-void *ZukuExecuteContextImpl::SliceLocalShard(int64_t local_device_id,
-                                              const StoreHandle &handle) {
+void* ZukuExecuteContextImpl::SliceLocalShard(int64_t local_device_id,
+                                              const StoreHandle& handle) {
   zuku::Processor p = LocalProcessor(local_device_id);
   auto [buffer] = on(p).defer(
-      [](const zuku::ShardedArray &array) {
+      [](const zuku::ShardedArray& array) {
         // do the slicing
         return array.tile().data();
       },
       handle.impl->array);
-  return const_cast<void *>(buffer.wait_and_get());
+  return const_cast<void*>(buffer.wait_and_get());
 }
 
 zuku::ShardedShape ZukuExecuteContextImpl::GetStoreShardedShape(
-    const StoreHandle &handle) {
+    const StoreHandle& handle) {
   return handle.impl->array->shape();
 }
 
@@ -418,7 +418,7 @@ StoreHandle ZukuExecuteContextImpl::AssembleShardsImpl(
           .if_on(p)
           .defer(
               [](std::shared_ptr<LegateStream> stream, zuku::Processor p,
-                 Shard shard, zuku::ShardedArray &array) {
+                 Shard shard, zuku::ShardedArray& array) {
                 // TODO: do the slicing
                 if (p.type() == zuku::Processor::Type::CPU) {
                   ::memcpy(array.tile().data(), shard.data, shard.size);
@@ -443,7 +443,7 @@ void ZukuExecuteContextImpl::Clear() {
   device_caches_.clear();
 }
 
-void ZukuExecuteContextImpl::Rename(StoreHandle &handle, std::string name) {
+void ZukuExecuteContextImpl::Rename(StoreHandle& handle, std::string name) {
   log_xla.debug() << "renaming " << handle.impl->name << " to " << name
                   << ", tensor_id=" << handle.impl->array->mesh_unique_id();
   handle.impl->name = std::move(name);
@@ -451,8 +451,8 @@ void ZukuExecuteContextImpl::Rename(StoreHandle &handle, std::string name) {
 
 void ZukuExecuteContextImpl::Reshard(int64_t local_device_id,
                                      int64_t global_device_id,
-                                     const StoreHandle &src,
-                                     const StoreHandle &dst) {
+                                     const StoreHandle& src,
+                                     const StoreHandle& dst) {
   zuku::Processor p = LocalProcessor(local_device_id);
 
   log_xla.debug() << "Reshard " << src.impl->name << " from "
@@ -470,14 +470,14 @@ bool ZukuExecuteContextImpl::IsGpu() {
   return zuku::Processor::DefaultType() == zuku::Processor::Type::GPU;
 }
 
-void ZukuExecuteContextImpl::StartTimer(const std::string &name) {
+void ZukuExecuteContextImpl::StartTimer(const std::string& name) {
   auto [start_time] = after(last_execute_events_[0]).defer([] {
     return std::chrono::steady_clock::now();
   });
   pending_timers_.emplace(name, std::move(start_time));
 }
 
-void ZukuExecuteContextImpl::StopTimer(const std::string &name) {
+void ZukuExecuteContextImpl::StopTimer(const std::string& name) {
   auto iter = pending_timers_.find(name);
   if (iter == pending_timers_.end()) {
     log_xla.warning() << "cannot stop timer " << name << ", does not exist";
@@ -568,7 +568,7 @@ std::shared_ptr<ZukuExecuteContext> ZukuExecuteContextImpl::Create(
     zuku::RealmConfig config) {
   std::array argv = {"legate-jax"};
   if (!rt.has_value()) {
-    rt = zuku::Init(argv.size(), (char **)argv.data(), config);
+    rt = zuku::Init(argv.size(), (char**)argv.data(), config);
     // This has to come after PyFinalize
     atexit(StopLegate);
   }
@@ -587,19 +587,19 @@ std::shared_ptr<ZukuExecuteContext> ZukuExecuteContextImpl::Create(
 ZukuExecuteContextImpl::~ZukuExecuteContextImpl() { all_contexts_.erase(this); }
 
 void ZukuExecuteContextImpl::ClearAllContexts() {
-  for (auto *context : all_contexts_) {
+  for (auto* context : all_contexts_) {
     context->Clear();
   }
 }
 
 ZukuExecuteContextImpl::ZukuExecuteContextImpl(Realm::Runtime rt) {
-  const auto &procs = zuku::Processor::DefaultProcs();
+  const auto& procs = zuku::Processor::DefaultProcs();
   zuku::Processor host = zuku::Processor::Util();
   last_execute_events_.reserve(procs.size());
   last_control_events_.reserve(procs.size());
   device_caches_.reserve(procs.size());
   host_caches_.reserve(procs.size());
-  for (auto &&proc : procs) {
+  for (auto&& proc : procs) {
     last_execute_events_.push_back(Realm::Event::NO_EVENT);
     last_control_events_.push_back(Realm::UserEvent::NO_USER_EVENT);
     zuku::Processor host =
@@ -610,7 +610,7 @@ ZukuExecuteContextImpl::ZukuExecuteContextImpl(Realm::Runtime rt) {
   all_contexts_.insert(this);
 }
 
-std::set<ZukuExecuteContextImpl *> ZukuExecuteContextImpl::all_contexts_;
+std::set<ZukuExecuteContextImpl*> ZukuExecuteContextImpl::all_contexts_;
 
 }  // namespace xla
 

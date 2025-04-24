@@ -36,16 +36,16 @@ struct MockZukuExecuteContext;
 
 class MockArrayCache {
  public:
-  void Allocate(int64_t local_device_id, const zuku::ShardedShape &shape,
-                MemoryKind kind, MockZukuExecuteContext &context);
+  void Allocate(int64_t local_device_id, const zuku::ShardedShape& shape,
+                MemoryKind kind, MockZukuExecuteContext& context);
 
-  void Free(const zuku::ShardedShape &shape, MemoryKind kind,
-            MockZukuExecuteContext &context);
+  void Free(const zuku::ShardedShape& shape, MemoryKind kind,
+            MockZukuExecuteContext& context);
 
   int64_t NumAllocations() const { return num_allocated_; }
 
   void Clear(int64_t local_device_id, MemoryKind kind,
-             const zuku::ShardedShape &shape, MockZukuExecuteContext &context);
+             const zuku::ShardedShape& shape, MockZukuExecuteContext& context);
 
   bool Full() const { return num_allocated_ == num_available_; }
 
@@ -89,10 +89,10 @@ class MockZukuExecuteContext final : public ZukuExecuteContext {
   void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                          int64_t global_device_id, zuku::DeviceList mesh,
                          std::shared_ptr<LegateCompiler> compiler,
-                         const std::vector<ScalarArgument> &scalars,
-                         const std::vector<StoreHandle> &inputs,
-                         const std::vector<StoreHandle> &outputs,
-                         zuku::Future<zuku::ArrayTile> &temp_buffer,
+                         const std::vector<ScalarArgument>& scalars,
+                         const std::vector<StoreHandle>& inputs,
+                         const std::vector<StoreHandle>& outputs,
+                         zuku::Future<zuku::ArrayTile>& temp_buffer,
                          LegateExecuteOptions options) override;
 
   void CreateCompileTask(int64_t local_device_id,
@@ -107,29 +107,29 @@ class MockZukuExecuteContext final : public ZukuExecuteContext {
   void ClearStoreCache(int64_t local_device_id) override;
 
   void OffloadDtoH(int64_t local_device_id,
-                   const std::vector<StoreHandle> &to_offload,
-                   const std::vector<StoreHandle> &pipelined,
-                   const std::string &task_name) override;
+                   const std::vector<StoreHandle>& to_offload,
+                   const std::vector<StoreHandle>& pipelined,
+                   const std::string& task_name) override;
 
   void OffloadHtoD(int64_t local_device_id,
-                   const std::vector<StoreHandle> &to_offload,
-                   const std::string &task_name) override;
+                   const std::vector<StoreHandle>& to_offload,
+                   const std::string& task_name) override;
 
   zuku::Future<zuku::ArrayTile> CreateBuffer(int64_t local_device_id,
                                              int64_t global_device_id,
                                              int64_t size) override;
 
   void Reshard(int64_t local_device_id, int64_t global_device_id,
-               const StoreHandle &src, const StoreHandle &dst) override;
+               const StoreHandle& src, const StoreHandle& dst) override;
 
-  void *SliceLocalShard(int64_t local_device_id,
-                        const StoreHandle &handle) override;
+  void* SliceLocalShard(int64_t local_device_id,
+                        const StoreHandle& handle) override;
 
-  void StartTimer(const std::string &name) override;
+  void StartTimer(const std::string& name) override;
 
-  void StopTimer(const std::string &name) override;
+  void StopTimer(const std::string& name) override;
 
-  zuku::ShardedShape GetStoreShardedShape(const StoreHandle &handle) override;
+  zuku::ShardedShape GetStoreShardedShape(const StoreHandle& handle) override;
 
   StoreHandle AssembleShards(
       int64_t local_device_id, int64_t global_device_id,
@@ -145,16 +145,16 @@ class MockZukuExecuteContext final : public ZukuExecuteContext {
 
   bool IsGpu() override;
 
-  bool HasLocalShard(const StoreHandle &handle) override;
+  bool HasLocalShard(const StoreHandle& handle) override;
 
-  void StoreBufferAction(int64_t local_device_id, BufferAction *actions,
-                         const StoreHandle &store, bool blocking) override;
+  void StoreBufferAction(int64_t local_device_id, BufferAction* actions,
+                         const StoreHandle& store, bool blocking) override;
 
-  void Rename(StoreHandle &handle, std::string name) override;
+  void Rename(StoreHandle& handle, std::string name) override;
 
   void FenceCompilation() override;
 
-  void Destroy(StoreHandle &store) override;
+  void Destroy(StoreHandle& store) override;
 
  private:
   StoreHandle CreateStoreImpl(int64_t local_device_id, int64_t global_device_id,

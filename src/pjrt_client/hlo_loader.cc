@@ -17,15 +17,15 @@ class DynamicBufferAllocator : public TaskMemoryAllocator {
  public:
   explicit DynamicBufferAllocator(zuku::Processor p) : proc_(std::move(p)) {}
 
-  void *Allocate(size_t size) override;
-  void Free(void *buf, size_t size) override;
+  void* Allocate(size_t size) override;
+  void Free(void* buf, size_t size) override;
 
  private:
-  std::unordered_map<void *, zuku::ArrayTile> tiles_;
+  std::unordered_map<void*, zuku::ArrayTile> tiles_;
   zuku::Processor proc_;
 };
 
-void *DynamicBufferAllocator::Allocate(size_t size) {
+void* DynamicBufferAllocator::Allocate(size_t size) {
   zuku::TileShape shape{
       .type = zuku::SupportedType::S8,
       .dims = {(int64_t)size},
@@ -36,17 +36,17 @@ void *DynamicBufferAllocator::Allocate(size_t size) {
   // we don't have a good way to be asynchronous with XLA
   event.wait();
 
-  void *data = tile.data();
+  void* data = tile.data();
   tiles_.insert({tile.data(), std::move(tile)});
   return data;
 }
 
-void DynamicBufferAllocator::Free(void *buf, size_t size) { tiles_.erase(buf); }
+void DynamicBufferAllocator::Free(void* buf, size_t size) { tiles_.erase(buf); }
 
 }  // namespace
 
 void LoadAndCompile(int64_t run_id, zuku::Processor p,
-                    const std::shared_ptr<LegateCompiler> &compiler) {
+                    const std::shared_ptr<LegateCompiler>& compiler) {
   // log_xla.debug() << "Compiling " << compiler->Name() << " on "
   //                << p.global_id();
   // only one GPU per node should be running the compilation
@@ -57,7 +57,7 @@ void LoadAndCompile(int64_t run_id, zuku::Processor p,
                                  .stream_executor_index = (int)p.local_id(),
                                  .allocator = &allocator,
                                  .print_stats = false});
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
     } catch (...) {
     }
     return compiler->MakeExecutable();

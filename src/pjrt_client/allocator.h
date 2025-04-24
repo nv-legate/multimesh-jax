@@ -11,9 +11,9 @@ namespace xla {
 
 class TaskMemoryAllocator {
  public:
-  virtual void *Allocate(size_t size) = 0;
+  virtual void* Allocate(size_t size) = 0;
 
-  virtual void Free(void *buf, size_t size) = 0;
+  virtual void Free(void* buf, size_t size) = 0;
 };
 
 static constexpr int64_t kTempMinAlignment = 4096;

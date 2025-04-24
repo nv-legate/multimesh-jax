@@ -15,7 +15,7 @@ bool ExecutableCache::compile_executable(
     uint64_t hlo_id,
     std::function<std::unique_ptr<LegateExecutable>()> invoke) {
   cache_lock.lock();
-  auto &entry = executables_[hlo_id];
+  auto& entry = executables_[hlo_id];
   cache_lock.unlock();
 
   std::lock_guard<std::mutex> guard(entry.lock);
@@ -27,7 +27,7 @@ bool ExecutableCache::compile_executable(
   return true;
 }
 
-LegateExecutable *ExecutableCache::find_executable(uint64_t hlo_id) {
+LegateExecutable* ExecutableCache::find_executable(uint64_t hlo_id) {
   std::lock_guard<std::mutex> guard(cache_lock);
   auto finder = executables_.find(hlo_id);
   if (executables_.end() == finder) {
@@ -36,7 +36,7 @@ LegateExecutable *ExecutableCache::find_executable(uint64_t hlo_id) {
   return finder->second.executable.get();
 }
 
-static ExecutableCache &get_executable_cache() {
+static ExecutableCache& get_executable_cache() {
   static ExecutableCache executable_cache;
   return executable_cache;
 }
@@ -47,7 +47,7 @@ bool compile_executable(
   return get_executable_cache().compile_executable(hlo_id, std::move(invoke));
 }
 
-LegateExecutable *find_executable(uint64_t hlo_id) {
+LegateExecutable* find_executable(uint64_t hlo_id) {
   return get_executable_cache().find_executable(hlo_id);
 }
 

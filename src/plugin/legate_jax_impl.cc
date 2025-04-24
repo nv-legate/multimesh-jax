@@ -13,8 +13,8 @@
 
 extern "C" void SetStartupConfig(zuku::RealmConfig cfg);
 
-extern "C" void CompileHloModuleFromFile(const std::string &hlo_file,
-                                         const std::string &platform_name,
+extern "C" void CompileHloModuleFromFile(const std::string& hlo_file,
+                                         const std::string& platform_name,
                                          int replica_count, int num_partitions,
                                          bool erase_sharding, bool autoshard,
                                          std::optional<int64_t> device_mem);
@@ -33,7 +33,7 @@ extern "C" void SetEnableMetadataNameTasks(bool flag);
 
 extern "C" void RegisterMetadataNameTaskWithFactory(
     std::string matcher,
-    std::function<std::vector<int64_t>(const std::string &task)> device_factory,
+    std::function<std::vector<int64_t>(const std::string& task)> device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes);
 
@@ -62,7 +62,7 @@ typename std::enable_if<sizeof(To) == sizeof(From) &&
                             std::is_trivially_copyable<From>::value &&
                             std::is_trivially_copyable<To>::value,
                         To>::type
-bit_cast(const From &src) noexcept {
+bit_cast(const From& src) noexcept {
   static_assert(std::is_trivially_constructible<To>::value,
                 "This implementation additionally requires destination type to "
                 "be trivially constructible");
@@ -73,13 +73,13 @@ bit_cast(const From &src) noexcept {
 }
 
 template <typename T>
-pybind11::bytes PackDescriptor(const T &descriptor) {
+pybind11::bytes PackDescriptor(const T& descriptor) {
   return pybind11::bytes(PackDescriptorAsString(descriptor));
 }
 
 template <typename T>
-pybind11::capsule EncapsulateFunction(T *fn) {
-  return pybind11::capsule(bit_cast<void *>(fn), "xla._CUSTOM_CALL_TARGET");
+pybind11::capsule EncapsulateFunction(T* fn) {
+  return pybind11::capsule(bit_cast<void*>(fn), "xla._CUSTOM_CALL_TARGET");
 }
 
 void no_op_entrypoint() {}
@@ -143,7 +143,7 @@ PYBIND11_MODULE(legate_jax_impl, m) {
   m.def(
       "_register_task_factory",
       [](py::str task_regex,
-         std::function<std::vector<int64_t>(const std::string &)>
+         std::function<std::vector<int64_t>(const std::string&)>
              device_callback,
          py::list py_device_dims, py::list py_device_axes,
          py::list py_logical_axes) {
