@@ -142,8 +142,22 @@ absl::Status MpmdComputationFusion::FuseComputations(
   auto* root_tuple =
       builder.AddInstruction(HloInstruction::CreateTuple(fused_root_operands));
 
+  bool is_backprop = false;
+  TF_RETURN_IF_ERROR(
+      builder.ForEachInstruction([&](const HloInstruction* instruction) {
+        if (absl::StrContains(instruction->metadata().op_name(),
+                              "transpose(jvp")) {
+          is_backprop = true;
+        }
+        return absl::OkStatus();
+      }));
   auto* new_comp = parent->parent()->AddComputationAndUnifyNamesAndIds(
       builder.Build(root_tuple), /*is_entry=*/false);
+  if (is_backprop && new_comp != nullptr &&
+      !absl::StartsWith(new_comp->name(), "bwd")) {
+    std::string new_name = absl::StrCat("bwd.", new_comp->name());
+    new_comp->SetAndSanitizeName(new_name);
+  }
 
   std::vector<HloInstruction*> fused_call_operands;
   fused_call_operands.reserve(parameters_needed.size());

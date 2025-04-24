@@ -371,6 +371,82 @@ absl::Status MpmdColoring::ComputeAssignedColors(
   return absl::OkStatus();
 }
 
+bool MpmdColoring::PropagateFromUsersAndOperandsColorDepth(
+    HloInstruction* instruction, const InstructionProperties& properties,
+    FilterVisitFn if_visit,
+    const absl::flat_hash_map<std::string, int64_t>& color_depth,
+    absl::flat_hash_map<HloInstruction*, bool>& recolorable_instructions) {
+  auto color = Color(instruction);
+
+  // Check if non-recolorable instruction is already assigned a color
+  if (color.has_value() && !recolorable_instructions.contains(instruction)) {
+    return false;
+  }
+
+  std::optional<std::string> operand_candidate_color = std::nullopt;
+  std::optional<std::string> user_candidate_color = std::nullopt;
+
+  for (auto* operand : properties.Operands(instruction)) {
+    const auto operand_color = Color(operand);
+    if (if_visit(operand) && operand_color.has_value() &&
+        color_depth.contains(*operand_color)) {
+      if (!operand_candidate_color.has_value() ||
+          color_depth.at(*operand_candidate_color) <
+              color_depth.at(*operand_color)) {
+        operand_candidate_color = operand_color;
+      }
+    }
+  }
+
+  if (instruction->opcode() != HloOpcode::kOptimizationBarrier) {
+    for (auto* user : properties.Users(instruction)) {
+      const auto user_color = Color(user);
+      if (if_visit(user) && user_color.has_value() &&
+          color_depth.contains(*user_color)) {
+        if (!user_candidate_color.has_value() ||
+            color_depth.at(*user_candidate_color) >
+                color_depth.at(*user_color)) {
+          user_candidate_color = user_color;
+        }
+      }
+    }
+  }
+
+  bool prefer_users_over_operands = false;
+  if (recolorable_instructions.contains(instruction)) {
+    prefer_users_over_operands = recolorable_instructions.at(instruction);
+  } else if (user_candidate_color.has_value()) {
+    prefer_users_over_operands = true;
+  }
+
+  std::optional<std::string> candidate_color = prefer_users_over_operands
+                                                   ? user_candidate_color
+                                                   : operand_candidate_color;
+  // Check if the candidate color is deeper than the user candidate color. Not
+  // ok to use in that case.
+  if (candidate_color.has_value() && user_candidate_color.has_value()) {
+    if (color_depth.at(*candidate_color) >
+        color_depth.at(*user_candidate_color)) {
+      candidate_color = user_candidate_color;
+    }
+  }
+
+  if (candidate_color.has_value()) {
+    VLOG(5) << "propagating color " << *candidate_color << " for "
+            << instruction->name();
+    AssignColor(instruction, *candidate_color);
+    properties.ForEachAlias(instruction, [&](HloInstruction* i) {
+      if (!IsAssignedColor(i)) {
+        AssignColor(i, *candidate_color);
+      }
+    });
+    recolorable_instructions[instruction] = prefer_users_over_operands;
+    return candidate_color != color;
+  }
+
+  return false;
+}
+
 bool MpmdColoring::PropagateFromUsersAndOperands(
     HloInstruction* instruction, const InstructionProperties& properties,
     FilterVisitFn if_visit,
@@ -383,7 +459,6 @@ bool MpmdColoring::PropagateFromUsersAndOperands(
       color_depths;  // reuse to avoid re-allocating memory
   absl::flat_hash_map<std::string, int64_t>
       color_topological_indices;  // reuse to avoid re-allocating memory
-  auto color = Color(instruction);
   std::optional<std::string> max_operand_color;
   // Max is a misnomer here for depth and topological index,
   // it actually refers to the fact that the color has the highest
@@ -506,6 +581,9 @@ MpmdColoring::GetColorPropagationPriorityFromString(
   } else if (priority_str == "TOPOLOGICAL") {
     VLOG(5) << "using topological priority for color propagation.";
     return MpmdColoring::ColorPropagationPriority::kTopological;
+  } else if (priority_str == "COLOR_DEPTH") {
+    VLOG(5) << "using color depth priority for color propagation.";
+    return MpmdColoring::ColorPropagationPriority::kColorDepth;
   } else {
     VLOG(5) << "invalid priority string, using weight priority for color "
                "propagation.";
@@ -525,6 +603,21 @@ static absl::flat_hash_map<const HloInstruction*, int64_t> ComputeDepthMap(
   return depth;
 }
 
+static absl::flat_hash_map<std::string, int64_t> ComputeColorDepthMap(
+    const HloComputation* computation,
+    const absl::flat_hash_map<const HloInstruction*, int64_t>& depth) {
+  absl::flat_hash_map<std::string, int64_t> color_depth;
+  for (auto* instruction : computation->MakeInstructionPostOrder()) {
+    auto inst_color = Color(instruction);
+    if (inst_color.has_value()) {
+      color_depth[*inst_color] =
+          std::max(value_or(color_depth, *inst_color, int64_t(0)),
+                   depth.at(instruction));
+    }
+  }
+  return color_depth;
+}
+
 static absl::flat_hash_map<const HloInstruction*, int64_t>
 CreateTopologicalIndexMap(const HloComputation* computation) {
   absl::flat_hash_map<const HloInstruction*, int64_t> instruction_to_topo_index;
@@ -542,6 +635,9 @@ absl::StatusOr<bool> MpmdColoring::PropagateIf(
   auto postorder = computation->MakeInstructionPostOrder();
   auto depth = ComputeDepthMap(computation);
   auto topological_index = CreateTopologicalIndexMap(computation);
+  auto color_depth = ComputeColorDepthMap(computation, depth);
+
+  absl::flat_hash_map<HloInstruction*, bool> recolorable_instructions;
 
   bool propagated = true;
   bool changed = false;
@@ -556,11 +652,22 @@ absl::StatusOr<bool> MpmdColoring::PropagateIf(
         continue;
       }
 
-      if (if_visit(instruction) && !IsAssignedColor(instruction)) {
+      if (if_visit(instruction) &&
+          (!IsAssignedColor(instruction) ||
+           recolorable_instructions.contains(instruction))) {
         VLOG(5) << "visiting " << instruction->name()
                 << " in color propagation from operands/users";
-        propagated |= PropagateFromUsersAndOperands(
-            instruction, properties, if_visit, depth, topological_index);
+        propagated |= [&]() {
+          if (color_propagation_priority_ ==
+              ColorPropagationPriority::kColorDepth) {
+            return PropagateFromUsersAndOperandsColorDepth(
+                instruction, properties, if_visit, color_depth,
+                recolorable_instructions);
+          } else {
+            return PropagateFromUsersAndOperands(
+                instruction, properties, if_visit, depth, topological_index);
+          }
+        }();
       }
       if (instruction->opcode() == HloOpcode::kWhile) {
         TF_ASSIGN_OR_RETURN(

@@ -36,6 +36,9 @@ UnrollLoopIncrementTasks(const std::vector<std::vector<HloInstruction*>>& tasks,
                          TaskSchedule& schedule) {
   const int64_t num_to_unroll = indices_to_unroll.size();
   const int64_t num_iterations = tasks.size();
+
+  if (num_to_unroll == 0) return tasks;
+
   // This function unrolls the loop increment tasks for the unrollable tasks
   // (side effect) tasks and returns the remaining tasks (return value)
   for (int64_t task_index : indices_to_unroll) {

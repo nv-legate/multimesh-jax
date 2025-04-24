@@ -457,7 +457,7 @@ def microbatch(
         element in that list is a task name, optionally associated with a
         specific microbatch. There must be exactly `pipeline_depth` device
         meshes in the custom schedule, with each task appearing exactly
-        `microbatch_size` times in the schedule.
+        `num_microbatches` times in the schedule.
 
     Returns:
       A wrapped version of ``fun`` that executes as a microbatch loop.

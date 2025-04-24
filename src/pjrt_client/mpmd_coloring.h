@@ -27,6 +27,7 @@ class MpmdColoring : public HloModulePass {
     kWeight,
     kDepth,
     kTopological,
+    kColorDepth,
   };
 
   static ColorPropagationPriority GetColorPropagationPriorityFromString(
@@ -77,6 +78,12 @@ class MpmdColoring : public HloModulePass {
       const absl::flat_hash_map<const HloInstruction*, int64_t>& depth,
       const absl::flat_hash_map<const HloInstruction*, int64_t>&
           topological_index);
+
+  bool PropagateFromUsersAndOperandsColorDepth(
+      HloInstruction* instruction, const InstructionProperties& properties,
+      FilterVisitFn if_visit,
+      const absl::flat_hash_map<std::string, int64_t>& color_depth,
+      absl::flat_hash_map<HloInstruction*, bool>& recolorable_instructions);
 
   // For a given `computation` and global module `properties`, compute
   // a partition color for the isntruction if it has been directly
