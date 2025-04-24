@@ -54,6 +54,7 @@ std::optional<int64_t> replicated_parameter_num_elements_cutoff = 0;
 std::optional<int64_t> recompute_from_arguments_if_cost_less_than{1024 * 1024};
 bool only_fuse_loop_tasks{false};
 bool use_task_fusion{true};
+bool respect_user_tasks{false};
 
 struct CompileOutput {
   std::vector<MpmdOperation> schedule;
@@ -137,6 +138,7 @@ absl::StatusOr<CompileOutput> CreateTasks(
   config.only_fuse_loop_tasks = only_fuse_loop_tasks;
   config.recompute_from_arguments_if_cost_less_than =
       recompute_from_arguments_if_cost_less_than;
+  config.respect_user_tasks = respect_user_tasks;
   TF_ASSIGN_OR_RETURN(
       auto partition_outputs,
       MpmdPartition(computation.proto(), options, argument_layout_pointers,
@@ -802,3 +804,7 @@ extern "C" void EnableOnlyFuseLoopTasks(bool enable) {
 }
 
 extern "C" void EnableTaskFusion(bool enable) { xla::use_task_fusion = enable; }
+
+extern "C" void EnableRespectUserTasks(bool enable) {
+  xla::respect_user_tasks = enable;
+}

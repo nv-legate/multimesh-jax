@@ -799,7 +799,9 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
 
   const MpmdColoring::ColorPropagationPriority color_propagation_priority =
       MpmdColoring::GetColorPropagationPriorityFromString(GetEnvOption(
-          kColorPropagationPriorityEnv, absl::string_view("WEIGHT")));
+          kColorPropagationPriorityEnv, config.respect_user_tasks
+                                            ? absl::string_view("COLOR_DEPTH")
+                                            : absl::string_view("WEIGHT")));
 
   std::vector<int64_t> devices = {
       options.executable_build_options.device_assignment().begin(),
@@ -880,9 +882,11 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
   mpmd_pipeline.AddPass<MpmdComputationFusion>(
       &partition, MpmdComputationFusion::FusionType::kMatchingColor,
       /*only_fuse_loop_tasks=*/false);
-//  mpmd_pipeline.AddPass<MpmdComputationFusion>(
-//       &partition, MpmdComputationFusion::FusionType::kMatchingDevices,
-//       /*only_fuse_loop_tasks=*/true);
+  if (!config.respect_user_tasks) {
+    mpmd_pipeline.AddPass<MpmdComputationFusion>(
+        &partition, MpmdComputationFusion::FusionType::kMatchingDevices,
+        /*only_fuse_loop_tasks=*/true);
+  }
   mpmd_pipeline.AddPass<HloDCE>();
   mpmd_pipeline.AddPass<MpmdLoopUnroll>(&partition);
   mpmd_pipeline.AddPass<MpmdInsertReshard>(&partition);

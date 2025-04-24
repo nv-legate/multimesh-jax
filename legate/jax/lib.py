@@ -20,6 +20,7 @@ from .legate_jax_impl import (
     enable_only_fuse_loop_tasks as _enable_only_fuse_loop_tasks,
     enable_recomputation as _enable_recomputation,
     enable_task_fusion as _enable_task_fusion,
+    enable_respect_user_tasks as _enable_respect_user_tasks,
 )
 from .no_op import no_op
 
@@ -159,6 +160,26 @@ def only_fuse_loop_tasks(enable: Optional[bool] = None, context_value=[False]):
     """
     with _set_context_value(
         enable, _enable_only_fuse_loop_tasks, context_value
+    ):
+        yield
+
+@contextmanager
+def enable_respect_user_tasks(enable: Optional[bool] = None, context_value=[False]):
+    """Sets whether user tasks should be respected.
+
+    This is primarily used for custom schedules, where it is important to
+    respect the user's task schedule, and provide exactly the number of
+    tasks that the user requested.
+
+    Args:
+        enable: optional, whether to enable respect user tasks
+        context_value: optional, a global variable holding the current context
+            value. The user should never pass this value. The program begins
+            in a context with ``enable`` False, which means that user tasks
+            are not respected.
+    """
+    with _set_context_value(
+        enable, _enable_respect_user_tasks, context_value
     ):
         yield
 
@@ -367,6 +388,7 @@ def _context(
     _enable_task_fusion=None,
     _enable_fast_path=None,
     _ignore_transforms=None,
+    _enable_respect_user_tasks=None,
 ):
     with tasks(configurable=_configurable) as A, autoshard(
         _autoshard
@@ -380,6 +402,8 @@ def _context(
         _ignore_transforms
     ) as F, enable_recomputation(
         _enable_recomputation
+    ) as G, enable_respect_user_tasks(
+        _enable_respect_user_tasks
     ):  # noqa: F841
         yield
 
@@ -392,6 +416,7 @@ def context(
     enable_task_fusion: Optional[bool] = None,
     enable_fast_path: Optional[bool] = None,
     ignore_transforms: Optional[bool] = None,
+    enable_respect_user_tasks: Optional[bool] = None,
 ):
     """Helper function to configure multiple contexts in a single manager.
 
@@ -409,5 +434,6 @@ def context(
         _enable_task_fusion=enable_task_fusion,
         _enable_fast_path=enable_fast_path,
         _ignore_transforms=ignore_transforms,
+        _enable_respect_user_tasks=enable_respect_user_tasks,
     ):
         yield
