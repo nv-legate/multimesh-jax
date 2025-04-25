@@ -320,6 +320,31 @@ cc_library(
 )
 
 cc_library(
+    name = "mpmd_unpack_optimization_barrier",
+    srcs = ["mpmd_unpack_optimization_barrier.cc"],
+    hdrs = ["mpmd_unpack_optimization_barrier.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "//xla/hlo/pass:hlo_pass_pipeline",
+        ":mpmd_instruction",
+        ":mpmd_utils",
+    ],
+)
+
+cc_library(
+    name = "mpmd_repack_optimization_barrier",
+    srcs = ["mpmd_repack_optimization_barrier.cc"],
+    hdrs = ["mpmd_repack_optimization_barrier.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "//xla/hlo/pass:hlo_pass_pipeline",
+        ":mpmd_instruction",
+        ":mpmd_utils",
+        ":mpmd_unpack_optimization_barrier",
+    ],
+)
+
+cc_library(
     name = "mpmd_cross_task_barrier_remover",
     srcs = ["mpmd_cross_task_barrier_remover.cc"],
     hdrs = ["mpmd_cross_task_barrier_remover.h"],
@@ -1510,6 +1535,30 @@ xla_cc_test(
         "@tsl//tsl/platform:test_main",
         "@zuku",
         ":hlo_partition",
+        ":mpmd_test_base",
+    ],
+)
+
+xla_cc_test(
+    name = "mpmd_unpack_optimization_barrier_test",
+    srcs = ["mpmd_unpack_optimization_barrier_test.cc"],
+    deps = [
+        ":mpmd_unpack_optimization_barrier",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/utils:hlo_matchers",
+        "@tsl//tsl/platform:test_main",
+        ":mpmd_test_base",
+    ],
+)
+
+xla_cc_test(
+    name = "mpmd_repack_optimization_barrier_test",
+    srcs = ["mpmd_repack_optimization_barrier_test.cc"],
+    deps = [
+        ":mpmd_repack_optimization_barrier",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/utils:hlo_matchers",
+        "@tsl//tsl/platform:test_main",
         ":mpmd_test_base",
     ],
 )

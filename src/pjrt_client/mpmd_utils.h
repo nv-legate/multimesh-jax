@@ -197,6 +197,8 @@ constexpr absl::string_view kCustomCallSliceOffset = "SliceOffset";
 constexpr absl::string_view kCustomCallRootTupleRecolor = "RootTupleRecolor";
 constexpr absl::string_view kCustomCallDummyOperation = "DummyOperation";
 constexpr absl::string_view kCustomCallSharding = "Sharding";
+constexpr absl::string_view kCustomCallUnpackedOptimizationBarrier =
+    "UnpackedOptimizationBarrier";
 
 }  // namespace xla
 
