@@ -188,7 +188,7 @@ TEST(LoopSchedulerTest, FillDrain) {
   absl::flat_hash_map<int, int> max_bwd_iter_visited_for_layer;
 
   // All the forward tasks should come before the backward tasks
-  for (auto&& scheduled_task : scheduled_tasks) {
+  for (auto&& scheduled_task : scheduled_tasks[0]) {
     auto [matched, type, layer_num, iter] =
         GetLayerInfo(scheduled_task->name());
 
@@ -229,7 +229,7 @@ void Run1F1BTest(TestConfig config,
       ScheduleLoops(test.partition, *test.loop_config, test.tasks));
   std::vector<int> num_fwd_tasks_done(test.num_layers, 0);
   std::vector<int> num_bwd_tasks_done(test.num_layers, 0);
-  for (auto&& scheduled_task : scheduled_tasks) {
+  for (auto&& scheduled_task : scheduled_tasks[0]) {
     VLOG(3) << scheduled_task->name();
     auto [matched, type, layer_num, iter] =
         GetLayerInfo(scheduled_task->name());
