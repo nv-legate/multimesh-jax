@@ -10,128 +10,18 @@
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/json_utils.h"
+#include "xla/hlo/pass/hlo_pass_pipeline.h"
 #include "xla/pjrt/legate/mpmd_instruction.h"
 #include "xla/pjrt/legate/mpmd_utils.h"
-#include "xla/service/call_inliner.h"
-#include "xla/service/tuple_simplifier.h"
+
+#include "xla/pjrt/legate/mpmd_inline_explicit_tasks.h"
+#include "xla/pjrt/legate/mpmd_insert_root_tuple_shardings.h"
+#include "xla/pjrt/legate/mpmd_compute_assigned_colors.h"
+#include "xla/pjrt/legate/mpmd_unpack_optimization_barrier.h"
+#include "xla/pjrt/legate/mpmd_repack_optimization_barrier.h"
 
 namespace xla {
 namespace {
-
-struct TaskConfig {
-  std::string name;
-  std::vector<int64_t> devices;
-  std::optional<LogicalShardingContext> autosharding;
-};
-
-template <typename K, typename V>
-V value_or(const absl::flat_hash_map<K, V>& m, const K& k, V v) {
-  auto iter = m.find(k);
-  if (iter == m.end()) {
-    return v;
-  }
-  return iter->second;
-}
-
-// Returns a task config for the `json` node.
-// `context` gives a debug description for errors.
-absl::StatusOr<TaskConfig> GetTaskConfig(const Json::Value& json,
-                                         const std::string& context) {
-  TF_ASSIGN_OR_RETURN(auto name,
-                      GetTaskValue<std::string>(json, context, "name"));
-  TF_ASSIGN_OR_RETURN(auto devices, GetTaskValue<std::vector<int64_t>>(
-                                        json, context, "devices"));
-  TF_ASSIGN_OR_RETURN(
-      std::optional<int64_t> loop_submesh_size,
-      GetOptionalTaskValue<int64_t>(json, context, "loop_submesh_size"));
-  TF_ASSIGN_OR_RETURN(
-      bool loop_submesh_reverse,
-      GetOptionalTaskValue(json, context, "loop_submesh_reverse", false));
-
-  auto autosharding_json = json.get("autosharding", Json::Value::null);
-  std::optional<LogicalShardingContext> autosharding;
-  if (!autosharding_json.isNull()) {
-    TF_ASSIGN_OR_RETURN(autosharding, GetLogicalShardingContext(
-                                          autosharding_json, context, devices));
-  }
-
-  if (loop_submesh_size.has_value()) {
-    autosharding->loop_submesh =
-        LoopDependentSubmesh({.task_mesh_size = *loop_submesh_size,
-                              .global_mesh_start = devices.front(),
-                              .global_mesh_stop = devices.back() + 1,
-                              .reverse = loop_submesh_reverse});
-  }
-
-  return TaskConfig{
-      .name = std::move(name),
-      .devices = std::move(devices),
-      .autosharding = std::move(autosharding),
-  };
-}
-
-// Computes a weight for a given instruction based on the byte size
-// of the instruction. Operations like broadcast have lower weight
-// since they can be reconstructed from a smaller operand
-// inside a fusion. This occurs before sharding propagation,
-// which means assuming the same sharding amount.
-int64_t OperandWeight(const HloInstruction* instruction) {
-  if (instruction->opcode() == HloOpcode::kBroadcast) {
-    return OperandWeight(instruction->operand(0));
-  }
-  return ShapeUtil::ElementsIn(instruction->shape());
-}
-
-bool AllowOverride(int64_t index, absl::Span<const bool> override) {
-  if (override.size() > index) {
-    return override[index];
-  }
-  if (override.empty()) {
-    return false;
-  }
-  return override[0];
-}
-
-absl::Status HandleRootTupleShardings(HloPartition* partition,
-                                      HloModule* module, HloInstruction* root) {
-  if (!root->has_sharding() || !root->shape().IsTuple()) {
-    return absl::OkStatus();
-  }
-
-  for (int64_t index = 0; index < root->operand_count(); ++index) {
-    const HloSharding& sharding = root->sharding().tuple_elements()[index];
-    auto* operand = root->mutable_operand(index);
-    const bool allow_sharding_overwrite = AllowOverride(
-        index, module->config().allow_spmd_sharding_propagation_to_output());
-    if (!sharding.IsReplicated() && !operand->has_sharding()) {
-      operand->set_sharding(sharding);
-    }
-
-    if (!allow_sharding_overwrite) {
-      VLOG(5) << operand->name() << " is root operand " << index
-              << ", which must use fixed sharding " << sharding;
-      // we have to create a coloring here to make sure that the correct output
-      // sharding is used for this
-      HloInstruction* recolor =
-          root->parent()->AddInstruction(HloInstruction::CreateCustomCall(
-              operand->shape(), {operand}, kCustomCallRootTupleRecolor));
-      TF_RETURN_IF_ERROR(root->ReplaceOperandWith(index, recolor));
-      std::string color = [&] {
-        if (sharding.IsReplicated()) {
-          return *partition->FindOrAllocateGlobalColor();
-        }
-        zuku::DeviceList devices =
-            *CreateDeviceList(sharding.tile_assignment());
-        return *partition->FindOrAllocateColor(devices, nullptr);
-      }();
-      recolor->set_sharding(sharding);
-      AssignColor(recolor, color);
-    }
-  }
-  return absl::OkStatus();
-}
-
 // Given a partition assigment `color` for the given `instruction`,
 // propagate colorings backward to aliases in the
 // `properties` map.
@@ -177,199 +67,6 @@ void ColorBackwards(const std::string& color, HloInstruction* instruction,
 }
 
 }  // namespace
-
-absl::Status MpmdColoring::ColorTuple(HloInstruction* instruction) {
-  std::optional<std::string> uniform_color{std::nullopt};
-  for (auto* operand : instruction->operands()) {
-    auto operand_color = Color(operand);
-    if (operand_color.has_value()) {
-      if (!uniform_color.has_value()) {
-        uniform_color = Color(operand);
-      } else if (*uniform_color != *operand_color) {
-        uniform_color = std::nullopt;
-        break;
-      }
-    } else {
-      uniform_color = std::nullopt;
-      break;
-    }
-  }
-
-  // tuples should only be assigned a uniform color when ALL of the
-  // operands have been assigned a color and that color is the same
-  if (uniform_color.has_value()) {
-    VLOG(5) << "assigning uniform color " << *uniform_color << " to tuple "
-            << instruction->name();
-    AssignColor(instruction, *std::move(uniform_color));
-  }
-
-  return absl::OkStatus();
-}
-
-absl::StatusOr<std::optional<std::string>>
-MpmdColoring::CheckForExplicitShardingColor(
-    HloInstruction* instruction, const InstructionProperties& properties) {
-  auto explicit_sharding = [&]() -> std::optional<HloSharding> {
-    if (instruction->has_sharding()) {
-      return instruction->sharding();
-    }
-    return std::nullopt;
-  }();
-
-  if (!explicit_sharding.has_value()) {
-    return std::nullopt;
-  }
-
-  if (explicit_sharding->IsReplicated()) {
-    // make sure this is not a parameter that has been explicitly assigned
-    // replicated sharding
-    std::optional<int64_t> parameter_number =
-        properties.ParameterNumber(instruction);
-    if (parameter_number.has_value()) {
-      if (AllowOverride(*parameter_number,
-                        instruction->parent()
-                            ->parent()
-                            ->config()
-                            .allow_spmd_sharding_propagation_to_parameters())) {
-        return std::nullopt;
-      }
-    } else {
-      return std::nullopt;
-    }
-  }
-
-  zuku::DeviceList devices = [&] {
-    if (explicit_sharding->IsReplicated()) {
-      return partition_->Devices();
-    }
-    return *CreateDeviceList(explicit_sharding->tile_assignment());
-  }();
-
-  auto devices_color = partition_->FindColor(devices);
-  if (!devices_color.has_value()) {
-    TF_ASSIGN_OR_RETURN(devices_color, partition_->AllocateColor(
-                                           "sharding", std::move(devices)));
-  }
-  VLOG(5) << instruction->name() << " assigned from sharding "
-          << *explicit_sharding << " to color=" << *devices_color;
-
-  return std::move(devices_color);
-}
-
-absl::StatusOr<bool> MpmdColoring::InlineExplicitTasks(
-    HloComputation* computation) {
-  bool changed = false;
-  for (auto* instruction : computation->MakeInstructionPostOrder()) {
-    if (instruction->IsCustomCall("LegateTask")) {
-      VLOG(5) << "coloring explicit task instruction " << instruction->name();
-
-      changed = true;
-
-      auto json = GetJsonValue(instruction->raw_backend_config_string().data(),
-                               instruction->raw_backend_config_string().size());
-      if (!json.ok()) {
-        return InvalidArgumentStrCat(instruction->name(),
-                                     " has bad json config");
-      }
-
-      TF_ASSIGN_OR_RETURN(
-          TaskConfig config,
-          GetTaskConfig(*json, std::string(instruction->name())));
-
-      auto dl = [&]() -> absl::StatusOr<zuku::DeviceList> {
-        if (config.devices.empty()) {
-          return partition_->Devices();
-        }
-        return CreateDeviceList(config.devices);
-      }();
-
-      std::shared_ptr<LogicalShardingContext> context;
-      if (config.autosharding.has_value()) {
-        context = std::make_shared<LogicalShardingContext>(
-            *std::move(config.autosharding));
-      }
-
-      TF_ASSIGN_OR_RETURN(const std::string color,
-                          partition_->AllocateColor(config.name, *std::move(dl),
-                                                    std::move(context)));
-
-      for (auto* sub : instruction->called_computations()[0]->instructions()) {
-        VLOG(5) << sub->name() << " assigned color=" << color
-                << " from task custom-call";
-        AssignColor(sub, color);
-      }
-      // turn the task into a regular call and inline
-      auto* call_to_inline =
-          computation->AddInstruction(HloInstruction::CreateCall(
-              instruction->shape(), instruction->operands(),
-              instruction->called_computations()[0]));
-
-      TF_RETURN_IF_ERROR(instruction->ReplaceAllUsesWith(call_to_inline));
-
-      AssignColor(instruction, color);
-    } else {
-      for (auto* comp : instruction->called_computations()) {
-        TF_ASSIGN_OR_RETURN(bool comp_changed, InlineExplicitTasks(comp));
-        changed |= comp_changed;
-      }
-    }
-  }
-  return changed;
-}
-
-absl::Status MpmdColoring::ComputeAssignedColors(
-    HloComputation* computation, const InstructionProperties& properties) {
-  for (auto* instruction : computation->MakeInstructionPostOrder()) {
-    if (instruction == computation->root_instruction() &&
-        instruction->opcode() == HloOpcode::kTuple) {
-      continue;
-    }
-
-    auto color = Color(instruction);
-    if (color.has_value()) {
-      // make sure the color is allocated in the HLO partition
-      if (!partition_->HasColor(*color)) {
-        return InvalidArgumentStrCat("color ", *color,
-                                     " has not been assigned a device mesh");
-      }
-    }
-
-    if (!color.has_value() && instruction->opcode() == HloOpcode::kTuple) {
-      TF_RETURN_IF_ERROR(ColorTuple(instruction));
-      continue;
-    }
-
-    if (!color.has_value()) {
-      TF_ASSIGN_OR_RETURN(
-          color, CheckForExplicitShardingColor(instruction, properties));
-    }
-
-    if (!color.has_value()) {
-      TF_ASSIGN_OR_RETURN(color,
-                          partition_->ComputeMetadataNameColor(instruction));
-      if (color.has_value()) {
-        VLOG(5) << "computed metadata name color for " << instruction->name()
-                << ",color=" << *color
-                << ",metadata=" << instruction->metadata().op_name();
-      }
-    }
-
-    if (color.has_value()) {
-      AssignColor(instruction, *color);
-      properties.ForEachAlias(instruction, [&](HloInstruction* i) {
-        if (!IsAssignedColor(i)) {
-          AssignColor(i, *color);
-        }
-      });
-    }
-
-    if (instruction->opcode() == HloOpcode::kWhile) {
-      TF_RETURN_IF_ERROR(ComputeAssignedColors(
-          instruction->called_computations()[0], properties));
-    }
-  }
-  return absl::OkStatus();
-}
 
 bool MpmdColoring::PropagateFromUsersAndOperandsColorDepth(
     HloInstruction* instruction, const InstructionProperties& properties,
@@ -648,7 +345,7 @@ absl::StatusOr<bool> MpmdColoring::PropagateIf(
       // their operands are uniformly colored
       if (instruction->opcode() == HloOpcode::kTuple ||
           instruction->opcode() == HloOpcode::kOptimizationBarrier) {
-        TF_RETURN_IF_ERROR(ColorTuple(instruction));
+        ColorTuple(instruction);
         continue;
       }
 
@@ -687,26 +384,16 @@ absl::StatusOr<bool> MpmdColoring::PropagateIf(
 absl::StatusOr<bool> MpmdColoring::Run(
     HloModule* module,
     const absl::flat_hash_set<absl::string_view>& execution_threads) {
-  auto* root = module->entry_computation()->root_instruction();
-  // we use sharding in the coloring so we do a (tiny) bit of sharding
-  // propagation if a root tuple has explicit sharding annotations, propagate
-  // them to the tuple operands
-  TF_RETURN_IF_ERROR(HandleRootTupleShardings(partition_, module, root));
-
-  TF_ASSIGN_OR_RETURN(bool changed,
-                      InlineExplicitTasks(module->entry_computation()));
-  if (changed) {
-    CallInliner inliner;
-    TF_ASSIGN_OR_RETURN(bool _, inliner.Run(module));
-
-    TupleSimplifier simplifier;
-    TF_ASSIGN_OR_RETURN(_, simplifier.Run(module));
-  }
-
+  bool changed;
+  auto root = module->entry_computation()->root_instruction();
   auto properties = InstructionProperties::Create(module);
 
-  TF_RETURN_IF_ERROR(
-      ComputeAssignedColors(module->entry_computation(), properties));
+  HloPassPipeline preprocess_pipeline("coloring_preprocess");
+  preprocess_pipeline.AddPass<MpmdInlineExplicitTasks>(partition_);
+  preprocess_pipeline.AddPass<MpmdInsertRootTupleShardings>(partition_);
+  preprocess_pipeline.AddPass<MpmdUnpackOptimizationBarrier>();
+  preprocess_pipeline.AddPass<MpmdComputeAssignedColors>(partition_);
+  TF_RETURN_IF_ERROR(preprocess_pipeline.Run(module).status());
 
   // first only visit elementwise propagation
   TF_ASSIGN_OR_RETURN(bool propagated_elementwise,
@@ -763,6 +450,10 @@ absl::StatusOr<bool> MpmdColoring::Run(
   } else {
     TF_RETURN_IF_ERROR(color_root(root));
   }
+
+  HloPassPipeline postprocess_pipeline("coloring_postprocess");
+  postprocess_pipeline.AddPass<MpmdRepackOptimizationBarrier>();
+  TF_RETURN_IF_ERROR(postprocess_pipeline.Run(module).status());
 
   // for now, assume coloring always changes the module
   return true;

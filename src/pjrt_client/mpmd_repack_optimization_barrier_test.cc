@@ -45,7 +45,8 @@ TEST_F(MpmdRepackOptimizationBarrierTest, TaskWithBarrierSingle) {
   MpmdRepackOptimizationBarrier repacker{};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, repacker.Run(module.get()));
 
-  std::cerr << module->ToString() << std::endl;
+  EXPECT_THAT(module->entry_computation()->instructions(),
+              Contains(AllOf(op::OptimizationBarrier())).Times(1));
 }
 
 static constexpr absl::string_view kTaskWithBarrierHloTuple = R"(
@@ -80,7 +81,8 @@ TEST_F(MpmdRepackOptimizationBarrierTest, TaskWithBarrierTuple) {
   MpmdRepackOptimizationBarrier repacker{};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, repacker.Run(module.get()));
 
-  std::cerr << module->ToString() << std::endl;
+  EXPECT_THAT(module->entry_computation()->instructions(),
+              Contains(AllOf(op::OptimizationBarrier())).Times(2));
 }
 
 }  // namespace

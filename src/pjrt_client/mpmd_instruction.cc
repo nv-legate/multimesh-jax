@@ -101,6 +101,34 @@ std::string ColorOrDefault(const HloInstruction* instruction) {
   return std::string(kDefaultColorName);
 }
 
+void ColorTuple(HloInstruction* instruction) {
+  std::optional<std::string> uniform_color{std::nullopt};
+  for (auto* operand : instruction->operands()) {
+    auto operand_color = Color(operand);
+    if (operand_color.has_value()) {
+      if (!uniform_color.has_value()) {
+        uniform_color = Color(operand);
+      } else if (*uniform_color != *operand_color) {
+        uniform_color = std::nullopt;
+        break;
+      }
+    } else {
+      uniform_color = std::nullopt;
+      break;
+    }
+  }
+
+  // tuples should only be assigned a uniform color when ALL of the
+  // operands have been assigned a color and that color is the same
+  if (uniform_color.has_value()) {
+    VLOG(5) << "assigning uniform color " << *uniform_color << " to tuple "
+            << instruction->name();
+    AssignColor(instruction, *std::move(uniform_color));
+  }
+
+  return absl::OkStatus();
+}
+
 bool IsAssignedColor(const HloInstruction* instruction) {
   return instruction->frontend_attributes().map().contains("color");
 }

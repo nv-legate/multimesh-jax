@@ -191,6 +191,24 @@ absl::Status RemoveUnusedInstructions(HloComputation* computation);
 absl::Status RemoveInstructionBackToParameters(HloComputation* computation,
                                                HloInstruction* instruction);
 
+template <typename K, typename V>
+V value_or(const absl::flat_hash_map<K, V>& m, const K& k, V v) {
+  auto iter = m.find(k);
+  if (iter == m.end()) {
+    return v;
+  }
+  return iter->second;
+}
+
+// Computes a weight for a given instruction based on the byte size
+// of the instruction. Operations like broadcast have lower weight
+// since they can be reconstructed from a smaller operand
+// inside a fusion. This occurs before sharding propagation,
+// which means assuming the same sharding amount.
+int64_t OperandWeight(const HloInstruction* instruction);
+
+bool AllowOverride(int64_t index, absl::Span<const bool> override);
+
 constexpr absl::string_view kCustomCallArgumentRecolor = "ArgumentRecolor";
 constexpr absl::string_view kCustomCallReshard = "Reshard";
 constexpr absl::string_view kCustomCallSliceOffset = "SliceOffset";

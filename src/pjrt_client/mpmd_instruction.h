@@ -35,6 +35,10 @@ void AssignColor(HloInstruction* instruction, std::string color);
 // Removes any existing partition color from the given `instruction`.
 void RemoveColor(HloInstruction* instruction);
 
+// Assigns a uniform color to the given `instruction` if all of the
+// operands have been assigned a color and that color is the same.
+void ColorTuple(HloInstruction* instruction);
+
 // Returns whether the given `instruction` has been assigned partition color.
 bool IsAssignedColor(const HloInstruction* instruction);
 

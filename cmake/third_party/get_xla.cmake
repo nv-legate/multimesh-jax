@@ -98,6 +98,7 @@ function(find_or_configure_xla)
   endif()
 
  set(_bazel_options
+   --linkopt="-fuse-ld=lld"
    --define open_source_build=true
    --define framework_shared_object=false
    --define tsl_protobuf_header_only=false

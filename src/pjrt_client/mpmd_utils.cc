@@ -811,4 +811,21 @@ absl::Status RemoveInstructionBackToParameters(HloComputation* computation,
   return absl::OkStatus();
 }
 
+int64_t OperandWeight(const HloInstruction* instruction) {
+  if (instruction->opcode() == HloOpcode::kBroadcast) {
+    return OperandWeight(instruction->operand(0));
+  }
+  return ShapeUtil::ElementsIn(instruction->shape());
+}
+
+bool AllowOverride(int64_t index, absl::Span<const bool> override) {
+  if (override.size() > index) {
+    return override[index];
+  }
+  if (override.empty()) {
+    return false;
+  }
+  return override[0];
+}
+
 }  // namespace xla

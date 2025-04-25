@@ -29,6 +29,17 @@ absl::StatusOr<std::string> OptimizationBarrierName(
   return instruction->frontend_attributes().map().at(kOriginalInstructionAttr);
 }
 
+absl::Status ClearOptimizationBarrierNames(HloComputation* computation) {
+  for (auto* instruction : computation->instructions()) {
+    FrontendAttributes attrs = instruction->frontend_attributes();
+    if (attrs.map().contains(kOriginalInstructionAttr)) {
+      (*attrs.mutable_map()).erase(kOriginalInstructionAttr);
+      instruction->set_frontend_attributes(std::move(attrs));
+    }
+  }
+  return absl::OkStatus();
+}
+
 }  // namespace
 
 absl::StatusOr<bool> MpmdRepackOptimizationBarrier::RepackComputation(
@@ -80,6 +91,8 @@ absl::StatusOr<bool> MpmdRepackOptimizationBarrier::RepackComputation(
                                                            get_tuple_element));
       }
     }
+
+    TF_RETURN_IF_ERROR(ClearOptimizationBarrierNames(computation));
   }
 
   return changed;
