@@ -37,8 +37,6 @@ extern "C" void EnableOnlyFuseLoopTasks(bool enable);
 
 extern "C" void EnableTaskFusion(bool enable);
 
-extern "C" void EnableRespectUserTasks(bool enable);
-
 extern "C" void ClearMetadataNameTasks();
 
 extern "C" void EnableLegateRecomputation(bool enable);
@@ -176,9 +174,6 @@ PYBIND11_MODULE(legate_jax_impl, m) {
   m.def(
       "enable_task_fusion", [](bool enable) { EnableTaskFusion(enable); },
       py::arg("enable"));
-  m.def(
-      "enable_respect_user_tasks",
-      [](bool enable) { EnableRespectUserTasks(enable); }, py::arg("enable"));
   m.def(
       "replicate_parameters_smaller_than_num_elements",
       [](int64_t num_elements) {

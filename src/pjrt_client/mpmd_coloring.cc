@@ -386,15 +386,21 @@ absl::StatusOr<bool> MpmdColoring::Run(
     const absl::flat_hash_set<absl::string_view>& execution_threads) {
   bool changed;
   auto root = module->entry_computation()->root_instruction();
-  auto properties = InstructionProperties::Create(module);
 
   HloPassPipeline preprocess_pipeline("coloring_preprocess");
   preprocess_pipeline.AddPass<MpmdInlineExplicitTasks>(partition_);
   preprocess_pipeline.AddPass<MpmdInsertRootTupleShardings>(partition_);
-  preprocess_pipeline.AddPass<MpmdUnpackOptimizationBarrier>();
   preprocess_pipeline.AddPass<MpmdComputeAssignedColors>(partition_);
+  preprocess_pipeline.AddPass<MpmdUnpackOptimizationBarrier>();
   TF_RETURN_IF_ERROR(preprocess_pipeline.Run(module).status());
 
+  TF_ASSIGN_OR_RETURN(bool enforce_bijective_tasks,
+                      EnforceBijectiveTasks(module->entry_computation()));
+  if (enforce_bijective_tasks) {
+    color_propagation_priority_ = ColorPropagationPriority::kColorDepth;
+  }
+
+  auto properties = InstructionProperties::Create(module);
   // first only visit elementwise propagation
   TF_ASSIGN_OR_RETURN(bool propagated_elementwise,
                       PropagateIf(

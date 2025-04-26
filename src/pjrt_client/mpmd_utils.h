@@ -191,6 +191,8 @@ absl::Status RemoveUnusedInstructions(HloComputation* computation);
 absl::Status RemoveInstructionBackToParameters(HloComputation* computation,
                                                HloInstruction* instruction);
 
+absl::StatusOr<bool> EnforceBijectiveTasks(HloComputation* computation);
+
 template <typename K, typename V>
 V value_or(const absl::flat_hash_map<K, V>& m, const K& k, V v) {
   auto iter = m.find(k);

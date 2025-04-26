@@ -1069,7 +1069,6 @@ tsl_pybind_extension(
         "EnableFastPath",
         "EnableTaskFusion",
         "EnableOnlyFuseLoopTasks",
-        "EnableRespectUserTasks",
         "EnableLegateRecomputation",
         "RegisterMetadataNameTask",
         "ReplicateParametersSmallerThanNumElements",

@@ -8,6 +8,7 @@
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
+#include "xla/pjrt/legate/json_utils.h"
 
 namespace xla {
 namespace {
@@ -809,6 +810,23 @@ absl::Status RemoveInstructionBackToParameters(HloComputation* computation,
     }
   }
   return absl::OkStatus();
+}
+
+absl::StatusOr<bool> EnforceBijectiveTasks(HloComputation* computation) {
+  for (auto* instruction : computation->instructions()) {
+    if (instruction->opcode() == HloOpcode::kWhile &&
+        instruction->has_backend_config()) {
+      std::string raw_config = instruction->raw_backend_config_string();
+      TF_ASSIGN_OR_RETURN(Json::Value json,
+                          GetJsonValue(raw_config.data(), raw_config.size()));
+      TF_ASSIGN_OR_RETURN(
+          std::string schedule_string,
+          GetOptionalTaskValue<std::string>(
+              json, std::string(instruction->name()), "schedule", ""));
+      if (schedule_string == "custom") return true;
+    }
+  }
+  return false;
 }
 
 int64_t OperandWeight(const HloInstruction* instruction) {

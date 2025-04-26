@@ -61,7 +61,6 @@ struct MpmdPartitionConfig {
   bool only_fuse_loop_tasks{false};
   bool hoist_loop_convert{false};
   bool remove_hoisted_reduces{false};
-  bool respect_user_tasks{false};
   std::optional<int64_t> recompute_from_arguments_if_cost_less_than{
       std::nullopt};
 };
