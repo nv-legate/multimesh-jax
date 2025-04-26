@@ -14,9 +14,6 @@
 
 namespace xla {
 
-using CustomSchedule =
-    std::vector<std::vector<std::pair<int64_t, std::string>>>;
-
 // Encapsulates a Legate-managed loop that slices an input
 // into microbatches and aggregates the results over the microbatch dimension.
 struct LoopConfig {
@@ -57,7 +54,8 @@ struct LoopConfig {
   std::optional<int> unrolling{};
   // The user specified custom pipeline schedule. Only required
   // for custom schedule option.
-  std::optional<CustomSchedule> custom_schedule{};
+  std::optional<std::vector<std::vector<std::pair<int64_t, std::string>>>>
+      custom_schedule{};
 };
 
 // Encapsulates a device mesh that changes on each iteration.

@@ -76,6 +76,9 @@ absl::StatusOr<LoopConfig> GetMicrobatchConfig(const std::string& name,
   TF_ASSIGN_OR_RETURN(std::optional<int> num_stages,
                       GetOptionalTaskValue<int>(json, name, "num_stages"));
 
+  // Need to define this type here to avoid macro complaining
+  using CustomSchedule =
+      std::vector<std::vector<std::pair<int64_t, std::string>>>;
   TF_ASSIGN_OR_RETURN(
       std::optional<CustomSchedule> custom_schedule,
       GetOptionalTaskValue<CustomSchedule>(json, name, "custom_schedule"));

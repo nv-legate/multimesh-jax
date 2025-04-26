@@ -33,7 +33,7 @@ static inline std::vector<int64_t> GetIndicesToUnroll(
 static inline std::vector<std::vector<HloInstruction*>>
 UnrollLoopIncrementTasks(const std::vector<std::vector<HloInstruction*>>& tasks,
                          const std::vector<int64_t>& indices_to_unroll,
-                         TaskSchedule& schedule) {
+                         std::vector<std::vector<HloInstruction*>>& schedule) {
   const int64_t num_to_unroll = indices_to_unroll.size();
   const int64_t num_iterations = tasks.size();
 
@@ -71,7 +71,8 @@ UnrollLoopIncrementTasks(const std::vector<std::vector<HloInstruction*>>& tasks,
 absl::Status ScheduleWavefront(
     const HloPartition& partition,
     const std::vector<std::vector<HloInstruction*>>& tasks,
-    const LoopConfig& loop_config, TaskSchedule& schedule) {
+    const LoopConfig& loop_config,
+    std::vector<std::vector<HloInstruction*>>& schedule) {
   if (tasks.empty()) {
     return;
   }
@@ -152,10 +153,10 @@ absl::Status ScheduleWavefront(
   return absl::OkStatus();
 }
 
-absl::StatusOr<TaskSchedule> ScheduleGpipe(
+absl::StatusOr<std::vector<std::vector<HloInstruction*>>> ScheduleGpipe(
     const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
-  TaskSchedule schedule(1);
+  std::vector<std::vector<HloInstruction*>> schedule(1);
   schedule[0].reserve(config.num_iterations * tasks[0].size());
   const int64_t tasks_per_iter = tasks[0].size();
   for (int64_t task_index = 0; task_index < tasks_per_iter; ++task_index) {
@@ -166,10 +167,12 @@ absl::StatusOr<TaskSchedule> ScheduleGpipe(
   return schedule;
 }
 
-absl::StatusOr<TaskSchedule> ScheduleCustomSchedule(
-    const CustomSchedule& custom_schedule,
+absl::StatusOr<std::vector<std::vector<HloInstruction*>>>
+ScheduleCustomSchedule(
+    const std::vector<std::vector<std::pair<int64_t, std::string>>>&
+        custom_schedule,
     const std::vector<std::vector<HloInstruction*>>& tasks,
-    TaskSchedule& schedule) {
+    std::vector<std::vector<HloInstruction*>>& schedule) {
   const int64_t num_microbatches = tasks.size();
   const int64_t num_custom_schedule_rows = custom_schedule.size();
   const int64_t tasks_per_iter = tasks.front().size();
@@ -244,15 +247,16 @@ absl::StatusOr<TaskSchedule> ScheduleCustomSchedule(
   return schedule;
 }
 
-absl::StatusOr<TaskSchedule> ScheduleCustom(
+absl::StatusOr<std::vector<std::vector<HloInstruction*>>> ScheduleCustom(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
   if (!config.custom_schedule.has_value()) {
     throw std::invalid_argument("Needs custom schedule or callback");
   }
 
-  const CustomSchedule custom_schedule = *config.custom_schedule;
-  TaskSchedule schedule(custom_schedule.size());
+  const std::vector<std::vector<std::pair<int64_t, std::string>>>
+      custom_schedule = *config.custom_schedule;
+  std::vector<std::vector<HloInstruction*>> schedule(custom_schedule.size());
 
   const std::vector<int64_t> indices_to_unroll =
       GetIndicesToUnroll(partition, tasks);
@@ -267,13 +271,14 @@ absl::StatusOr<TaskSchedule> ScheduleCustom(
   return ScheduleCustomSchedule(custom_schedule, remaining_tasks, schedule);
 }
 
-absl::StatusOr<TaskSchedule> SchedulePrefetchWavefront(
+absl::StatusOr<std::vector<std::vector<HloInstruction*>>>
+SchedulePrefetchWavefront(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<int64_t>& indices_to_unroll,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
   // gpipe schedule the first tasks to get everyone started and to avoid
   // delays later in the pipeline
-  TaskSchedule schedule(1);
+  std::vector<std::vector<HloInstruction*>> schedule(1);
 
   const std::vector<std::vector<HloInstruction*>> remaining_tasks =
       UnrollLoopIncrementTasks(tasks, indices_to_unroll, schedule);
@@ -284,11 +289,11 @@ absl::StatusOr<TaskSchedule> SchedulePrefetchWavefront(
   return schedule;
 }
 
-absl::StatusOr<TaskSchedule> ScheduleWavefront(
+absl::StatusOr<std::vector<std::vector<HloInstruction*>>> ScheduleWavefront(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
   if (tasks.empty() || tasks[0].empty()) {
-    return TaskSchedule(1);
+    return std::vector<std::vector<HloInstruction*>>(1);
   }
 
   if (tasks[0].size() == 1) {
@@ -301,7 +306,8 @@ absl::StatusOr<TaskSchedule> ScheduleWavefront(
   return SchedulePrefetchWavefront(partition, config, indices_to_unroll, tasks);
 }
 
-absl::StatusOr<TaskSchedule> SchedulePrefetchWavefront(
+absl::StatusOr<std::vector<std::vector<HloInstruction*>>>
+SchedulePrefetchWavefront(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
   if (tasks.empty() || tasks[0].empty()) {
@@ -324,7 +330,7 @@ absl::StatusOr<TaskSchedule> SchedulePrefetchWavefront(
   return ScheduleWavefront(partition, config, tasks);
 }
 
-absl::StatusOr<TaskSchedule> ScheduleLoops(
+absl::StatusOr<std::vector<std::vector<HloInstruction*>>> ScheduleLoops(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
   switch (config.schedule) {
