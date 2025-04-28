@@ -6,10 +6,8 @@
 #include "xla/pjrt/legate/legate_pjrt_executable.h"
 
 #include <functional>
-#include <type_traits>
 #include <variant>
 
-#include "tsl/platform/fingerprint.h"
 #include "xla/hlo/ir/hlo_sharding.h"
 #include "xla/layout.h"
 #include "xla/pjrt/legate/legate_pjrt_buffer.h"
@@ -41,66 +39,6 @@ constexpr absl::string_view kDynamicSchedulePostLoopTasks =
     "LEGATE_XLA_DYNAMIC_SCHEDULE_POST_LOOP_TASKS";
 
 std::atomic<int64_t> next_run_id{0};
-
-template <class T, class Enable = void>
-struct AppendFingerprint {
-  uint64_t operator()(const T& t, uint64_t combiner) {
-    return tsl::FingerprintCat64(util::Fingerprint64(t), combiner);
-  }
-};
-
-template <class T>
-struct AppendFingerprint<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
-  uint64_t operator()(const T& t, uint64_t combiner) {
-    return tsl::FingerprintCat64(::util::Fingerprint(static_cast<uint64_t>(t)),
-                                 combiner);
-  }
-};
-
-template <class T>
-struct AppendFingerprint<std::vector<T>> {
-  uint64_t operator()(const std::vector<T>& vec, size_t combiner) {
-    for (const T& t : vec) {
-      combiner = AppendFingerprint<T>()(t, combiner);
-    }
-    return combiner;
-  }
-};
-
-template <>
-struct AppendFingerprint<StoreHandle> {
-  uint64_t operator()(const StoreHandle& store, size_t combiner) {
-    VLOG(3) << "hash before store: " << combiner;
-    return AppendFingerprint<decltype(store.unique_id)>()(store.unique_id,
-                                                          combiner);
-  }
-};
-
-template <>
-struct AppendFingerprint<SpmdHloModuleTask> {
-  uint64_t operator()(const SpmdHloModuleTask& task, uint64_t combiner) {
-    VLOG(3) << "hash before scheduled task: " << combiner;
-    return tsl::FingerprintCat64(
-        tsl::Fingerprint64(task.compiler->module().autofdo_fingerprint()),
-        combiner);
-  }
-};
-
-uint64_t FingerprintHelper(uint64_t state) { return state; }
-
-template <typename T, typename... Args>
-uint64_t FingerprintHelper(uint64_t state, const T& t, Args&&... args) {
-  const uint64_t next = AppendFingerprint<T>()(t, state);
-  return FingerprintHelper(next, args...);
-}
-
-template <typename T, typename... Args>
-size_t Fingerprint(T&& t, Args&&... args) {
-  static uint64_t combiner =
-      tsl::Fingerprint64("really wish absl enabled deterministic seeds");
-  VLOG(3) << "initial hash: " << combiner;
-  return FingerprintHelper(combiner, t, std::forward<Args>(args)...);
-}
 
 }  // namespace
 
@@ -239,6 +177,8 @@ class TaskTempMemoryAllocator {
   size_t position_;
   size_t total_size_;
   char* buffer_;
+  // field is used, but is somehow not recognized by clang-tidy
+  // NOLINTNEXTLINE(clang-diagnostic-unused-private-field)
   TaskMemoryAllocator* allocator_;
 };
 
@@ -418,10 +358,6 @@ LegatePjRtExecutable::Execute(
     }
 
     return std::move(permuted_outputs);
-  }
-
-  if (!fingerprint_.has_value()) {
-    // fingerprint_ = Fingerprint(task_schedule_);
   }
 
   context_->OpenWindow();
@@ -747,7 +683,7 @@ LegatePjRtExecutable::Execute(
               << " and local shape " << result_shape.local_shape;
 
       auto legate_buffer = std::make_unique<LegatePjRtBuffer>(
-          std::move(root_stores[comp][out]), std::move(hlo_sharding),
+          std::move(root_stores[comp][out]), hlo_sharding,
           result_shape.global_shape, result_shape.local_shape, legate_client_,
           base_client_, addressable_devices_[comp],
           addressable_devices_[comp]->default_memory_space().value_or(nullptr),

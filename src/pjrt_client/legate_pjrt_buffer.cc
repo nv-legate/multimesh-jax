@@ -54,7 +54,8 @@ PjRtFuture<> LegatePjRtBuffer::ToLiteral(MutableLiteralBase* literal) {
 absl::StatusOr<std::unique_ptr<PjRtBuffer>> LegatePjRtBuffer::CopyToMemorySpace(
     PjRtMemorySpace* dst_memory_space) {
   auto* dst_device = dst_memory_space->devices().front();
-  VLOG(3) << "LegatePjRtBuffer::CopyToDevice: " << dst_device->id();
+  VLOG(3) << "LegatePjRtBuffer::CopyToDevice: "
+          << dst_device->global_device_id().value();
   auto new_variant = [&]() -> absl::StatusOr<data_variant_t> {
     if (has_native_buffer()) {
       TF_ASSIGN_OR_RETURN(auto* memory_space,

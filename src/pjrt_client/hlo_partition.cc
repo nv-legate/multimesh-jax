@@ -35,8 +35,6 @@ bool enable_recomputation = false;
 
 constexpr absl::string_view kLoopIncrementColor = "loop_increment";
 
-constexpr absl::string_view kDefaultDevicesName = "default";
-
 constexpr char kLegateTaskCustomCallTarget[] = "LegateTask";
 constexpr char kMicrobatchCustomCallTarget[] = "Microbatch";
 constexpr char kMicrobatchInitCustomCallTarget[] = "MicrobatchInit";
@@ -129,43 +127,6 @@ NamedTaskContext* DefaultTask(const zuku::DeviceList& devices) {
     }
   }
   return nullptr;
-}
-
-// Returns a task config for the `json` node.
-// `context` gives a debug description for errors.
-absl::StatusOr<TaskConfig> GetTaskConfig(const Json::Value& json,
-                                         const std::string& context) {
-  TF_ASSIGN_OR_RETURN(auto name,
-                      GetTaskValue<std::string>(json, context, "name"));
-  TF_ASSIGN_OR_RETURN(auto devices, GetTaskValue<std::vector<int64_t>>(
-                                        json, context, "devices"));
-  TF_ASSIGN_OR_RETURN(
-      std::optional<int64_t> loop_submesh_size,
-      GetOptionalTaskValue<int64_t>(json, context, "loop_submesh_size"));
-  TF_ASSIGN_OR_RETURN(
-      bool loop_submesh_reverse,
-      GetOptionalTaskValue(json, context, "loop_submesh_reverse", false));
-
-  auto autosharding_json = json.get("autosharding", Json::Value::null);
-  std::optional<LogicalShardingContext> autosharding;
-  if (!autosharding_json.isNull()) {
-    TF_ASSIGN_OR_RETURN(autosharding, GetLogicalShardingContext(
-                                          autosharding_json, context, devices));
-  }
-
-  if (loop_submesh_size.has_value()) {
-    autosharding->loop_submesh =
-        LoopDependentSubmesh({.task_mesh_size = *loop_submesh_size,
-                              .global_mesh_start = devices.front(),
-                              .global_mesh_stop = devices.back() + 1,
-                              .reverse = loop_submesh_reverse});
-  }
-
-  return TaskConfig{
-      .name = std::move(name),
-      .devices = std::move(devices),
-      .autosharding = std::move(autosharding),
-  };
 }
 
 absl::StatusOr<std::shared_ptr<LogicalShardingContext>>

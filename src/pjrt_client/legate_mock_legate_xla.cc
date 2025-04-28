@@ -42,6 +42,8 @@ struct StoreHandleImpl {
   std::string name{};
 };
 
+// Destructor cannot be defined in the header file due to PIMPL
+// NOLINTNEXTLINE(modernize-use-equals-default)
 StoreHandle::~StoreHandle() {}
 
 template <typename H>

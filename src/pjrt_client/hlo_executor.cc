@@ -97,7 +97,6 @@ void RunExecutable(zuku::Stream* zs, int64_t run_id, zuku::DeviceList devices,
   for (size_t i = 0; i < scalars.size(); ++i) {
     scalar_buffers[scalars[i].parameter_number] = std::visit(
         zuku::overloaded{[&](auto value) {
-          using value_t = decltype(value);
           auto* host_value_buffer =
               reinterpret_cast<decltype(value)*>(&host_scalar_arguments[i]);
           *host_value_buffer = value;
@@ -143,6 +142,7 @@ void RunExecutable(zuku::Stream* zs, int64_t run_id, zuku::DeviceList devices,
                          p.local_id());
   }
 
+  const int64_t num_local_devices = p.NumLocalInDeviceList(devices, p.type());
   LegateDeviceAssignment device_assignment{
       {.local_device_id = p.local_id(),
        .global_device_id = p.global_id(),
@@ -157,11 +157,9 @@ void RunExecutable(zuku::Stream* zs, int64_t run_id, zuku::DeviceList devices,
   static bool blocking = false;  // BlockingExecution();
 
   auto start_clock = std::chrono::steady_clock::now();
-  auto error_message = exe->Execute(
-      zs, run_id, input_buffers, output_buffers, &allocator, device_assignment,
-      p.NumLocalInDeviceList(devices, p.type()), platform, blocking);
-
-  // log_xla.debug() << "Done executing " << compiler->Name();
+  auto error_message =
+      exe->Execute(zs, run_id, input_buffers, output_buffers, &allocator,
+                   device_assignment, num_local_devices, platform, blocking);
 
   if (error_message.has_value()) {
     throw std::runtime_error(*error_message);

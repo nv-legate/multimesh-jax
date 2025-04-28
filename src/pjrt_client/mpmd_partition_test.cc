@@ -319,8 +319,8 @@ TEST_F(MpmdPartitionTest, UserSpecifiedShardings) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
       RunMpmdOnHloString(kUserSpecifiedShardingsHlo, /*num_devices=*/2,
-                       {.use_module_config_auto_param_sharding = true,
-                        .use_module_config_auto_output_sharding = true}));
+                         {.use_module_config_auto_param_sharding = true,
+                          .use_module_config_auto_output_sharding = true}));
   auto [tasks, intermediates] = std::move(result);
 }
 

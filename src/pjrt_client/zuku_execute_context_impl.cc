@@ -70,6 +70,8 @@ StoreHandleImpl::~StoreHandleImpl() {
   }
 }
 
+// Destructor cannot be defined in the header file due to PIMPL
+// NOLINTNEXTLINE(modernize-use-equals-default)
 StoreHandle::~StoreHandle() {}
 
 Realm::Logger log_xla("legate.xla");
@@ -124,7 +126,6 @@ zuku::store_vector<zuku::ShardedArray> ZukuExecuteContextImpl::GetStores(
 }
 
 void ZukuExecuteContextImpl::OpenWindow() {
-  return;
   // we have to limit the maximum number of open windows
   // to make sure the Realm event graph doesn't explode in size
   while (window_markers_.size() >= kMaxOpenWindows) {
@@ -498,6 +499,9 @@ void ZukuExecuteContextImpl::StopTimer(const std::string& name) {
 
 zuku::Future<zuku::ArrayTile> ZukuExecuteContextImpl::CreateBuffer(
     int64_t local_device_id, int64_t global_device_id, int64_t size) {
+  // Realm currently does not build with int64_t types, which creates
+  // build issues on some systems
+  // NOLINTNEXTLINE(google-runtime-int)
   Realm::Rect<1, long long> bounds;
   bounds.lo[0] = 0;
   bounds.hi[0] = std::max<int64_t>(0, size - 1);

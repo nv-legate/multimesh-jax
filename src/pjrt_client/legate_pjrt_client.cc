@@ -442,21 +442,6 @@ HloModuleProto LegateClient::ShardBatch(const HloModuleProto& proto) const {
   return sharded;
 }
 
-static absl::StatusOr<HloInstructionProto*> GetMutableRoot(
-    HloModuleProto& proto) {
-  for (auto& comp : *proto.mutable_computations()) {
-    if (comp.id() == proto.entry_computation_id()) {
-      for (auto& instr : *comp.mutable_instructions()) {
-        if (instr.id() == comp.root_id()) {
-          return &instr;
-        }
-      }
-    }
-  }
-  return InvalidArgument(
-      "HloModuleProto has not root instruction of entry computation");
-}
-
 absl::Status AssignExplicitParameterSharding(
     bool auto_shard, const HloModuleProto& proto,
     std::vector<OpSharding>& param_shardings) {

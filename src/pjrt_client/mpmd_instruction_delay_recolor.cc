@@ -12,14 +12,7 @@
 #include "xla/pjrt/legate/mpmd_utils.h"
 
 namespace xla {
-
 namespace {
-
-bool IsParameterOrParameterCopy(HloInstruction* instruction) {
-  return instruction->opcode() == HloOpcode::kParameter ||
-         (instruction->opcode() == HloOpcode::kCopy &&
-          instruction->operand(0)->opcode() == HloOpcode::kParameter);
-}
 
 // Returns any user of `instruction` that is a call or
 // nullptr if no users are call instructions.

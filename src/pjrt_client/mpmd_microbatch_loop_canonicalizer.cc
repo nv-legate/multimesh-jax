@@ -8,24 +8,10 @@
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/pjrt/legate/mpmd_instruction.h"
 #include "xla/service/call_inliner.h"
-#include "xla/service/tuple_simplifier.h"
+#include "xla/hlo/transforms/simplifiers//tuple_simplifier.h"
 #include "xla/pjrt/legate/mpmd_utils.h"
 
 namespace xla {
-namespace {
-
-bool IsSimpleAccumulatorOp(HloInstruction* instruction) {
-  switch (instruction->opcode()) {
-    case HloOpcode::kConvert:
-    case HloOpcode::kReshape:
-    case HloOpcode::kBroadcast:
-      return true;
-    default:
-      return false;
-  }
-}
-
-}  // namespace
 
 absl::StatusOr<bool> MpmdMicrobatchLoopCanonicalizer::Run(
     HloModule* module,

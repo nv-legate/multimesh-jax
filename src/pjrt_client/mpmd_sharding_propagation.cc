@@ -59,34 +59,6 @@ bool ShardingFits(const HloSharding& sharding, const Shape& shape) {
   return true;
 }
 
-std::shared_ptr<const HloSharding> ElementwiseUsersShouldShardReplicated(
-    const HloInstruction* instruction) {
-  // already sharded
-  if (instruction->has_sharding() && !instruction->sharding().IsReplicated()) {
-    return nullptr;
-  }
-  std::shared_ptr<const HloSharding> candidate{nullptr};
-  int64_t num_sharded_users = 0;
-  for (auto* user : instruction->users()) {
-    if (user->IsElementwise() && user->has_sharding()) {
-      if (!user->sharding().IsReplicated()) {
-        ++num_sharded_users;
-        if (candidate) {
-          if (*candidate != user->sharding()) {
-            // different shardings in play, just keep replicated
-            // since there is no one preferred sharding pattern
-            return nullptr;
-          }
-        } else {
-          candidate = user->sharding_ptr();
-        }
-      }
-    }
-  }
-
-  return candidate;
-}
-
 bool ShardingCanBeReassigned(const HloInstruction* instruction) {
   return !instruction->has_sharding() || !HasAssignedAxes(instruction);
 }

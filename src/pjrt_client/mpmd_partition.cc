@@ -69,8 +69,6 @@ overloaded(Ts...) -> overloaded<Ts...>;
 namespace xla {
 namespace {
 
-constexpr int kMinReshardSizeToBlockOffloading = 100;
-
 constexpr absl::string_view kHoistConvertEnv = "LEGATE_XLA_HOIST_CONVERT";
 constexpr absl::string_view kZeroArgsEnv = "LEGATE_XLA_ZERO_ARGUMENTS";
 constexpr absl::string_view kRemoveHoistedReduce =
@@ -122,21 +120,6 @@ absl::StatusOr<HloSharding> ToMpmdSharding(
   }
 
   return HloSharding::FromProto(proto);
-}
-
-bool ShardingEqual(HloInstruction* lhs, const zuku::DeviceList& lhs_devices,
-                   HloInstruction* rhs, const zuku::DeviceList& rhs_devices) {
-  if (lhs_devices != rhs_devices) {
-    return false;
-  }
-
-  if (lhs->has_sharding()) {
-    if (rhs->has_sharding()) {
-      return rhs->sharding() == lhs->sharding();
-    }
-    return false;
-  }
-  return !rhs->has_sharding();
 }
 
 absl::StatusOr<HloSharding> ToMpmdSharding(
@@ -417,12 +400,12 @@ absl::Status MpmdScheduler::AddHloModuleTask(
               << index << " " << operand->name() << ", type=" << input.type
               << ", index=" << input.index << " with scheduling name "
               << operand->metadata().scheduling_name();
-      inputs.push_back(std::move(input));
       input_names[operand->metadata().scheduling_name()] = index;
       // need to track these for input/output alias pass later
       if (input.type == Store::Type::TEMP) {
         temporary_param_indices.insert(index);
       }
+      inputs.push_back(std::move(input));
     }
   }
 
@@ -439,11 +422,11 @@ absl::Status MpmdScheduler::AddHloModuleTask(
             << user->tuple_index() << " " << user->name()
             << ", type=" << output.type << ", index=" << output.index
             << " with scheduling name " << user->metadata().scheduling_name();
-    outputs.push_back(std::move(output));
     // need to track these for input/output alias pass later
     if (output.type == Store::Type::TEMP) {
       temporary_root_indices.insert(user->tuple_index());
     }
+    outputs.push_back(std::move(output));
     auto alias_iter = input_names.find(user->metadata().scheduling_name());
     if (alias_iter != input_names.end()) {
       VLOG(5) << "adding loop-carried alias pair " << alias_iter->second << ": "

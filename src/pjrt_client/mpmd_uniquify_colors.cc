@@ -7,17 +7,9 @@
 
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/legate_sharding.h"
 #include "xla/pjrt/legate/mpmd_instruction.h"
 
 namespace xla {
-namespace {
-
-int64_t Weight(HloInstruction* instruction) {
-  return ShapeUtil::ElementsIn(GetSpmdShape(instruction));
-}
-
-}  // namespace
 
 absl::StatusOr<bool> MpmdUniquifyColors::Run(
     HloModule* module,

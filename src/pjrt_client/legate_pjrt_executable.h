@@ -208,8 +208,6 @@ class LegatePjRtExecutable : public PjRtLoadedExecutable {
  private:
   std::vector<MpmdOperation> schedule_;
 
-  // A unique fingerprint used in creating a trace ID
-  std::optional<uint64_t> fingerprint_;
   std::string name_;
 
   PjRtClient* base_client_;

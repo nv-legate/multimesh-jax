@@ -146,6 +146,7 @@ absl::Status MpmdComputationFusion::FuseComputations(
       builder.Build(root_tuple), /*is_entry=*/false);
 
   std::vector<HloInstruction*> fused_call_operands;
+  fused_call_operands.reserve(parameters_needed.size());
   for (auto* operand : parameters_needed) {
     fused_call_operands.push_back(operand);
   }
