@@ -8,6 +8,7 @@ function(find_or_configure_xla)
   rapids_cpm_package_details(OpenXLA version git_repo git_branch shallow exclude_from_all)
 
   set(LegateJAX_BAZEL_REMOTE_CACHE "" CACHE STRING "An optional remote cache for bazel builds")
+  set(LegateJAX_XLA_LINKER "" CACHE STRING "The linker to override the default linker chosen by Bazel")
 
 
   if (xla_REPOSITORY)
@@ -90,12 +91,21 @@ function(find_or_configure_xla)
   endif()
 
  set(_bazel_options
-   --linkopt="-fuse-ld=lld"
    --define open_source_build=true
    --define framework_shared_object=false
    --define tsl_protobuf_header_only=false
    --config=cuda
  )
+
+ if (LegateJAX_XLA_LINKER)
+   list(APPEND _bazel_options 
+     --linkopt=-fuse-ld=${LegateJAX_XLA_LINKER})
+   if (${LegateJAX_XLA_LINKER} STREQUAL "lld")
+     list(APPEND _bazel_options
+       --linkopt -Wl,--undefined-version)
+   endif()
+ endif()
+ 
  if (LegateJAX_ASAN)
    list (APPEND _bazel_options
      --copt -fsanitize=address
