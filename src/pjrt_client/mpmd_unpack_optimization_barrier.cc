@@ -17,13 +17,13 @@ namespace {
 
 absl::Status AssignOptimizationBarrierName(HloInstruction* instruction,
                                            HloInstruction* original) {
-  FrontendAttributes attrs = instruction->frontend_attributes();
-  if (attrs.map().contains(kOriginalInstructionAttr)) {
+  if (instruction->has_backend_config()) {
     return absl::AlreadyExistsError(
         "Instruction already has original optimization barrier name");
   }
-  (*attrs.mutable_map())[kOriginalInstructionAttr] = original->name();
-  instruction->set_frontend_attributes(std::move(attrs));
+  // Should be ok to directly assign the name since we are not expecting
+  // any other users of the instruction
+  instruction->set_raw_backend_config_string(std::string(original->name()));
   return absl::OkStatus();
 }
 

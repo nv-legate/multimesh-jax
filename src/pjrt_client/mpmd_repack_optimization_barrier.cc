@@ -12,30 +12,28 @@
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/pjrt/legate/mpmd_instruction.h"
 #include "xla/pjrt/legate/mpmd_utils.h"
-#include "xla/pjrt/legate/mpmd_unpack_optimization_barrier.h"
 
+#include "xla/pjrt/legate/mpmd_unpack_optimization_barrier.h"
 namespace xla {
 
 namespace {
 
 absl::StatusOr<std::string> OptimizationBarrierName(
     HloInstruction* instruction) {
-  if (!instruction->frontend_attributes().map().contains(
-          kOriginalInstructionAttr)) {
+  if (!instruction->has_backend_config()) {
     return InvalidArgumentStrCat("Optimization barrier placeholder ",
                                  instruction->name(),
                                  " has no original instruction name");
   }
-  return instruction->frontend_attributes().map().at(kOriginalInstructionAttr);
+  return instruction->raw_backend_config_string();
 }
 
 absl::Status ClearOptimizationBarrierNames(HloComputation* computation) {
   for (auto* instruction : computation->instructions()) {
-    FrontendAttributes attrs = instruction->frontend_attributes();
-    if (attrs.map().contains(kOriginalInstructionAttr)) {
-      (*attrs.mutable_map()).erase(kOriginalInstructionAttr);
-      instruction->set_frontend_attributes(std::move(attrs));
+    if (!instruction->has_backend_config()) {
+      continue;
     }
+    instruction->set_raw_backend_config_string("");
   }
   return absl::OkStatus();
 }

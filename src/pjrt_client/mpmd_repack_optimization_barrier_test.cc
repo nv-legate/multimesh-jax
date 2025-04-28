@@ -30,8 +30,8 @@ ENTRY %main.15 {
   %convert.5 = f32[] convert(s32[] %Arg_1.2), metadata={op_name="jit(c)/jit(main)/task_f/convert_element_type[new_dtype=float32 weak_type=False]"}
   %broadcast.6 = f32[8]{0} broadcast(f32[] %convert.5), dimensions={}, metadata={op_name="jit(c)/jit(main)/task_f/mul"}
   %multiply.7 = f32[8]{0} multiply(f32[8]{0} %multiply.4, f32[8]{0} %broadcast.6), metadata={op_name="jit(c)/jit(main)/task_f/mul"}
-  %cosine.8 = f32[8]{0} cosine(f32[8]{0} %multiply.7), metadata={op_name="jit(c)/jit(main)/task_g/cos"}
-  %custom-call = f32[8]{0} custom-call(f32[8]{0} %cosine.8), custom_call_target="UnpackedOptimizationBarrier", frontend_attributes={original_instruction="opt-barrier.1"}
+  %tangent.8 = f32[8]{0} tan(f32[8]{0} %multiply.7), metadata={op_name="jit(c)/jit(main)/task_g/tan"}
+  %custom-call = f32[8]{0} custom-call(f32[8]{0} %tangent.8), custom_call_target="UnpackedOptimizationBarrier", backend_config="opt-barrier.1"
   %add.9 = f32[8]{0} add(f32[8]{0} %custom-call, f32[8]{0} %multiply.7), metadata={op_name="jit(c)/jit(main)/task_g/add"}
   ROOT %add.10 = f32[] add(f32[8]{0} %custom-call, f32[8]{0} %add.9)
 } // main.15
@@ -46,7 +46,7 @@ TEST_F(MpmdRepackOptimizationBarrierTest, TaskWithBarrierSingle) {
   TF_ASSERT_OK_AND_ASSIGN(bool changed, repacker.Run(module.get()));
 
   EXPECT_THAT(module->entry_computation()->instructions(),
-              Contains(AllOf(op::OptimizationBarrier())).Times(1));
+              Contains(op::OptimizationBarrier(op::Tan())));
 }
 
 static constexpr absl::string_view kTaskWithBarrierHloTuple = R"(
@@ -63,13 +63,14 @@ ENTRY %main.15 {
   %convert.5 = f32[] convert(s32[] %Arg_1.2), metadata={op_name="jit(c)/jit(main)/task_f/convert_element_type[new_dtype=float32 weak_type=False]"}
   %broadcast.6 = f32[8]{0} broadcast(f32[] %convert.5), dimensions={}, metadata={op_name="jit(c)/jit(main)/task_f/mul"}
   %multiply.7 = f32[8]{0} multiply(f32[8]{0} %multiply.4, f32[8]{0} %broadcast.6), metadata={op_name="jit(c)/jit(main)/task_f/mul"}
-  %cosine.8 = f32[8]{0} cosine(f32[8]{0} %multiply.7), metadata={op_name="jit(c)/jit(main)/task_g/cos"}
-  %custom-call.0 = f32[8]{0} custom-call(f32[8]{0} %multiply.7), custom_call_target="UnpackedOptimizationBarrier", frontend_attributes={original_instruction="opt-barrier.1"}
-  %custom-call.1 = f32[8]{0} custom-call(f32[8]{0} %cosine.8), custom_call_target="UnpackedOptimizationBarrier", frontend_attributes={original_instruction="opt-barrier.1"}
-  %add.9 = f32[8]{0} add(f32[8]{0} %custom-call.1, f32[8]{0} %custom-call.0), metadata={op_name="jit(c)/jit(main)/task_g/add"}
-  %tuple.2 = (f32[8]{0}, f32[8]{0}) tuple(f32[8]{0} %add.9, f32[8]{0} %cosine.8)
-  %custom-call.2 = f32[8]{0} custom-call(f32[8]{0} %add.9), custom_call_target="UnpackedOptimizationBarrier", frontend_attributes={original_instruction="opt-barrier.2"}
-  ROOT %add.10 = f32[] add(f32[8]{0} %custom-call.1, f32[8]{0} %custom-call.2)
+  %tangent.8 = f32[8]{0} tan(f32[8]{0} %multiply.7), metadata={op_name="jit(c)/jit(main)/task_g/tan"}
+  %custom-call = f32[8]{0} custom-call(f32[8]{0} %multiply.7), custom_call_target="UnpackedOptimizationBarrier", backend_config="opt-barrier.1"
+  %custom-call.1 = f32[8]{0} custom-call(f32[8]{0} %tangent.8), custom_call_target="UnpackedOptimizationBarrier", backend_config="opt-barrier.1"
+  %add.9 = f32[8]{0} add(f32[8]{0} %custom-call.1, f32[8]{0} %multiply.7), metadata={op_name="jit(c)/jit(main)/task_g/add"}
+  %custom-call.2 = f32[8]{0} custom-call(f32[8]{0} %add.9), custom_call_target="UnpackedOptimizationBarrier", backend_config="opt-barrier.2"
+  %custom-call.3 = f32[8]{0} custom-call(f32[8]{0} %tangent.8), custom_call_target="UnpackedOptimizationBarrier", backend_config="opt-barrier.2"
+  %add.10 = f32[8]{0} add(f32[8]{0} %custom-call.1, f32[8]{0} %custom-call.2)
+  ROOT %tuple = (f32[8]{0}, f32[8]{0}, f32[8]{0}) tuple(f32[8]{0} %custom-call, f32[8]{0} %custom-call.3, f32[8]{0} %add.10)
 }
 )";
 
@@ -82,7 +83,11 @@ TEST_F(MpmdRepackOptimizationBarrierTest, TaskWithBarrierTuple) {
   TF_ASSERT_OK_AND_ASSIGN(bool changed, repacker.Run(module.get()));
 
   EXPECT_THAT(module->entry_computation()->instructions(),
-              Contains(AllOf(op::OptimizationBarrier())).Times(2));
+              Contains(op::OptimizationBarrier()).Times(2));
+  EXPECT_THAT(module->entry_computation()->instructions(),
+              Contains(op::Tuple(op::Multiply(), op::Tan())));
+  EXPECT_THAT(module->entry_computation()->instructions(),
+              Contains(op::Tuple(op::Add(), op::Tan())));
 }
 
 }  // namespace
