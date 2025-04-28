@@ -162,6 +162,20 @@ cc_library(
 )
 
 cc_library(
+    name = "mpmd_reorder_shard_map_transpose",
+    srcs = ["mpmd_reorder_shard_map_transpose.cc"],
+    hdrs = ["mpmd_reorder_shard_map_transpose.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@zuku",
+        "//xla/hlo/pass:hlo_pass_pipeline",
+        ":hlo_partition",
+        ":mpmd_instruction",
+        ":mpmd_utils",
+    ],
+)
+
+cc_library(
     name = "mpmd_logical_sharding_propagation",
     srcs = ["mpmd_logical_sharding_propagation.cc"],
     hdrs = ["mpmd_logical_sharding_propagation.h"],
@@ -670,6 +684,7 @@ cc_library(
         ":mpmd_unused_param_output_remover",
         ":mpmd_hoist_loop_convert",
         ":mpmd_hoist_shard_map_reduce",
+        ":mpmd_reorder_shard_map_transpose",
         ":mpmd_shard_map_loop_reduce",
         ":mpmd_simple_loop_increment_coloring",
         ":mpmd_loop_unroll",
@@ -1297,6 +1312,20 @@ xla_cc_test(
     srcs = ["mpmd_insert_reshard_test.cc"],
     deps = [
         ":mpmd_insert_reshard",
+        ":hlo_partition",
+        ":mpmd_test_base",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/utils:hlo_matchers",
+        "@tsl//tsl/platform:test_main",
+    ],
+)
+
+xla_cc_test(
+    name = "mpmd_reorder_shard_map_transpose_test",
+    srcs = ["mpmd_reorder_shard_map_transpose_test.cc"],
+    deps = [
+        ":mpmd_reorder_shard_map_transpose",
+        ":mpmd_hoist_shard_map_reduce",
         ":hlo_partition",
         ":mpmd_test_base",
         "//xla/hlo/ir:hlo",

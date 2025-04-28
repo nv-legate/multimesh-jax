@@ -22,6 +22,13 @@
 namespace xla {
 namespace {
 
+bool IsAddComputation(const HloComputation* comp) {
+  HloInstruction* root = comp->root_instruction();
+  return root->opcode() == HloOpcode::kAdd &&
+      root->operand(0) == comp->parameter_instruction(0) &&
+      root->operand(1) == comp->parameter_instruction(1);
+}
+
 bool ShardedOverCxnDims(const HloInstruction* i) {
   if (i->opcode() == HloOpcode::kReduce &&
       i->called_computations()[0]->root_instruction()->opcode() ==
@@ -56,7 +63,32 @@ bool ShardedOverCxnDims(const HloInstruction* i) {
         }
       }
     }
+  } else if (i->opcode() == HloOpcode::kScatter) {
+    auto* update_comp = i->called_computations()[0];
+    if (!IsAddComputation(update_comp)) {
+      return false;
+    }
+
+    // check that to_apply is an add and that the sharding is non-trivial
+    auto* scatter = static_cast<const HloScatterInstruction*>(i);
+    absl::Span<HloInstruction* const> operands = scatter->scatter_operands();
+    absl::Span<HloInstruction* const> updates = scatter->scatter_updates();
+
+    for (int i = 0; i < operands.length(); i++) {
+      HloInstruction* operand = operands[i];
+      HloInstruction* update = updates[i];
+
+      if (!IsReplicatedOrNotSharded(operand) && 
+          !IsReplicatedOrNotSharded(update) &&
+          operand->sharding().ReplicateOnLastTileDim() &&
+          !update->sharding().ReplicateOnLastTileDim()) {
+        // partial updates are sent to the operand so an
+        // all-reduce must be performed to complete sum
+        return true;
+      }
+    }
   }
+
   return false;
 }
 
@@ -84,7 +116,7 @@ MpmdShardMapLoopReduce::CreateOutlinedPartitionedModule(
       std::string(instruction->name()), std::move(subconfig));
   HloCloneContext outlined_context{outlined_module.get()};
 
-  absl::InlinedVector<HloInstruction*, 2> operands;
+  absl::InlinedVector<HloInstruction*, 3> operands;
   int64_t param_number = 0;
   for (auto* operand : instruction->operands()) {
     TF_ASSIGN_OR_RETURN(
@@ -121,6 +153,7 @@ absl::Status MpmdShardMapLoopReduce::ReplaceWithOutlinedPartitionedModule(
     HloInstruction* instruction, const HloModule& module,
     HloPassCleanup& cleanup) {
   HloCloneContext context{instruction->parent()->parent()};
+
   // this all-reduce can be lifted out of the loop
   absl::flat_hash_map<const HloInstruction*, HloInstruction*> clone_map;
   auto color = Color(instruction);
@@ -138,7 +171,7 @@ absl::Status MpmdShardMapLoopReduce::ReplaceWithOutlinedPartitionedModule(
         AssignColor(manual_shard, *color);
       }
     } else {
-      absl::InlinedVector<HloInstruction*, 2> new_operands;
+      absl::InlinedVector<HloInstruction*, 3> new_operands;
       for (auto* operand : outlined->operands()) {
         auto iter = clone_map.find(operand);
         if (iter == clone_map.end()) {
@@ -208,7 +241,8 @@ absl::StatusOr<bool> MpmdShardMapLoopReduce::VisitLoop(
   for (auto* instruction : computation->MakeInstructionPostOrder()) {
     VLOG(5) << "visiting " << instruction->name();
     if ((instruction->opcode() == HloOpcode::kDot ||
-         instruction->opcode() == HloOpcode::kReduce) &&
+         instruction->opcode() == HloOpcode::kReduce ||
+         instruction->opcode() == HloOpcode::kScatter) &&
         ShardedOverCxnDims(instruction)) {
       VLOG(5) << instruction->name()
               << " is loop-carried add that is sharded over cxn dims in "

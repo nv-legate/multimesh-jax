@@ -7,6 +7,7 @@
 
 #include <optional>
 
+#include "mpmd_reorder_shard_map_transpose.h"
 #include "xla/client/executable_build_options.h"
 #include "xla/hlo/ir/hlo_clone_context.h"
 #include "xla/hlo/ir/hlo_computation.h"
@@ -44,6 +45,7 @@
 #include "xla/pjrt/legate/mpmd_sharding_propagation.h"
 #include "xla/pjrt/legate/mpmd_simple_loop_increment_coloring.h"
 #include "xla/pjrt/legate/mpmd_store.h"
+#include "xla/pjrt/legate/mpmd_reorder_shard_map_transpose.h"
 #include "xla/pjrt/legate/mpmd_uniquify_colors.h"
 #include "xla/pjrt/legate/mpmd_unused_loop_output_remover.h"
 #include "xla/pjrt/legate/mpmd_unused_param_output_remover.h"
@@ -887,6 +889,7 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
   mpmd_pipeline.AddPass<MpmdShardMapLoopReduce>(&partition);
   mpmd_pipeline.AddPass<MpmdHoistShardMapReduce>(&partition,
                                                  remove_hoisted_reduces);
+  mpmd_pipeline.AddPass<MpmdReorderShardMapTranspose>();
   mpmd_pipeline.AddPass<MpmdComputationGrouper>(&partition);
   mpmd_pipeline.AddPass<MpmdCrossTaskBarrierRemover>(
       &partition, /*remove_parameters=*/true);
