@@ -99,10 +99,7 @@ absl::StatusOr<bool> MpmdLogicalShardingPropagation::Run(
         // output sharding
         auto* lhs = instruction->operand(0);
         auto* rhs = instruction->operand(1);
-        VLOG(5) << "dot has lhs " << lhs->name() << " " << lhs->metadata().op_name();
         auto lhs_axes = GetAxes(lhs);
-        VLOG(5) << "dot has rhs " << rhs->name() << " "
-                << rhs->metadata().op_name();
         auto rhs_axes = GetAxes(rhs);
         if (lhs_axes.has_value() && rhs_axes.has_value()) {
           VLOG(5) << "dot " << instruction->name()
