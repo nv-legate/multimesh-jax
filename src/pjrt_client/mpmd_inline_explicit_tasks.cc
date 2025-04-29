@@ -85,7 +85,7 @@ absl::StatusOr<bool> MpmdInlineExplicitTasks::InlineExplicitTasks(
 
       auto dl = [&]() -> absl::StatusOr<zuku::DeviceList> {
         if (config.devices.empty()) {
-          return partition_->DefaultDevices();
+          return partition_->Devices();
         }
         return CreateDeviceList(config.devices);
       }();

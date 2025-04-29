@@ -77,7 +77,8 @@ absl::Status MpmdComputeAssignedColors::ComputeAssignedColors(
     if (color.has_value()) {
       // make sure the color is allocated in the HLO partition
       if (!partition_->HasColor(*color)) {
-        TF_RETURN_IF_ERROR(partition_->AllocateColor(*color));
+        return InvalidArgumentStrCat("color ", *color,
+                                     " has not been assigned a device mesh");
       }
     }
 

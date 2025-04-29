@@ -496,17 +496,17 @@ def microbatch(
 
         nonlocal custom_schedule
         if custom_schedule is not None and is_list_of_list_of_strings(custom_schedule):
-            new_custom_schedule = []
+            canonical_custom_schedule = []
             for device_row in custom_schedule:
                 task_counter = collections.defaultdict(int)
-                new_custom_schedule.append([])
+                canonical_custom_schedule.append([])
                 for task_id in device_row:
-                    new_custom_schedule[-1].append((task_counter[task_id], task_id))
+                    canonical_custom_schedule[-1].append((task_counter[task_id], task_id))
                     task_counter[task_id] += 1
                 for task_id, count in task_counter.items():
                     if (count != num_microbatches):
                         raise ValueError(f"task {task_id} has {count} microbatches, but there are {num_microbatches} microbatches")
-            custom_schedule = new_custom_schedule
+            custom_schedule = canonical_custom_schedule
 
         json_args = optional_kwargs(
             num_microbatches=num_microbatches,
@@ -755,9 +755,15 @@ def register_task(
             if dims is None:
                 dims = (len(devices),)
             device_ids = [_to_device_id(d) for d in devices]
+    elif callback is not None:
+        if dims is None:
+            raise ValueError(
+                f"in register_task({regex}), when callback is used, you must "
+                "specify mesh, devices, or dims to define mesh shape"
+            )
     else:
         raise ValueError(
-            f"in register_task({regex}), must give mesh, devices, or devices_callback"
+            f"in register_task({regex}), must give mesh, devices, or callback"
         )
 
     if device_axes is None and mesh is None:

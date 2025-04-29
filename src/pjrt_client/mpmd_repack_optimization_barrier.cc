@@ -30,7 +30,8 @@ absl::StatusOr<std::string> OptimizationBarrierName(
 
 absl::Status ClearOptimizationBarrierNames(HloComputation* computation) {
   for (auto* instruction : computation->instructions()) {
-    if (!instruction->has_backend_config()) {
+    if (!instruction->has_backend_config() ||
+        !instruction->IsCustomCall(kCustomCallUnpackedOptimizationBarrier)) {
       continue;
     }
     instruction->set_raw_backend_config_string("");

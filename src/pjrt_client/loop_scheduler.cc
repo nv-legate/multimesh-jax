@@ -177,6 +177,12 @@ ScheduleCustomSchedule(
   const int64_t num_custom_schedule_rows = custom_schedule.size();
   const int64_t tasks_per_iter = tasks.front().size();
 
+  for (int64_t task_index = 0; task_index < tasks_per_iter; ++task_index) {
+    VLOG(5) << "task " << tasks[0][task_index]->name() << " "
+            << tasks[0][task_index]->called_computations()[0]->name() << " "
+            << ColorOrDefault(tasks[0][task_index]);
+  }
+
   absl::flat_hash_map<std::string, int64_t> custom_schedule_task_counts;
   for (int64_t mesh_id = 0; mesh_id < num_custom_schedule_rows; ++mesh_id) {
     for (const auto& [iter, task_name] : custom_schedule[mesh_id]) {
