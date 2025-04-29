@@ -39,15 +39,19 @@ function(find_or_configure_xla)
        "${PROJECT_SOURCE_DIR}/src/pjrt_client/*.h"
        "${PROJECT_SOURCE_DIR}/src/pjrt_client/BUILD")
 
-
-  file(MAKE_DIRECTORY ${xla_SOURCE_DIR}/xla/pjrt/legate RESULT result)
-
   set(xla_symlink_files)
   foreach(PATH ${xla_source_files})
     get_filename_component(FILE_NAME ${PATH} NAME)
     list(APPEND xla_symlink_files "${xla_SOURCE_DIR}/xla/pjrt/legate/${FILE_NAME}")
-    file(CREATE_LINK ${PATH} ${xla_SOURCE_DIR}/xla/pjrt/legate/${FILE_NAME})
   endforeach()
+
+  add_custom_command(
+      OUTPUT ${xla_symlink_files}
+      COMMAND ${CMAKE_COMMAND} -E create_symlink
+              ${PROJECT_SOURCE_DIR}/src/pjrt_client
+              ${xla_SOURCE_DIR}/xla/pjrt/legate
+      COMMENT "Symlink plugin client code into XLA source tree at ${xla_SOURCE_DIR}"
+  )
 
   set(test_names
     mpmd_partition_test
@@ -189,27 +193,6 @@ function(find_or_configure_xla)
 
   add_dependencies(xla xla_build)
   add_dependencies(xla_compiler_plugin xla_build)
-
-  if (LegateJAX_ENABLE_TESTS)
-    file(GLOB legate_jax_test_files
-         "${PROJECT_SOURCE_DIR}/src/pjrt_client/testdata/*")
-    set(xla_test_files)
-    foreach(PATH ${legate_jax_test_files})
-      get_filename_component(FILE_NAME ${PATH} NAME)
-      list(APPEND xla_test_files "${xla_SOURCE_DIR}/xla/pjrt/legate/testdata/${FILE_NAME}")
-    endforeach()
-
-    add_custom_command(
-	OUTPUT ${xla_test_files}
-        COMMAND ${CMAKE_COMMAND} -E create_symlink
-                ${PROJECT_SOURCE_DIR}/src/pjrt_client/testdata
-                ${xla_SOURCE_DIR}/xla/pjrt/legate/testdata
-        COMMENT "Symlink testdata into XLA source tree at ${xla_SOURCE_DIR}"
-    )
-    add_custom_target(legate_test_files ALL
-	    DEPENDS ${xla_test_files})
-    add_dependencies(xla_build legate_test_files)
-  endif()
 
   add_library(xla::xla ALIAS xla)
   add_library(xla::xla_compiler_plugin ALIAS xla_compiler_plugin)
