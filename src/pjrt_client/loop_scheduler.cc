@@ -180,7 +180,8 @@ ScheduleCustomSchedule(
   for (int64_t task_index = 0; task_index < tasks_per_iter; ++task_index) {
     VLOG(5) << "task " << tasks[0][task_index]->name() << " "
             << tasks[0][task_index]->called_computations()[0]->name() << " "
-            << ColorOrDefault(tasks[0][task_index]);
+            << ColorOrDefault(tasks[0][task_index])
+            << " to be custom scheduled";
   }
 
   absl::flat_hash_map<std::string, int64_t> custom_schedule_task_counts;
