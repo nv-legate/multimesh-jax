@@ -162,6 +162,7 @@ def only_fuse_loop_tasks(enable: Optional[bool] = None, context_value=[False]):
     ):
         yield
 
+
 @contextmanager
 def autoshard(autoshard: bool = True):
     """Opens a context where shardings constraints become logical shardings.
