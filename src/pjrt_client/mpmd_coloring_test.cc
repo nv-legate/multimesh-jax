@@ -57,7 +57,7 @@ TEST_F(MpmdColoringTest, SimpleImplicitTask) {
 
   // multiply.4, multiply.7, 2 Aargs, a convert and a broadcast
   EXPECT_THAT(module->entry_computation()->instructions(),
-              Contains(m::Color("task_f")).Times(6));
+              Contains(m::Color("task_f")).Times(4));
 
   // cosine.8, add.9, reduce.14
   EXPECT_THAT(module->entry_computation()->instructions(),
@@ -184,7 +184,7 @@ TEST_F(MpmdColoringTest, TransformerColoring) {
 
   auto device_factory = [](const std::string& name) {
     int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(9), &layer_num);
+    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
     if (!parsed) {
       throw std::runtime_error(
           absl::StrCat("failed to parse layer number from", name));
@@ -194,7 +194,7 @@ TEST_F(MpmdColoringTest, TransformerColoring) {
     std::iota(devices.begin(), devices.end(), offset);
     return devices;
   };
-  RegisterMatcherTestTaskWithFactory("(x_layers_\\d+)", device_factory, {2, 2},
+  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {2, 2},
                                      {"x", "y"},
                                      {{"replica", "x"}, {"mdl", "y"}});
   RegisterMatcherTestTask("(emb).*", {0, 1, 2, 3, 4, 5, 6, 7}, {2, 4},
@@ -226,13 +226,13 @@ TEST_F(MpmdColoringTest, TransformerColoring) {
             Contains(AllOf(op::Dot(), m::Color("compute_loss"))).Times(Gt(0)),
             Contains(m::Color("final_ln")).Times(Gt(5)),
             Contains(AllOf(op::Copy(), m::ShapeLargerThan(5000),
-                           m::Color("x_layers_0")))
+                           m::Color("layers_0")))
                 .Times(Gt(5)),
-            Contains(AllOf(op::Dot(), m::Color("x_layers_0"))).Times(Gt(5)),
+            Contains(AllOf(op::Dot(), m::Color("layers_0"))).Times(Gt(5)),
             Contains(AllOf(op::Copy(), m::ShapeLargerThan(5000),
-                           m::Color("x_layers_6")))
+                           m::Color("layers_6")))
                 .Times(Gt(5)),
-            Contains(AllOf(op::Dot(), m::Color("x_layers_6"))).Times(Gt(5))));
+            Contains(AllOf(op::Dot(), m::Color("layers_6"))).Times(Gt(5))));
 }
 
 static constexpr absl::string_view kBackwardsColoringDoesNotOverwrite = R"(

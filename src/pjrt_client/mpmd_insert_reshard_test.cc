@@ -253,15 +253,13 @@ TEST_F(MpmdInsertReshardTest, ScalarReshard) {
   MpmdInsertReshard inserter{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, inserter.Run(module.get()));
 
-  TF_ASSERT_OK_AND_ASSIGN(auto global_color,
-                          partition_->FindOrAllocateGlobalColor("scalars"));
-
   // the parameter should get resharded into both uses
   // the first is over the same devices, but changes from sharded to replicated
   // the second has the same sharding, but different devices
   EXPECT_THAT(module->entry_computation()->root_instruction()->operands(),
-              ElementsAre(AllOf(op::CustomCall(std::string(kCustomCallReshard)),
-                                m::Color(global_color))));
+              ElementsAre(AllOf(
+                  op::CustomCall(std::string(kCustomCallReshard)),
+                  m::Devices(*partition_, {{.start = 0, .num_devices = 8}}))));
 }
 
 constexpr absl::string_view kRootTupleRecolorHlo = R"(
