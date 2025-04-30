@@ -95,16 +95,14 @@ bool MpmdColoring::PropagateFromUsersAndOperandsColorDepth(
     }
   }
 
-  if (instruction->opcode() != HloOpcode::kOptimizationBarrier) {
-    for (auto* user : properties.Users(instruction)) {
-      const auto user_color = Color(user);
-      if (if_visit(user) && user_color.has_value() &&
-          color_depth.contains(*user_color)) {
-        if (!user_candidate_color.has_value() ||
-            color_depth.at(*user_candidate_color) >
-                color_depth.at(*user_color)) {
-          user_candidate_color = user_color;
-        }
+  for (auto* user : properties.Users(instruction)) {
+    const auto user_color = Color(user);
+    if (if_visit(user) && user_color.has_value() &&
+        color_depth.contains(*user_color)) {
+      if (!user_candidate_color.has_value() ||
+          color_depth.at(*user_candidate_color) >
+              color_depth.at(*user_color)) {
+        user_candidate_color = user_color;
       }
     }
   }
@@ -245,10 +243,8 @@ bool MpmdColoring::PropagateFromUsersAndOperands(
   for (auto* operand : properties.Operands(instruction)) {
     add_user_or_operand(operand);
   }
-  if (instruction->opcode() != HloOpcode::kOptimizationBarrier) {
-    for (auto* user : properties.Users(instruction)) {
-      add_user_or_operand(user);
-    }
+  for (auto* user : properties.Users(instruction)) {
+    add_user_or_operand(user);
   }
 
   if (max_operand_color.has_value()) {
@@ -343,8 +339,7 @@ absl::StatusOr<bool> MpmdColoring::PropagateIf(
     for (auto* instruction : postorder) {
       // these take special care to only assign themselves colors when all of
       // their operands are uniformly colored
-      if (instruction->opcode() == HloOpcode::kTuple ||
-          instruction->opcode() == HloOpcode::kOptimizationBarrier) {
+      if (instruction->opcode() == HloOpcode::kTuple) {
         ColorTuple(instruction);
         continue;
       }
