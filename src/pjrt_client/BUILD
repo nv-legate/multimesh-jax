@@ -595,22 +595,6 @@ cc_library(
 )
 
 cc_library(
-    name = "python_callback",
-    srcs = ["python_callback.cc"],
-    hdrs = ["python_callback.h"],
-    deps = [
-        "@zuku",
-        "@com_google_absl//absl/status",
-        "@local_config_python//:python_headers",
-        "//xla/hlo/ir:hlo",
-        ":mpmd_loop",
-        ":mpmd_instruction",
-        ":hlo_partition",
-    ],
-    linkopts = ["-lpython3.10"],
-)
-
-cc_library(
     name = "loop_scheduler",
     srcs = ["loop_scheduler.cc"],
     hdrs = ["loop_scheduler.h"],
@@ -621,7 +605,6 @@ cc_library(
         "//xla/hlo/ir:hlo",
         ":hlo_partition",
         ":legate_computation",
-        ":python_callback",
     ],
 )
 
