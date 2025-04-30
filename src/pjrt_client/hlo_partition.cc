@@ -24,7 +24,6 @@
 #include "xla/pjrt/legate/logical_sharding_context.h"
 #include "xla/pjrt/legate/mpmd_instruction.h"
 #include "xla/pjrt/legate/mpmd_utils.h"
-#include "xla/tsl/platform/logging.h"
 #include "xla/util.h"
 
 namespace xla {
@@ -407,11 +406,6 @@ HloPartition::ComputeMetadataNameColor(HloInstruction* instruction) {
       }
 
       auto [devices, color_name] = context.callback(matched_name, backprop);
-      if (colors_.contains(color_name)) {
-        VLOG(5) << "found existing color " << color_name << " for "
-                << matched_name;
-        return color_name;
-      }
       const int64_t start = devices.first;
       const int64_t num_devices = devices.second - start;
       zuku::DeviceList dl{{.start = start, .num_devices = num_devices}};
