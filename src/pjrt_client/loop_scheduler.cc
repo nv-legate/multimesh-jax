@@ -330,7 +330,7 @@ SchedulePrefetchWavefront(
   const std::vector<int64_t> indices_to_unroll =
       GetIndicesToUnroll(partition, tasks);
 
-  if (indices_to_unroll.size() > 0) {
+  if (!indices_to_unroll.empty()) {
     return SchedulePrefetchWavefront(partition, config, indices_to_unroll,
                                      tasks);
   }
