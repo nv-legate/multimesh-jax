@@ -18,9 +18,7 @@
 
 namespace xla {
 
-// Assigns a coloring to all non-trivial operations in the HLO module
-// to create a partition of all operations based on user annotations.
-// Partitions (colors) are assigned to instructions as a frontend attribute.
+// Assigns a coloring to all user annotated instructions in the HLO module
 class MpmdComputeAssignedColors : public HloModulePass {
  public:
   explicit MpmdComputeAssignedColors(HloPartition* partition)

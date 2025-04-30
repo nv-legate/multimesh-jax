@@ -28,16 +28,15 @@ TEST_F(MpmdReorderShardMapTransposeTest, ReorderOnDataParallelTransformer) {
   MpmdHoistShardMapReduce hoister{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, hoister.Run(module.get()));
 
-  EXPECT_THAT(
-      m::FlatInstructions(module.get()), 
-      Contains(op::Transpose(op::CustomCall("SPMDShardToFullShape"))));
+  EXPECT_THAT(m::FlatInstructions(module.get()),
+              Contains(op::Transpose(op::CustomCall("SPMDShardToFullShape"))));
 
   // perform reordering
   MpmdReorderShardMapTranspose reorderer;
   TF_ASSERT_OK_AND_ASSIGN(changed, reorderer.Run(module.get()));
 
   EXPECT_THAT(
-      m::FlatInstructions(module.get()), 
+      m::FlatInstructions(module.get()),
       Contains(op::CustomCall("SPMDShardToFullShape", op::Transpose())));
 }
 

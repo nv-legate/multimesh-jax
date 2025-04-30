@@ -32,9 +32,9 @@ class MpmdReorderShardMapTranspose : public HloModulePass {
 
   using HloPassInterface::Run;
   using HloPassInterface::RunOnModuleGroup;
-  
-  absl::string_view name() const override { 
-    return "mpmd-reorder-shard-map-transpose"; 
+
+  absl::string_view name() const override {
+    return "mpmd-reorder-shard-map-transpose";
   }
 
  private:

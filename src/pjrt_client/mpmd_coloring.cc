@@ -100,8 +100,7 @@ bool MpmdColoring::PropagateFromUsersAndOperandsColorDepth(
     if (if_visit(user) && user_color.has_value() &&
         color_depth.contains(*user_color)) {
       if (!user_candidate_color.has_value() ||
-          color_depth.at(*user_candidate_color) >
-              color_depth.at(*user_color)) {
+          color_depth.at(*user_candidate_color) > color_depth.at(*user_color)) {
         user_candidate_color = user_color;
       }
     }

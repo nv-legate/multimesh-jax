@@ -18,13 +18,10 @@
 
 namespace xla {
 
-// Assigns a coloring to all non-trivial operations in the HLO module
-// to create a partition of all operations based on user annotations.
-// Partitions (colors) are assigned to instructions as a frontend attribute.
+// If module has a sharded root tuple, propagate the sharding to it's operands
+// and insert RootTupleRecolor custom calls to signify sharding overwrites
 class MpmdInsertRootTupleShardings : public HloModulePass {
  public:
-  // The `partition` object containing the mapping from partition color
-  // to the assigned submesh.
   explicit MpmdInsertRootTupleShardings(HloPartition* partition)
       : partition_(partition) {}
 
