@@ -168,8 +168,8 @@ class TaskTest(LegateJaxTestCase):
             ("model", "y"),
         ]
 
-        def device_factory(name: str) -> List[int]:
-            return [0, 1]
+        def device_factory(name: str, backprop: bool) -> List[int]:
+            return [0, 2], "bwd." + name if backprop else name
 
         legate.jax.register_task(
             r"(task\d+)",

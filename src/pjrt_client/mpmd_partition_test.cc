@@ -200,10 +200,10 @@ ENTRY main.100 {
   custom-call.19 = f32[8]{0} custom-call(Arg_0.1, Arg_1.2), custom_call_target="LegateTask", called_computations={f.impl.12}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   custom-call.43 = f32[] custom-call(custom-call.19, Arg_0.1), custom_call_target="LegateTask", called_computations={g.impl.36}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   constant.3 = f32[] constant(1)
-  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={g_bwd.impl.56}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={g_bwd.impl.56}, backend_config={"name": "bwd.g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   get-tuple-element.67 = f32[8]{0} get-tuple-element(custom-call.65), index=1
   get-tuple-element.66 = f32[8]{0} get-tuple-element(custom-call.65), index=0
-  custom-call.95 = (f32[8]{0}, pred[]) custom-call(Arg_0.1, Arg_1.2, get-tuple-element.66), custom_call_target="LegateTask", called_computations={f_bwd.impl_0.83}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.95 = (f32[8]{0}, pred[]) custom-call(Arg_0.1, Arg_1.2, get-tuple-element.66), custom_call_target="LegateTask", called_computations={f_bwd.impl_0.83}, backend_config={"name": "bwd.f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   get-tuple-element.96 = f32[8]{0} get-tuple-element(custom-call.95), index=0
   add.98 = f32[8]{0} add(get-tuple-element.67, get-tuple-element.96)
   ROOT tuple.99 = (f32[], f32[8]{0}) tuple(custom-call.43, add.98)
@@ -709,26 +709,6 @@ TEST_F(MpmdPartitionTest, MicrobatchMultipleTasksInLoopHlo) {
                               m::Store({.type = Store::Type::TEMP})}))));
 }
 
-static constexpr absl::string_view kTutorialkHlo = R"(
-ENTRY main.15 {
-  Arg_0.1 = f32[8]{0} parameter(0)
-  Arg_1.2 = f32[8]{0} parameter(1)
-  cos.red = f32[8]{0} cosine(Arg_0.1), frontend_attributes={color="red"}
-  add.red = f32[8]{0} add(cos.red, Arg_0.1)
-  cos.blue = f32[8]{0} cosine(add.red), frontend_attributes={color="blue"}
-  add.blue = f32[8]{0} add(cos.blue, Arg_1.2)
-  ROOT tuple = (f32[8]{0}, f32[8]{0}) tuple(add.blue, add.red)
-} // main.15
-)";
-
-TEST_F(MpmdPartitionTest, Tutorial) {
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto module, GetHloModuleFromText(kTutorialkHlo, /*num_devices=*/4));
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto result, RunMpmdOnHloModule(std::move(module), /*num_devices=*/4));
-  auto [tasks, intermediates] = std::move(result);
-}
-
 static constexpr absl::string_view kSimpleImplicitTaskHlo = R"(
 region_0.10 {
   Arg_0.11 = f32[] parameter(0)
@@ -751,8 +731,8 @@ ENTRY main.15 {
 )";
 
 TEST_F(MpmdPartitionTest, SimpleImplicitTask) {
-  RegisterNamedTestTask("task_f", {0, 1}, {2}, {"x"}, {{"x", "batch"}});
-  RegisterNamedTestTask("task_g", {2, 3}, {2}, {"x"}, {{"x", "batch"}});
+  RegisterNamedTestTask("task_f", {0, 2}, {2}, {"x"}, {{"x", "batch"}});
+  RegisterNamedTestTask("task_g", {2, 4}, {2}, {"x"}, {{"x", "batch"}});
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
       RunMpmdOnHloString(kSimpleImplicitTaskHlo, /*num_devices=*/4));
@@ -835,11 +815,11 @@ iota_transpose_perm: 0
 )";
 
 TEST_F(MpmdPartitionTest, ReshardGlobalInputsToSubmeshInputs) {
-  RegisterNamedTestTask("embedding", {0, 1, 2, 3}, {2, 2}, {"x", "y"},
+  RegisterNamedTestTask("embedding", {0, 4}, {2, 2}, {"x", "y"},
                         {{"x", "x"}, {"y", "y"}});
-  RegisterNamedTestTask("task_0", {0, 1}, {2, 1}, {"x", "y"},
+  RegisterNamedTestTask("task_0", {0, 2}, {2, 1}, {"x", "y"},
                         {{"x", "x"}, {"y", "y"}});
-  RegisterNamedTestTask("task_1", {2, 3}, {2, 1}, {"x", "y"},
+  RegisterNamedTestTask("task_1", {2, 4}, {2, 1}, {"x", "y"},
                         {{"x", "x"}, {"y", "y"}});
 
   TF_ASSERT_OK_AND_ASSIGN(
@@ -1120,8 +1100,8 @@ ENTRY main.15 {
 )";
 
 TEST_F(MpmdPartitionTest, SimpleImplicitTaskOptBarrier) {
-  RegisterNamedTestTask("task_f", {0, 1}, {2}, {"x"}, {{"x", "batch"}});
-  RegisterNamedTestTask("task_g", {2, 3}, {2}, {"x"}, {{"x", "batch"}});
+  RegisterNamedTestTask("task_f", {0, 2}, {2}, {"x"}, {{"x", "batch"}});
+  RegisterNamedTestTask("task_g", {2, 4}, {2}, {"x"}, {{"x", "batch"}});
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
       RunMpmdOnHloString(kSimpleImplicitTaskOptBarrierHlo, /*num_devices=*/4));
@@ -1835,9 +1815,9 @@ ENTRY main.82 {
 )";
 
 TEST_F(MpmdPartitionTest, MpmdMicrobatch) {
-  RegisterNamedTestTask("layer0", {0, 1, 2, 3}, {4}, {"x"}, {{"x", "batch"}});
-  RegisterNamedTestTask("layer1", {0, 1}, {2}, {"x"}, {{"x", "batch"}});
-  RegisterNamedTestTask("layer2", {0, 1, 2, 3}, {4}, {"x"}, {{"x", "batch"}});
+  RegisterNamedTestTask("layer0", {0, 4}, {4}, {"x"}, {{"x", "batch"}});
+  RegisterNamedTestTask("layer1", {0, 2}, {2}, {"x"}, {{"x", "batch"}});
+  RegisterNamedTestTask("layer2", {0, 4}, {4}, {"x"}, {{"x", "batch"}});
 
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
@@ -2259,8 +2239,8 @@ ENTRY main.66 {
 )";
 
 TEST_F(MpmdPartitionTest, RootParameterReplicatedSubmesh) {
-  RegisterNamedTestTask("layer0", {0, 1}, {2}, {"x"}, {{"batch", "x"}});
-  RegisterNamedTestTask("layer1", {2, 3}, {2}, {"x"}, {{"batch", "x"}});
+  RegisterNamedTestTask("layer0", {0, 2}, {2}, {"x"}, {{"batch", "x"}});
+  RegisterNamedTestTask("layer1", {2, 4}, {2}, {"x"}, {{"batch", "x"}});
   // just validate that it builds
   TF_ASSERT_OK_AND_ASSIGN(auto result,
                           RunMpmdOnHloString(kRootParameterReplicatedSubmeshHlo,
@@ -2364,8 +2344,8 @@ ENTRY main.82 {
 )";
 
 TEST_F(MpmdPartitionTest, ShardedDynamicSlice) {
-  RegisterNamedTestTask("layer0", {0, 1}, {2}, {"x"}, {{"x", "x"}});
-  RegisterNamedTestTask("layer1", {2, 3}, {2}, {"x"}, {{"x", "x"}});
+  RegisterNamedTestTask("layer0", {0, 2}, {2}, {"x"}, {{"x", "x"}});
+  RegisterNamedTestTask("layer1", {2, 4}, {2}, {"x"}, {{"x", "x"}});
 
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
@@ -2413,9 +2393,9 @@ iota_transpose_perm: 0
 TEST_F(MpmdPartitionTest, HloAutoshardingDotHlo) {
   GTEST_SKIP() << "autosharding from dot operands still needs to be defined";
 
-  RegisterNamedTestTask("task1", {0, 1, 2, 3}, {2, 2}, {"x", "y"},
+  RegisterNamedTestTask("task1", {0, 4}, {2, 2}, {"x", "y"},
                         {{"x", "x"}, {"y", "y"}});
-  RegisterNamedTestTask("task2", {4, 5, 6, 7}, {2, 2}, {"x", "y"},
+  RegisterNamedTestTask("task2", {4, 8}, {2, 2}, {"x", "y"},
                         {{"x", "x"}, {"y", "y"}});
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
@@ -2490,7 +2470,7 @@ TEST_F(MpmdPartitionTest, LoopInputInstruction) {
 
 TEST_F(MpmdPartitionTest, DecomposeMultipleLayers) {
   EnableLegateRecomputation(true);
-  auto device_factory = [](const std::string& name) {
+  auto device_factory = [](const std::string& name, bool backprop) {
     int layer_num;
     bool parsed = absl::SimpleAtoi(name.substr(9), &layer_num);
     if (!parsed) {
@@ -2498,19 +2478,24 @@ TEST_F(MpmdPartitionTest, DecomposeMultipleLayers) {
           absl::StrCat("failed to parse layer number from", name));
     }
     int64_t offset = (layer_num / 4) * 4;
-    std::vector<int64_t> devices(4);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
+    std::string color = [&] {
+      if (backprop) {
+        return absl::StrCat("bwd.", name);
+      }
+      return name;
+    }();
+    auto devices = std::make_pair(offset, offset + 4);
+    return std::make_pair(devices, std::move(color));
   };
   RegisterMatcherTestTaskWithFactory("(x_layers_\\d+)", device_factory, {2, 2},
                                      {"x", "y"},
                                      {{"replica", "x"}, {"mdl", "y"}});
-  RegisterMatcherTestTask("(emb).*", {0, 1, 2, 3, 4, 5, 6, 7}, {2, 4},
-                          {"x", "y"}, {{"replica", "x"}, {"mdl", "y"}});
-  RegisterMatcherTestTask("(final_ln).*", {0, 1, 2, 3, 4, 5, 6, 7}, {2, 4},
-                          {"x", "y"}, {{"replica", "x"}, {"mdl", "y"}});
-  RegisterMatcherTestTask("(compute_loss).*", {0, 1, 2, 3, 4, 5, 6, 7}, {2, 4},
-                          {"x", "y"}, {{"replica", "x"}, {"mdl", "y"}});
+  RegisterMatcherTestTask("(emb).*", {0, 8}, {2, 4}, {"x", "y"},
+                          {{"replica", "x"}, {"mdl", "y"}});
+  RegisterMatcherTestTask("(final_ln).*", {0, 8}, {2, 4}, {"x", "y"},
+                          {{"replica", "x"}, {"mdl", "y"}});
+  RegisterMatcherTestTask("(compute_loss).*", {0, 8}, {2, 4}, {"x", "y"},
+                          {{"replica", "x"}, {"mdl", "y"}});
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
       RunMpmdOnHloTextPath(
@@ -2541,15 +2526,15 @@ TEST_F(MpmdPartitionTest, AutoshardingRootReturn) {
 
 TEST_F(MpmdPartitionTest, DecomposeMicrobatchSpmd) {
   EnableLegateRecomputation(true);
-  RegisterMatcherTestTask("(x_layers_\\d+).*", {0, 1}, {2, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(x_layers_\\d+).*", {0, 2}, {2, 1}, {"x", "y"},
                           {{"replica", "x"}, {"mdl", "y"}});
-  RegisterMatcherTestTask("(position_emb).*", {0, 1}, {2, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(position_emb).*", {0, 2}, {2, 1}, {"x", "y"},
                           {{"replica", "x"}, {"mdl", "y"}});
-  RegisterMatcherTestTask("(emb_lookup).*", {0, 1}, {2, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(emb_lookup).*", {0, 2}, {2, 1}, {"x", "y"},
                           {{"replica", "x"}, {"mdl", "y"}});
-  RegisterMatcherTestTask("(final_ln).*", {0, 1}, {2, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(final_ln).*", {0, 2}, {2, 1}, {"x", "y"},
                           {{"replica", "x"}, {"mdl", "y"}});
-  RegisterMatcherTestTask("(compute_loss).*", {0, 1}, {2, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(compute_loss).*", {0, 2}, {2, 1}, {"x", "y"},
                           {{"replica", "x"}, {"mdl", "y"}});
   TF_ASSERT_OK_AND_ASSIGN(
       auto result, RunMpmdOnHloTextPath("spmd_microbatch_4layers.txt",
@@ -2561,16 +2546,16 @@ TEST_F(MpmdPartitionTest, DecomposeMicrobatchSpmd) {
 TEST_F(MpmdPartitionTest, ReplicateArgumentThroughLoop) {
   EnableLegateRecomputation(true);
   RegisterMatcherTestTask(
-      "(x_layers_\\d+).*", {0, 1}, {1, 1, 2}, {"x", "y", "z"},
+      "(x_layers_\\d+).*", {0, 2}, {1, 1, 2}, {"x", "y", "z"},
       {{"replica", "x"}, {"data", "y"}, {"mdl", "z"}, {"seq", "z"}});
   RegisterMatcherTestTask(
-      "(emb).*", {0, 1}, {1, 1, 2}, {"x", "y", "z"},
+      "(emb).*", {0, 2}, {1, 1, 2}, {"x", "y", "z"},
       {{"replica", "x"}, {"data", "y"}, {"mdl", "z"}, {"seq", "z"}});
   RegisterMatcherTestTask(
-      "(final_ln).*", {0, 1}, {1, 1, 2}, {"x", "y", "z"},
+      "(final_ln).*", {0, 2}, {1, 1, 2}, {"x", "y", "z"},
       {{"replica", "x"}, {"data", "y"}, {"mdl", "z"}, {"seq", "z"}});
   RegisterMatcherTestTask(
-      "(compute_loss).*", {0, 1}, {1, 1, 2}, {"x", "y", "z"},
+      "(compute_loss).*", {0, 2}, {1, 1, 2}, {"x", "y", "z"},
       {{"replica", "x"}, {"data", "y"}, {"mdl", "z"}, {"seq", "z"}});
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
@@ -2586,16 +2571,16 @@ TEST_F(MpmdPartitionTest, ReplicateArgumentThroughLoop) {
 TEST_F(MpmdPartitionTest, RngColoringFail) {
   EnableLegateRecomputation(true);
   RegisterMatcherTestTask(
-      "(layers_\\d+).*", {0, 1}, {1, 1, 2}, {"x", "y", "z"},
+      "(layers_\\d+).*", {0, 2}, {1, 1, 2}, {"x", "y", "z"},
       {{"replica", "x"}, {"data", "y"}, {"mdl", "z"}, {"seq", "z"}});
   RegisterMatcherTestTask(
-      "(emb).*", {0, 1}, {1, 1, 2}, {"x", "y", "z"},
+      "(emb).*", {0, 2}, {1, 1, 2}, {"x", "y", "z"},
       {{"replica", "x"}, {"data", "y"}, {"mdl", "z"}, {"seq", "z"}});
   RegisterMatcherTestTask(
-      "(final_ln).*", {0, 1}, {1, 1, 2}, {"x", "y", "z"},
+      "(final_ln).*", {0, 2}, {1, 1, 2}, {"x", "y", "z"},
       {{"replica", "x"}, {"data", "y"}, {"mdl", "z"}, {"seq", "z"}});
   RegisterMatcherTestTask(
-      "(compute_loss).*", {0, 1}, {1, 1, 2}, {"x", "y", "z"},
+      "(compute_loss).*", {0, 2}, {1, 1, 2}, {"x", "y", "z"},
       {{"replica", "x"}, {"data", "y"}, {"mdl", "z"}, {"seq", "z"}});
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,

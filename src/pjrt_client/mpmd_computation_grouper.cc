@@ -294,24 +294,10 @@ absl::Status BuildContext::ReplaceWithCall(
   auto* root_tuple =
       builder_->AddInstruction(HloInstruction::CreateTuple(roots));
 
-  bool is_backprop = false;
-  TF_RETURN_IF_ERROR(
-      builder_->ForEachInstruction([&](const HloInstruction* instruction) {
-        if (absl::StrContains(instruction->metadata().op_name(),
-                              "transpose(jvp")) {
-          is_backprop = true;
-        }
-        return absl::OkStatus();
-      }));
-
   auto* task_computation =
       computation->parent()->AddComputationAndUnifyNamesAndIds(
           builder_->Build(root_tuple),
           /*is_entry=*/false);
-  if (is_backprop && !absl::StartsWith(name_, "bwd")) {
-    std::string new_name = absl::StrCat("bwd.", name_);
-    task_computation->SetAndSanitizeName(new_name);
-  }
 
   std::vector<HloInstruction*> parameters;
   parameters.reserve(parameters_.size());

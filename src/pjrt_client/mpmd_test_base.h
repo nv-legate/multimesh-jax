@@ -283,18 +283,20 @@ struct MpmdStoreMatcherConfig {
 }  // namespace mpmd_matchers
 
 void RegisterNamedTestTask(
-    std::string name, std::vector<int64_t> devices, std::vector<int64_t> dims,
-    std::vector<std::string> axes,
+    std::string name, std::pair<int64_t, int64_t> devices,
+    std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes);
 
 void RegisterMatcherTestTask(
-    std::string matcher, std::vector<int64_t> devices,
+    std::string matcher, std::pair<int64_t, int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes);
 
 void RegisterMatcherTestTaskWithFactory(
     std::string matcher,
-    std::function<std::vector<int64_t>(const std::string& task)> device_factory,
+    std::function<std::pair<std::pair<int64_t, int64_t>, std::string>(
+        const std::string& task, bool backprop)>
+        device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes);
 

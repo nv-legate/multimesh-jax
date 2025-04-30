@@ -503,33 +503,39 @@ std::vector<HloComputation*> WhileBodies(HloModule* module) {
 
 }  // namespace mpmd_matchers
 
-void RegisterNamedTestTask(
-    std::string name, std::vector<int64_t> devices, std::vector<int64_t> dims,
-    std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes) {
-  RegisterMetadataNameMatcher(absl::StrCat("(", name, ")"), name);
-  RegisterMetadataNameTask(name, std::move(devices), std::move(dims),
-                           std::move(axes), std::move(logical_axes));
-}
-
 void RegisterMatcherTestTask(
-    std::string matcher, std::vector<int64_t> devices,
+    std::string matcher, std::pair<int64_t, int64_t> devices,
     std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes) {
-  RegisterMetadataNameMatcher(matcher, std::nullopt);
-  RegisterMetadataNameTask(matcher, std::move(devices), std::move(dims),
-                           std::move(axes), std::move(logical_axes));
+  auto callback = [=](const std::string& matched, bool backprop) {
+    std::string name = matched;
+    if (backprop) {
+      name = absl::StrCat("bwd.", name);
+    }
+    return std::make_pair(devices, name);
+  };
+  RegisterMetadataNameTask(matcher, callback, std::move(dims), std::move(axes),
+                           std::move(logical_axes));
+}
+
+void RegisterNamedTestTask(
+    std::string name, std::pair<int64_t, int64_t> devices,
+    std::vector<int64_t> dims, std::vector<std::string> axes,
+    std::vector<std::pair<std::string, std::string>> logical_axes) {
+  RegisterMatcherTestTask(absl::StrCat("(", name, ")"), devices,
+                          std::move(dims), std::move(axes),
+                          std::move(logical_axes));
 }
 
 void RegisterMatcherTestTaskWithFactory(
     std::string matcher,
-    std::function<std::vector<int64_t>(const std::string& task)> device_factory,
+    std::function<std::pair<std::pair<int64_t, int64_t>, std::string>(
+        const std::string&, bool)>
+        device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes) {
-  RegisterMetadataNameMatcher(matcher, std::nullopt);
-  RegisterMetadataNameTaskWithFactory(matcher, std::move(device_factory),
-                                      std::move(dims), std::move(axes),
-                                      std::move(logical_axes));
+  RegisterMetadataNameTask(matcher, std::move(device_factory), std::move(dims),
+                           std::move(axes), std::move(logical_axes));
 }
 
 }  // namespace xla

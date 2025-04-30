@@ -82,6 +82,40 @@ std::ostream& operator<<(std::ostream& os, const ReplicaGroup& group) {
   return os;
 }
 
+std::pair<std::pair<int64_t, int64_t>, std::string> TaskCallback(
+    const std::string& name, bool backprop, int64_t devices_per_stage,
+    int64_t layers_per_stage, int64_t total_devices) {
+  int layer_num;
+  bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
+  if (!parsed) {
+    throw std::runtime_error(
+        absl::StrCat("failed to parse layer number from", name));
+  }
+
+  std::string color = [&] {
+    if (backprop) {
+      return absl::StrCat("bwd.", name);
+    }
+    return name;
+  }();
+
+  const int64_t num_device_groups = total_devices / devices_per_stage;
+  const int64_t offset =
+      ((layer_num / layers_per_stage) % num_device_groups) * devices_per_stage;
+  auto devices = std::make_pair(offset, offset + devices_per_stage);
+  return std::make_pair(devices, std::move(color));
+};
+
+std::function<std::pair<std::pair<int64_t, int64_t>, std::string>(
+    const std::string&, bool)>
+TaskCallback(int64_t devices_per_stage, int64_t layers_per_stage,
+             int64_t total_devices) {
+  return [=](const std::string& name, bool backprop) {
+    return TaskCallback(name, backprop, devices_per_stage, layers_per_stage,
+                        total_devices);
+  };
+}
+
 std::vector<ReplicaGroup> FlatReplicaGroups(
     const std::vector<SpmdHloModuleTask>& tasks) {
   std::vector<ReplicaGroup> all_groups;
@@ -430,43 +464,28 @@ TEST_F(LegateExecutableTest, ExecuteMicrobatches) {
 TEST_F(LegateExecutableTest, Pipeline2x8Stages) {
   GTEST_SKIP() << "Data parallelism with non-uniform mesh sizes has sharding "
                   "propagation bug with aliasing";
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
 
-    static constexpr int kLayersPerStage = 12;
-    static constexpr int kDevicesPerStage = 8;
-
-    const int64_t offset = (layer_num / kLayersPerStage) * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
+  static constexpr int kLayersPerStage = 12;
+  static constexpr int kDevicesPerStage = 8;
   static constexpr int kTotalDevices = 16;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kTotalDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-  std::vector<int64_t> embeddings_dims = {2, 1, 8};
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
       {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {4, 1, 2},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {4, 1, 2},
+      {"x", "y", "z"}, transformer_axes);
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
                          "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {2, 1, 8},
+    RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
 
@@ -478,49 +497,31 @@ TEST_F(LegateExecutableTest, Pipeline2x8StagesReplicateSmallParams) {
   static constexpr int kDevicesPerStage = 8;
   static constexpr int kTotalDevices = 16;
   static constexpr int kNumDeviceGroups = 2;
-  static constexpr int64_t kMaxBytesAllocated = 29000000000;
-
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-
-    const int64_t offset =
-        ((layer_num / kLayersPerStage) % kNumDeviceGroups) * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
+  static constexpr int64_t kMaxBytesAllocated = 29500000000;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kDevicesPerStage);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
-  std::vector<int64_t> logits_devices(kDevicesPerStage);
-  std::iota(logits_devices.begin(), logits_devices.end(),
-            kTotalDevices - kDevicesPerStage);
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
       {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {1, 1, 8},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 8},
+      {"x", "y", "z"}, transformer_axes);
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(default)"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {1, 1, 8},
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {1, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
 
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, logits_devices, {1, 1, 8}, {"x", "y", "z"},
-                            embeddings_axes);
+    RegisterMatcherTestTask(matcher,
+                            {kTotalDevices - kDevicesPerStage, kTotalDevices},
+                            {1, 1, 8}, {"x", "y", "z"}, embeddings_axes);
   }
 
   ReplicateParametersSmallerThanNumElements(1024 * 2048);
@@ -531,37 +532,14 @@ TEST_F(LegateExecutableTest, Pipeline2x8StagesReplicateSmallParams) {
 }
 
 TEST_F(LegateExecutableTest, Pipeline2x8Stages24LayersReplicateSmallParams) {
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-
-    static constexpr int kLayersPerStage = 2;
-    static constexpr int kDevicesPerStage = 8;
-    static constexpr int kStagesPerRepeat = 2;
-
-    const int64_t stage_num = layer_num / kLayersPerStage;
-    const int64_t offset = (stage_num % kStagesPerRepeat) * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
+  static constexpr int kLayersPerStage = 2;
   static constexpr int kTotalDevices = 16;
-  static constexpr int kStageDevices = 8;
+  static constexpr int kDevicesPerStage = 8;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kStageDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
-  std::vector<int64_t> logits_devices(kStageDevices);
-  std::iota(logits_devices.begin(), logits_devices.end(), 8);
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
       {"replica", "x"},
@@ -570,15 +548,18 @@ TEST_F(LegateExecutableTest, Pipeline2x8Stages24LayersReplicateSmallParams) {
       {"seq", "y"},
       {"seq", "z"}};
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {1, 1, 8},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 8},
+      {"x", "y", "z"}, transformer_axes);
   for (auto&& matcher : {"(emb_lookup).*", "(position_emb).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {1, 1, 8},
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {1, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, logits_devices, {1, 1, 8}, {"x", "y", "z"},
-                            embeddings_axes);
+    RegisterMatcherTestTask(matcher,
+                            {kTotalDevices - kDevicesPerStage, kTotalDevices},
+                            {1, 1, 8}, {"x", "y", "z"}, embeddings_axes);
   }
 
   ReplicateParametersSmallerThanNumElements(64 * 2048);
@@ -587,37 +568,14 @@ TEST_F(LegateExecutableTest, Pipeline2x8Stages24LayersReplicateSmallParams) {
 }
 
 TEST_F(LegateExecutableTest, Opt175ReplicateSmallParams) {
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-
-    static constexpr int kLayersPerStage = 1;
-    static constexpr int kDevicesPerStage = 8;
-    static constexpr int kStagesPerRepeat = 16;
-
-    const int64_t stage_num = layer_num / kLayersPerStage;
-    const int64_t offset = (stage_num % kStagesPerRepeat) * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
+  static constexpr int kLayersPerStage = 1;
   static constexpr int kTotalDevices = 128;
-  static constexpr int kStageDevices = 8;
+  static constexpr int kDevicesPerStage = 8;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kStageDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
-  std::vector<int64_t> logits_devices(kStageDevices);
-  std::iota(logits_devices.begin(), logits_devices.end(), 8);
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
       {"replica", "x"},
@@ -626,15 +584,18 @@ TEST_F(LegateExecutableTest, Opt175ReplicateSmallParams) {
       {"seq", "y"},
       {"seq", "z"}};
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {1, 1, 8},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 8},
+      {"x", "y", "z"}, transformer_axes);
   for (auto&& matcher : {"(emb_lookup).*", "(position_emb).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {1, 1, 8},
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {1, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, logits_devices, {1, 1, 8}, {"x", "y", "z"},
-                            embeddings_axes);
+    RegisterMatcherTestTask(matcher,
+                            {kTotalDevices - kDevicesPerStage, kTotalDevices},
+                            {1, 1, 8}, {"x", "y", "z"}, embeddings_axes);
   }
 
   ReplicateParametersSmallerThanNumElements(128 * 2048);
@@ -644,43 +605,29 @@ TEST_F(LegateExecutableTest, Opt175ReplicateSmallParams) {
 
 TEST_F(LegateExecutableTest, Pipeline2x8StagesMicrobatch8) {
   GTEST_SKIP() << "TODO: sharding propagation bug leads to bad alias";
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-
-    static constexpr int kLayersPerStage = 12;
-    static constexpr int kDevicesPerStage = 8;
-
-    const int64_t offset = (layer_num / kLayersPerStage) * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
 
   static constexpr int kTotalDevices = 16;
+  static constexpr int kDevicesPerStage = 8;
+  static constexpr int kLayersPerStage = 12;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kTotalDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-  std::vector<int64_t> embeddings_dims = {2, 1, 8};
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
       {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {4, 1, 2},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {4, 1, 2},
+      {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
                          "(compute_loss).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {2, 1, 8},
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {4, 1, 2},
                             {"x", "y", "z"}, embeddings_axes);
   }
 
@@ -690,35 +637,15 @@ TEST_F(LegateExecutableTest, Pipeline2x8StagesMicrobatch8) {
 
 TEST_F(LegateExecutableTest, Pipeline2x8StagesCircularScheduling) {
   GTEST_SKIP() << "Need to resolve sharding mismatch with data parallelism";
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-
-    static constexpr int kLayersPerRepeat = 8;
-    static constexpr int kLayersPerStage = 4;
-    static constexpr int kDevicesPerStage = 8;
-
-    const int64_t layer_offset_in_repeat = layer_num % kLayersPerRepeat;
-    const int64_t offset =
-        (layer_offset_in_repeat / kLayersPerStage) * kDevicesPerStage;
-
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
 
   static constexpr int kTotalDevices = 16;
+  static constexpr int kLayersPerStage = 4;
+  static constexpr int kDevicesPerStage = 8;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kTotalDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
   std::vector<int64_t> embeddings_dims = {2, 1, 8};
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
@@ -726,11 +653,14 @@ TEST_F(LegateExecutableTest, Pipeline2x8StagesCircularScheduling) {
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {4, 1, 2},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {4, 1, 2},
+      {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
                          "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {2, 1, 8},
+    RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
 
@@ -740,35 +670,15 @@ TEST_F(LegateExecutableTest, Pipeline2x8StagesCircularScheduling) {
 TEST_F(LegateExecutableTest,
        Pipeline2x8StagesCircularSchedulingControlReplication) {
   GTEST_SKIP() << "Need to resolve sharding mismatch with data parallelism";
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-
-    static constexpr int kLayersPerRepeat = 8;
-    static constexpr int kLayersPerStage = 4;
-    static constexpr int kDevicesPerStage = 8;
-
-    const int64_t layer_offset_in_repeat = layer_num % kLayersPerRepeat;
-    const int64_t offset =
-        (layer_offset_in_repeat / kLayersPerStage) * kDevicesPerStage;
-
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
 
   static constexpr int kTotalDevices = 16;
+  static constexpr int kLayersPerStage = 4;
+  static constexpr int kDevicesPerStage = 8;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kTotalDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
   std::vector<int64_t> embeddings_dims = {2, 1, 8};
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
@@ -776,11 +686,14 @@ TEST_F(LegateExecutableTest,
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {4, 1, 2},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {4, 1, 2},
+      {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
                          "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {2, 1, 8},
+    RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
 
@@ -801,31 +714,14 @@ TEST_F(LegateExecutableTest,
 
 TEST_F(LegateExecutableTest, Pipeline4x2Stages) {
   GTEST_SKIP() << "TODO: fix non-uniform sharding propagation bug";
-
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-
-    static constexpr int kDevicesPerStage = 2;
-
-    const int64_t offset = layer_num * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
+  static constexpr int kDevicesPerStage = 2;
+  static constexpr int kLayersPerStage = 1;
   static constexpr int kTotalDevices = 8;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kTotalDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
   std::vector<int64_t> embeddings_dims = {2, 1, 4};
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
@@ -833,11 +729,14 @@ TEST_F(LegateExecutableTest, Pipeline4x2Stages) {
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {2, 1, 1},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {2, 1, 1},
+      {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
                          "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {2, 1, 4},
+    RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 4},
                             {"x", "y", "z"}, embeddings_axes);
   }
 
@@ -845,48 +744,35 @@ TEST_F(LegateExecutableTest, Pipeline4x2Stages) {
 }
 
 TEST_F(LegateExecutableTest, Pipeline4x2Stages1F1B) {
-  return;
-  static constexpr int kDevicesPerStage = 8;
-  static constexpr int kTotalDevices = 32;
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
+  GTEST_SKIP() << "Sharding pattern not yet supported";
 
-    const int64_t offset = layer_num * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
+  static constexpr int kDevicesPerStage = 8;
+  static constexpr int kLayersPerStage = 1;
+  static constexpr int kTotalDevices = 32;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kDevicesPerStage);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
-  std::vector<int64_t> logits_devices(kDevicesPerStage);
-  std::iota(logits_devices.begin(), logits_devices.end(),
-            kTotalDevices - kDevicesPerStage);
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
       {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {1, 1, 8},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 8},
+      {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {1, 1, 8},
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {1, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, logits_devices, {1, 1, 8}, {"x", "y", "z"},
-                            embeddings_axes);
+    RegisterMatcherTestTask(matcher,
+                            {kTotalDevices - kDevicesPerStage, kTotalDevices},
+                            {1, 1, 8}, {"x", "y", "z"}, embeddings_axes);
   }
 
   ReplicateParametersSmallerThanNumElements(64 * 2048);
@@ -895,41 +781,33 @@ TEST_F(LegateExecutableTest, Pipeline4x2Stages1F1B) {
 
 TEST_F(LegateExecutableTest, MaximalDeviceSharding4x1Stages) {
   GTEST_SKIP() << "do not yet support maximal device sharding";
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
 
-    std::vector<int64_t> devices{layer_num};
-    return devices;
-  };
-
+  static constexpr int kDevicesPerStage = 1;
+  static constexpr int kLayersPerStage = 1;
   static constexpr int kTotalDevices = 4;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices = {0};
-  std::vector<int64_t> logits_devices = {3};
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
       {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {1, 1, 1},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 1},
+      {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {1, 1, 1},
-                            {"x", "y", "z"}, embeddings_axes);
+    RegisterMatcherTestTask(matcher, {0, 1}, {1, 1, 1}, {"x", "y", "z"},
+                            embeddings_axes);
   }
 
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, logits_devices, {1, 1, 1}, {"x", "y", "z"},
+    RegisterMatcherTestTask(matcher, {3, 4}, {1, 1, 1}, {"x", "y", "z"},
                             embeddings_axes);
   }
 
@@ -938,31 +816,14 @@ TEST_F(LegateExecutableTest, MaximalDeviceSharding4x1Stages) {
 
 TEST_F(LegateExecutableTest, ShardedPipeline4x2Stages) {
   GTEST_SKIP() << "TODO: fix non-uniform sharding propagation bug";
-
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-
-    static constexpr int kDevicesPerStage = 2;
-
-    const int64_t offset = layer_num * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
   static constexpr int kTotalDevices = 8;
-  GTEST_SKIP() << "TODO: fix non-uniform sharding propagation bug";
+  static constexpr int kDevicesPerStage = 2;
+  static constexpr int kLayersPerStage = 1;
+
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kTotalDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
   std::vector<int64_t> embeddings_dims = {2, 1, 4};
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
@@ -970,11 +831,14 @@ TEST_F(LegateExecutableTest, ShardedPipeline4x2Stages) {
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {2, 1, 1},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {2, 1, 1},
+      {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
                          "(compute_loss).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {2, 1, 4},
+    RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 4},
                             {"x", "y", "z"}, embeddings_axes);
   }
 
@@ -982,33 +846,14 @@ TEST_F(LegateExecutableTest, ShardedPipeline4x2Stages) {
 }
 
 TEST_F(LegateExecutableTest, DP2_PP2_TP8_4nodes) {
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-
-    static constexpr int kDevicesPerStage = 16;
-    static constexpr int kLayersPerStage = 12;
-    const int64_t stage = layer_num / kLayersPerStage;
-    const int64_t offset = stage * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
+  static constexpr int kDevicesPerStage = 16;
+  static constexpr int kLayersPerStage = 12;
   static constexpr int kEmbeddingsDevices = 16;
   static constexpr int kLogitsDevices = 16;
   static constexpr int kTotalDevices = kEmbeddingsDevices + kLogitsDevices;
 
-  std::vector<int64_t> embeddings_devices(kEmbeddingsDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
   std::vector<int64_t> embeddings_dims = {2, 1, 8};
 
-  std::vector<int64_t> logits_devices(kLogitsDevices);
-  std::iota(logits_devices.begin(), logits_devices.end(), kEmbeddingsDevices);
   std::vector<int64_t> logits_dims = {2, 1, 8};
 
   std::vector<std::pair<std::string, std::string>> axes = {
@@ -1020,45 +865,33 @@ TEST_F(LegateExecutableTest, DP2_PP2_TP8_4nodes) {
       {"seq", "z"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {2, 1, 8},
-                                     {"x", "y", "z"}, axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {2, 1, 8},
+      {"x", "y", "z"}, axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {2, 1, 8},
+    RegisterMatcherTestTask(matcher, {0, kEmbeddingsDevices}, {2, 1, 8},
                             {"x", "y", "z"}, axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, logits_devices, {2, 1, 8}, {"x", "y", "z"},
-                            axes);
+    RegisterMatcherTestTask(matcher,
+                            {kTotalDevices - kLogitsDevices, kTotalDevices},
+                            {2, 1, 8}, {"x", "y", "z"}, axes);
   }
 
   ExecutePath("data-parallel-4-nodes.txt", /*num_devices=*/kTotalDevices);
 }
 
 TEST_F(LegateExecutableTest, ShardedPipeline2x4StagesSmallMicrobatch) {
-  auto device_factory = [](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-
-    static constexpr int kDevicesPerStage = 4;
-
-    const int64_t offset = layer_num * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
   static constexpr int kTotalDevices = 8;
+  static constexpr int kLayersPerStage = 1;
+  static constexpr int kDevicesPerStage = 4;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kTotalDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
   std::vector<int64_t> embeddings_dims = {2, 1, 4};
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
@@ -1066,11 +899,14 @@ TEST_F(LegateExecutableTest, ShardedPipeline2x4StagesSmallMicrobatch) {
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {2, 1, 2},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {2, 1, 2},
+      {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
                          "(compute_loss).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {2, 1, 4},
+    RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 4},
                             {"x", "y", "z"}, embeddings_axes);
   }
 
@@ -1080,45 +916,31 @@ TEST_F(LegateExecutableTest, ShardedPipeline2x4StagesSmallMicrobatch) {
 TEST_F(LegateExecutableTest, PP2_TP4_TransformerEngine) {
   static constexpr int kTotalDevices = 8;
   static constexpr int kDevicesPerStage = 4;
-
-  auto device_factory = [=](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-
-    const int64_t offset = layer_num * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
+  static constexpr int kLayersPerStage = 1;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kDevicesPerStage);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
-  std::vector<int64_t> logits_devices(kDevicesPerStage);
-  std::iota(logits_devices.begin(), logits_devices.end(), kDevicesPerStage);
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
       {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {1, 1, 4},
-                                     {"x", "y", "z"}, transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 4},
+      {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices, {1, 1, 4},
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {1, 1, 4},
                             {"x", "y", "z"}, embeddings_axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, logits_devices, {1, 1, 4}, {"x", "y", "z"},
-                            embeddings_axes);
+    RegisterMatcherTestTask(matcher,
+                            {kTotalDevices - kDevicesPerStage, kTotalDevices},
+                            {1, 1, 4}, {"x", "y", "z"}, embeddings_axes);
   }
 
   ExecutePath("tp4_pp2_te.txt", /*num_devices=*/kTotalDevices);
@@ -1130,49 +952,30 @@ TEST_F(LegateExecutableTest, TransformerTwoNodes) {
   static constexpr int kLayersPerStage = 1;
   static constexpr int kNumGroups = 4;
 
-  auto device_factory = [=](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-    const int64_t stage = layer_num / kLayersPerStage;
-    const int64_t group = stage % kNumGroups;
-
-    const int64_t offset = group * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kDevicesPerStage);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
-  std::vector<int64_t> logits_devices(kDevicesPerStage);
-  std::iota(logits_devices.begin(), logits_devices.end(),
-            kDevicesPerStage * (kNumGroups - 1));
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
       {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory,
-                                     {1, 1, kDevicesPerStage}, {"x", "y", "z"},
-                                     transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {1, 1, kDevicesPerStage}, {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices,
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"},
                             embeddings_axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, logits_devices, {1, 1, kDevicesPerStage},
-                            {"x", "y", "z"}, embeddings_axes);
+    RegisterMatcherTestTask(
+        matcher, {kTotalDevices - kDevicesPerStage, kTotalDevices},
+        {1, 1, kDevicesPerStage}, {"x", "y", "z"}, embeddings_axes);
   }
 
   ReplicateParametersSmallerThanNumElements(16 * 2048);
@@ -1188,49 +991,30 @@ TEST_F(LegateExecutableTest, TransformerTwoNodesHostOffload) {
   static constexpr int64_t kMaxDeviceBytesHighWatermark = 53 * 1e9;
   static constexpr int64_t kMaxHostBytesHighWatermark = 50 * 1e9;
 
-  auto device_factory = [=](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-    const int64_t stage = layer_num / kLayersPerStage;
-    const int64_t group = stage % kNumGroups;
-
-    const int64_t offset = group * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kDevicesPerStage);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
-  std::vector<int64_t> logits_devices(kDevicesPerStage);
-  std::iota(logits_devices.begin(), logits_devices.end(),
-            kDevicesPerStage * (kNumGroups - 1));
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
       {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory,
-                                     {1, 1, kDevicesPerStage}, {"x", "y", "z"},
-                                     transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {1, 1, kDevicesPerStage}, {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices,
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"},
                             embeddings_axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, logits_devices, {1, 1, kDevicesPerStage},
-                            {"x", "y", "z"}, embeddings_axes);
+    RegisterMatcherTestTask(
+        matcher, {kTotalDevices - kDevicesPerStage, kTotalDevices},
+        {1, 1, kDevicesPerStage}, {"x", "y", "z"}, embeddings_axes);
   }
 
   ReplicateParametersSmallerThanNumElements(16 * 2048);
@@ -1262,48 +1046,25 @@ TEST_F(LegateExecutableTest, ShardingMismatchLoadBalanced) {
   static constexpr int kLayersPerStage = 1;
   static constexpr int kNumGroups = 2;
 
-  auto device_factory = [=](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-    const int64_t stage = layer_num / kLayersPerStage;
-    const int64_t group = stage % kNumGroups;
-
-    const int64_t offset = group * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
-  std::vector<int64_t> embeddings_devices(kTotalDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
-  std::vector<int64_t> first_layer_devices(kDevicesPerStage);
-  std::iota(first_layer_devices.begin(), first_layer_devices.end(), 0);
-
   std::vector<std::pair<std::string, std::string>> axes = {
       {"data", "x"},     {"stage", "y"},  {"fsdp", "y"},
       {"sequence", "z"}, {"tensor", "z"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory,
-                                     {1, 1, kDevicesPerStage}, {"x", "y", "z"},
-                                     axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   for (auto&& matcher :
        {"(position_emb).*", "(emb_lookup).*", "(token_embedder).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices,
+    RegisterMatcherTestTask(matcher, {0, kTotalDevices},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
   for (auto&& matcher :
        {"(final_ln).*", "(decoder_norm).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices,
+    RegisterMatcherTestTask(matcher, {0, kTotalDevices},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
-  RegisterMatcherTestTask("default", first_layer_devices,
-                          {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
 
   ReplicateParametersSmallerThanNumElements(128 * 2048);
   ExecutePath("sharding_mismatch_load_balanced_2nodes.txt",
@@ -1317,43 +1078,24 @@ TEST_F(LegateExecutableTest, HostOffloadCrash) {
   static constexpr int kLayersPerStage = 1;
   static constexpr int kNumGroups = 2;
 
-  auto device_factory = [=](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-    const int64_t stage = layer_num / kLayersPerStage;
-    const int64_t group = stage % kNumGroups;
-
-    const int64_t offset = group * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
-  std::vector<int64_t> embeddings_devices(kTotalDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
   std::vector<std::pair<std::string, std::string>> axes = {
       {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory,
-                                     {1, 1, kDevicesPerStage}, {"x", "y", "z"},
-                                     axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices,
+    RegisterMatcherTestTask(matcher, {0, kTotalDevices},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices,
+    RegisterMatcherTestTask(matcher, {0, kTotalDevices},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
-  RegisterMatcherTestTask("default", embeddings_devices, {1, 1, kTotalDevices},
-                          {"x", "y", "z"}, axes);
 
   ReplicateParametersSmallerThanNumElements(128 * 2048);
   ExecutePath("host_offload_crash_2layers.txt", /*num_devices=*/kTotalDevices);
@@ -1367,52 +1109,31 @@ TEST_F(LegateExecutableTest, TransformerTwoNodesDynamicSliceEmbeddingsLogits) {
   static constexpr int kLayersPerStage = 1;
   static constexpr int kNumGroups = 4;
 
-  auto device_factory = [=](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-    const int64_t stage = layer_num / kLayersPerStage;
-    const int64_t group = stage % kNumGroups;
-
-    const int64_t offset = group * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
       {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
   };
-  std::vector<int64_t> embeddings_devices(kTotalDevices);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
-  std::vector<int64_t> default_devices(kDevicesPerStage);
-  std::iota(default_devices.begin(), default_devices.end(), 0);
 
   std::vector<std::pair<std::string, std::string>> transformer_axes = {
       {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
       {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory,
-                                     {1, 1, kDevicesPerStage}, {"x", "y", "z"},
-                                     transformer_axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {1, 1, kDevicesPerStage}, {"x", "y", "z"}, transformer_axes);
+
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices,
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"},
                             embeddings_axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices,
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"},
                             embeddings_axes);
   }
-  RegisterMatcherTestTask("default", default_devices, {1, 1, kDevicesPerStage},
-                          {"x", "y", "z"}, embeddings_axes);
 
   ReplicateParametersSmallerThanNumElements(16 * 2048);
   ExecutePath("2nodes_transformer.txt", /*num_devices=*/kTotalDevices);
@@ -1425,50 +1146,26 @@ TEST_F(LegateExecutableTest, Gpt3_16nodes) {
   static constexpr int kLayersPerStage = 1;
   static constexpr int kNumGroups = 16;
 
-  auto device_factory = [=](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-    const int64_t stage = layer_num / kLayersPerStage;
-    const int64_t group = stage % kNumGroups;
-
-    const int64_t offset = group * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
-  std::vector<int64_t> embeddings_devices(kDevicesPerStage);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
-  std::vector<int64_t> logits_devices(kDevicesPerStage);
-  std::iota(logits_devices.begin(), logits_devices.end(),
-            kTotalDevices - kDevicesPerStage);
-
   std::vector<std::pair<std::string, std::string>> axes = {
       {"data", "x"},           {"stage", "y"},    {"fsdp", "y"},
       {"fsdp_transpose", "y"}, {"sequence", "z"}, {"tensor", "z"},
       {"autoregressive", "z"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory,
-                                     {1, 1, kDevicesPerStage}, {"x", "y", "z"},
-                                     axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   for (auto&& matcher :
        {"(position_emb).*", "(emb_lookup).*", "(token_embedder).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices,
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
   for (auto&& matcher : {"(final_ln).*", "(compute_loss).*", "(logits_dense).*",
                          "(decoder_norm).*"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices,
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
-  RegisterMatcherTestTask("default", embeddings_devices,
-                          {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
 
   ReplicateParametersSmallerThanNumElements(256 * 2048);
   ExecutePath("maxtext_gpt3.txt", /*num_devices=*/kTotalDevices);
@@ -1480,41 +1177,19 @@ TEST_F(LegateExecutableTest, MaxtextMismatchedAlias) {
   static constexpr int kLayersPerStage = 1;
   static constexpr int kNumGroups = 2;
 
-  auto device_factory = [=](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-    const int64_t stage = layer_num / kLayersPerStage;
-    const int64_t group = stage % kNumGroups;
-
-    const int64_t offset = group * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-
-  std::vector<int64_t> embeddings_devices(kDevicesPerStage);
-  std::iota(embeddings_devices.begin(), embeddings_devices.end(), 0);
-
-  std::vector<int64_t> logits_devices(kDevicesPerStage);
-  std::iota(logits_devices.begin(), logits_devices.end(),
-            kTotalDevices - kDevicesPerStage);
-
   std::vector<std::pair<std::string, std::string>> axes = {
       {"data", "x"},           {"stage", "y"},    {"fsdp", "y"},
       {"fsdp_transpose", "y"}, {"sequence", "z"}, {"tensor", "z"},
       {"autoregressive", "z"},
   };
 
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory,
-                                     {1, 1, kDevicesPerStage}, {"x", "y", "z"},
-                                     axes);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   for (auto&& matcher : {"(emb).*", "(final_ln).*", "(compute_loss).*",
                          "(logits_dense).*", "(decoder_norm).*", "default"}) {
-    RegisterMatcherTestTask(matcher, embeddings_devices,
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
 
@@ -1536,30 +1211,14 @@ TEST_F(LegateExecutableTest, DP_2x2x2) {
   constexpr int kDP = 2;
   constexpr int kTP = 2;
 
-  auto device_factory = [=](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-    const int64_t stage = layer_num / kLayersPerStage;
-    const int64_t group = stage % kNumGroups;
-
-    const int64_t offset = group * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory,
-                                     {kDP, 1, kTP}, {"x", "y", "z"}, axes);
-
-  std::vector<int64_t> emb_devices(kDevicesPerStage);
-  std::iota(emb_devices.begin(), emb_devices.end(), 0);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {kDP, 1, kTP}, {"x", "y", "z"}, axes);
 
   for (auto&& matcher : {"(emb).*", "(final_ln).*", "(compute_loss).*",
                          "(logits_dense).*", "(decoder_norm).*"}) {
-    RegisterMatcherTestTask(matcher, emb_devices, {kDP, 1, kTP},
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {kDP, 1, kTP},
                             {"x", "y", "z"}, axes);
   }
 
@@ -1625,30 +1284,14 @@ TEST_F(LegateExecutableTest, DP_2_2_8_unused_loop_outputs) {
   constexpr int kDP = 2;
   constexpr int kTP = 2;
 
-  auto device_factory = [=](const std::string& name) {
-    int layer_num;
-    bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
-    if (!parsed) {
-      throw std::runtime_error(
-          absl::StrCat("failed to parse layer number from", name));
-    }
-    const int64_t stage = layer_num / kLayersPerStage;
-    const int64_t group = stage % kNumGroups;
-
-    const int64_t offset = group * kDevicesPerStage;
-    std::vector<int64_t> devices(kDevicesPerStage);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
-  };
-  RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory,
-                                     {kDP, 1, kTP}, {"x", "y", "z"}, axes);
-
-  std::vector<int64_t> emb_devices(kDevicesPerStage);
-  std::iota(emb_devices.begin(), emb_devices.end(), 0);
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {kDP, 1, kTP}, {"x", "y", "z"}, axes);
 
   for (auto&& matcher : {"(emb).*", "(final_ln).*", "(compute_loss).*",
                          "(logits_dense).*", "(decoder_norm).*"}) {
-    RegisterMatcherTestTask(matcher, emb_devices, {kDP, 1, kTP},
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {kDP, 1, kTP},
                             {"x", "y", "z"}, axes);
   }
 
@@ -1679,11 +1322,8 @@ TEST_F(LegateExecutableTest, DP_2_2_8_unused_loop_outputs) {
 
 TEST_F(LegateExecutableTest, SingleNodeTransformer) {
   GTEST_SKIP() << "TODO: sharding propagation bug";
-
   static constexpr int kTotalDevices = 8;
 
-  std::vector<int64_t> devices(kTotalDevices);
-  std::iota(devices.begin(), devices.end(), 0);
   std::vector<int64_t> dims = {1, 8, 1};
 
   std::vector<std::pair<std::string, std::string>> axes = {{"replica", "x"},
@@ -1694,7 +1334,8 @@ TEST_F(LegateExecutableTest, SingleNodeTransformer) {
 
   for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
                          "(compute_loss).*", "default", "(layers_\\d+)"}) {
-    RegisterMatcherTestTask(matcher, devices, dims, {"x", "y", "z"}, axes);
+    RegisterMatcherTestTask(matcher, {0, kTotalDevices}, dims, {"x", "y", "z"},
+                            axes);
   }
   ExecutePath("single-node-opt.txt", /*num_devices=*/kTotalDevices);
 }

@@ -66,8 +66,8 @@ TEST_F(MpmdLogicalShardingTest, SimpleAutosharding) {
       auto module,
       GetHloModuleFromText(kSimpleAutoshardedHlo, /*num_devices=*/4));
 
-  RegisterMatcherTestTask("(task_f)", {0, 1}, {2}, {"x"}, {{"x", "x"}});
-  RegisterMatcherTestTask("(task_g)", {2, 3}, {2}, {"x"}, {{"x", "x"}});
+  RegisterMatcherTestTask("(task_f)", {0, 2}, {2}, {"x"}, {{"x", "x"}});
+  RegisterMatcherTestTask("(task_g)", {2, 4}, {2}, {"x"}, {{"x", "x"}});
 
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
@@ -130,8 +130,7 @@ iota_transpose_perm: 0
 TEST_F(MpmdLogicalShardingTest, TransposeOperandAutoShardParam) {
   GTEST_SKIP() << "autosharding propagation across kTranspose not yet defined";
 
-  RegisterMatcherTestTask("(task)", {0, 1, 2, 3, 4, 5, 6, 7}, {4, 2, 1},
-                          {"x", "y", "z"},
+  RegisterMatcherTestTask("(task)", {0, 8}, {4, 2, 1}, {"x", "y", "z"},
                           {{"x", "x"}, {"y", "y"}, {"z", "z"}});
 
   TF_ASSERT_OK_AND_ASSIGN(
@@ -172,8 +171,7 @@ iota_transpose_perm: 0
 TEST_F(MpmdLogicalShardingTest, TransposeAutoShardParam) {
   GTEST_SKIP() << "autosharding propagation across kTranspose not yet defined";
 
-  RegisterMatcherTestTask("(task)", {0, 1, 2, 3, 4, 5, 6, 7}, {2, 1, 4},
-                          {"x", "y", "z"},
+  RegisterMatcherTestTask("(task)", {0, 8}, {2, 1, 4}, {"x", "y", "z"},
                           {{"x", "x"}, {"y", "y"}, {"z", "z"}});
 
   TF_ASSERT_OK_AND_ASSIGN(
@@ -219,7 +217,7 @@ TEST_F(MpmdLogicalShardingTest, SimpleAutoShardParam) {
       unsharded_tasks,
       ElementsAre(m::TaskInstructions(Not(Contains(op::CustomCall())))));
 
-  RegisterMatcherTestTask("(task)", {0, 1}, {2, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(task)", {0, 2}, {2, 1}, {"x", "y"},
                           {{"x", "x"}, {"y", "y"}});
   TF_ASSERT_OK_AND_ASSIGN(
       result, RunMpmdOnHloString(kSimpleAutoShardParamHlo, /*num_devices=*/2,
@@ -266,7 +264,7 @@ ENTRY main.19 {
 
 TEST_F(MpmdLogicalShardingTest, GradientAutoShardParam) {
   static constexpr int kDevicesPerTask = 2;
-  auto device_factory = [=](const std::string& task) {
+  auto device_factory = [=](const std::string& task, bool backprop) {
     std::string task_number_str;
     bool match = RE2::FullMatch(task, "task_(\\d+)", &task_number_str);
     if (!match) {
@@ -281,10 +279,16 @@ TEST_F(MpmdLogicalShardingTest, GradientAutoShardParam) {
                 << ", this should not have happened" << std::endl;
       abort();
     }
+
+    std::string color = [&] {
+      if (backprop) {
+        return absl::StrCat("bwd.", task);
+      }
+      return task;
+    }();
     int offset = task_number * kDevicesPerTask;
-    std::vector<int64_t> devices(kDevicesPerTask);
-    std::iota(devices.begin(), devices.end(), offset);
-    return std::move(devices);
+    auto devices = std::make_pair(offset, offset + kDevicesPerTask);
+    return std::make_pair(devices, std::move(color));
   };
 
   RegisterMatcherTestTaskWithFactory("(task_\\d+)", std::move(device_factory),
@@ -346,9 +350,9 @@ ENTRY main.33 {
 )";
 
 TEST_F(MpmdLogicalShardingTest, GradientMultiTaskAutoShardHlo) {
-  RegisterMatcherTestTask("(task_0)", {0, 1}, {2, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(task_0)", {0, 2}, {2, 1}, {"x", "y"},
                           {{"x", "x"}, {"y", "y"}});
-  RegisterMatcherTestTask("(task_1)", {2, 3}, {2, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(task_1)", {2, 4}, {2, 1}, {"x", "y"},
                           {{"x", "x"}, {"y", "y"}});
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
@@ -367,8 +371,9 @@ TEST_F(MpmdLogicalShardingTest, GradientMultiTaskAutoShardHlo) {
                  m::TaskParameters(Each(m::ShardingOrReplicated(sharding))))));
 
   // the task_0 forward and backprop tasks should have devices 0,1
-  // the combined task_1 fwd/bad task should have devices 2,3
+  // the task_1 fwd/bad tasks should have devices 2,3
   EXPECT_THAT(sharded_tasks, ElementsAre(m::TaskDevices(ElementsAre(0, 1)),
+                                         m::TaskDevices(ElementsAre(2, 3)),
                                          m::TaskDevices(ElementsAre(2, 3)),
                                          m::TaskDevices(ElementsAre(0, 1))));
 }

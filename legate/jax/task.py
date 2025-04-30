@@ -18,11 +18,7 @@ from jax.interpreters.mlir import hlo, ir
 from jax.sharding import Mesh, PartitionSpec as P
 from jax.tree_util import tree_map
 
-from .legate_jax_impl import (
-    _register_metadata_name,
-    _register_task,
-    _register_task_factory,
-)
+from .legate_jax_impl import _register_task, _register_task_factory
 from .lib import (
     autoshard,
     optional_kwargs,
@@ -562,7 +558,7 @@ def register_task(
     name: Optional[str] = None,
     mesh: Optional[Mesh] = None,
     dims: Optional[Sequence[int]] = None,
-    callback: Optional[Callable[[str], list[int]]] = None,
+    callback: Optional[Callable[[str], Tuple[Tuple[int, int], str]]] = None,
     devices: np.ndarray | Sequence[xc.Device] | Sequence[int] | None = None,
     device_axes: Optional[Sequence[str]] = None,
     logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
@@ -574,9 +570,12 @@ def register_task(
         This should match the name of a Flax module or a name passed to
         ``jax.with_named_scope``.
       mesh: optional, a Mesh context defining the devices and mesh shape
-      callback: optional, a function taking the match group from
-        the ``regex`` and returning an integer list
-        enumerating the devices to include in the task.
+      callback: optional, a function that takes are arguments the match group from
+        the ``regex`` and a boolean indicating whether the task is
+        a backprop (generated from autograd). The function returns a
+        [start,stop) tuple defining the range devices for the task
+        and a unique color (string) for the task. For the device range
+        [start, stop), stop is exclusive.
       dims: optional, the submesh dimensions for the task. Only one
         of ``mesh`` or ``dims`` should be given.
       devices: optional, a numpy array or list of jax devices
@@ -633,11 +632,12 @@ def register_task(
       >>> from legate.jax import register_task
       >>> from jax.sharding import PartitionSpec as P, Mesh
       >>>
-      >>> def callback(name):
+      >>> def callback(name) -> Tuple[Tuple[int,int],str]:
       ...   layer_num = int(name.split(".")][-1])
       ...   devices_per_layer = 4
       ...   start = layer_num * devices_per_layer
-      ...   return list(range(start, start + devices_per_layer))
+      ...   stop = start + device_per_layer
+      ...   return [start, stop], f"lyr_{layer_num}"
       >>>
       >>> def f(x):
       ...   x = with_sharding_constraint(x, P("batch", "model"))
@@ -738,7 +738,6 @@ def register_task(
 
     if "(" not in regex and ")" not in regex:
         regex = f"({regex})"
-    _register_metadata_name(regex, name)
     if callback is not None:
         _register_task_factory(
             regex,
@@ -749,9 +748,10 @@ def register_task(
         )
     else:
         _register_task(
-            name or regex,
+            regex,
             device_ids,
             list(dims),
             list(device_axes),
             list(logical_axes),
+            name=name,
         )

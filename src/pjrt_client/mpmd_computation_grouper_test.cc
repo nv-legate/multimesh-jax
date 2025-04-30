@@ -50,8 +50,8 @@ TEST_F(MpmdComputationGrouperTest, SimpleImplicitTask) {
       auto module,
       GetHloModuleFromText(kSimpleImplicitTaskHlo, /*num_devices=*/4));
 
-  RegisterMatcherTestTask("(task_f)", {0, 1}, {2}, {"x"}, {{"x", "batch"}});
-  RegisterMatcherTestTask("(task_g)", {2, 3}, {2}, {"x"}, {{"x", "batch"}});
+  RegisterMatcherTestTask("(task_f)", {0, 2}, {2}, {"x"}, {{"x", "batch"}});
+  RegisterMatcherTestTask("(task_g)", {2, 4}, {2}, {"x"}, {{"x", "batch"}});
 
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));

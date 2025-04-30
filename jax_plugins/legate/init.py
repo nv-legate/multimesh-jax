@@ -69,6 +69,7 @@ def init(
             "legate_ifrt_client",
             "mpmd_partition",
             "mpmd_autosharding",
+            "mpmd_coloring",
             "mpmd_computation_grouper",
             "mpmd_utils",
             "mpmd_argument_recompute",
@@ -78,6 +79,7 @@ def init(
             "legate_pjrt_buffer",
             "legate_pjrt_client",
             "loop_scheduler",
+            "hlo_partition",
         ]
         xla_debug = xla_debug_levels[debug]
         vmods = [f"{vmod}={xla_debug}" for vmod in vmods]

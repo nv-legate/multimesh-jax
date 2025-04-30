@@ -131,11 +131,11 @@ tile_assignment_devices: 3
 )";
 
 TEST_F(LegateClientTest, AutoShardingReshardedParameter) {
-  RegisterMatcherTestTask("(layer0)", {0, 1, 2, 3}, {4, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(layer0)", {0, 4}, {4, 1}, {"x", "y"},
                           {{"x", "x"}, {"y", "y"}});
-  RegisterMatcherTestTask("(layer1)", {0, 1}, {2, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(layer1)", {0, 2}, {2, 1}, {"x", "y"},
                           {{"x", "x"}, {"y", "y"}});
-  RegisterMatcherTestTask("(layer2)", {0, 1, 2, 3}, {4, 1}, {"x", "y"},
+  RegisterMatcherTestTask("(layer2)", {0, 4}, {4, 1}, {"x", "y"},
                           {{"x", "x"}, {"y", "y"}});
 
   int num_devices = 4;

@@ -104,6 +104,25 @@ TEST_F(MpmdInstructionDelayRecolorTest, DelayInitInstructions) {
       auto module,
       GetHloModuleFromText(kDelayInitInstructionsHlo, /*num_devices=*/2));
 
+  TF_ASSIGN_OR_RETURN(auto green,
+                      partition_->AllocateColor(
+                          "green", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto red,
+                      partition_->AllocateColor(
+                          "red", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto orange,
+                      partition_->AllocateColor(
+                          "orange", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto yellow,
+                      partition_->AllocateColor(
+                          "yellow", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto brown,
+                      partition_->AllocateColor(
+                          "brown", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto blue,
+                      partition_->AllocateColor(
+                          "blue", {{.start = 0, .num_devices = 2}}, nullptr));
+
   MpmdInstructionDelayRecolor recolor{partition_.get()};
 
   TF_ASSERT_OK_AND_ASSIGN(bool changed, recolor.Run(module.get()));
@@ -208,6 +227,25 @@ TEST_F(MpmdInstructionDelayRecolorTest, DelaySharedBroadcastInstructions) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kSharedConstantHlo, /*num_devices=*/2));
 
+  TF_ASSIGN_OR_RETURN(auto green,
+                      partition_->AllocateColor(
+                          "green", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto red,
+                      partition_->AllocateColor(
+                          "red", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto orange,
+                      partition_->AllocateColor(
+                          "orange", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto yellow,
+                      partition_->AllocateColor(
+                          "yellow", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto brown,
+                      partition_->AllocateColor(
+                          "brown", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto blue,
+                      partition_->AllocateColor(
+                          "blue", {{.start = 0, .num_devices = 2}}, nullptr));
+
   MpmdInstructionDelayRecolor recolor{partition_.get()};
 
   TF_ASSERT_OK_AND_ASSIGN(bool changed, recolor.Run(module.get()));
@@ -221,15 +259,6 @@ TEST_F(MpmdInstructionDelayRecolorTest, DelaySharedBroadcastInstructions) {
           Contains(Property(
               &HloComputation::instructions,
               Contains(AllOf(op::Exp(), m::Color("orange"))).Times(1)))));
-}
-
-TEST_F(MpmdInstructionDelayRecolorTest, FailedRecolor24Layers) {
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto module,
-      GetHloModuleFromPath("failed_recolor_24layers.txt", /*num_devices=*/16));
-
-  MpmdInstructionDelayRecolor recolor{partition_.get()};
-  TF_ASSERT_OK_AND_ASSIGN(bool changed, recolor.Run(module.get()));
 }
 
 }  // namespace

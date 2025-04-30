@@ -50,6 +50,15 @@ TEST_F(MpmdAssignBufferSchedulingNameTest, BasicTasks) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kBasicTasksHlo, /*num_devices=*/4));
 
+  TF_ASSIGN_OR_RETURN(
+      auto f,
+      partition_->AllocateColor(
+          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
+  TF_ASSIGN_OR_RETURN(
+      auto g,
+      partition_->AllocateColor(
+          "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
+
   MpmdAssignBufferSchedulingName assigner{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, assigner.Run(module.get()));
 
@@ -175,6 +184,14 @@ TEST_F(MpmdAssignBufferSchedulingNameTest, AliasBufferAssignment) {
       auto module,
       GetHloModuleFromPath("alias-buffer-assignment.txt", /*num_devices=*/8));
 
+  TF_ASSIGN_OR_RETURN(
+      auto li, partition_->AllocateColor(
+                   "loop_increment",
+                   zuku::DeviceList{{.start = 0, .num_devices = 8}}, nullptr));
+  TF_ASSIGN_OR_RETURN(
+      auto pr, partition_->AllocateColor(
+                   "replicated-params",
+                   zuku::DeviceList{{.start = 0, .num_devices = 8}}, nullptr));
   TF_ASSIGN_OR_RETURN(
       auto emb,
       partition_->AllocateColor(

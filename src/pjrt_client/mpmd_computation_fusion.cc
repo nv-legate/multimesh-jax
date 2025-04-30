@@ -217,7 +217,7 @@ absl::StatusOr<bool> MpmdComputationFusion::Visit(HloComputation* computation) {
   bool found_match = true;
   int64_t iter = 0;
   while (found_match) {
-    VLOG(5) << "computating HLO ordering for fusion iteration";
+    VLOG(5) << "computing HLO ordering for fusion iteration";
     DependencyHloOrdering ordering{computation->parent()};
 
     struct FusionSet {

@@ -39,8 +39,8 @@ TEST_F(MpmdShardingPropagationTest, SimpleAutosharding) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kSimpleShardedHlo, /*num_devices=*/4));
 
-  RegisterMetadataNameTask("(task_f)", {0, 1}, {2}, {"x"}, {{"batch", "x"}});
-  RegisterMetadataNameTask("(task_g)", {2, 3}, {2}, {"x"}, {{"batch", "x"}});
+  RegisterNamedTestTask("task_f", {0, 2}, {2}, {"x"}, {{"batch", "x"}});
+  RegisterNamedTestTask("task_g", {2, 4}, {2}, {"x"}, {{"batch", "x"}});
 
   HloSharding correct_sharding =
       module->entry_computation()->parameter_instruction(0)->sharding();
@@ -165,6 +165,12 @@ TEST_F(MpmdShardingPropagationTest, NestedWhileLoop) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kNestedWhileHlo, /*num_devices=*/4));
 
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto f, partition_->AllocateColor(
+                  "task_f", {{.start = 0, .num_devices = 4}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto g, partition_->AllocateColor(
+                  "task_g", {{.start = 0, .num_devices = 4}}, nullptr));
   MpmdShardingPropagation propagation{
       partition_.get(), MpmdShardingPropagation::PropagationMode::ForwardFull};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, propagation.Run(module.get()));
@@ -183,7 +189,9 @@ TEST_F(MpmdShardingPropagationTest, ShardReplicatedIntermediates) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromPath("large_replicated_intermediate.txt",
                                         /*num_devices=*/8));
-
+  TF_ASSIGN_OR_RETURN(auto blue,
+                      partition_->AllocateColor(
+                          "blue", {{.start = 0, .num_devices = 8}}, nullptr));
   MpmdShardingPropagation propagation{
       partition_.get(),
       MpmdShardingPropagation::PropagationMode::BackwardInputOutput};
@@ -198,6 +206,7 @@ TEST_F(MpmdShardingPropagationTest, LargeParametersNotSharded) {
 
   zuku::DeviceList devices04{{.start = 0, .num_devices = 4}};
   zuku::DeviceList devices48{{.start = 4, .num_devices = 4}};
+  zuku::DeviceList devices08{{.start = 0, .num_devices = 8}};
   LogicalShardingContext context04{
       .devices = devices04,
       .dims = {1, 1, 4},
@@ -217,6 +226,9 @@ TEST_F(MpmdShardingPropagationTest, LargeParametersNotSharded) {
   auto context48_ptr =
       std::make_shared<LogicalShardingContext>(std::move(context48));
 
+  TF_ASSIGN_OR_RETURN(
+      auto rp,
+      partition_->AllocateColor("replicated-params", devices08, context04_ptr));
   TF_ASSIGN_OR_RETURN(
       auto emb, partition_->AllocateColor("emb", devices04, context04_ptr));
   TF_ASSIGN_OR_RETURN(auto layer0, partition_->AllocateColor(

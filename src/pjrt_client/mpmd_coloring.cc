@@ -278,7 +278,7 @@ absl::StatusOr<bool> MpmdColoring::InlineExplicitTasks(
 
       auto dl = [&]() -> absl::StatusOr<zuku::DeviceList> {
         if (config.devices.empty()) {
-          return partition_->DefaultDevices();
+          return partition_->Devices();
         }
         return CreateDeviceList(config.devices);
       }();
@@ -329,7 +329,8 @@ absl::Status MpmdColoring::ComputeAssignedColors(
     if (color.has_value()) {
       // make sure the color is allocated in the HLO partition
       if (!partition_->HasColor(*color)) {
-        TF_RETURN_IF_ERROR(partition_->AllocateColor(*color));
+        return InvalidArgumentStrCat("color ", *color,
+                                     " has not been assigned a device mesh");
       }
     }
 

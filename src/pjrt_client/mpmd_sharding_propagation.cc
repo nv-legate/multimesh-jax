@@ -372,7 +372,10 @@ absl::Status MpmdShardingPropagation::ShardForwardCallInstruction(
                                    ", but expected ", *task_color);
     }
     VLOG(5) << input->name() << " passing to parameter " << param->name()
-            << ": " << input->sharding_or_default(HloSharding::Replicate());
+            << ": " << input->sharding_or_default(HloSharding::Replicate())
+            << " on color " << *task_color << " over devices " << devices
+            << " with existing sharding "
+            << param->sharding_or_default(HloSharding::Replicate());
     PropagateSharding(input, param, devices.size(), properties,
                       propagate_replicated);
     VLOG(5) << param->name() << " now has sharding "

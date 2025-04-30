@@ -21,19 +21,13 @@ extern "C" void CompileHloModuleFromFile(const std::string& hlo_file,
 
 extern "C" void LegateShutdown();
 
-extern "C" void RegisterMetadataNameMatcher(std::string matcher,
-                                            std::optional<std::string> name);
-
-extern "C" void RegisterMetadataNameTask(
-    std::string matcher, std::vector<int64_t> devices,
-    std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes);
-
 extern "C" void SetEnableMetadataNameTasks(bool flag);
 
-extern "C" void RegisterMetadataNameTaskWithFactory(
+extern "C" void RegisterMetadataNameTask(
     std::string matcher,
-    std::function<std::vector<int64_t>(const std::string& task)> device_factory,
+    std::function<std::pair<std::pair<int64_t, int64_t>, std::string>(
+        const std::string&, bool)>
+        callback,
     std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes);
 
@@ -100,25 +94,24 @@ PYBIND11_MODULE(legate_jax_impl, m) {
         [](bool flag) { SetEnableMetadataNameTasks(flag); });
   m.def(
       "_register_task",
-      [](py::str task_regex, py::list py_devices, py::list py_device_dims,
-         py::list py_device_axes, py::list py_logical_axes) {
-        RegisterMetadataNameTask(
-            task_regex.cast<std::string>(),
-            py_devices.cast<std::vector<int64_t>>(),
-            py_device_dims.cast<std::vector<int64_t>>(),
-            py_device_axes.cast<std::vector<std::string>>(),
-            py_logical_axes
-                .cast<std::vector<std::pair<std::string, std::string>>>());
+      [](std::string task_regex, std::vector<int64_t> py_devices,
+         std::vector<int64_t> py_device_dims,
+         std::vector<std::string> py_device_axes,
+         std::vector<std::pair<std::string, std::string>> py_logical_axes,
+         std::optional<std::string> name) {
+        const int64_t start = py_devices.front();
+        const int64_t stop = py_devices.back() + 1;
+        auto callback = [=](const std::string& match, bool backprop)
+            -> std::pair<std::pair<int64_t, int64_t>, std::string> {
+          return {{start, stop}, name.value_or(match)};
+        };
+
+        RegisterMetadataNameTask(task_regex, callback, py_device_dims,
+                                 py_device_axes, py_logical_axes);
       },
       py::arg("task_regex"), py::arg("devices"), py::arg("dims"),
-      py::arg("device_axes"), py::arg("logical_axes"));
-  m.def(
-      "_register_metadata_name",
-      [](py::str matcher, std::optional<std::string> name) {
-        RegisterMetadataNameMatcher(matcher.cast<std::string>(),
-                                    std::move(name));
-      },
-      py::arg("matcher"), py::arg("name") = py::none());
+      py::arg("device_axes"), py::arg("logical_axes"),
+      py::arg("name") = py::none());
   m.def(
       "set_startup_config",
       [](std::optional<int> cpus, std::optional<int> gpus,
@@ -142,17 +135,15 @@ PYBIND11_MODULE(legate_jax_impl, m) {
       py::arg("profile") = false);
   m.def(
       "_register_task_factory",
-      [](py::str task_regex,
-         std::function<std::vector<int64_t>(const std::string&)>
+      [](std::string task_regex,
+         std::function<std::pair<std::pair<int64_t, int64_t>, std::string>(
+             const std::string&, bool)>
              device_callback,
-         py::list py_device_dims, py::list py_device_axes,
-         py::list py_logical_axes) {
-        RegisterMetadataNameTaskWithFactory(
-            task_regex.cast<std::string>(), device_callback,
-            py_device_dims.cast<std::vector<int64_t>>(),
-            py_device_axes.cast<std::vector<std::string>>(),
-            py_logical_axes
-                .cast<std::vector<std::pair<std::string, std::string>>>());
+         std::vector<int64_t> py_device_dims,
+         std::vector<std::string> py_device_axes,
+         std::vector<std::pair<std::string, std::string>> py_logical_axes) {
+        RegisterMetadataNameTask(task_regex, device_callback, py_device_dims,
+                                 py_device_axes, py_logical_axes);
       },
       py::arg("task_regex"), py::arg("device_callback"), py::arg("dims"),
       py::arg("device_axes"), py::arg("logical_axes"));

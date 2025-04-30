@@ -42,7 +42,12 @@ ENTRY main.117 {
 TEST_F(MpmdArgumentRecomputeTest, BasicRecomputeFromArguments) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kBasicRecomputeHlo, /*num_devices=*/2));
-
+  TF_ASSIGN_OR_RETURN(auto red,
+                      partition_->AllocateColor(
+                          "red", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto blue,
+                      partition_->AllocateColor(
+                          "blue", {{.start = 0, .num_devices = 2}}, nullptr));
   // no rec
   {
     // set a low recompute cost and make sure nothing is recomputed
@@ -95,7 +100,12 @@ TEST_F(MpmdArgumentRecomputeTest, RecomputeSharedClone) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module,
       GetHloModuleFromText(kRecomputeSharedCloneHlo, /*num_devices=*/2));
-
+  TF_ASSIGN_OR_RETURN(auto red,
+                      partition_->AllocateColor(
+                          "red", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto blue,
+                      partition_->AllocateColor(
+                          "blue", {{.start = 0, .num_devices = 2}}, nullptr));
   MpmdArgumentRecompute recompute{partition_.get(),
                                   /*max_recompute_cost=*/8192};
 
@@ -140,6 +150,12 @@ TEST_F(MpmdArgumentRecomputeTest, RecomputeFromReplicatedArgument) {
       auto module,
       GetHloModuleFromText(kReplicatedArgumentHlo, /*num_devices=*/2));
 
+  TF_ASSIGN_OR_RETURN(auto red,
+                      partition_->AllocateColor(
+                          "red", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSIGN_OR_RETURN(auto blue,
+                      partition_->AllocateColor(
+                          "blue", {{.start = 0, .num_devices = 2}}, nullptr));
   MpmdArgumentRecompute recompute{partition_.get(),
                                   /*max_recompute_cost=*/4096};
 

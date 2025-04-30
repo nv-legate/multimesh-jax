@@ -34,7 +34,7 @@ bool enable_metadata_name_tasks = true;
 bool enable_recomputation = false;
 
 constexpr absl::string_view kLoopIncrementColor = "loop_increment";
-
+constexpr absl::string_view kJvpTransposeMetadata = "transpose(jvp";
 constexpr char kLegateTaskCustomCallTarget[] = "LegateTask";
 constexpr char kMicrobatchCustomCallTarget[] = "Microbatch";
 constexpr char kMicrobatchInitCustomCallTarget[] = "MicrobatchInit";
@@ -58,8 +58,6 @@ struct TaskConfig {
 
 }  // namespace
 
-static constexpr absl::string_view kDefaultTaskMatcher = "(default)";
-
 absl::StatusOr<Json::Value> GetJson(HloInstruction* instruction) {
   auto json = GetJsonValue(instruction->raw_backend_config_string().data(),
                            instruction->raw_backend_config_string().size());
@@ -80,53 +78,23 @@ absl::StatusOr<Json::Value> GetJson(const HloInstructionProto& instr) {
   return std::move(json);
 }
 
-struct MetadataNameMatcher {
-  std::unique_ptr<re2::RE2> matcher;
-  std::optional<std::string> name;
-};
-
 // Struct holding all the metadata for matching implicit tasks
 // and mapping matched names to physical submeshes
 struct NamedTaskContext {
-  using device_factory_fxn =
-      std::function<std::vector<int64_t>(const std::string& task)>;
-
-  std::string name;
-  std::variant<device_factory_fxn, zuku::DeviceList> devices;
+  std::unique_ptr<re2::RE2> matcher;
+  HloPartition::name_and_devices_fxn callback;
   std::vector<int64_t> dims;
   std::vector<std::string> device_axes;
   std::vector<std::pair</*logical=*/std::string, /*device=*/std::string>>
       logical_axes;
-  std::optional<LoopDependentSubmesh> loop_submesh{std::nullopt};
+  bool backprop{false};
 };
-
-std::vector<MetadataNameMatcher>& MetadataNameMatchers() {
-  static auto* metadata_name_matchers = new std::vector<MetadataNameMatcher>;
-  return *metadata_name_matchers;
-}
 
 // Static helper for returning implicit task map mapping
 // matched names to their task metadata
-absl::flat_hash_map<std::string, NamedTaskContext>& NamedTaskContexts() {
-  static auto* named_task_contexts =
-      new absl::flat_hash_map<std::string, NamedTaskContext>;
+std::vector<NamedTaskContext>& NamedTaskContexts() {
+  static auto* named_task_contexts = new std::vector<NamedTaskContext>;
   return *named_task_contexts;
-}
-
-std::vector<NamedTaskContext>& DefaultTasks() {
-  static auto* default_tasks = new std::vector<NamedTaskContext>;
-  return *default_tasks;
-}
-
-NamedTaskContext* DefaultTask(const zuku::DeviceList& devices) {
-  for (auto& task : DefaultTasks()) {
-    if (std::holds_alternative<zuku::DeviceList>(task.devices)) {
-      if (std::get<zuku::DeviceList>(task.devices) == devices) {
-        return &task;
-      }
-    }
-  }
-  return nullptr;
 }
 
 absl::StatusOr<std::shared_ptr<LogicalShardingContext>>
@@ -140,7 +108,6 @@ MakeLogicalShardingContext(zuku::DeviceList devices,
           .dims = implicit_task_config.dims,
           .device_axes = implicit_task_config.device_axes,
           .logical_axes = implicit_task_config.logical_axes,
-          .loop_submesh = implicit_task_config.loop_submesh,
       });
   return std::move(context);
 }
@@ -188,7 +155,7 @@ int64_t HloPartition::NumDevicesForInstruction(
     }
     return config.devices.size();
   }
-  return default_config_.devices.size();
+  return devices_.size();
 }
 
 bool HloPartition::EquivalentMesh(const std::string& lhs_color,
@@ -270,20 +237,7 @@ bool HloPartition::SameMesh(const HloInstruction* lhs,
 
 absl::StatusOr<HloPartition> HloPartition::Create(HloModule* module,
                                                   zuku::DeviceList devices) {
-  NamedTaskContext* default_task = DefaultTask(devices);
-
-  std::shared_ptr<LogicalShardingContext> default_autosharding{nullptr};
-  if (default_task) {
-    TF_ASSIGN_OR_RETURN(
-        default_autosharding,
-        MakeLogicalShardingContext(
-            std::get<zuku::DeviceList>(default_task->devices), *default_task));
-    return HloPartition{module, devices,
-                        std::get<zuku::DeviceList>(default_task->devices),
-                        std::move(default_autosharding)};
-  }
-
-  return HloPartition{module, devices, devices, nullptr};
+  return HloPartition{module, devices};
 }
 
 absl::StatusOr<std::string> HloPartition::FindOrAllocateColor(
@@ -342,19 +296,19 @@ bool HloPartition::IsLoopIncrementColor(const std::string& color) const {
 absl::StatusOr<std::string> HloPartition::FindOrAllocateDefaultColor(
     std::optional<std::string> name) {
   if (name.has_value()) {
-    return FindOrAllocateColor(*std::move(name), default_config_.devices,
-                               default_config_.logical_sharding_context);
+    return FindOrAllocateColor(*std::move(name), devices_, nullptr);
   }
 
   // see if we have a color allocated across the default device list
-  auto iter = device_list_to_colors_.find(default_config_.devices);
+  auto iter = device_list_to_colors_.find(devices_);
   if (iter != device_list_to_colors_.end()) {
     return iter->second.front();
   }
 
   // no existing allocated colors on the default devices, make one now
-  return FindOrAllocateColor(default_config_.name, default_config_.devices,
-                             default_config_.logical_sharding_context);
+  return FindOrAllocateColor(
+      absl::StrCat("devices_", devices_.start(), "...", devices_.stop()),
+      devices_, nullptr);
 }
 
 bool HloPartition::HasColor(const std::string& color) const {
@@ -368,14 +322,6 @@ std::optional<std::string> HloPartition::FindColor(
     return std::nullopt;
   }
   return iter->second.front();
-}
-
-absl::Status HloPartition::AllocateColor(
-    std::string name, std::shared_ptr<LogicalShardingContext> context) {
-  TF_ASSIGN_OR_RETURN(auto _,
-                      AllocateColor(std::move(name), default_config_.devices,
-                                    std::move(context)));
-  return absl::OkStatus();
 }
 
 absl::StatusOr<std::string> HloPartition::AllocateColor(
@@ -394,9 +340,6 @@ absl::StatusOr<std::string> HloPartition::AllocateColor(
   auto& config = colors_[name];
   if (context) {
     config.logical_sharding_context = std::move(context);
-  } else if (default_config_.logical_sharding_context &&
-             default_config_.logical_sharding_context->devices == devices) {
-    config.logical_sharding_context = std::move(context);
   }
 
   device_list_to_colors_[devices].push_back(name);
@@ -411,7 +354,10 @@ const HloPartition::ColorConfig& HloPartition::ConfigForColor(
   if (iter != colors_.end()) {
     return iter->second;
   }
-  return default_config_;
+  LOG(FATAL) << "no config exists for color " << color;
+  // make the compiler happy
+  static HloPartition::ColorConfig config;
+  return config;
 }
 
 const zuku::DeviceList& HloPartition::DevicesForColor(
@@ -425,7 +371,7 @@ const zuku::DeviceList& HloPartition::DevicesForInstruction(
   if (color.has_value()) {
     return DevicesForColor(*color);
   }
-  return default_config_.devices;
+  return devices_;
 }
 
 absl::StatusOr<std::optional<std::string>>
@@ -440,79 +386,55 @@ HloPartition::ComputeMetadataNameColor(HloInstruction* instruction) {
     return std::nullopt;
   }
   VLOG(5) << "computing implicit color for " << instruction->name();
-  for (const auto& matcher : MetadataNameMatchers()) {
+  for (const auto& context : NamedTaskContexts()) {
     std::string matched_name;
     VLOG(5) << instruction->name() << " trying to match "
-            << matcher.matcher->pattern() << " against " << metadata_op_name;
-    if (re2::RE2::PartialMatch(metadata_op_name, *matcher.matcher,
+            << context.matcher->pattern() << " against " << metadata_op_name;
+    if (re2::RE2::PartialMatch(metadata_op_name, *context.matcher,
                                &matched_name)) {
       if (matched_name.empty()) {
-        return InvalidArgumentStrCat("matcher '", matcher.matcher->pattern(),
+        return InvalidArgumentStrCat("matcher '", context.matcher->pattern(),
                                      " produced an empty match on ",
                                      metadata_op_name);
       }
 
-      std::string context_name = [&] {
-        if (matcher.name.has_value()) {
-          return *matcher.name;
-        }
-        return matcher.matcher->pattern();
-      }();
+      const bool backprop =
+          absl::StrContains(metadata_op_name, kJvpTransposeMetadata);
+      auto match_iter = matched_colors_.find({matched_name, backprop});
+      if (match_iter != matched_colors_.end()) {
+        return match_iter->second;
+      }
 
-      std::string color_name = [&] {
-        if (matcher.name.has_value()) {
-          return *matcher.name;
+      auto [devices, color_name] = context.callback(matched_name, backprop);
+      const int64_t start = devices.first;
+      const int64_t num_devices = devices.second - start;
+      zuku::DeviceList dl{{.start = start, .num_devices = num_devices}};
+      auto config_iter = colors_.find(color_name);
+      if (config_iter != colors_.end()) {
+        if (dl != config_iter->second.devices) {
+          return InvalidArgumentStrCat(
+              "task ", matched_name, " on color ", color_name,
+              " was previously allocated with different device list, cannot "
+              "have multiple submeshes for a color");
         }
-        return matched_name;
-      }();
-
-      // already set up, no need to set up again
-      if (colors_.contains(color_name)) {
         return color_name;
       }
 
-      if (!NamedTaskContexts().contains(context_name)) {
-        return InvalidArgumentStrCat("name ", matched_name,
-                                     " has no context registered");
-      }
-
-      const auto& named_context = NamedTaskContexts().at(context_name);
-
-      auto devices =
-          [](const NamedTaskContext& matcher,
-             const std::string& task_name) -> absl::StatusOr<zuku::DeviceList> {
-        if (std::holds_alternative<NamedTaskContext::device_factory_fxn>(
-                matcher.devices)) {
-          try {
-            return CreateDeviceList(
-                std::get<NamedTaskContext::device_factory_fxn>(matcher.devices)(
-                    task_name));
-          } catch (std::exception& e) {
-            // I would prefer not to do a global catch here,
-            // but otherwise you might get a meaningless pybind error
-            return InvalidArgumentStrCat(
-                "factory function for named task ", task_name,
-                " returned invalid Python value for the device list:\n",
-                e.what());
-          }
-        }
-        return std::get<zuku::DeviceList>(matcher.devices);
-      }(named_context, matched_name);
-      TF_RETURN_IF_ERROR(devices.status());
       TF_ASSIGN_OR_RETURN(auto context,
-                          MakeLogicalShardingContext(*devices, named_context));
+                          MakeLogicalShardingContext(dl, context));
       TF_ASSIGN_OR_RETURN(
           const std::string uniquified_name,
-          AllocateColor(color_name, *std::move(devices), std::move(context)));
-
+          AllocateColor(color_name, std::move(dl), std::move(context)));
       if (uniquified_name != color_name) {
         return InternalStrCat(
-            "task ", matched_name,
-            " was already allocated, cannot re-allocate an implicit name");
+            "color ", color_name,
+            " was already allocated with mismatched config, cannot reallocate");
       }
+
       VLOG(5) << "Adding new metadata name task for color=" << color_name
-              << " on context=" << context_name;
-      return std::move(color_name);
+              << " on context=" << matched_name;
+      matched_colors_[{matched_name, backprop}] = color_name;
+      return color_name;
     }
   }
   return std::nullopt;
@@ -532,38 +454,12 @@ bool ContainsLegateCustomCall(const HloModuleProto& proto) {
 
 }  // namespace xla
 
-extern "C" void RegisterMetadataNameMatcher(std::string matcher,
-                                            std::optional<std::string> name) {
-  xla::MetadataNameMatchers().push_back(xla::MetadataNameMatcher{
-      .matcher = std::make_unique<re2::RE2>(matcher), .name = name});
-}
-
-extern "C" void RegisterMetadataNameTaskWithFactory(
-    std::string matcher,
-    std::function<std::vector<int64_t>(const std::string& task)> device_factory,
-    std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes) {
-  VLOG(3) << "Registering implicit task with factory " << matcher;
-  if (dims.size() != axes.size()) {
-    throw std::invalid_argument(
-        absl::StrCat("no. dims does not match no. axes (", dims.size(),
-                     " != ", axes.size(), ")"));
-  }
-
-  xla::NamedTaskContexts()[matcher] = xla::NamedTaskContext{
-      .name = matcher,  // std::make_unique<re2::RE2>(matcher),
-      .devices = std::move(device_factory),
-      .dims = std::move(dims),
-      .device_axes = std::move(axes),
-      .logical_axes = std::move(logical_axes)};
-}
-
 extern "C" void SetEnableMetadataNameTasks(bool flag) {
   xla::enable_metadata_name_tasks = flag;
 }
 
 extern "C" void RegisterMetadataNameTask(
-    std::string matcher, std::vector<int64_t> devices,
+    std::string matcher, xla::HloPartition::name_and_devices_fxn callback,
     std::vector<int64_t> dims, std::vector<std::string> axes,
     std::vector<std::pair<std::string, std::string>> logical_axes) {
   // TODO, add an API for this
@@ -572,65 +468,23 @@ extern "C" void RegisterMetadataNameTask(
 
   VLOG(5) << "Registering implicit task " << matcher;
 
-  if (devices.empty()) {
-    throw std::runtime_error(
-        absl::StrCat("empty device list given to task ", matcher));
-  }
-
   if (dims.size() != axes.size()) {
     throw std::invalid_argument(
         absl::StrCat("no. dims does not match no. axes (", dims.size(),
                      " != ", axes.size(), ")"));
   }
 
-  int64_t dim_product = 1;
-  for (auto dim : dims) {
-    dim_product *= dim;
-  }
-
-  const int64_t task_size =
-      loop_submesh_size.has_value() ? *loop_submesh_size : devices.size();
-
-  if (dim_product != task_size) {
-    throw std::invalid_argument(absl::StrCat(
-        "for task matcher '", matcher, "' product of dims (", dim_product,
-        ") does not match no. devices = ", task_size));
-  }
-
-  std::optional<xla::LoopDependentSubmesh> loop_submesh{std::nullopt};
-  if (loop_submesh_size.has_value()) {
-    loop_submesh =
-        xla::LoopDependentSubmesh({.task_mesh_size = *loop_submesh_size,
-                                   .global_mesh_start = devices.front(),
-                                   .global_mesh_stop = devices.back() + 1,
-                                   .reverse = loop_submesh_reverse});
-  }
-
-  auto dl = xla::CreateDeviceList(devices);
-  if (!dl.ok()) {
-    throw std::runtime_error(std::string(dl.status().message()));
-  }
-
-  xla::NamedTaskContext task{.name = matcher,
-                             .devices = *std::move(dl),
+  xla::NamedTaskContext task{.matcher = std::make_unique<re2::RE2>(matcher),
+                             .callback = std::move(callback),
                              .dims = std::move(dims),
                              .device_axes = std::move(axes),
-                             .logical_axes = std::move(logical_axes),
-                             .loop_submesh = std::move(loop_submesh)};
+                             .logical_axes = std::move(logical_axes)};
 
-  if (matcher == xla::kDefaultTaskMatcher) {
-    xla::DefaultTasks().push_back(std::move(task));
-  } else {
-    xla::NamedTaskContexts()[matcher] = std::move(task);
-  }
+  xla::NamedTaskContexts().push_back(std::move(task));
 }
 
 extern "C" void EnableLegateRecomputation(bool enable) {
   xla::enable_recomputation = enable;
 }
 
-extern "C" void ClearMetadataNameTasks() {
-  xla::MetadataNameMatchers().clear();
-  xla::NamedTaskContexts().clear();
-  xla::DefaultTasks().clear();
-}
+extern "C" void ClearMetadataNameTasks() { xla::NamedTaskContexts().clear(); }

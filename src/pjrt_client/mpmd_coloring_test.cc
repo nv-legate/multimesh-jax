@@ -46,8 +46,8 @@ TEST_F(MpmdColoringTest, SimpleImplicitTask) {
       auto module,
       GetHloModuleFromText(kSimpleImplicitTaskHlo, /*num_devices=*/4));
 
-  RegisterMatcherTestTask("(task_f)", {0, 1}, {2}, {"x"}, {{"x", "batch"}});
-  RegisterMatcherTestTask("(task_g)", {2, 3}, {2}, {"x"}, {{"x", "batch"}});
+  RegisterMatcherTestTask("(task_f)", {0, 2}, {2}, {"x"}, {{"x", "batch"}});
+  RegisterMatcherTestTask("(task_g)", {2, 4}, {2}, {"x"}, {{"x", "batch"}});
 
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
@@ -55,7 +55,7 @@ TEST_F(MpmdColoringTest, SimpleImplicitTask) {
   // f -> color 0
   // g -> color 1
 
-  // multiply.4, multiply.7, 2 Aargs, a convert and a broadcast
+  // multiply.4, multiply.7, a convert and a broadcast
   EXPECT_THAT(module->entry_computation()->instructions(),
               Contains(m::Color("task_f")).Times(4));
 
@@ -98,8 +98,8 @@ TEST_F(MpmdColoringTest, TaskWithBarrier) {
   TF_ASSERT_OK_AND_ASSIGN(auto module, GetHloModuleFromText(kTaskWithBarrierHlo,
                                                             /*num_devices=*/4));
 
-  RegisterMatcherTestTask("(task_f)", {0, 1}, {2}, {"x"}, {{"x", "batch"}});
-  RegisterMatcherTestTask("(task_g)", {2, 3}, {2}, {"x"}, {{"x", "batch"}});
+  RegisterMatcherTestTask("(task_f)", {0, 2}, {2}, {"x"}, {{"x", "batch"}});
+  RegisterMatcherTestTask("(task_g)", {2, 4}, {2}, {"x"}, {{"x", "batch"}});
 
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
@@ -170,6 +170,12 @@ ENTRY main.117 {
 TEST_F(MpmdColoringTest, NestedWhileColoring) {
   TF_ASSERT_OK_AND_ASSIGN(auto module, GetHloModuleFromText(kNestedWhileHlo,
                                                             /*num_devices=*/4));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto f, partition_->AllocateColor(
+                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto g, partition_->AllocateColor(
+                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
 
@@ -182,7 +188,7 @@ TEST_F(MpmdColoringTest, TransformerColoring) {
   TF_ASSERT_OK_AND_ASSIGN(auto module, GetHloModuleFromPath("opt_8layers.txt",
                                                             /*num_devices=*/8));
 
-  auto device_factory = [](const std::string& name) {
+  auto device_factory = [](const std::string& name, bool backprop) {
     int layer_num;
     bool parsed = absl::SimpleAtoi(name.substr(7), &layer_num);
     if (!parsed) {
@@ -190,21 +196,26 @@ TEST_F(MpmdColoringTest, TransformerColoring) {
           absl::StrCat("failed to parse layer number from", name));
     }
     int64_t offset = (layer_num / 4) * 4;
-    std::vector<int64_t> devices(4);
-    std::iota(devices.begin(), devices.end(), offset);
-    return devices;
+    std::string color = [&] {
+      if (backprop) {
+        return absl::StrCat("bwd.", name);
+      }
+      return name;
+    }();
+    auto devices = std::make_pair(offset, offset + 4);
+    return std::make_pair(devices, std::move(color));
   };
   RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {2, 2},
                                      {"x", "y"},
                                      {{"replica", "x"}, {"mdl", "y"}});
-  RegisterMatcherTestTask("(emb).*", {0, 1, 2, 3, 4, 5, 6, 7}, {2, 4},
-                          {"x", "y"}, {{"replica", "x"}, {"mdl", "y"}});
-  RegisterMatcherTestTask("(emb).*", {0, 1, 2, 3, 4, 5, 6, 7}, {2, 4},
-                          {"x", "y"}, {{"replica", "x"}, {"mdl", "y"}});
-  RegisterMatcherTestTask("(final_ln).*", {0, 1, 2, 3, 4, 5, 6, 7}, {2, 4},
-                          {"x", "y"}, {{"replica", "x"}, {"mdl", "y"}});
-  RegisterMatcherTestTask("(compute_loss).*", {0, 1, 2, 3, 4, 5, 6, 7}, {2, 4},
-                          {"x", "y"}, {{"replica", "x"}, {"mdl", "y"}});
+  RegisterMatcherTestTask("(emb).*", {0, 8}, {2, 4}, {"x", "y"},
+                          {{"replica", "x"}, {"mdl", "y"}});
+  RegisterMatcherTestTask("(emb).*", {0, 8}, {2, 4}, {"x", "y"},
+                          {{"replica", "x"}, {"mdl", "y"}});
+  RegisterMatcherTestTask("(final_ln).*", {0, 8}, {2, 4}, {"x", "y"},
+                          {{"replica", "x"}, {"mdl", "y"}});
+  RegisterMatcherTestTask("(compute_loss).*", {0, 8}, {2, 4}, {"x", "y"},
+                          {{"replica", "x"}, {"mdl", "y"}});
 
   MpmdMicrobatchLoopCanonicalizer inliner{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, inliner.Run(module.get()));
@@ -253,6 +264,12 @@ TEST_F(MpmdColoringTest, BackwardsColoringDoesNotOverwrite) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kBackwardsColoringDoesNotOverwrite,
                                         /*num_devices=*/4));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto f, partition_->AllocateColor(
+                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto g, partition_->AllocateColor(
+                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
 
@@ -265,6 +282,12 @@ TEST_F(MpmdColoringTest, FavorMostRecentOperands) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kBackwardsColoringDoesNotOverwrite,
                                         /*num_devices=*/4));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto f, partition_->AllocateColor(
+                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto g, partition_->AllocateColor(
+                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
 
@@ -388,6 +411,12 @@ TEST_F(MpmdColoringTest, TaskWithSplitBarrierHlo) {
       auto module,
       GetHloModuleFromText(kTaskWithSplitBarrierHlo, /*num_devices=*/2));
 
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto f, partition_->AllocateColor(
+                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto g, partition_->AllocateColor(
+                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
 
@@ -419,6 +448,12 @@ TEST_F(MpmdColoringTest, UsersWeightPriorityColoring) {
       auto module,
       GetHloModuleFromText(kTaskWithMultiplePropagationChoicesUsers,
                            /*num_devices=*/2));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto f, partition_->AllocateColor(
+                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto g, partition_->AllocateColor(
+                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
   MpmdColoring coloring{partition_.get(),
                         MpmdColoring::ColorPropagationPriority::kWeight};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
@@ -432,6 +467,12 @@ TEST_F(MpmdColoringTest, UsersDepthPriorityColoring) {
       auto module,
       GetHloModuleFromText(kTaskWithMultiplePropagationChoicesUsers,
                            /*num_devices=*/2));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto f, partition_->AllocateColor(
+                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto g, partition_->AllocateColor(
+                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
   MpmdColoring coloring{partition_.get(),
                         MpmdColoring::ColorPropagationPriority::kDepth};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
@@ -445,6 +486,13 @@ TEST_F(MpmdColoringTest, UsersTopologicalPriorityColoring) {
       auto module,
       GetHloModuleFromText(kTaskWithMultiplePropagationChoicesUsers,
                            /*num_devices=*/2));
+
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto f, partition_->AllocateColor(
+                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto g, partition_->AllocateColor(
+                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
   MpmdColoring coloring{partition_.get(),
                         MpmdColoring::ColorPropagationPriority::kTopological};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
@@ -470,6 +518,12 @@ TEST_F(MpmdColoringTest, OperandsEqualWeightPriorityColoringPreferCloser) {
       auto module,
       GetHloModuleFromText(kTaskWithMultiplePropagationChoicesOperands,
                            /*num_devices=*/2));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto f, partition_->AllocateColor(
+                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto g, partition_->AllocateColor(
+                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
   MpmdColoring coloring{partition_.get(),
                         MpmdColoring::ColorPropagationPriority::kWeight};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
@@ -496,6 +550,15 @@ TEST_F(MpmdColoringTest, MixedDepthPriorityColoringPreferOperands) {
       auto module,
       GetHloModuleFromText(kTaskWithMultiplePropagationChoicesMixed,
                            /*num_devices=*/2));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto f, partition_->AllocateColor(
+                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto g, partition_->AllocateColor(
+                  "task_g", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto h, partition_->AllocateColor(
+                  "task_h", {{.start = 0, .num_devices = 2}}, nullptr));
   MpmdColoring coloring{partition_.get(),
                         MpmdColoring::ColorPropagationPriority::kDepth};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
