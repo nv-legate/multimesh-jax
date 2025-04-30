@@ -1,0 +1,15 @@
+#! /usr/bin/env python
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
+#                         All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+import json
+import sys
+
+with open("compile_commands.json") as f:
+  data = json.load(f)
+
+for entry in data:
+  path = entry["file"]
+  if path.endswith(".cc") and "pjrt/legate" in path and not path.endswith("cu.cc"):
+    print(path)

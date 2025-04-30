@@ -1,14 +1,17 @@
 #! /usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
+#                         All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
-pushd /opt/workspace/xla
+path=${1:-/opt/workspace/xla}
+nproc=${2:-16}
 
-nproc=${1:-16}
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-find xla/pjrt/legate -name "*.cc" \
-   ! -name "*test*.cc" \
-   ! -name "*cu.cc" \
-   ! -name "*xla_compiler.cc" \
-   -print0 | xargs -0 -P ${nproc} -I % sh -c 'echo % ; clang-tidy-17 -p compile_commands.json %'
+pushd $path
+
+$SCRIPT_DIR/get-clang-tidy-files \
+  | xargs -P ${nproc} -I % sh -c "echo % ; clang-tidy-17 -p compile_commands.json %"
 
 if [ $? -ne 0 ]; then
     echo "At least one clang-tidy command failed"
@@ -17,5 +20,3 @@ if [ $? -ne 0 ]; then
 fi
 
 popd
-
-
