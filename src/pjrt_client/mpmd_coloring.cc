@@ -389,8 +389,6 @@ absl::StatusOr<bool> MpmdColoring::Run(
     HloModule* module,
     const absl::flat_hash_set<absl::string_view>& execution_threads) {
   bool changed;
-  auto root = module->entry_computation()->root_instruction();
-
   HloPassPipeline preprocess_pipeline("coloring_preprocess");
   preprocess_pipeline.AddPass<MpmdInlineExplicitTasks>(partition_);
   preprocess_pipeline.AddPass<MpmdInsertRootTupleShardings>(partition_);
@@ -453,12 +451,14 @@ absl::StatusOr<bool> MpmdColoring::Run(
     }
     return absl::OkStatus();
   };
-  if (root->shape().IsTuple()) {
-    for (auto* operand : root->mutable_operands()) {
+  if (module->entry_computation()->root_instruction()->shape().IsTuple()) {
+    for (auto* operand :
+         module->entry_computation()->root_instruction()->mutable_operands()) {
       TF_RETURN_IF_ERROR(color_root(operand));
     }
   } else {
-    TF_RETURN_IF_ERROR(color_root(root));
+    TF_RETURN_IF_ERROR(
+        color_root(module->entry_computation()->root_instruction()));
   }
 
   HloPassPipeline postprocess_pipeline("coloring_postprocess");

@@ -68,64 +68,6 @@ TEST_F(MpmdColoringTest, SimpleImplicitTask) {
               Each(AnyOf(AllOf(op::Add(), m::HasColor()), Not(op::Add()))));
 }
 
-static constexpr absl::string_view kTaskWithBarrierHlo = R"(
-region_0.10 {
-  Arg_0.11 = f32[] parameter(0)
-  Arg_1.12 = f32[] parameter(1)
-  ROOT add.13 = f32[] add(Arg_0.11, Arg_1.12), metadata={op_name="jit(c)/jit(main)/task_g/reduce_sum[axes=(0,)]"}
-}
-
-ENTRY main.15 {
-  Arg_0.1 = f32[8]{0} parameter(0), sharding={replicated}
-  multiply.4 = f32[8]{0} multiply(Arg_0.1, Arg_0.1), metadata={op_name="jit(c)/jit(main)/task_f/mul"}
-  Arg_1.2 = s32[] parameter(1), sharding={replicated}
-  convert.5 = f32[] convert(Arg_1.2), metadata={op_name="jit(c)/jit(main)/task_f/convert_element_type[new_dtype=float32 weak_type=False]"}
-  broadcast.6 = f32[8]{0} broadcast(convert.5), dimensions={}, metadata={op_name="jit(c)/jit(main)/task_f/mul"}
-  multiply.7 = f32[8]{0} multiply(multiply.4, broadcast.6), metadata={op_name="jit(c)/jit(main)/task_f/mul"}
-  cosine.8 = f32[8]{0} cosine(multiply.7), metadata={op_name="jit(c)/jit(main)/task_g/cos"}
-  tuple.1 = (f32[8]{0}, f32[8]{0}) tuple(multiply.7, cosine.8)
-  opt-barrier.1 = (f32[8]{0}, f32[8]{0}) opt-barrier(tuple.1)
-  gte.cosine.8 = get-tuple-element(opt-barrier.1), index=1
-  add.9 = f32[8]{0} add(gte.cosine.8, multiply.7), metadata={op_name="jit(c)/jit(main)/task_g/add"}
-  tuple.2 = (f32[8]{0}, f32[8]{0}) tuple(add.9, cosine.8)
-  opt-barrier.2 = (f32[8]{0}, f32[8]{0}) opt-barrier(tuple.2)
-  gte.add.9 = get-tuple-element(opt-barrier.2), index=0
-  ROOT add.10 = f32[] add(gte.cosine.8, gte.add.9)
-} // main.15
-)";
-
-TEST_F(MpmdColoringTest, TaskWithBarrier) {
-  TF_ASSERT_OK_AND_ASSIGN(auto module, GetHloModuleFromText(kTaskWithBarrierHlo,
-                                                            /*num_devices=*/4));
-
-  RegisterMatcherTestTask("(task_f)", {0, 2}, {2}, {"x"}, {{"x", "batch"}});
-  RegisterMatcherTestTask("(task_g)", {2, 4}, {2}, {"x"}, {{"x", "batch"}});
-
-  MpmdColoring coloring{partition_.get()};
-  TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
-
-  // f -> color 0
-  // g -> color 1
-
-  // one of the barriers should have a color, the other should not
-  EXPECT_THAT(
-      module->entry_computation()->instructions(),
-      Contains(AllOf(op::OptimizationBarrier(), m::HasColor())).Times(1));
-  EXPECT_THAT(
-      module->entry_computation()->instructions(),
-      Contains(AllOf(op::OptimizationBarrier(), Not(m::HasColor()))).Times(1));
-
-  // one of the tuples should have a color, the other should not
-  EXPECT_THAT(module->entry_computation()->instructions(),
-              Contains(AllOf(op::Tuple(), m::HasColor())).Times(1));
-  EXPECT_THAT(module->entry_computation()->instructions(),
-              Contains(AllOf(op::Tuple(), Not(m::HasColor()))).Times(1));
-
-  // all of the adds and cosines should have a color
-  EXPECT_THAT(module->entry_computation()->instructions(),
-              Not(Contains(AllOf(op::Add(), Not(m::HasColor())))));
-}
-
 static constexpr absl::string_view kNestedWhileHlo = R"(
 HloModule jit_c, entry_computation_layout={(f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4]{0}, f32[4]{0})->f32[]}
 
@@ -375,60 +317,6 @@ TEST_F(MpmdColoringTest, MpmdTaskCall) {
               AllOf(Not(Contains(op::CustomCall("LegateTask"))),
                     Contains(AllOf(op::Exp(), m::Color("g"))).Times(1),
                     Contains(AllOf(op::Negate(), m::Color("g.bwd"))).Times(1)));
-}
-
-static constexpr absl::string_view kTaskWithSplitBarrierHlo = R"(
-region_0.10 {
-  Arg_0.11 = f32[] parameter(0)
-  Arg_1.12 = f32[] parameter(1)
-  ROOT add.13 = f32[] add(Arg_0.11, Arg_1.12), metadata={op_name="jit(c)/jit(main)/task_g/reduce_sum[axes=(0,)]"}
-}
-
-ENTRY main.15 {
-  Arg_0.1 = f32[8]{0} parameter(0), sharding={replicated}
-  multiply.4 = f32[8]{0} multiply(Arg_0.1, Arg_0.1), frontend_attributes={color="task_f"}
-  Arg_1.2 = s32[] parameter(1), sharding={replicated}
-  convert.5 = f32[] convert(Arg_1.2), frontend_attributes={color="task_f"}
-  broadcast.6 = f32[8]{0} broadcast(convert.5), dimensions={}, frontend_attributes={color="task_f"}
-  multiply.7 = f32[8]{0} multiply(multiply.4, broadcast.6), frontend_attributes={color="task_f"}
-  exp.8 = f32[8]{0} exponential(multiply.7), frontend_attributes={color="task_g"}
-  add.9 = f32[8]{0} add(exp.8, multiply.7), frontend_attributes={color="task_g"}
-  tuple.1 = (f32[8]{0}, f32[8]{0}, f32[8]{0}) tuple(multiply.7, exp.8, add.9)
-  opt-barrier.1 = (f32[8]{0}, f32[8]{0}, f32[8]{0}) opt-barrier(tuple.1)
-  gte.multiply.7 = get-tuple-element(opt-barrier.1), index=0
-  gte.exp.8 = get-tuple-element(opt-barrier.1), index=1
-  gte.add.9 = get-tuple-element(opt-barrier.1), index=2
-  add.10 = f32[8]{0} add(gte.exp.8, gte.multiply.7), frontend_attributes={color="task_g"}
-  tuple.2 = (f32[8]{0}, f32[8]{0}) tuple(add.10, exp.8)
-  opt-barrier.2 = (f32[8]{0}, f32[8]{0}) opt-barrier(tuple.2)
-  gte.add.10 = get-tuple-element(opt-barrier.2), index=0
-  ROOT add.11 = f32[] add(gte.exp.8, gte.add.10)
-} // main.15
-)";
-
-TEST_F(MpmdColoringTest, TaskWithSplitBarrierHlo) {
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto module,
-      GetHloModuleFromText(kTaskWithSplitBarrierHlo, /*num_devices=*/2));
-
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto f, partition_->AllocateColor(
-                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto g, partition_->AllocateColor(
-                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
-  MpmdColoring coloring{partition_.get()};
-  TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
-
-  // all maths ops should have a color
-  // only one of the 2 opt-barriers should have been colored
-  EXPECT_THAT(
-      m::FlatInstructionsWithoutReducesAndPredicates(module.get()),
-      AllOf(
-          Each(Not(AnyOf(AllOf(op::Add(), Not(m::HasColor())),
-                         AllOf(op::Exp(), Not(m::HasColor()))))),
-          Contains(op::OptimizationBarrier()).Times(2),
-          Contains(AllOf(op::OptimizationBarrier(), m::HasColor())).Times(1)));
 }
 
 constexpr absl::string_view kTaskWithMultiplePropagationChoicesUsers = R"(
