@@ -798,8 +798,9 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
       kRemoveHoistedReduce, /*deflt=*/config.remove_hoisted_reduces);
 
   const MpmdColoring::ColorPropagationPriority color_propagation_priority =
-      MpmdColoring::GetColorPropagationPriorityFromString(GetEnvOption(
-          kColorPropagationPriorityEnv, absl::string_view("WEIGHT")));
+      MpmdColoring::GetColorPropagationPriorityFromString(
+          GetEnvOption(kColorPropagationPriorityEnv,
+                       /*deflt=*/absl::string_view("WEIGHT")));
 
   std::vector<int64_t> devices = {
       options.executable_build_options.device_assignment().begin(),

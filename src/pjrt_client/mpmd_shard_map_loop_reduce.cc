@@ -25,8 +25,8 @@ namespace {
 bool IsAddComputation(const HloComputation* comp) {
   HloInstruction* root = comp->root_instruction();
   return root->opcode() == HloOpcode::kAdd &&
-      root->operand(0) == comp->parameter_instruction(0) &&
-      root->operand(1) == comp->parameter_instruction(1);
+         root->operand(0) == comp->parameter_instruction(0) &&
+         root->operand(1) == comp->parameter_instruction(1);
 }
 
 bool ShardedOverCxnDims(const HloInstruction* i) {
@@ -78,7 +78,7 @@ bool ShardedOverCxnDims(const HloInstruction* i) {
       HloInstruction* operand = operands[i];
       HloInstruction* update = updates[i];
 
-      if (!IsReplicatedOrNotSharded(operand) && 
+      if (!IsReplicatedOrNotSharded(operand) &&
           !IsReplicatedOrNotSharded(update) &&
           operand->sharding().ReplicateOnLastTileDim() &&
           !update->sharding().ReplicateOnLastTileDim()) {

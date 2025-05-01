@@ -62,6 +62,8 @@ function(find_or_configure_xla)
     legate_pjrt_executable_test
     mpmd_sharding_propagation_test
     mpmd_simple_loop_increment_coloring_test
+    mpmd_unpack_optimization_barrier_test
+    mpmd_repack_optimization_barrier_test
     mpmd_coloring_test
     mpmd_cut_size_minimizer_test
     mpmd_computation_grouper_test

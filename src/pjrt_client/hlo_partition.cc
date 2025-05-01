@@ -351,13 +351,10 @@ absl::StatusOr<std::string> HloPartition::AllocateColor(
 const HloPartition::ColorConfig& HloPartition::ConfigForColor(
     const std::string& color) const {
   auto iter = colors_.find(color);
-  if (iter != colors_.end()) {
-    return iter->second;
+  if (iter == colors_.end()) {
+    LOG(FATAL) << "no config exists for color " << color;
   }
-  LOG(FATAL) << "no config exists for color " << color;
-  // make the compiler happy
-  static HloPartition::ColorConfig config;
-  return config;
+  return iter->second;
 }
 
 const zuku::DeviceList& HloPartition::DevicesForColor(

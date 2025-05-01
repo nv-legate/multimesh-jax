@@ -16,6 +16,7 @@
 #include "xla/hlo/transforms/simplifiers/hlo_dce.h"
 #include "xla/pjrt/legate/color_dfs.h"
 #include "xla/pjrt/legate/mpmd_instruction.h"
+#include "xla/pjrt/legate/mpmd_utils.h"
 #include "xla/tsl/platform/errors.h"
 #include "xla/util.h"
 
@@ -399,6 +400,11 @@ absl::StatusOr<bool> MpmdComputationFusion::Run(
   VLOG(5) << "starting fusion pass for type=" << type_
           << " only_fuse_loop=" << std::boolalpha << only_fuse_loop_tasks_
           << " on module " << module->name();
+  TF_ASSIGN_OR_RETURN(bool enforce_bijective_tasks,
+                      EnforceBijectiveTasks(module->entry_computation()));
+  if (type_ == FusionType::kMatchingDevices && enforce_bijective_tasks) {
+    return false;
+  }
   bool changed = false;
   std::vector<HloComputation*> to_visit = {module->entry_computation()};
   while (!to_visit.empty()) {

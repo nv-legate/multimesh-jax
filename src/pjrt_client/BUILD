@@ -320,6 +320,31 @@ cc_library(
 )
 
 cc_library(
+    name = "mpmd_unpack_optimization_barrier",
+    srcs = ["mpmd_unpack_optimization_barrier.cc"],
+    hdrs = ["mpmd_unpack_optimization_barrier.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "//xla/hlo/pass:hlo_pass_pipeline",
+        ":mpmd_instruction",
+        ":mpmd_utils",
+    ],
+)
+
+cc_library(
+    name = "mpmd_repack_optimization_barrier",
+    srcs = ["mpmd_repack_optimization_barrier.cc"],
+    hdrs = ["mpmd_repack_optimization_barrier.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "//xla/hlo/pass:hlo_pass_pipeline",
+        ":mpmd_instruction",
+        ":mpmd_utils",
+        ":mpmd_unpack_optimization_barrier",
+    ],
+)
+
+cc_library(
     name = "mpmd_cross_task_barrier_remover",
     srcs = ["mpmd_cross_task_barrier_remover.cc"],
     hdrs = ["mpmd_cross_task_barrier_remover.h"],
@@ -464,9 +489,9 @@ cc_library(
 )
 
 cc_library(
-    name = "mpmd_coloring",
-    srcs = ["mpmd_coloring.cc"],
-    hdrs = ["mpmd_coloring.h"],
+    name = "mpmd_inline_explicit_tasks",
+    srcs = ["mpmd_inline_explicit_tasks.cc"],
+    hdrs = ["mpmd_inline_explicit_tasks.h"],
     deps = [
         "@com_google_absl//absl/status",
         "@jsoncpp_git//:jsoncpp",
@@ -478,6 +503,57 @@ cc_library(
         "//xla/service:call_inliner",
         ":mpmd_instruction",
         ":hlo_partition",
+    ],
+)
+
+cc_library(
+    name = "mpmd_insert_root_tuple_shardings",
+    srcs = ["mpmd_insert_root_tuple_shardings.cc"],
+    hdrs = ["mpmd_insert_root_tuple_shardings.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@zuku",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/pass:hlo_pass_pipeline",
+        "//xla/service:hlo_pass_pipeline",
+        ":mpmd_instruction",
+        ":hlo_partition",
+    ],
+)
+
+cc_library(
+    name = "mpmd_compute_assigned_colors",
+    srcs = ["mpmd_compute_assigned_colors.cc"],
+    hdrs = ["mpmd_compute_assigned_colors.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@zuku",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/pass:hlo_pass_pipeline",
+        "//xla/service:hlo_pass_pipeline",
+        ":mpmd_instruction",
+        ":hlo_partition",
+    ],
+)
+
+cc_library(
+    name = "mpmd_coloring",
+    srcs = ["mpmd_coloring.cc"],
+    hdrs = ["mpmd_coloring.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@zuku",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/pass:hlo_pass_pipeline",
+        "//xla/service:hlo_pass_pipeline",
+        ":mpmd_instruction",
+        ":hlo_partition",
+        ":mpmd_utils",
+        ":mpmd_inline_explicit_tasks",
+        ":mpmd_insert_root_tuple_shardings",
+        ":mpmd_compute_assigned_colors",
+        ":mpmd_unpack_optimization_barrier",
+        ":mpmd_repack_optimization_barrier",
     ],
 )
 
@@ -589,6 +665,7 @@ cc_library(
     deps = [
         "@com_google_absl//absl/base:core_headers",
         "@tsl//tsl/platform:status",
+        "@jsoncpp_git//:jsoncpp",
         "//xla/hlo/ir:hlo",
         "@zuku",
         ":json_utils",
@@ -1492,6 +1569,30 @@ xla_cc_test(
         "@tsl//tsl/platform:test_main",
         "@zuku",
         ":hlo_partition",
+        ":mpmd_test_base",
+    ],
+)
+
+xla_cc_test(
+    name = "mpmd_unpack_optimization_barrier_test",
+    srcs = ["mpmd_unpack_optimization_barrier_test.cc"],
+    deps = [
+        ":mpmd_unpack_optimization_barrier",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/utils:hlo_matchers",
+        "@tsl//tsl/platform:test_main",
+        ":mpmd_test_base",
+    ],
+)
+
+xla_cc_test(
+    name = "mpmd_repack_optimization_barrier_test",
+    srcs = ["mpmd_repack_optimization_barrier_test.cc"],
+    deps = [
+        ":mpmd_repack_optimization_barrier",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/utils:hlo_matchers",
+        "@tsl//tsl/platform:test_main",
         ":mpmd_test_base",
     ],
 )

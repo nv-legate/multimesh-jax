@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import collections
 from functools import partial
 from typing import Any, Callable, Literal, Optional, Sequence, Tuple, Type
 
@@ -167,24 +168,24 @@ legate_task_p.def_abstract_eval(_custom_abstract_eval)
 legate_task_p.def_impl(__legate_task_lowering_impl)
 
 
-def call_legate_task(f, *args, config: str = "", **kwargs):
+def call_legate_task(f, *args, config: str = "", name_override: Optional[str] = None, **kwargs):
     jaxpr, out_shapes = jax.make_jaxpr(
         partial(f, **kwargs), return_shape=True
     )(*args)
     flat_args = jax.tree.leaves(args)
     out_tree = jax.tree.structure(out_shapes)
     out_flat = legate_task_p.bind(
-        *flat_args, name=f.__name__, jaxpr=jaxpr, config=config
+        *flat_args, name=name_override or f.__name__, jaxpr=jaxpr, config=config
     )
     return jax.tree.unflatten(out_tree, out_flat)
 
 
-def call_legate_task_fwd(f, *args, config: str = "", **kwargs):
-    return call_legate_task(f, *args, config=config, **kwargs), args
+def call_legate_task_fwd(f, *args, config: str = "", name_override: Optional[str] = None, **kwargs):
+    return call_legate_task(f, *args, config=config, name_override=name_override, **kwargs), args
 
 
-def call_legate_task_bwd(f, primals, tangents, config: str = "", **kwargs):
-    return call_legate_task(f, primals, tangents, config=config, **kwargs)
+def call_legate_task_bwd(f, primals, tangents, config: str = "", name_override: Optional[str] = None, **kwargs):
+    return call_legate_task(f, primals, tangents, config=config, name_override=name_override, **kwargs)
 
 
 def _legate_task_lowering(
@@ -283,7 +284,7 @@ def _get_wrapped_task(
         _, f_vjp = jax.vjp(fxn, *primals)
         return f_vjp(tangents)
 
-    bwd = partial(call_legate_task_bwd, f_bwd, config=json.dumps(args))
+    bwd = partial(call_legate_task_bwd, f_bwd, config=json.dumps(args), name_override=f"{fxn.__name__}_bwd")
 
     vjp_taskify = jax.custom_vjp(wrapped)
     vjp_taskify.defvjp(fwd, bwd)
@@ -371,9 +372,10 @@ def microbatch(
     argnum: int = 0,
     interleave: Optional[int] = None,
     num_stages: Optional[int] = None,
-    schedule: Optional[Literal["1f1b", "gpipe", "wavefront"]] = None,
+    schedule: Optional[Literal["1f1b", "gpipe", "wavefront", "custom"]] = None,
     unrolling: Optional[int] = None,
     arg_shardings: Optional[Any] = None,
+    custom_schedule: Optional[list[list[str]] | list[list[tuple[int, str]]]] = None,
 ):
     """Unrolls a function along an axis into a microbatch loop.
 
@@ -448,12 +450,29 @@ def microbatch(
         ``argnum`` with shardings. The shardings can be any sharding-equivalent
         object including partition specs or ``NamedSharding``  If specified,
         this applies the sharding annotations to all sliced inputs.
+      custom_schedule: optional, a list of lists of strings or tuples of
+        (int, string) specifying the custom pipeline schedule of microbatch
+        iterations/stages when ``schedule`` is 'custom'. The custom schedule
+        Each list in custom_schedule corresponds to a device mesh, and each
+        element in that list is a task name, optionally associated with a
+        specific microbatch. There must be exactly `pipeline_depth` device
+        meshes in the custom schedule, with each task appearing exactly
+        `num_microbatches` times in the schedule.
 
     Returns:
       A wrapped version of ``fun`` that executes as a microbatch loop.
 
     .. _jax.jit: https://jax.readthedocs.io/en/latest/_autosummary/jax.jit.html
     """  # noqa: E501
+
+    if custom_schedule is not None:
+        if schedule is not None and schedule != "custom":
+            raise ValueError(
+                f"When custom_schedule is provided, schedule must be 'custom' or None, but got '{schedule}'"
+            )
+        # Set schedule to "custom" by default when custom_schedule is provided
+        schedule = "custom"
+
     if should_ignore_transforms():
         return fun
 
@@ -472,6 +491,23 @@ def microbatch(
         if num_microbatches == 1:
             return fun(*args, **kwargs)
 
+        def is_list_of_list_of_strings(l: list[Any]) -> bool:
+            return isinstance(l, list) and all(isinstance(i, list) and all(isinstance(j, str) for j in i) for i in l)
+
+        nonlocal custom_schedule
+        if custom_schedule is not None and is_list_of_list_of_strings(custom_schedule):
+            canonical_custom_schedule = []
+            for device_row in custom_schedule:
+                task_counter = collections.defaultdict(int)
+                canonical_custom_schedule.append([])
+                for task_id in device_row:
+                    canonical_custom_schedule[-1].append((task_counter[task_id], task_id))
+                    task_counter[task_id] += 1
+                for task_id, count in task_counter.items():
+                    if (count != num_microbatches):
+                        raise ValueError(f"task {task_id} has {count} microbatches, but there are {num_microbatches} microbatches")
+            custom_schedule = canonical_custom_schedule
+
         json_args = optional_kwargs(
             num_microbatches=num_microbatches,
             slice_dim=dim,
@@ -481,6 +517,7 @@ def microbatch(
             unrolling=unrolling,
             num_stages=num_stages,
             schedule=schedule,
+            custom_schedule=custom_schedule,
         )
 
         mark_microbatch = no_op(
@@ -569,6 +606,7 @@ def register_task(
       regex: A full name or regular expression with match group.
         This should match the name of a Flax module or a name passed to
         ``jax.with_named_scope``.
+      name: optional, a metadata name to assign to the task context
       mesh: optional, a Mesh context defining the devices and mesh shape
       callback: optional, a function that takes are arguments the match group from
         the ``regex`` and a boolean indicating whether the task is

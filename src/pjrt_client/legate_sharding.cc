@@ -634,7 +634,8 @@ absl::StatusOr<zuku::ShardedShape> XlaShapeToLegateShape(
       sharding_dims.push_back(
           {.size = dim, .sharding = 1, .permutation = dim_number++});
     }
-    sharding_dims.push_back({.size = 1, .sharding = devices.size(), .permutation = dim_number});
+    sharding_dims.push_back(
+        {.size = 1, .sharding = devices.size(), .permutation = dim_number});
     zuku::ShardedShape sharded_shape{
         .type = zuku_type,
         .sharding = {.dims = std::move(sharding_dims), .devices = devices}};

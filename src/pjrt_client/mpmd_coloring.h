@@ -7,7 +7,6 @@
 #define XLA_PJRT_LEGATE_MPMD_COLORING_H_
 
 #include <cstdint>
-#include <optional>
 #include <string>
 
 #include "absl/status/status.h"
@@ -18,15 +17,15 @@
 
 namespace xla {
 
-// Assigns a coloring to all non-trivial operations in the HLO module
+// Propagates a coloring to all non-trivial operations in the HLO module
 // to create a partition of all operations based on user annotations.
-// Partitions (colors) are assigned to instructions as a frontend attribute.
 class MpmdColoring : public HloModulePass {
  public:
   enum class ColorPropagationPriority {
     kWeight,
     kDepth,
     kTopological,
+    kColorDepth,
   };
 
   static ColorPropagationPriority GetColorPropagationPriorityFromString(
@@ -78,29 +77,11 @@ class MpmdColoring : public HloModulePass {
       const absl::flat_hash_map<const HloInstruction*, int64_t>&
           topological_index);
 
-  // For a given `computation` and global module `properties`, compute
-  // a partition color for the isntruction if it has been directly
-  // assigned by the user by either an explicit task block or
-  // an op_name matcher.
-  absl::Status ComputeAssignedColors(HloComputation* computation,
-                                     const InstructionProperties& properties);
-
-  // For a given `computation`, iterate through and inline all explicit
-  // Legate task blocks. This is equivalent to running the CallInliner
-  // on the computation and assigning the scope color as a frontend attribute.
-  absl::StatusOr<bool> InlineExplicitTasks(HloComputation* computation);
-
-  // Assign a color to the given tuple `instruction`, if uniformly colored.
-  absl::Status ColorTuple(HloInstruction* instruction);
-
-  // If the given `instruction`, has not been assigned a color based on
-  // user annotation, but the instruction does have an explicit sharding
-  // then assign the instruction to a partition over the sharding devices
-  // since any instruction explicitly assigned to a given device mesh
-  // must be assigned a specific partition color and cannot be freely
-  // assigned anywhere.
-  absl::StatusOr<std::optional<std::string>> CheckForExplicitShardingColor(
-      HloInstruction* instruction, const InstructionProperties& properties);
+  bool PropagateFromUsersAndOperandsColorDepth(
+      HloInstruction* instruction, const InstructionProperties& properties,
+      FilterVisitFn if_visit,
+      const absl::flat_hash_map<std::string, int64_t>& color_depth,
+      absl::flat_hash_map<HloInstruction*, bool>& recolorable_instructions);
 
   HloPartition* partition_;
   ColorPropagationPriority color_propagation_priority_;
