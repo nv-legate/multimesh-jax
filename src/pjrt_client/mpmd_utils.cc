@@ -823,7 +823,7 @@ absl::StatusOr<bool> EnforceBijectiveTasks(HloComputation* computation) {
           std::string schedule_string,
           GetOptionalTaskValue<std::string>(
               json, std::string(instruction->name()), "schedule", ""));
-      if (schedule_string == "custom") return true;
+      return (schedule_string == "custom");
     }
   }
   return false;

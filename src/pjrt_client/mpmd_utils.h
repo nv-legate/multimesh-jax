@@ -193,15 +193,6 @@ absl::Status RemoveInstructionBackToParameters(HloComputation* computation,
 
 absl::StatusOr<bool> EnforceBijectiveTasks(HloComputation* computation);
 
-template <typename K, typename V>
-V value_or(const absl::flat_hash_map<K, V>& m, const K& k, V v) {
-  auto iter = m.find(k);
-  if (iter == m.end()) {
-    return v;
-  }
-  return iter->second;
-}
-
 // Computes a weight for a given instruction based on the byte size
 // of the instruction. Operations like broadcast have lower weight
 // since they can be reconstructed from a smaller operand

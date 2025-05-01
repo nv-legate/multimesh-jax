@@ -22,6 +22,16 @@
 
 namespace xla {
 namespace {
+
+template <typename K, typename V>
+V value_or(const absl::flat_hash_map<K, V>& m, const K& k, V v) {
+  auto iter = m.find(k);
+  if (iter == m.end()) {
+    return v;
+  }
+  return iter->second;
+}
+
 // Given a partition assigment `color` for the given `instruction`,
 // propagate colorings backward to aliases in the
 // `properties` map.

@@ -10,11 +10,12 @@
 #include "xla/util.h"
 
 namespace xla {
+namespace {
 
-static inline std::vector<int64_t> GetIndicesToUnroll(
+absl::flat_hash_set<int64_t> GetIndicesToUnroll(
     const HloPartition& partition,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
-  std::vector<int64_t> indices_to_unroll;
+  absl::flat_hash_set<int64_t> indices_to_unroll;
 
   auto unroll_task = [&](HloInstruction* call) {
     auto color = Color(call);
@@ -23,21 +24,19 @@ static inline std::vector<int64_t> GetIndicesToUnroll(
 
   for (int64_t task_index = 0; task_index < tasks[0].size(); ++task_index) {
     if (unroll_task(tasks[0][task_index])) {
-      indices_to_unroll.push_back(task_index);
+      indices_to_unroll.insert(task_index);
     }
   }
 
   return indices_to_unroll;
 }
 
-static inline std::vector<std::vector<HloInstruction*>>
-UnrollLoopIncrementTasks(const std::vector<std::vector<HloInstruction*>>& tasks,
-                         const std::vector<int64_t>& indices_to_unroll,
-                         std::vector<std::vector<HloInstruction*>>& schedule) {
+std::vector<std::vector<HloInstruction*>> UnrollLoopIncrementTasks(
+    const std::vector<std::vector<HloInstruction*>>& tasks,
+    const absl::flat_hash_set<int64_t>& indices_to_unroll,
+    std::vector<std::vector<HloInstruction*>>& schedule) {
   const int64_t num_to_unroll = indices_to_unroll.size();
   const int64_t num_iterations = tasks.size();
-
-  if (num_to_unroll == 0) return tasks;
 
   // This function unrolls the loop increment tasks for the unrollable tasks
   // (side effect) tasks and returns the remaining tasks (return value)
@@ -52,21 +51,18 @@ UnrollLoopIncrementTasks(const std::vector<std::vector<HloInstruction*>>& tasks,
   std::vector<std::vector<HloInstruction*>> remaining_tasks(tasks.size());
   for (int64_t iter = 0; iter < num_iterations; ++iter) {
     remaining_tasks[iter].reserve(tasks[iter].size() - num_to_unroll);
-    int64_t task_index = 0;
-    int64_t loop_task_index = 0;
-    while (task_index < tasks[iter].size()) {
-      if (task_index == indices_to_unroll[loop_task_index]) {
-        ++loop_task_index;
-        ++task_index;
-        continue;
+    for (int64_t task_index = 0; task_index < tasks[iter].size();
+         ++task_index) {
+      if (!indices_to_unroll.contains(task_index)) {
+        remaining_tasks[iter].push_back(tasks[iter][task_index]);
       }
-      remaining_tasks[iter].push_back(tasks[iter][task_index]);
-      ++task_index;
     }
   }
 
   return remaining_tasks;
 }
+
+}  // namespace
 
 absl::Status ScheduleWavefront(
     const HloPartition& partition,
@@ -265,7 +261,7 @@ absl::StatusOr<std::vector<std::vector<HloInstruction*>>> ScheduleCustom(
       custom_schedule = *config.custom_schedule;
   std::vector<std::vector<HloInstruction*>> schedule(custom_schedule.size());
 
-  const std::vector<int64_t> indices_to_unroll =
+  const absl::flat_hash_set<int64_t> indices_to_unroll =
       GetIndicesToUnroll(partition, tasks);
   const std::vector<std::vector<HloInstruction*>> remaining_tasks =
       UnrollLoopIncrementTasks(tasks, indices_to_unroll, schedule);
@@ -281,7 +277,7 @@ absl::StatusOr<std::vector<std::vector<HloInstruction*>>> ScheduleCustom(
 absl::StatusOr<std::vector<std::vector<HloInstruction*>>>
 SchedulePrefetchWavefront(
     const HloPartition& partition, const LoopConfig& config,
-    const std::vector<int64_t>& indices_to_unroll,
+    const absl::flat_hash_set<int64_t>& indices_to_unroll,
     const std::vector<std::vector<HloInstruction*>>& tasks) {
   // gpipe schedule the first tasks to get everyone started and to avoid
   // delays later in the pipeline
@@ -307,7 +303,7 @@ absl::StatusOr<std::vector<std::vector<HloInstruction*>>> ScheduleWavefront(
     return ScheduleGpipe(config, tasks);
   }
 
-  const std::vector<int64_t> indices_to_unroll =
+  const absl::flat_hash_set<int64_t> indices_to_unroll =
       GetIndicesToUnroll(partition, tasks);
 
   return SchedulePrefetchWavefront(partition, config, indices_to_unroll, tasks);
@@ -327,7 +323,7 @@ SchedulePrefetchWavefront(
     return ScheduleGpipe(config, tasks);
   }
 
-  const std::vector<int64_t> indices_to_unroll =
+  const absl::flat_hash_set<int64_t> indices_to_unroll =
       GetIndicesToUnroll(partition, tasks);
 
   if (!indices_to_unroll.empty()) {
