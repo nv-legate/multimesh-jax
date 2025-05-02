@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Hello world example with Legate tasks &#8212; Legate-JAX  documentation</title>
+    <title>Hello world example with Legate tasks &#8212; MultiMesh-JAX  documentation</title>
   
   
   
@@ -141,7 +141,7 @@
   
   
   
-    <p class="title logo__title">Legate-JAX  documentation</p>
+    <p class="title logo__title">MultiMesh-JAX  documentation</p>
   
 </a></div>
         <div class="sidebar-primary-item">
@@ -163,8 +163,8 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../api.html">Public API: legate.jax package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="../legate.jax.flax.html">Public API: legate.jax.flax package</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api.html">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
 </ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
 </details></li>
 </ul>
@@ -221,7 +221,7 @@
 <div class="article-header-buttons">
 
 
-<a href="https://github.com/nv-legate/legate-jax" target="_blank"
+<a href="https://github.com/nv-legate/multimesh-jax" target="_blank"
    class="btn btn-sm btn-source-repository-button"
    title="Source repository"
    data-bs-placement="bottom" data-bs-toggle="tooltip"
@@ -342,11 +342,11 @@ document.write(`
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jax-example-with-two-functions">Jax example with two functions</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jax-example-with-spmd-sharding">Jax example with SPMD sharding</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#legate-jax-example-with-mpmd-execution">Legate-Jax example with MPMD execution</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh-for-example-with-mpmd-execution">MultiMesh for example with MPMD execution</a></li>
 </ul>
             </nav>
         </div>
@@ -367,12 +367,12 @@ document.write(`
 <li><p>Familiarity with Jax meshes and devices</p></li>
 </ol>
 </section>
-<section id="initialize-legate-jax">
-<h2>Initialize Legate-Jax<a class="headerlink" href="#initialize-legate-jax" title="Link to this heading">#</a></h2>
-<p>The first step in a Legate-Jax program is to initialize the environment. Before any other imports, <code class="docutils literal notranslate"><span class="pre">jax_plugins.legate.init</span></code> should be called with the appropriate arguments for configuring Legate. This does violate the common Python style rule of top-level imports coming before all code. The parameters for Legate must be configured before importing any Jax functions to ensure that backend clients are initialized properly.</p>
+<section id="initialize-multimesh-for">
+<h2>Initialize MultiMesh for<a class="headerlink" href="#initialize-multimesh-for" title="Link to this heading">#</a></h2>
+<p>The first step in a MultiMesh for program is to initialize the environment. Before any other imports, <code class="docutils literal notranslate"><span class="pre">jax_plugins.multimesh.init</span></code> should be called with the appropriate arguments for configuring Legate. This does violate the common Python style rule of top-level imports coming before all code. The parameters for Legate must be configured before importing any Jax functions to ensure that backend clients are initialized properly.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.legate</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.multimesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
 <span class="n">init</span><span class="p">(</span><span class="n">cpus</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -381,13 +381,13 @@ document.write(`
 </section>
 <section id="import-jax-packages">
 <h2>Import Jax packages<a class="headerlink" href="#import-jax-packages" title="Link to this heading">#</a></h2>
-<p>Once Legate-Jax has been initialized, the standard set of Jax imports can be done. We also import the special Legate-Jax functions.</p>
+<p>Once MultiMesh for has been initialized, the standard set of Jax imports can be done. We also import the special MultiMesh for functions.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">legate.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">task</span><span class="p">,</span> <span class="n">mjit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">task</span><span class="p">,</span> <span class="n">mjit</span>
 </pre></div>
 </div>
 </div>
@@ -463,23 +463,23 @@ I0000 00:00:1725909779.687352 2083386 cpu_client.cc:466] TfrtCpuClient created.
 </div>
 </div>
 </section>
-<section id="legate-jax-example-with-mpmd-execution">
-<h2>Legate-Jax example with MPMD execution<a class="headerlink" href="#legate-jax-example-with-mpmd-execution" title="Link to this heading">#</a></h2>
+<section id="multimesh-for-example-with-mpmd-execution">
+<h2>MultiMesh for example with MPMD execution<a class="headerlink" href="#multimesh-for-example-with-mpmd-execution" title="Link to this heading">#</a></h2>
 <p>Jax generally limits computations to SPMD with all devices executing the same computation.  MPMD patterns where different operations are executed on difference devices can be difficult or impossible to express with native Jax idioms.  Legate adds runtime support for MPMD execution, available in user code through the &#64;task decorator. Instead of running <code class="docutils literal notranslate"><span class="pre">f</span></code> and <code class="docutils literal notranslate"><span class="pre">g</span></code> functions across both devices, we run <code class="docutils literal notranslate"><span class="pre">f</span></code> on device 0 and <code class="docutils literal notranslate"><span class="pre">g</span></code> on device 1.  The output is seen being placed on device 1.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">all_devices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">())</span>
 
-<span class="n">legate_f</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">devices</span><span class="o">=</span><span class="n">all_devices</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">1</span><span class="p">])</span>
-<span class="n">legate_g</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">devices</span><span class="o">=</span><span class="n">all_devices</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">2</span><span class="p">])</span>
+<span class="n">mm_f</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">devices</span><span class="o">=</span><span class="n">all_devices</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">mm_g</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">devices</span><span class="o">=</span><span class="n">all_devices</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">2</span><span class="p">])</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">legate_c</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">legate_g</span><span class="p">(</span><span class="o">*</span><span class="n">legate_f</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
-<span class="n">legate_c</span> <span class="o">=</span> <span class="n">mjit</span><span class="p">(</span><span class="n">legate_c</span><span class="p">,</span> <span class="n">devices</span><span class="o">=</span><span class="n">all_devices</span><span class="p">,</span> <span class="n">in_shardings</span><span class="o">=</span><span class="p">(</span><span class="n">sharding</span><span class="p">,))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">mm_c</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">mm_g</span><span class="p">(</span><span class="o">*</span><span class="n">mm_f</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+<span class="n">mm_c</span> <span class="o">=</span> <span class="n">mjit</span><span class="p">(</span><span class="n">mm_c</span><span class="p">,</span> <span class="n">devices</span><span class="o">=</span><span class="n">all_devices</span><span class="p">,</span> <span class="n">in_shardings</span><span class="o">=</span><span class="p">(</span><span class="n">sharding</span><span class="p">,))</span>
 
 <span class="k">with</span> <span class="n">mesh</span><span class="p">:</span>
   <span class="n">batch</span> <span class="o">=</span> <span class="n">mjit</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">,</span> <span class="n">devices</span><span class="o">=</span><span class="n">all_devices</span><span class="p">,</span> <span class="n">out_shardings</span><span class="o">=</span><span class="n">sharding</span><span class="p">,</span> <span class="n">static_argnums</span><span class="o">=</span><span class="mi">0</span><span class="p">)(</span><span class="mi">8</span><span class="p">)</span>
-  <span class="n">result</span> <span class="o">=</span> <span class="n">legate_c</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+  <span class="n">result</span> <span class="o">=</span> <span class="n">mm_c</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
 <span class="n">result</span><span class="o">.</span><span class="n">devices</span><span class="p">()</span>
 </pre></div>
 </div>
@@ -542,11 +542,11 @@ I0000 00:00:1725909779.687352 2083386 cpu_client.cc:466] TfrtCpuClient created.
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jax-example-with-two-functions">Jax example with two functions</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#jax-example-with-spmd-sharding">Jax example with SPMD sharding</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#legate-jax-example-with-mpmd-execution">Legate-Jax example with MPMD execution</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh-for-example-with-mpmd-execution">MultiMesh for example with MPMD execution</a></li>
 </ul>
   </nav></div>
 
@@ -561,7 +561,7 @@ I0000 00:00:1725909779.687352 2083386 cpu_client.cc:466] TfrtCpuClient created.
   <div class="footer-item">
     
 <p class="component-author">
-By The Legate-JAX authors
+By The MultiMesh-JAX authors
 </p>
 
   </div>
@@ -571,7 +571,7 @@ By The Legate-JAX authors
 
   <p class="copyright">
     
-      © Copyright 2024, The Legate-JAX Authors..
+      © Copyright 2024, The MultiMesh-JAX Authors..
       <br/>
     
   </p>

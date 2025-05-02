@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Getting Started &#8212; Legate-JAX  documentation</title>
+    <title>Getting Started &#8212; MultiMesh-JAX  documentation</title>
   
   
   
@@ -52,8 +52,8 @@
     <script>DOCUMENTATION_OPTIONS.pagename = 'getting-started';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Public API: legate.jax package" href="api.html" />
-    <link rel="prev" title="Legate-JAX: MPMD auto-sharding for JAX" href="index.html" />
+    <link rel="next" title="Public API: multimesh.jax package" href="api.html" />
+    <link rel="prev" title="MultiMesh for JAX: MPMD auto-sharding for JAX" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -141,7 +141,7 @@
   
   
   
-    <p class="title logo__title">Legate-JAX  documentation</p>
+    <p class="title logo__title">MultiMesh-JAX  documentation</p>
   
 </a></div>
         <div class="sidebar-primary-item">
@@ -163,8 +163,8 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="api.html">Public API: legate.jax package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="legate.jax.flax.html">Public API: legate.jax.flax package</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="api.html">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
 </ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
 </details></li>
 </ul>
@@ -221,7 +221,7 @@
 <div class="article-header-buttons">
 
 
-<a href="https://github.com/nv-legate/legate-jax" target="_blank"
+<a href="https://github.com/nv-legate/multimesh-jax" target="_blank"
    class="btn btn-sm btn-source-repository-button"
    title="Source repository"
    data-bs-placement="bottom" data-bs-toggle="tooltip"
@@ -357,33 +357,34 @@ document.write(`
                   
   <section class="tex2jax_ignore mathjax_ignore" id="getting-started">
 <h1>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading">#</a></h1>
-<p>The simplest way to get started is by downloading one of the Legate-JAX containers.
+<p>The simplest way to get started is by downloading one of the MultiMesh for JAX containers.
 There is a full development container which includes all source files and enables
 rebuilding each component.</p>
 <section id="docker-images">
 <h2>Docker Images<a class="headerlink" href="#docker-images" title="Link to this heading">#</a></h2>
 <p>The easiest way to get started is by building images
-using <a class="reference external" href="https://github.com/nv-legate/legate-jax-workflows">Legate-Jax workflows</a>.</p>
+using <a class="reference external" href="https://github.com/nv-legate/multimesh-jax-workflows">MultiMesh for Jax workflows</a>.</p>
 </section>
 <section id="running-jupyter-tutorials-with-docker">
 <h2>Running Jupyter tutorials with Docker<a class="headerlink" href="#running-jupyter-tutorials-with-docker" title="Link to this heading">#</a></h2>
 <p>The recommended way to run the examples is through Docker.
+Note: prebuilt containers are not yet available for open-source.
 To launch a Jupyter notebook in the container for running on CPU
 that can be loaded in a local browser:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-w<span class="w"> </span>/opt/legate-jax/docs/notebooks<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-w<span class="w"> </span>/opt/workspace/multimesh-jax/docs/notebooks<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-p<span class="w"> </span><span class="m">8675</span>:8675<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>gitlab-master.nvidia.com:5005/legate/quickstart.internal/multimesh-jax-dev<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>jupyter<span class="w"> </span>notebook<span class="w"> </span>--allow-root<span class="w"> </span>--ip<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="o">=</span><span class="m">8675</span>
 </pre></div>
 </div>
 <p>The notebook will then be available at the link shown.<br />
 If GPUs are available, then docker can be launched as:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-w<span class="w"> </span>/opt/legate-jax/docs/notebooks<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-w<span class="w"> </span>/opt/workspace/multimesh-jax/docs/notebooks<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-p<span class="w"> </span><span class="m">8675</span>:8675<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--gpus<span class="w"> </span>&lt;N&gt;<span class="w"> </span><span class="se">\ </span>
-<span class="w">  </span>gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>gitlab-master.nvidia.com:5005/legate/quickstart.internal/multimesh-jax-dev<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>jupyter<span class="w"> </span>notebook<span class="w"> </span>--allow-root<span class="w"> </span>--ip<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="o">=</span><span class="m">8675</span>
 </pre></div>
 </div>
@@ -391,9 +392,8 @@ If GPUs are available, then docker can be launched as:</p>
 </section>
 <section id="building-images">
 <h2>Building Images<a class="headerlink" href="#building-images" title="Link to this heading">#</a></h2>
-<p>Instructions for building Legate-JAX can be found in the <a class="reference external" href="https://github.com/nv-legate/legate.jax/blob/main/docker/README.md">README</a>.
-Included in the <code class="docutils literal notranslate"><span class="pre">docker</span></code> folder are scripts showing how to configure, build, and install
-the various components.</p>
+<p>Instructions for building MultiMesh for JAX can be found in the <a class="reference external" href="https://github.com/nv-legate/multimesh-jax-workflows/blob/main/README.md">README</a>,
+which is a monorepo that handles all of the components required for building the plugin.</p>
 </section>
 </section>
 
@@ -414,7 +414,7 @@ the various components.</p>
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Legate-JAX: MPMD auto-sharding for JAX</p>
+        <p class="prev-next-title">MultiMesh for JAX: MPMD auto-sharding for JAX</p>
       </div>
     </a>
     <a class="right-next"
@@ -422,7 +422,7 @@ the various components.</p>
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Public API: legate.jax package</p>
+        <p class="prev-next-title">Public API: multimesh.jax package</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -459,7 +459,7 @@ the various components.</p>
   <div class="footer-item">
     
 <p class="component-author">
-By The Legate-JAX authors
+By The MultiMesh-JAX authors
 </p>
 
   </div>
@@ -469,7 +469,7 @@ By The Legate-JAX authors
 
   <p class="copyright">
     
-      © Copyright 2024, The Legate-JAX Authors..
+      © Copyright 2024, The MultiMesh-JAX Authors..
       <br/>
     
   </p>

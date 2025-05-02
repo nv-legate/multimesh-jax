@@ -1,6 +1,6 @@
-.. currentmodule:: legate.jax
+.. currentmodule:: multimesh.jax
 
-Public API: legate.jax package
+Public API: multimesh.jax package
 ==============================
 
 Subpackages
@@ -9,7 +9,7 @@ Subpackages
 .. toctree::
    :maxdepth: 1
 
-   legate.jax.flax
+   multimesh.jax.flax
 
 Task transformations
 --------------------

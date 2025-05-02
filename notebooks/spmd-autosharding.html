@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Logical autosharding for SPMD &#8212; Legate-JAX  documentation</title>
+    <title>Logical autosharding for SPMD &#8212; MultiMesh-JAX  documentation</title>
   
   
   
@@ -141,7 +141,7 @@
   
   
   
-    <p class="title logo__title">Legate-JAX  documentation</p>
+    <p class="title logo__title">MultiMesh-JAX  documentation</p>
   
 </a></div>
         <div class="sidebar-primary-item">
@@ -163,8 +163,8 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../api.html">Public API: legate.jax package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="../legate.jax.flax.html">Public API: legate.jax.flax package</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api.html">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
 </ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
 </details></li>
 </ul>
@@ -221,7 +221,7 @@
 <div class="article-header-buttons">
 
 
-<a href="https://github.com/nv-legate/legate-jax" target="_blank"
+<a href="https://github.com/nv-legate/multimesh-jax" target="_blank"
    class="btn btn-sm btn-source-repository-button"
    title="Source repository"
    data-bs-placement="bottom" data-bs-toggle="tooltip"
@@ -342,7 +342,7 @@ document.write(`
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#regular-jax-create-layers-with-explicit-spmd-sharding-annotations">Regular Jax: create layers with explicit SPMD sharding annotations</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#appendix">Appendix</a><ul class="visible nav section-nav flex-column">
@@ -370,12 +370,12 @@ document.write(`
 <li><p>Familiarity with the concepts of tensor sharding and parallelism</p></li>
 </ol>
 </section>
-<section id="initialize-legate-jax">
-<h2>Initialize Legate-Jax<a class="headerlink" href="#initialize-legate-jax" title="Link to this heading">#</a></h2>
-<p>The first step in a Legate-Jax program is to initialize the environment. Before any other imports, <code class="docutils literal notranslate"><span class="pre">jax_plugins.legate.init</span></code> should be called with the appropriate arguments for configuring Legate. This does violate the common Python style rule of top-level imports coming before all code. It is possible to configure Legate ahead-of-time with environment variables, but the programmatic method here is generally cleaner and easier.  The parameters for Legate must be configured before importing any Jax functions.</p>
+<section id="initialize-multimesh-for">
+<h2>Initialize MultiMesh for<a class="headerlink" href="#initialize-multimesh-for" title="Link to this heading">#</a></h2>
+<p>The first step in a MultiMesh for program is to initialize the environment. Before any other imports, <code class="docutils literal notranslate"><span class="pre">jax_plugins.multimesh.init</span></code> should be called with the appropriate arguments for configuring MultiMesh. This does violate the common Python style rule of top-level imports coming before all code. It is possible to configure MultiMesh ahead-of-time with environment variables, but the programmatic method here is generally cleaner and easier.  The parameters for MultiMesh must be configured before importing any Jax functions.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.legate</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.multimesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
 
 <span class="n">init</span><span class="p">(</span><span class="n">cpus</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 </pre></div>
@@ -385,7 +385,7 @@ document.write(`
 </section>
 <section id="import-jax-packages">
 <h2>Import Jax packages<a class="headerlink" href="#import-jax-packages" title="Link to this heading">#</a></h2>
-<p>Once Legate-Jax has been initialized, a standard set of Jax imports can be done.</p>
+<p>Once MultiMesh for has been initialized, a standard set of Jax imports can be done.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
@@ -393,7 +393,7 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mesh</span><span class="p">,</span> <span class="n">NamedSharding</span><span class="p">,</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax.debug</span><span class="w"> </span><span class="kn">import</span> <span class="n">visualize_array_sharding</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">legate.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">with_sharding_constraint</span><span class="p">,</span> <span class="n">parallelize</span><span class="p">,</span> <span class="n">task</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">with_sharding_constraint</span><span class="p">,</span> <span class="n">parallelize</span><span class="p">,</span> <span class="n">task</span>
 </pre></div>
 </div>
 </div>
@@ -512,7 +512,7 @@ Params
 </div>
 </div>
 </div>
-<p>Legate-Jax follows a model of <em>logical autosharding</em>, which slighly changes the usual Jax flow.
+<p>MultiMesh for follows a model of <em>logical autosharding</em>, which slightly changes the usual Jax flow.
 The order of steps is now:</p>
 <ol class="arabic simple">
 <li><p>Writing numpy-like code that implements the model</p></li>
@@ -538,8 +538,8 @@ The order of steps is now:</p>
 </div>
 </div>
 </div>
-<p>Legate-Jax provides a helper function to simplify the workflow.
-The <code class="docutils literal notranslate"><span class="pre">legate.jax.parallelize</span></code> function takes the <code class="docutils literal notranslate"><span class="pre">get_input_batch</span></code> and <code class="docutils literal notranslate"><span class="pre">init_params</span></code> functions as inputs. It executes an ahead-of-time compilation with autosharding and returns the <code class="docutils literal notranslate"><span class="pre">get_sharded_batch</span></code> and <code class="docutils literal notranslate"><span class="pre">get_sharded_params</span></code> functions.</p>
+<p>MultiMesh for provides a helper function to simplify the workflow.
+The <code class="docutils literal notranslate"><span class="pre">multimesh.jax.parallelize</span></code> function takes the <code class="docutils literal notranslate"><span class="pre">get_input_batch</span></code> and <code class="docutils literal notranslate"><span class="pre">init_params</span></code> functions as inputs. It executes an ahead-of-time compilation with autosharding and returns the <code class="docutils literal notranslate"><span class="pre">get_sharded_batch</span></code> and <code class="docutils literal notranslate"><span class="pre">get_sharded_params</span></code> functions.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sharded_model</span><span class="p">,</span> <span class="n">init_sharded_params</span><span class="p">,</span> <span class="n">get_sharded_batch</span> <span class="o">=</span> <span class="n">parallelize</span><span class="p">(</span>
@@ -594,18 +594,18 @@ Params
 </pre>
 </div></div>
 </div>
-<p>What we see in the debug output and the visualization is replicated sharding - a single block replicated to all CPUs. In the previous compilation, there was no logical task context to define how <em>logical autosharding</em> should be converted to physical shardings. <code class="docutils literal notranslate"><span class="pre">legate.jax</span></code> provides the <code class="docutils literal notranslate"><span class="pre">task</span></code> transformation to create this context. We define a 1-D mesh and map the logical <code class="docutils literal notranslate"><span class="pre">batch</span></code> and <code class="docutils literal notranslate"><span class="pre">model</span></code> axis to the device <code class="docutils literal notranslate"><span class="pre">x</span></code> axis.</p>
+<p>What we see in the debug output and the visualization is replicated sharding - a single block replicated to all CPUs. In the previous compilation, there was no logical task context to define how <em>logical autosharding</em> should be converted to physical shardings. <code class="docutils literal notranslate"><span class="pre">multimesh.jax</span></code> provides the <code class="docutils literal notranslate"><span class="pre">task</span></code> transformation to create this context. We define a 1-D mesh and map the logical <code class="docutils literal notranslate"><span class="pre">batch</span></code> and <code class="docutils literal notranslate"><span class="pre">model</span></code> axis to the device <code class="docutils literal notranslate"><span class="pre">x</span></code> axis.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">legate_model</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> 
-                    <span class="n">devices</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">()),</span>
-                    <span class="n">device_axes</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,),</span>
-                    <span class="n">logical_axes</span><span class="o">=</span><span class="p">(</span>
-                      <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
-                      <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
-                    <span class="p">))</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">mm_model</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> 
+                <span class="n">devices</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">()),</span>
+                <span class="n">device_axes</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,),</span>
+                <span class="n">logical_axes</span><span class="o">=</span><span class="p">(</span>
+                  <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+                  <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+                <span class="p">))</span>
 <span class="n">sharded_model</span><span class="p">,</span> <span class="n">init_sharded_params</span><span class="p">,</span> <span class="n">get_sharded_batch</span> <span class="o">=</span> <span class="n">parallelize</span><span class="p">(</span>
-    <span class="n">legate_model</span><span class="p">,</span> <span class="n">init_params</span><span class="o">=</span><span class="n">init_params</span><span class="p">,</span> <span class="n">get_input_batch</span><span class="o">=</span><span class="n">get_input_batch</span>
+    <span class="n">mm_model</span><span class="p">,</span> <span class="n">init_params</span><span class="o">=</span><span class="n">init_params</span><span class="p">,</span> <span class="n">get_input_batch</span><span class="o">=</span><span class="n">get_input_batch</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -673,7 +673,7 @@ Params
 <span class="n">data_loader</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">8</span><span class="p">),</span> <span class="n">out_shardings</span><span class="o">=</span><span class="n">input_sharding</span><span class="p">)</span>
 <span class="n">example_batch</span> <span class="o">=</span> <span class="n">data_loader</span><span class="p">()</span>
 <span class="n">sharded_model</span><span class="p">,</span> <span class="n">init_sharded_params</span> <span class="o">=</span> <span class="n">parallelize</span><span class="p">(</span>
-    <span class="n">legate_model</span><span class="p">,</span> <span class="n">init_params</span><span class="o">=</span><span class="n">init_params</span><span class="p">,</span> <span class="n">initial_batch</span><span class="o">=</span><span class="n">example_batch</span>
+    <span class="n">mm_model</span><span class="p">,</span> <span class="n">init_params</span><span class="o">=</span><span class="n">init_params</span><span class="p">,</span> <span class="n">initial_batch</span><span class="o">=</span><span class="n">example_batch</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -701,8 +701,8 @@ I0000 00:00:1725909887.198362 2088951 hlo_module_config.h:188] Overwriting use_s
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">param_shardings</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree_map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">AUTO</span><span class="p">(</span><span class="n">mesh</span><span class="p">),</span> <span class="n">param_shapes</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Once the abstract shapes are know, the function is compiled in a <code class="docutils literal notranslate"><span class="pre">legate.jax</span></code> autosharding context:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">legate</span><span class="o">.</span><span class="n">jax</span><span class="o">.</span><span class="n">autoshard</span><span class="p">(</span><span class="kc">True</span><span class="p">):</span>
+<p>Once the abstract shapes are known, the function is compiled in a <code class="docutils literal notranslate"><span class="pre">multimesh.jax</span></code> autosharding context:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">multimesh</span><span class="o">.</span><span class="n">jax</span><span class="o">.</span><span class="n">autoshard</span><span class="p">(</span><span class="kc">True</span><span class="p">):</span>
   <span class="n">jit_f</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> 
           <span class="n">in_shardings</span><span class="o">=</span><span class="p">(</span><span class="n">param_shardings</span><span class="p">,</span> <span class="n">batch_sharding</span><span class="p">),</span> 
           <span class="n">out_shardings</span><span class="o">=</span><span class="n">out_shardings</span><span class="p">)</span>
@@ -760,7 +760,7 @@ I0000 00:00:1725909887.198362 2088951 hlo_module_config.h:188] Overwriting use_s
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#regular-jax-create-layers-with-explicit-spmd-sharding-annotations">Regular Jax: create layers with explicit SPMD sharding annotations</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#appendix">Appendix</a><ul class="visible nav section-nav flex-column">
@@ -782,7 +782,7 @@ I0000 00:00:1725909887.198362 2088951 hlo_module_config.h:188] Overwriting use_s
   <div class="footer-item">
     
 <p class="component-author">
-By The Legate-JAX authors
+By The MultiMesh-JAX authors
 </p>
 
   </div>
@@ -792,7 +792,7 @@ By The Legate-JAX authors
 
   <p class="copyright">
     
-      © Copyright 2024, The Legate-JAX Authors..
+      © Copyright 2024, The MultiMesh-JAX Authors..
       <br/>
     
   </p>

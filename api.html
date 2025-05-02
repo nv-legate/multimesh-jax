@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Public API: legate.jax package &#8212; Legate-JAX  documentation</title>
+    <title>Public API: multimesh.jax package &#8212; MultiMesh-JAX  documentation</title>
   
   
   
@@ -52,7 +52,7 @@
     <script>DOCUMENTATION_OPTIONS.pagename = 'api';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Public API: legate.jax.flax package" href="legate.jax.flax.html" />
+    <link rel="next" title="Public API: multimesh.jax.flax package" href="multimesh.jax.flax.html" />
     <link rel="prev" title="Getting Started" href="getting-started.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -141,7 +141,7 @@
   
   
   
-    <p class="title logo__title">Legate-JAX  documentation</p>
+    <p class="title logo__title">MultiMesh-JAX  documentation</p>
   
 </a></div>
         <div class="sidebar-primary-item">
@@ -163,8 +163,8 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current nav bd-sidenav">
-<li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">Public API: legate.jax package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="legate.jax.flax.html">Public API: legate.jax.flax package</a></li>
+<li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
 </ul><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
 </details></li>
 </ul>
@@ -221,7 +221,7 @@
 <div class="article-header-buttons">
 
 
-<a href="https://github.com/nv-legate/legate-jax" target="_blank"
+<a href="https://github.com/nv-legate/multimesh-jax" target="_blank"
    class="btn btn-sm btn-source-repository-button"
    title="Source repository"
    data-bs-placement="bottom" data-bs-toggle="tooltip"
@@ -331,7 +331,7 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>Public API: legate.jax package</h1>
+    <h1>Public API: multimesh.jax package</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
@@ -359,13 +359,13 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="public-api-legate-jax-package">
-<h1>Public API: legate.jax package<a class="headerlink" href="#public-api-legate-jax-package" title="Link to this heading">#</a></h1>
+  <section id="public-api-multimesh-jax-package">
+<h1>Public API: multimesh.jax package<a class="headerlink" href="#public-api-multimesh-jax-package" title="Link to this heading">#</a></h1>
 <section id="subpackages">
 <h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading">#</a></h2>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="legate.jax.flax.html">Public API: legate.jax.flax package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
 </ul>
 </div>
 </section>
@@ -373,19 +373,19 @@ document.write(`
 <h2>Task transformations<a class="headerlink" href="#task-transformations" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/legate.jax.task.html#legate.jax.task" title="legate.jax.task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">task</span></code></a>(fun[, name, mesh, devices, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.task.html#multimesh.jax.task" title="multimesh.jax.task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">task</span></code></a>(fun[, name, mesh, devices, ...])</p></td>
 <td><p>Wraps a function in an auto-sharding task context</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/legate.jax.microbatch.html#legate.jax.microbatch" title="legate.jax.microbatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">microbatch</span></code></a>(fun, dim, size[, argnum, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.microbatch.html#multimesh.jax.microbatch" title="multimesh.jax.microbatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">microbatch</span></code></a>(fun, dim, size[, argnum, ...])</p></td>
 <td><p>Unrolls a function along an axis into a microbatch loop.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/legate.jax.parallelize.html#legate.jax.parallelize" title="legate.jax.parallelize"><code class="xref py py-obj docutils literal notranslate"><span class="pre">parallelize</span></code></a>(fun, *[, init_params, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.parallelize.html#multimesh.jax.parallelize" title="multimesh.jax.parallelize"><code class="xref py py-obj docutils literal notranslate"><span class="pre">parallelize</span></code></a>(fun, *[, init_params, ...])</p></td>
 <td><p>Compiles an abstract function into a sharded function</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/legate.jax.with_sharding_constraint.html#legate.jax.with_sharding_constraint" title="legate.jax.with_sharding_constraint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_sharding_constraint</span></code></a>(x, axis_resources)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.with_sharding_constraint.html#multimesh.jax.with_sharding_constraint" title="multimesh.jax.with_sharding_constraint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_sharding_constraint</span></code></a>(x, axis_resources)</p></td>
 <td><p>Applies logical sharding annotations to the input(s)</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/legate.jax.register_task.html#legate.jax.register_task" title="legate.jax.register_task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_task</span></code></a>(regex, *[, name, mesh, dims, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.register_task.html#multimesh.jax.register_task" title="multimesh.jax.register_task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_task</span></code></a>(regex, *[, name, mesh, dims, ...])</p></td>
 <td><p>Registers a name or regex-based task autosharding context</p></td>
 </tr>
 </tbody>
@@ -396,26 +396,26 @@ document.write(`
 <h2>Compiler contexts<a class="headerlink" href="#compiler-contexts" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/legate.jax.autoshard.html#legate.jax.autoshard" title="legate.jax.autoshard"><code class="xref py py-obj docutils literal notranslate"><span class="pre">autoshard</span></code></a>([autoshard])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.autoshard.html#multimesh.jax.autoshard" title="multimesh.jax.autoshard"><code class="xref py py-obj docutils literal notranslate"><span class="pre">autoshard</span></code></a>([autoshard])</p></td>
 <td><p>Opens a context where shardings constraints become logical shardings.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/legate.jax.context.html#legate.jax.context" title="legate.jax.context"><code class="xref py py-obj docutils literal notranslate"><span class="pre">context</span></code></a>([autoshard, enable_recomputation, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.context.html#multimesh.jax.context" title="multimesh.jax.context"><code class="xref py py-obj docutils literal notranslate"><span class="pre">context</span></code></a>([autoshard, enable_recomputation, ...])</p></td>
 <td><p>Helper function to configure multiple contexts in a single manager.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/legate.jax.enable_fast_path.html#legate.jax.enable_fast_path" title="legate.jax.enable_fast_path"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_fast_path</span></code></a>([enable, context_value])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.enable_fast_path.html#multimesh.jax.enable_fast_path" title="multimesh.jax.enable_fast_path"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_fast_path</span></code></a>([enable, context_value])</p></td>
 <td><p>(en|dis)ables native Jax fallthrough path for jitted functions.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/legate.jax.enable_recomputation.html#legate.jax.enable_recomputation" title="legate.jax.enable_recomputation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_recomputation</span></code></a>([enable, context_value])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.enable_recomputation.html#multimesh.jax.enable_recomputation" title="multimesh.jax.enable_recomputation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_recomputation</span></code></a>([enable, context_value])</p></td>
 <td><p>(dis|en)ables comm-avoiding recompute of inter-task intermediates.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/legate.jax.enable_task_fusion.html#legate.jax.enable_task_fusion" title="legate.jax.enable_task_fusion"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_task_fusion</span></code></a>([enable, context_value])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.enable_task_fusion.html#multimesh.jax.enable_task_fusion" title="multimesh.jax.enable_task_fusion"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_task_fusion</span></code></a>([enable, context_value])</p></td>
 <td><p>Sets whether tasks should be allowed to fuse.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/legate.jax.only_fuse_loop_tasks.html#legate.jax.only_fuse_loop_tasks" title="legate.jax.only_fuse_loop_tasks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">only_fuse_loop_tasks</span></code></a>([enable, context_value])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.only_fuse_loop_tasks.html#multimesh.jax.only_fuse_loop_tasks" title="multimesh.jax.only_fuse_loop_tasks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">only_fuse_loop_tasks</span></code></a>([enable, context_value])</p></td>
 <td><p>Sets whether tasks outside microbatch loops should be allowed to fuse.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/legate.jax.ignore_transforms.html#legate.jax.ignore_transforms" title="legate.jax.ignore_transforms"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ignore_transforms</span></code></a>([ignore])</p></td>
-<td><p>Sets debug context where all Legate transformations are no-ops.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.ignore_transforms.html#multimesh.jax.ignore_transforms" title="multimesh.jax.ignore_transforms"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ignore_transforms</span></code></a>([ignore])</p></td>
+<td><p>Sets debug context where all MultiMesh transformations are no-ops.</p></td>
 </tr>
 </tbody>
 </table>
@@ -444,11 +444,11 @@ document.write(`
       </div>
     </a>
     <a class="right-next"
-       href="legate.jax.flax.html"
+       href="multimesh.jax.flax.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Public API: legate.jax.flax package</p>
+        <p class="prev-next-title">Public API: multimesh.jax.flax package</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -489,7 +489,7 @@ document.write(`
   <div class="footer-item">
     
 <p class="component-author">
-By The Legate-JAX authors
+By The MultiMesh-JAX authors
 </p>
 
   </div>
@@ -499,7 +499,7 @@ By The Legate-JAX authors
 
   <p class="copyright">
     
-      © Copyright 2024, The Legate-JAX Authors..
+      © Copyright 2024, The MultiMesh-JAX Authors..
       <br/>
     
   </p>

@@ -1,7 +1,7 @@
-Legate-JAX: MPMD auto-sharding for JAX
+MultiMesh for JAX: MPMD auto-sharding for JAX
 ======================================
 
-Legate-JAX provides a framework for creating `task` contexts within large computations.
+MultiMesh for JAX provides a framework for creating `task` contexts within large computations.
 This allows different subcomputations to be placed on different GPU submeshes to 
 implement, e.g. pipeline parallelism. It also enables flexibly resharding tensors
 based on logical names.
@@ -16,14 +16,14 @@ based on logical names.
       :class-card: sd-border-0
       :shadow: None
 
-      Legate-JAX uses idiomatic JAX transforms to assign submesh contexts to functions or Flax modules
+      MultiMesh for JAX uses idiomatic JAX transforms to assign submesh contexts to functions or Flax modules
 
    .. grid-item-card:: Plugin Installation
       :columns: 12 6 6 4
       :class-card: sd-border-0
       :shadow: None
 
-      Legate-JAX adds compiler and runtime functionality via the `jax_plugins` interface
+      MultiMesh for JAX adds compiler and runtime functionality via the `jax_plugins` interface
 
 .. toctree::
    :hidden:
