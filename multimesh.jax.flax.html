@@ -171,7 +171,6 @@
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1 has-children"><a class="reference internal" href="tutorials.html">Tutorials</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="notebooks/hello-world.html">Hello world example with Legate tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/flax-mpmd.html">Pipeline example with simple MLP layers</a></li>
@@ -360,10 +359,10 @@ document.write(`
 <h2>Task transformations<a class="headerlink" href="#task-transformations" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
 <tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">task</span></code>(model[, name, mesh, devices, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.flax.task.html#multimesh.jax.flax.task" title="multimesh.jax.flax.task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">task</span></code></a>(model[, name, mesh, devices, ...])</p></td>
 <td><p>Wraps a Flax module in an auto-sharding task context</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">parallelize_step</span></code>(model, optimizer, mesh[, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.flax.parallelize_step.html#multimesh.jax.flax.parallelize_step" title="multimesh.jax.flax.parallelize_step"><code class="xref py py-obj docutils literal notranslate"><span class="pre">parallelize_step</span></code></a>(model, optimizer, mesh[, ...])</p></td>
 <td><p>Combines model loss function and optimizer into an autosharded step function</p></td>
 </tr>
 </tbody>
@@ -374,10 +373,10 @@ document.write(`
 <h2>Logical sharding annotations<a class="headerlink" href="#logical-sharding-annotations" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
 <tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">shard_axes</span></code>(*args)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.flax.shard_axes.html#multimesh.jax.flax.shard_axes" title="multimesh.jax.flax.shard_axes"><code class="xref py py-obj docutils literal notranslate"><span class="pre">shard_axes</span></code></a>(*args)</p></td>
 <td><p>Helper function to simplify naming axes of Flax parameters</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_sharding_constraint</span></code>(x, axis_resources)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.flax.with_sharding_constraint.html#multimesh.jax.flax.with_sharding_constraint" title="multimesh.jax.flax.with_sharding_constraint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_sharding_constraint</span></code></a>(x, axis_resources)</p></td>
 <td><p>Applies logical sharding annotations to the input(s)</p></td>
 </tr>
 </tbody>
@@ -457,7 +456,7 @@ By The MultiMesh-JAX authors
 
   <p class="copyright">
     
-      © Copyright 2024, The MultiMesh-JAX Authors..
+      © Copyright 2025, The MultiMesh-JAX Authors..
       <br/>
     
   </p>

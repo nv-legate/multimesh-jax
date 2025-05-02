@@ -1,10 +1,12 @@
 MultiMesh for JAX: MPMD auto-sharding for JAX
 ======================================
 
-MultiMesh for JAX provides a framework for creating `task` contexts within large computations.
-This allows different subcomputations to be placed on different GPU submeshes to 
-implement, e.g. pipeline parallelism. It also enables flexibly resharding tensors
-based on logical names.
+MultiMesh for JAX provides a framework for creating `task` contexts within jitted computations,
+allowing different subcomputations to be placed on different GPU submeshes. These
+`task` computations can be combined inside a global `jit` with data resharding across submeshes
+occurring automatically. MultiMesh therefore enable pipeline parallelism to be easily expressed.
+Standard Jax SPMD sharding idioms can be used within each `task`,
+enabling full N-dimension parallelism.
 
 .. grid:: 2
    :margin: 0

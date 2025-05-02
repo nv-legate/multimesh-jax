@@ -171,7 +171,6 @@
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="current nav bd-sidenav">
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="../tutorials.html">Tutorials</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="hello-world.html">Hello world example with Legate tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">Pipeline example with simple MLP layers</a></li>
@@ -506,8 +505,8 @@ MultiMesh for emphasizes logical autosharding - using descriptive names rather t
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-04-11 16:51:20,072:jax._src.xla_bridge:1004: Platform &#39;legate&#39; is experimental and not all JAX functionality may be correctly supported!
-2025-04-11 16:51:21.992142: W ./xla/service/hlo_module_config.h:193] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-05-01 21:25:05,307:jax._src.xla_bridge:1004: Platform &#39;multimesh&#39; is experimental and not all JAX functionality may be correctly supported!
+2025-05-01 21:25:07.873985: W ./xla/service/hlo_module_config.h:193] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
 </pre></div>
 </div>
 </div>
@@ -526,7 +525,7 @@ MultiMesh for emphasizes logical autosharding - using descriptive names rather t
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Loss =  159.94763
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Loss =  64.85133
 </pre></div>
 </div>
 </div>
@@ -564,32 +563,32 @@ REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=Partiti
 (4, 4)
 </pre></div>
 </div>
-<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌──────────────┐
-│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>│
-└──────────────┘
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌─────────────────┐
+│MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>│
+└─────────────────┘
 </pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌────────┐
-│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>│
-├────────┤
-│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>│
-├────────┤
-│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>│
-├────────┤
-│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>│
-└────────┘
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌───────────┐
+│MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>│
+├───────────┤
+│MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>│
+├───────────┤
+│MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>│
+├───────────┤
+│MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>│
+└───────────┘
 </pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌──────────────┐
-│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>│
-└──────────────┘
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌─────────────────┐
+│MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>│
+└─────────────────┘
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌───────────────────────┐
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>      │
 └───────────────────────┘
 </pre>
 </div></div>
@@ -675,7 +674,7 @@ By The MultiMesh-JAX authors
 
   <p class="copyright">
     
-      © Copyright 2024, The MultiMesh-JAX Authors..
+      © Copyright 2025, The MultiMesh-JAX Authors..
       <br/>
     
   </p>

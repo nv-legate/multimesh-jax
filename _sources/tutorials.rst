@@ -11,7 +11,6 @@ or deployed codebases.
    :maxdepth: 1
    :caption: Task API for pure JAX functions
 
-   notebooks/hello-world
    notebooks/spmd-autosharding
    notebooks/mpmd-autosharding
 

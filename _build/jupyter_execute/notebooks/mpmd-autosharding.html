@@ -171,7 +171,6 @@
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../tutorials.html">Tutorials</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/hello-world.html">Hello world example with Legate tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/flax-mpmd.html">Pipeline example with simple MLP layers</a></li>
@@ -455,9 +454,7 @@ Previously we did an SPMD problem, which used a uniform mesh across the whole mo
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Platform &#39;legate&#39; is experimental and not all JAX functionality may be correctly supported!
-WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
-I0000 00:00:1725909873.850320 2087960 cpu_client.cc:466] TfrtCpuClient created.
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-05-01 21:20:41,934:jax._src.xla_bridge:1004: Platform &#39;multimesh&#39; is experimental and not all JAX functionality may be correctly supported!
 </pre></div>
 </div>
 </div>
@@ -486,12 +483,7 @@ I0000 00:00:1725909873.850320 2087960 cpu_client.cc:466] TfrtCpuClient created.
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>W0000 00:00:1725909873.946196 2087960 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909873.946210 2087960 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
-W0000 00:00:1725909873.947315 2087960 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909873.947325 2087960 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
-W0000 00:00:1725909873.947612 2087960 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909873.947620 2087960 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-05-01 21:20:43.544764: W ./xla/service/hlo_module_config.h:193] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
 </pre></div>
 </div>
 </div>
@@ -514,26 +506,26 @@ Param 2
 </pre></div>
 </div>
 <div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌───────────────────────┐
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>      │
 └───────────────────────┘
 </pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌────────┬────────┬────────┬────────┐
-│        │        │        │        │
-│        │        │        │        │
-│        │        │        │        │
-│        │        │        │        │
-│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>│LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>│
-│        │        │        │        │
-│        │        │        │        │
-│        │        │        │        │
-│        │        │        │        │
-└────────┴────────┴────────┴────────┘
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌───────────┬───────────┬───────────┬───────────┐
+│           │           │           │           │
+│           │           │           │           │
+│           │           │           │           │
+│           │           │           │           │
+│MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>│MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>│MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>│MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>│
+│           │           │           │           │
+│           │           │           │           │
+│           │           │           │           │
+│           │           │           │           │
+└───────────┴───────────┴───────────┴───────────┘
 </pre>
 </div></div>
 </div>
@@ -547,13 +539,13 @@ Param 2
 </div>
 <div class="cell_output docutils container">
 <div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌───────────────────────┐
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>      │
 └───────────────────────┘
 </pre>
 </div></div>
@@ -575,21 +567,21 @@ Param 2
 </div>
 <div class="cell_output docutils container">
 <div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">┌───────────────────────┐
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">0</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>      │
 ├───────────────────────┤
-│       LEGATE <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>        │
+│      MULTIMESH <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>      │
 └───────────────────────┘
 </pre>
 </div></div>
@@ -604,14 +596,7 @@ Param 2
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>W0000 00:00:1725909874.992275 2087960 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909874.992290 2087960 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
-W0000 00:00:1725909874.993265 2087960 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909874.993274 2087960 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
-W0000 00:00:1725909874.993470 2087960 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909874.993477 2087960 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
-W0000 00:00:1725909874.993710 2087960 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909874.993716 2087960 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-05-01 21:20:45.058192: W ./xla/service/hlo_module_config.h:193] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
 </pre></div>
 </div>
 </div>
@@ -675,7 +660,7 @@ By The MultiMesh-JAX authors
 
   <p class="copyright">
     
-      © Copyright 2024, The MultiMesh-JAX Authors..
+      © Copyright 2025, The MultiMesh-JAX Authors..
       <br/>
     
   </p>

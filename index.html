@@ -172,7 +172,6 @@
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1 has-children"><a class="reference internal" href="tutorials.html">Tutorials</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="notebooks/hello-world.html">Hello world example with Legate tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/flax-mpmd.html">Pipeline example with simple MLP layers</a></li>
@@ -346,10 +345,12 @@ document.write(`
                   
   <section id="multimesh-for-jax-mpmd-auto-sharding-for-jax">
 <h1>MultiMesh for JAX: MPMD auto-sharding for JAX<a class="headerlink" href="#multimesh-for-jax-mpmd-auto-sharding-for-jax" title="Link to this heading">#</a></h1>
-<p>MultiMesh for JAX provides a framework for creating <cite>task</cite> contexts within large computations.
-This allows different subcomputations to be placed on different GPU submeshes to
-implement, e.g. pipeline parallelism. It also enables flexibly resharding tensors
-based on logical names.</p>
+<p>MultiMesh for JAX provides a framework for creating <cite>task</cite> contexts within jitted computations,
+allowing different subcomputations to be placed on different GPU submeshes. These
+<cite>task</cite> computations can be combined inside a global <cite>jit</cite> with data resharding across submeshes
+occurring automatically. MultiMesh therefore enable pipeline parallelism to be easily expressed.
+Standard Jax SPMD sharding idioms can be used within each <cite>task</cite>,
+enabling full N-dimension parallelism.</p>
 <div class="sd-container-fluid sd-sphinx-override sd-m-0 sd-p-0 docutils">
 <div class="sd-row sd-row-cols-2 sd-row-cols-xs-2 sd-row-cols-sm-2 sd-row-cols-md-2 sd-row-cols-lg-2 sd-g-0 sd-g-xs-0 sd-g-sm-0 sd-g-md-0 sd-g-lg-0 docutils">
 <div class="sd-col sd-d-flex-row sd-col-12 sd-col-xs-12 sd-col-sm-6 sd-col-md-6 sd-col-lg-4 docutils">
@@ -426,7 +427,7 @@ By The MultiMesh-JAX authors
 
   <p class="copyright">
     
-      © Copyright 2024, The MultiMesh-JAX Authors..
+      © Copyright 2025, The MultiMesh-JAX Authors..
       <br/>
     
   </p>

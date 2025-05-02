@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Pipeline example with simple MLP layers &#8212; Legate-JAX  documentation</title>
+    <title>Pipeline example with simple MLP layers &#8212; MultiMesh-JAX  documentation</title>
   
   
   
@@ -141,7 +141,7 @@
   
   
   
-    <p class="title logo__title">Legate-JAX  documentation</p>
+    <p class="title logo__title">MultiMesh-JAX  documentation</p>
   
 </a></div>
         <div class="sidebar-primary-item">
@@ -163,15 +163,14 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../api.html">Public API: legate.jax package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="../../../../../legate.jax.flax.html">Public API: legate.jax.flax package</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../api.html">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
 </ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
 </details></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../tutorials.html">Tutorials</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/hello-world.html">Hello world example with Legate tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/flax-mpmd.html">Pipeline example with simple MLP layers</a></li>
@@ -221,7 +220,7 @@
 <div class="article-header-buttons">
 
 
-<a href="https://github.com/nv-legate/legate-jax" target="_blank"
+<a href="https://github.com/nv-legate/multimesh-jax" target="_blank"
    class="btn btn-sm btn-source-repository-button"
    title="Source repository"
    data-bs-placement="bottom" data-bs-toggle="tooltip"
@@ -343,7 +342,7 @@ document.write(`
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#optional-but-helpful-to-know">Optional, but helpful, to know</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-single-layer-with-sharding-annotations">Create single layer with sharding annotations</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-full-model-with-pipelined-layers">Create full model with pipelined layers</a></li>
@@ -369,7 +368,7 @@ document.write(`
 <li><p>A basic knowledge of Jax and numpy</p></li>
 <li><p>Familiarity with the concepts of tensor sharding and parallelism</p></li>
 <li><p>Familiarity with basic neural network concepts like dense layers, activation functions, and backprop</p></li>
-<li><p>The previous tutorials on SPMD/MPMD autosharding with Legate-Jax</p></li>
+<li><p>The previous tutorials on SPMD/MPMD autosharding with MultiMesh for</p></li>
 </ol>
 </section>
 <section id="optional-but-helpful-to-know">
@@ -379,12 +378,12 @@ document.write(`
 <li><p>Optax package with different optimizers</p></li>
 </ol>
 </section>
-<section id="initialize-legate-jax">
-<h2>Initialize Legate-Jax<a class="headerlink" href="#initialize-legate-jax" title="Link to this heading">#</a></h2>
-<p>As in the previous examples, the first step in a Legate-Jax program is to initialize the environment.</p>
+<section id="initialize-multimesh-for">
+<h2>Initialize MultiMesh for<a class="headerlink" href="#initialize-multimesh-for" title="Link to this heading">#</a></h2>
+<p>As in the previous examples, the first step in a MultiMesh for program is to initialize the environment.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.legate</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.multimesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
 
 <span class="n">init</span><span class="p">(</span>
   <span class="n">cpus</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
@@ -396,12 +395,12 @@ document.write(`
 </section>
 <section id="import-jax-packages">
 <h2>Import Jax packages<a class="headerlink" href="#import-jax-packages" title="Link to this heading">#</a></h2>
-<p>Once Legate-Jax has been initialized, the standard set of Jax imports can be done. In this case, we are also importing:</p>
+<p>Once MultiMesh for has been initialized, the standard set of Jax imports can be done. In this case, we are also importing:</p>
 <ol class="arabic simple">
 <li><p>Flax, which is used to define modules with parameters</p></li>
 <li><p>Optax, which provides optimizers for updating parameters</p></li>
 </ol>
-<p>For more details on <a class="reference external" href="https://github.com/google/flax">Flax</a> and <a class="reference external" href="https://github.com/google-deepmind/optax">Optax</a>, the user should consult the docs for these packages. For this tutorial, the usage of these packages should be relatively clear. <em>Note:</em> functions that were previously imported from <code class="docutils literal notranslate"><span class="pre">legate.jax</span></code> must now be imported from <code class="docutils literal notranslate"><span class="pre">legate.jax.flax</span></code>. Jax requires pure functions while Flax uses an “object-oriented” paradigm of modules with state. Flax often requires special wrappers around standard Jax functions that interoperate with the Flax-&gt;Jax functionalization process.</p>
+<p>For more details on <a class="reference external" href="https://github.com/google/flax">Flax</a> and <a class="reference external" href="https://github.com/google-deepmind/optax">Optax</a>, the user should consult the docs for these packages. For this tutorial, the usage of these packages should be relatively clear. <em>Note:</em> functions that were previously imported from <code class="docutils literal notranslate"><span class="pre">multimesh.jax</span></code> must now be imported from <code class="docutils literal notranslate"><span class="pre">multimesh.jax.flax</span></code>. Jax requires pure functions while Flax uses an “object-oriented” paradigm of modules with state. Flax often requires special wrappers around standard Jax functions that interoperate with the Flax-&gt;Jax functionalization process.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
@@ -409,14 +408,14 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">optax</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mesh</span><span class="p">,</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">legate.jax.flax</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax.flax</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">parallelize_step</span><span class="p">,</span> 
     <span class="n">shard_axes</span><span class="p">,</span> 
     <span class="n">task</span><span class="p">,</span> 
     <span class="n">with_sharding_constraint</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">flax</span><span class="w"> </span><span class="kn">import</span> <span class="n">linen</span> <span class="k">as</span> <span class="n">nn</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">legate.jax</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">multimesh.jax</span>
 </pre></div>
 </div>
 </div>
@@ -448,8 +447,8 @@ document.write(`
 <h2>Create full model with pipelined layers<a class="headerlink" href="#create-full-model-with-pipelined-layers" title="Link to this heading">#</a></h2>
 <p>Using the MLP building blocks, we can build up a pipeline parallel model. Each layer of the pipeline will be assigned to a different submesh, which is computed in the <code class="docutils literal notranslate"><span class="pre">submesh</span></code> method.
 For each new layer, the device grid is incremented. An important abstraction here is the <code class="docutils literal notranslate"><span class="pre">axis_map</span></code> used in the <code class="docutils literal notranslate"><span class="pre">Pipeline</span></code>.
-Legate-Jax emphasizes logical autosharding - using descriptive names rather than positional or hardware-specific names. This follows the philosophy used in <a class="reference external" href="https://crfm.stanford.edu/2023/06/16/levanter-1_0-release.html">Levanter</a> outlined in this <a class="reference external" href="https://nlp.seas.harvard.edu/NamedTensor">article</a> - and also followed by <a class="reference external" href="https://github.com/google/maxtext">maxtext</a> and <a class="reference external" href="https://github.com/google-research/t5x">T5x</a> and their use of <a class="reference external" href="https://flax.readthedocs.io/en/v0.8.2/api_reference/flax.linen/_autosummary/flax.linen.logical_to_mesh_axes.html">logical sharding rules</a>.  Flax code is written with logical names (<code class="docutils literal notranslate"><span class="pre">batch</span></code>, <code class="docutils literal notranslate"><span class="pre">data</span></code>, <code class="docutils literal notranslate"><span class="pre">model</span></code>), which then must be bound to physical device axes (<code class="docutils literal notranslate"><span class="pre">x</span></code> and <code class="docutils literal notranslate"><span class="pre">y</span></code>) to fully define the parallelism. This creates a separation between model specification (logical code written with named tensor axes) and model mapping (physical sharding of axes across a device mesh).</p>
-<p>In this particular case, we map the <code class="docutils literal notranslate"><span class="pre">batch</span></code> and <code class="docutils literal notranslate"><span class="pre">data</span></code> logical dimensions to the physical <code class="docutils literal notranslate"><span class="pre">x</span></code> axis and give each submesh a <code class="docutils literal notranslate"><span class="pre">4x1</span></code> shape. Legate-Jax therefore provides the following capabilities:</p>
+MultiMesh for emphasizes logical autosharding - using descriptive names rather than positional or hardware-specific names. This follows the philosophy used in <a class="reference external" href="https://crfm.stanford.edu/2023/06/16/levanter-1_0-release.html">Levanter</a> outlined in this <a class="reference external" href="https://nlp.seas.harvard.edu/NamedTensor">article</a> - and also followed by <a class="reference external" href="https://github.com/google/maxtext">maxtext</a> and <a class="reference external" href="https://github.com/google-research/t5x">T5x</a> and their use of <a class="reference external" href="https://flax.readthedocs.io/en/v0.6.11/api_reference/_autosummary/flax.linen.logical_to_mesh_axes.html">logical sharding rules</a>.  Flax code is written with logical names (<code class="docutils literal notranslate"><span class="pre">batch</span></code>, <code class="docutils literal notranslate"><span class="pre">data</span></code>, <code class="docutils literal notranslate"><span class="pre">model</span></code>), which then must be bound to physical device axes (<code class="docutils literal notranslate"><span class="pre">x</span></code> and <code class="docutils literal notranslate"><span class="pre">y</span></code>) to fully define the parallelism. This creates a separation between model specification (logical code written with named tensor axes) and model mapping (physical sharding of axes across a device mesh).</p>
+<p>In this particular case, we map the <code class="docutils literal notranslate"><span class="pre">batch</span></code> and <code class="docutils literal notranslate"><span class="pre">data</span></code> logical dimensions to the physical <code class="docutils literal notranslate"><span class="pre">x</span></code> axis and give each submesh a <code class="docutils literal notranslate"><span class="pre">4x1</span></code> shape. MultiMesh for therefore provides the following capabilities:</p>
 <ol class="arabic simple">
 <li><p>The ability to assign computations to a submesh within a larger computation. Jax enforces an SPMD requirement where tensors must be sharded across all devices and every device must participate.</p></li>
 <li><p>Logical sharding rules within a submesh. This provides similar functionality to T5x and Levanter, but allows arbitrary resharding.</p></li>
@@ -487,14 +486,14 @@ Legate-Jax emphasizes logical autosharding - using descriptive names rather than
 </section>
 <section id="initialize-parameters-and-create-parallel-training-function">
 <h2>Initialize parameters and create parallel training function<a class="headerlink" href="#initialize-parameters-and-create-parallel-training-function" title="Link to this heading">#</a></h2>
-<p>So far the code looks almost the same as standard Flax code with a few extra annotations. The full power of Legate-Jax comes from its auto-sharding compiler that reads all the submesh annotations and transforms the global computation into a series of submesh tasks. Managing Jax training state and shardings can be difficult when directly calling <code class="docutils literal notranslate"><span class="pre">jax.jit</span></code>. The Legate-Jax Flax wrappers provides a <code class="docutils literal notranslate"><span class="pre">parallelize_step</span></code> for training that allows users to generate MPMD auto-sharded models for Flax modules, similar to the previous MPMD example. The user simply passes in the <code class="docutils literal notranslate"><span class="pre">model</span></code>, a standard <code class="docutils literal notranslate"><span class="pre">optax</span></code> optimizer, and an example input batch. Legate-Jax does all the work to derive all the shardings, compile the model, and initialize all the sharded training state. <code class="docutils literal notranslate"><span class="pre">parallelize_step</span></code> returns back the four objects necessary to run a training loop:</p>
+<p>So far the code looks almost the same as standard Flax code with a few extra annotations. The full power of MultiMesh for comes from its auto-sharding compiler that reads all the submesh annotations and transforms the global computation into a series of submesh tasks. Managing Jax training state and shardings can be difficult when directly calling <code class="docutils literal notranslate"><span class="pre">jax.jit</span></code>. The MultiMesh for Flax wrappers provides a <code class="docutils literal notranslate"><span class="pre">parallelize_step</span></code> for training that allows users to generate MPMD auto-sharded models for Flax modules, similar to the previous MPMD example. The user simply passes in the <code class="docutils literal notranslate"><span class="pre">model</span></code>, a standard <code class="docutils literal notranslate"><span class="pre">optax</span></code> optimizer, and an example input batch. MultiMesh for does all the work to derive all the shardings, compile the model, and initialize all the sharded training state. <code class="docutils literal notranslate"><span class="pre">parallelize_step</span></code> returns back the four objects necessary to run a training loop:</p>
 <ol class="arabic simple">
 <li><p>A <code class="docutils literal notranslate"><span class="pre">step_fn</span></code> for computing gradients and updating parameters</p></li>
 <li><p>The randomly initialized sharded parameters</p></li>
-<li><p>The mesh context to use for traing steps</p></li>
+<li><p>The mesh context to use for training steps</p></li>
 <li><p>A function for preprocessing input batches located in host memory into device arrays</p></li>
 </ol>
-<p>This setup is slightly different than the <code class="docutils literal notranslate"><span class="pre">legate.jax.parallelize</span></code> function, but is more idiomatic to Flax and training.</p>
+<p>This setup is slightly different than the <code class="docutils literal notranslate"><span class="pre">multimesh.jax.parallelize</span></code> function, but is more idiomatic to Flax and training.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
@@ -506,19 +505,8 @@ Legate-Jax emphasizes logical autosharding - using descriptive names rather than
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Platform &#39;legate&#39; is experimental and not all JAX functionality may be correctly supported!
-WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
-I0000 00:00:1725909824.322251 2085553 cpu_client.cc:466] TfrtCpuClient created.
-W0000 00:00:1725909825.232108 2085553 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909825.232123 2085553 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
-W0000 00:00:1725909825.235610 2085553 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909825.235621 2085553 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
-W0000 00:00:1725909825.235911 2085553 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909825.235920 2085553 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
-W0000 00:00:1725909825.236348 2085553 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909825.236361 2085553 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
-W0000 00:00:1725909825.236881 2085553 hlo_module_config.h:186] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
-I0000 00:00:1725909825.236890 2085553 hlo_module_config.h:188] Overwriting use_spmd_partitioning to true, because use_auto_spmd_partitioning is true.
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-04-11 16:51:20,072:jax._src.xla_bridge:1004: Platform &#39;legate&#39; is experimental and not all JAX functionality may be correctly supported!
+2025-04-11 16:51:21.992142: W ./xla/service/hlo_module_config.h:193] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
 </pre></div>
 </div>
 </div>
@@ -551,7 +539,7 @@ I0000 00:00:1725909825.236890 2085553 hlo_module_config.h:188] Overwriting use_s
 <li><p>A (4,) tensor replicated across devices 0-3 corresponding to the first layer bias</p></li>
 <li><p>A (16,4) tensor fully sharded across devices 0-3 corresponding to the fully connected weights in the first layer</p></li>
 <li><p>A (4,) tensor replicated across devices 4-7 corresponding to the second layer bias</p></li>
-<li><p>A (16,4) tensor fully sharded across devices 4-7 corresponding to the fully connected weights in the second layer</p></li>
+<li><p>A (4,4) tensor fully sharded across devices 4-7 corresponding to the fully connected weights in the second layer</p></li>
 </ol>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -568,7 +556,7 @@ I0000 00:00:1725909825.236890 2085553 hlo_module_config.h:188] Overwriting use_s
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>()
-REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=PartitionSpec())
+REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=PartitionSpec(), memory_kind=unpinned_host)
 (4,)
 (16, 4)
 (4,)
@@ -643,7 +631,7 @@ REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=Partiti
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#optional-but-helpful-to-know">Optional, but helpful, to know</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-legate-jax">Initialize Legate-Jax</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-single-layer-with-sharding-annotations">Create single layer with sharding annotations</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-full-model-with-pipelined-layers">Create full model with pipelined layers</a></li>
@@ -664,7 +652,7 @@ REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=Partiti
   <div class="footer-item">
     
 <p class="component-author">
-By The Legate-JAX authors
+By The MultiMesh-JAX authors
 </p>
 
   </div>
@@ -674,7 +662,7 @@ By The Legate-JAX authors
 
   <p class="copyright">
     
-      © Copyright 2024, The Legate-JAX Authors..
+      © Copyright 2025, The MultiMesh-JAX Authors..
       <br/>
     
   </p>
