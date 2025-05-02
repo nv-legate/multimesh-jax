@@ -6,7 +6,7 @@ allowing different subcomputations to be placed on different GPU submeshes. Thes
 `task` computations can be combined inside a global `jit` with data resharding across submeshes
 occurring automatically. MultiMesh therefore enable pipeline parallelism to be easily expressed.
 Standard Jax SPMD sharding idioms can be used within each `task`,
-enabling full N-dimension parallelism.
+enabling full N-dimensional parallelism.
 
 .. grid:: 2
    :margin: 0
