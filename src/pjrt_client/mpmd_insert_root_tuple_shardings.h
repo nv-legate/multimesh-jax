@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_MPMD_INSERT_ROOT_TUPLE_SHARDINGS_H_
-#define XLA_PJRT_LEGATE_MPMD_INSERT_ROOT_TUPLE_SHARDINGS_H_
+#ifndef XLA_PJRT_MULTIMESH_MPMD_INSERT_ROOT_TUPLE_SHARDINGS_H_
+#define XLA_PJRT_MULTIMESH_MPMD_INSERT_ROOT_TUPLE_SHARDINGS_H_
 
 #include <cstdint>
 #include <optional>
@@ -13,8 +13,8 @@
 #include "absl/status/status.h"
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/hlo/pass/hlo_pass_interface.h"
-#include "xla/pjrt/legate/hlo_partition.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 
 namespace xla {
 
@@ -47,4 +47,4 @@ class MpmdInsertRootTupleShardings : public HloModulePass {
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_MPMD_INSERT_ROOT_TUPLE_SHARDINGS_H_
+#endif  // XLA_PJRT_MULTIMESH_MPMD_INSERT_ROOT_TUPLE_SHARDINGS_H_

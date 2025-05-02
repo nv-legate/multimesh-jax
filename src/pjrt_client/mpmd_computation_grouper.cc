@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_computation_grouper.h"
+#include "xla/pjrt/multimesh/mpmd_computation_grouper.h"
 
 #include <algorithm>
 #include <limits>
@@ -14,9 +14,9 @@
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/color_dfs.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/color_dfs.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 #include "xla/util.h"
 
 namespace xla {
@@ -428,7 +428,7 @@ absl::Status MpmdComputationGrouper::GroupComputationIntoTasks(
       continue;
     }
     if (IsMicrobatchLoop(instruction)) {
-      // this is a Legate-managed while loop
+      // this is a MultiMesh while loop
       builders.push_back(std::make_unique<BuildContext>(instruction));
       // all inputs to the loop should be roots of a precursor task
       for (auto* operand :

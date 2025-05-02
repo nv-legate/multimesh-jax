@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_repeated_output_copy.h"
+#include "xla/pjrt/multimesh/mpmd_repeated_output_copy.h"
 
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/util.h"

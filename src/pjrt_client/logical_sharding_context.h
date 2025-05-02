@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_AUTOSHARD_CONTEXT_H_
-#define XLA_PJRT_LEGATE_AUTOSHARD_CONTEXT_H_
+#ifndef XLA_PJRT_MULTIMESH_AUTOSHARD_CONTEXT_H_
+#define XLA_PJRT_MULTIMESH_AUTOSHARD_CONTEXT_H_
 
 #include <vector>
 
 #include "json/json.h"
 #include "src/zuku/mesh.h"
-#include "xla/pjrt/legate/mpmd_loop.h"
+#include "xla/pjrt/multimesh/mpmd_loop.h"
 
 namespace xla {
 

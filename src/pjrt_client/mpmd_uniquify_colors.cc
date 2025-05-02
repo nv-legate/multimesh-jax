@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_uniquify_colors.h"
+#include "xla/pjrt/multimesh/mpmd_uniquify_colors.h"
 
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
 
 namespace xla {
 

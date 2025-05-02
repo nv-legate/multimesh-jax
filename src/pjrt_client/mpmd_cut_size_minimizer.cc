@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_cut_size_minimizer.h"
+#include "xla/pjrt/multimesh/mpmd_cut_size_minimizer.h"
 
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/legate_sharding.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mm_sharding.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
 
 namespace xla {
 namespace {

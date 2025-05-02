@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _XLA_PJRT_LEGATE_STORE_HANDLE_H_
-#define _XLA_PJRT_LEGATE_STORE_HANDLE_H_
+#ifndef _XLA_PJRT_MULTIMESH_STORE_HANDLE_H_
+#define _XLA_PJRT_MULTIMESH_STORE_HANDLE_H_
 
 #include "src/zuku/tiled_array.h"
-#include "xla/pjrt/legate/store_handle_fwd.h"
+#include "xla/pjrt/multimesh/store_handle_fwd.h"
 
 namespace xla {
 

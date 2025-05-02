@@ -114,7 +114,7 @@ absl::Status RegisterCustomCallTarget(const PJRT_Api* c_api,
 
 }  // namespace
 
-NB_MODULE(legate_xla_compiler, m) {
+NB_MODULE(multimesh_xla_compiler, m) {
   m.def(
       "register_custom_call_target",
       [](nb::capsule c_api, nb::object fn_name_py, nb::object fn,

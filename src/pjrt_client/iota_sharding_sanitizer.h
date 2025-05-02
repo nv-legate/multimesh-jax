@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_IOTA_SHARDING_SANITIZER_H_
-#define XLA_PJRT_LEGATE_IOTA_SHARDING_SANITIZER_H_
+#ifndef XLA_PJRT_MULTIMESH_IOTA_SHARDING_SANITIZER_H_
+#define XLA_PJRT_MULTIMESH_IOTA_SHARDING_SANITIZER_H_
 
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/hlo/pass/hlo_pass_interface.h"
-#include "xla/pjrt/legate/hlo_partition.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
 #include "xla/util.h"
 
 namespace xla {
@@ -37,4 +37,4 @@ class IotaShardingSanitizer : public HloModulePass {
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_IOTA_SHARDING_SANITIZER_H_
+#endif  // XLA_PJRT_MULTIMESH_IOTA_SHARDING_SANITIZER_H_

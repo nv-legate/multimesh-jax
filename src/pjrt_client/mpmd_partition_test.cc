@@ -2,7 +2,7 @@
  * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
-#include "xla/pjrt/legate/mpmd_partition.h"
+#include "xla/pjrt/multimesh/mpmd_partition.h"
 
 #include <utility>
 
@@ -11,8 +11,8 @@
 #include "xla/client/executable_build_options.h"
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/hlo/utils/hlo_matchers.h"
-#include "xla/pjrt/legate/hlo_partition.h"
-#include "xla/pjrt/legate/mpmd_test_base.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
+#include "xla/pjrt/multimesh/mpmd_test_base.h"
 #include "xla/shape.h"
 #include "xla/shape_util.h"
 #include "xla/util.h"
@@ -197,13 +197,13 @@ f_bwd.impl_0.83 {
 ENTRY main.100 {
   Arg_0.1 = f32[8]{0} parameter(0), sharding={maximal device=0}
   Arg_1.2 = s32[] parameter(1), sharding={maximal device=0}
-  custom-call.19 = f32[8]{0} custom-call(Arg_0.1, Arg_1.2), custom_call_target="LegateTask", called_computations={f.impl.12}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
-  custom-call.43 = f32[] custom-call(custom-call.19, Arg_0.1), custom_call_target="LegateTask", called_computations={g.impl.36}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.19 = f32[8]{0} custom-call(Arg_0.1, Arg_1.2), custom_call_target="MultiMeshTask", called_computations={f.impl.12}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.43 = f32[] custom-call(custom-call.19, Arg_0.1), custom_call_target="MultiMeshTask", called_computations={g.impl.36}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   constant.3 = f32[] constant(1)
-  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={g_bwd.impl.56}, backend_config={"name": "bwd.g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="MultiMeshTask", called_computations={g_bwd.impl.56}, backend_config={"name": "bwd.g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   get-tuple-element.67 = f32[8]{0} get-tuple-element(custom-call.65), index=1
   get-tuple-element.66 = f32[8]{0} get-tuple-element(custom-call.65), index=0
-  custom-call.95 = (f32[8]{0}, pred[]) custom-call(Arg_0.1, Arg_1.2, get-tuple-element.66), custom_call_target="LegateTask", called_computations={f_bwd.impl_0.83}, backend_config={"name": "bwd.f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.95 = (f32[8]{0}, pred[]) custom-call(Arg_0.1, Arg_1.2, get-tuple-element.66), custom_call_target="MultiMeshTask", called_computations={f_bwd.impl_0.83}, backend_config={"name": "bwd.f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   get-tuple-element.96 = f32[8]{0} get-tuple-element(custom-call.95), index=0
   add.98 = f32[8]{0} add(get-tuple-element.67, get-tuple-element.96)
   ROOT tuple.99 = (f32[], f32[8]{0}) tuple(custom-call.43, add.98)
@@ -251,9 +251,9 @@ constexpr absl::string_view kUserSpecifiedShardingsHlo = R"(
 HloModule jit_c, entry_computation_layout={(f32[8]{0}, s32[])->(f32[], f32[8]{0})}, allow_spmd_sharding_propagation_to_parameters={true,false}, allow_spmd_sharding_propagation_to_output={false,true}
 
 f.impl.12 {
-  Arg_0.13 = f32[8]{0} parameter(0), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  Arg_0.13 = f32[8]{0} parameter(0), metadata={op_name="jit(c)/jit(main)/mm_task"}
   multiply.15 = f32[8]{0} multiply(Arg_0.13, Arg_0.13), metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/mul"}
-  Arg_1.14 = s32[] parameter(1), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  Arg_1.14 = s32[] parameter(1), metadata={op_name="jit(c)/jit(main)/mm_task"}
   convert.16 = f32[] convert(Arg_1.14), metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/convert_element_type[new_dtype=float32 weak_type=False sharding=None]"}
   broadcast.17 = f32[8]{0} broadcast(convert.16), dimensions={}, metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/mul"}
   ROOT multiply.18 = f32[8]{0} multiply(multiply.15, broadcast.17), metadata={op_name="jit(c)/jit(main)/jvp(jit(f.impl))/mul"}
@@ -266,9 +266,9 @@ region_0.32 {
 }
 
 g.impl.36 {
-  Arg_0.37 = f32[8]{0} parameter(0), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  Arg_0.37 = f32[8]{0} parameter(0), metadata={op_name="jit(c)/jit(main)/mm_task"}
   exp.40 = f32[8]{0} exponential(Arg_0.37), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/cos"}
-  Arg_1.38 = f32[8]{0} parameter(1), metadata={op_name="jit(c)/jit(main)/legate_task"}
+  Arg_1.38 = f32[8]{0} parameter(1), metadata={op_name="jit(c)/jit(main)/mm_task"}
   add.41 = f32[8]{0} add(exp.40, Arg_1.38), metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/add"}
   constant.39 = f32[] constant(0)
   ROOT reduce.42 = f32[] reduce(add.41, constant.39), dimensions={0}, to_apply=region_0.32, metadata={op_name="jit(c)/jit(main)/jvp(jit(g.impl))/reduce_sum[axes=(0,)]"}
@@ -302,13 +302,13 @@ f_bwd.impl_0.83 {
 ENTRY main.100 {
   Arg_0.1 = f32[8]{0} parameter(0), sharding={replicated}
   Arg_1.2 = s32[] parameter(1), sharding={replicated}
-  custom-call.19 = f32[8]{0} custom-call(Arg_0.1, Arg_1.2), custom_call_target="LegateTask", called_computations={f.impl.12}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
-  custom-call.43 = f32[] custom-call(custom-call.19, Arg_0.1), custom_call_target="LegateTask", called_computations={g.impl.36}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.19 = f32[8]{0} custom-call(Arg_0.1, Arg_1.2), custom_call_target="MultiMeshTask", called_computations={f.impl.12}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.43 = f32[] custom-call(custom-call.19, Arg_0.1), custom_call_target="MultiMeshTask", called_computations={g.impl.36}, backend_config={"name": "g", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   constant.3 = f32[] constant(1)
-  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="LegateTask", called_computations={g_bwd.impl.56}, backend_config={"name": "g.bwd", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.65 = (f32[8]{0}, f32[8]{0}) custom-call(custom-call.19, Arg_0.1, constant.3), custom_call_target="MultiMeshTask", called_computations={g_bwd.impl.56}, backend_config={"name": "g.bwd", "devices": [1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   get-tuple-element.67 = f32[8]{0} get-tuple-element(custom-call.65), index=1
   get-tuple-element.66 = f32[8]{0} get-tuple-element(custom-call.65), index=0
-  custom-call.95 = (f32[8]{0}, pred[]) custom-call(Arg_0.1, Arg_1.2, get-tuple-element.66), custom_call_target="LegateTask", called_computations={f_bwd.impl_0.83}, backend_config={"name": "f.bwd", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.95 = (f32[8]{0}, pred[]) custom-call(Arg_0.1, Arg_1.2, get-tuple-element.66), custom_call_target="MultiMeshTask", called_computations={f_bwd.impl_0.83}, backend_config={"name": "f.bwd", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   get-tuple-element.96 = f32[8]{0} get-tuple-element(custom-call.95), index=0
   add.98 = f32[8]{0} add(get-tuple-element.67, get-tuple-element.96)
   ROOT tuple.99 = (f32[], f32[8]{0}) tuple(custom-call.43, add.98), sharding={{replicated},{devices=[2]<=[2]}}
@@ -342,8 +342,8 @@ g.impl_0 {
 
 ENTRY main.15 {
   Arg_0.1 = f32[8]{0} parameter(0), sharding={devices=[2]<=[2]}
-  custom-call.4 = f32[8]{0} custom-call(Arg_0.1), custom_call_target="LegateTask", called_computations={f.impl_0}, backend_config={"type": "input", "name": "f", "devices": [0, 1]}
-  ROOT custom-call.7 = f32[8]{0} custom-call(custom-call.4), custom_call_target="LegateTask", called_computations={g.impl_0}, backend_config={"type": "output", "name": "g", "devices": [2, 3]}
+  custom-call.4 = f32[8]{0} custom-call(Arg_0.1), custom_call_target="MultiMeshTask", called_computations={f.impl_0}, backend_config={"type": "input", "name": "f", "devices": [0, 1]}
+  ROOT custom-call.7 = f32[8]{0} custom-call(custom-call.4), custom_call_target="MultiMeshTask", called_computations={g.impl_0}, backend_config={"type": "output", "name": "g", "devices": [2, 3]}
 } // main.15
 )";
 static constexpr std::array kShardingPropagationIntermediateTaskOrder = {"f",
@@ -400,10 +400,10 @@ g.impl_0 {
 
 ENTRY main.23 {
   Arg_0.1 = f32[4,2]{1,0} parameter(0), sharding={devices=[2,1]<=[2]}
-  custom-call.4 = f32[4,2]{1,0} custom-call(Arg_0.1), custom_call_target="LegateTask", called_computations={f.impl_0}, backend_config={"type": "input", "name": "f", "devices": [0, 1]}
+  custom-call.4 = f32[4,2]{1,0} custom-call(Arg_0.1), custom_call_target="MultiMeshTask", called_computations={f.impl_0}, backend_config={"type": "input", "name": "f", "devices": [0, 1]}
   custom-call.17 = f32[4,2]{1,0} custom-call(custom-call.4), custom_call_target="Sharding", sharding={replicated}
   Arg_1.2 = f32[4,2]{1,0} parameter(1), sharding={devices=[2,1]<=[2]}
-  ROOT custom-call.5 = f32[4,2]{1,0} custom-call(custom-call.17, Arg_1.2), custom_call_target="LegateTask", called_computations={g.impl_0}, backend_config={"type": "input", "name": "g", "devices": [2, 3]}
+  ROOT custom-call.5 = f32[4,2]{1,0} custom-call(custom-call.17, Arg_1.2), custom_call_target="MultiMeshTask", called_computations={g.impl_0}, backend_config={"type": "input", "name": "g", "devices": [2, 3]}
 }
 
 )";
@@ -504,8 +504,8 @@ ENTRY main.34 {
   multiply.6 = f32[8]{0} multiply(Arg_0.1, broadcast.4)
   Arg_1.2 = s32[] parameter(1), sharding={replicated}
   Arg_2.3 = f32[8]{0} parameter(2), sharding={replicated}
-  custom-call.4 = f32[8]{0} custom-call(multiply.6, Arg_1.2), custom_call_target="LegateTask", called_computations={f.impl_0}, backend_config={"type": "input", "name": "f", "devices": [0, 1]}
-  ROOT custom-call.5 = f32[8]{0} custom-call(custom-call.4, Arg_1.2, Arg_2.3), custom_call_target="LegateTask", called_computations={g.impl_0}, backend_config={"type": "input", "name": "f", "devices": [0, 1]}
+  custom-call.4 = f32[8]{0} custom-call(multiply.6, Arg_1.2), custom_call_target="MultiMeshTask", called_computations={f.impl_0}, backend_config={"type": "input", "name": "f", "devices": [0, 1]}
+  ROOT custom-call.5 = f32[8]{0} custom-call(custom-call.4, Arg_1.2, Arg_2.3), custom_call_target="MultiMeshTask", called_computations={g.impl_0}, backend_config={"type": "input", "name": "f", "devices": [0, 1]}
 } // main.34
 )";
 
@@ -569,8 +569,8 @@ static constexpr absl::string_view kMicrobatchMultipleTasksInLoopHlo = R"(
 HloModule jit_c, entry_computation_layout={(f32[4,4]{1,0}, f32[4]{0}, f32[4]{0})->f32[]}, allow_spmd_sharding_propagation_to_parameters={true,true,true}, allow_spmd_sharding_propagation_to_output={true}
 
 f.impl.17.clone {
-  Arg_0.0 = f32[2,4]{1,0} parameter(0), metadata={op_name="jit(c)/jit(main)/while/body/legate_task"}
-  Arg_1.0 = f32[4]{0} parameter(1), metadata={op_name="jit(c)/jit(main)/while/body/legate_task"}
+  Arg_0.0 = f32[2,4]{1,0} parameter(0), metadata={op_name="jit(c)/jit(main)/while/body/mm_task"}
+  Arg_1.0 = f32[4]{0} parameter(1), metadata={op_name="jit(c)/jit(main)/while/body/mm_task"}
   reshape.0 = f32[1,4]{1,0} reshape(Arg_1.0), metadata={op_name="jit(c)/jit(main)/while/body/jit(f.impl)/broadcast_in_dim[shape=(1, 4) broadcast_dimensions=(1,)]"}
   broadcast.0 = f32[1,4]{1,0} broadcast(reshape.0), dimensions={0,1}, metadata={op_name="jit(c)/jit(main)/while/body/jit(f.impl)/mul"}
   reshape.1 = f32[4]{0} reshape(broadcast.0), metadata={op_name="jit(c)/jit(main)/while/body/jit(f.impl)/mul"}
@@ -585,8 +585,8 @@ region_1.39 {
 }
 
 g.impl.43.clone {
-  Arg_0.2 = f32[2,4]{1,0} parameter(0), metadata={op_name="jit(c)/jit(main)/while/body/legate_task"}
-  Arg_1.1 = f32[4]{0} parameter(1), metadata={op_name="jit(c)/jit(main)/while/body/legate_task"}
+  Arg_0.2 = f32[2,4]{1,0} parameter(0), metadata={op_name="jit(c)/jit(main)/while/body/mm_task"}
+  Arg_1.1 = f32[4]{0} parameter(1), metadata={op_name="jit(c)/jit(main)/while/body/mm_task"}
   reshape.2 = f32[1,4]{1,0} reshape(Arg_1.1), metadata={op_name="jit(c)/jit(main)/while/body/jit(g.impl)/broadcast_in_dim[shape=(1, 4) broadcast_dimensions=(1,)]"}
   broadcast.2 = f32[1,4]{1,0} broadcast(reshape.2), dimensions={0,1}, metadata={op_name="jit(c)/jit(main)/while/body/jit(g.impl)/mul"}
   reshape.3 = f32[4]{0} reshape(broadcast.2), metadata={op_name="jit(c)/jit(main)/while/body/jit(g.impl)/mul"}
@@ -614,9 +614,9 @@ region_0.74 {
   dynamic-slice.0 = f32[2,4]{1,0} dynamic-slice(get-tuple-element.79, select.0, constant.1), dynamic_slice_sizes={2,4}, metadata={op_name="jit(c)/jit(main)/while/body/dynamic_slice[slice_sizes=(2, 4)]"}
   custom-call.0 = f32[2,4]{1,0} custom-call(dynamic-slice.0), custom_call_target="MicrobatchSlice", metadata={op_name="jit(c)/jit(main)/while/body/MicrobatchSlice/MicrobatchSlice"}, backend_config={"num_microbatches": 2, "slice_dim": 0, "size": 2, "batch_dim": 0}
   get-tuple-element.80 = f32[4]{0} get-tuple-element(arg_tuple.75), index=4
-  custom-call.1 = f32[2,4]{1,0} custom-call(custom-call.0, get-tuple-element.80), custom_call_target="LegateTask", called_computations={f.impl.17.clone}, metadata={op_name="jit(c)/jit(main)/while/body/legate_task"}, backend_config={"name": "f", "devices": [0,1], "color": 0, "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.1 = f32[2,4]{1,0} custom-call(custom-call.0, get-tuple-element.80), custom_call_target="MultiMeshTask", called_computations={f.impl.17.clone}, metadata={op_name="jit(c)/jit(main)/while/body/mm_task"}, backend_config={"name": "f", "devices": [0,1], "color": 0, "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   get-tuple-element.81 = f32[4]{0} get-tuple-element(arg_tuple.75), index=5
-  custom-call.2 = f32[] custom-call(custom-call.1, get-tuple-element.81), custom_call_target="LegateTask", called_computations={g.impl.43.clone}, metadata={op_name="jit(c)/jit(main)/while/body/legate_task"}, backend_config={"name": "g", "devices": [2,3], "color": 0, "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.2 = f32[] custom-call(custom-call.1, get-tuple-element.81), custom_call_target="MultiMeshTask", called_computations={g.impl.43.clone}, metadata={op_name="jit(c)/jit(main)/while/body/mm_task"}, backend_config={"name": "g", "devices": [2,3], "color": 0, "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   add.2 = f32[] add(get-tuple-element.78, custom-call.2), metadata={op_name="jit(c)/jit(main)/while/body/add"}
   ROOT tuple.87 = (s32[], s32[], f32[], f32[4,4]{1,0}, f32[4]{0}, /*index=5*/f32[4]{0}) tuple(add.86, add.0, add.2, get-tuple-element.79, get-tuple-element.80, /*index=5*/get-tuple-element.81)
 } // region_0.74
@@ -997,13 +997,13 @@ None.55 {
   multiply.76 = f32[2,4]{1,0} multiply(custom-call.69, custom-call.74)
   Arg_2.58 = f32[4]{0} parameter(2)
   call.77 = f32[2,4]{1,0} call(multiply.76, Arg_2.58), to_apply=f.impl.11
-  custom-call.78 = f32[2,4]{1,0} custom-call(multiply.76, Arg_2.58), custom_call_target="LegateTask", called_computations={f.impl.19}, backend_config={"name": "f", "devices": [0,1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.78 = f32[2,4]{1,0} custom-call(multiply.76, Arg_2.58), custom_call_target="MultiMeshTask", called_computations={f.impl.19}, backend_config={"name": "f", "devices": [0,1], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   Arg_3.59 = f32[4]{0} parameter(3)
   call.79 = f32[] call(custom-call.78, Arg_3.59), to_apply=g.impl.31
   constant.62 = s32[] constant(2)
   add.75 = s32[] add(Arg_4.60, constant.62)
   Arg_5.61 = f32[] parameter(5)
-  custom-call.80 = f32[] custom-call(custom-call.78, Arg_3.59), custom_call_target="LegateTask", called_computations={g.impl.45}, backend_config={"name": "g", "devices": [2,3], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.80 = f32[] custom-call(custom-call.78, Arg_3.59), custom_call_target="MultiMeshTask", called_computations={g.impl.45}, backend_config={"name": "g", "devices": [2,3], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   add.81 = f32[] add(Arg_5.61, custom-call.80)
   ROOT tuple.82 = (s32[], f32[]) tuple(add.75, add.81)
 } // None.55
@@ -1673,8 +1673,8 @@ ENTRY main.19 {
   custom-call.5 = s32[4,4]{1,0} custom-call(Arg_0.1), custom_call_target="AutoSharding", backend_config={"axes": [["batch"], ["model"]]}
   Arg_1.2 = s32[4,4]{1,0} parameter(1)
   custom-call.12 = s32[4,4]{1,0} custom-call(Arg_1.2), custom_call_target="AutoSharding", backend_config={"axes": [["batch"], ["model"]]}
-  custom-call.19 = s32[4,4]{1,0} custom-call(custom-call.5), custom_call_target="LegateTask", called_computations={f.impl.12}, metadata={op_name="jit(c)/jit(main)/legate_task"}, backend_config={"name": "f", "devices": [0,1,2,3], "autosharding": {"dims": [2, 2], "device_axes": ["x", "y"], "logical_axes": [["batch", "x"], ["model", "y"]]}}
-  ROOT custom-call.20 = s32[4,4]{1,0} custom-call(custom-call.19, custom-call.12), custom_call_target="LegateTask", called_computations={g.impl.12}, metadata={op_name="jit(c)/jit(main)/legate_task"}, backend_config={"name": "g", "devices": [4,5,6,7], "autosharding": {"dims": [2, 2], "device_axes": ["x", "y"], "logical_axes": [["batch", "x"], ["model", "y"]]}}
+  custom-call.19 = s32[4,4]{1,0} custom-call(custom-call.5), custom_call_target="MultiMeshTask", called_computations={f.impl.12}, metadata={op_name="jit(c)/jit(main)/mm_task"}, backend_config={"name": "f", "devices": [0,1,2,3], "autosharding": {"dims": [2, 2], "device_axes": ["x", "y"], "logical_axes": [["batch", "x"], ["model", "y"]]}}
+  ROOT custom-call.20 = s32[4,4]{1,0} custom-call(custom-call.19, custom-call.12), custom_call_target="MultiMeshTask", called_computations={g.impl.12}, metadata={op_name="jit(c)/jit(main)/mm_task"}, backend_config={"name": "g", "devices": [4,5,6,7], "autosharding": {"dims": [2, 2], "device_axes": ["x", "y"], "logical_axes": [["batch", "x"], ["model", "y"]]}}
 } // main.19
 )";
 
@@ -2469,7 +2469,7 @@ TEST_F(MpmdPartitionTest, LoopInputInstruction) {
 }
 
 TEST_F(MpmdPartitionTest, DecomposeMultipleLayers) {
-  EnableLegateRecomputation(true);
+  EnableMultiMeshRecomputation(true);
   auto device_factory = [](const std::string& name, bool backprop) {
     int layer_num;
     bool parsed = absl::SimpleAtoi(name.substr(9), &layer_num);
@@ -2525,7 +2525,7 @@ TEST_F(MpmdPartitionTest, AutoshardingRootReturn) {
 }
 
 TEST_F(MpmdPartitionTest, DecomposeMicrobatchSpmd) {
-  EnableLegateRecomputation(true);
+  EnableMultiMeshRecomputation(true);
   RegisterMatcherTestTask("(x_layers_\\d+).*", {0, 2}, {2, 1}, {"x", "y"},
                           {{"replica", "x"}, {"mdl", "y"}});
   RegisterMatcherTestTask("(position_emb).*", {0, 2}, {2, 1}, {"x", "y"},
@@ -2544,7 +2544,7 @@ TEST_F(MpmdPartitionTest, DecomposeMicrobatchSpmd) {
 }
 
 TEST_F(MpmdPartitionTest, ReplicateArgumentThroughLoop) {
-  EnableLegateRecomputation(true);
+  EnableMultiMeshRecomputation(true);
   RegisterMatcherTestTask(
       "(x_layers_\\d+).*", {0, 2}, {1, 1, 2}, {"x", "y", "z"},
       {{"replica", "x"}, {"data", "y"}, {"mdl", "z"}, {"seq", "z"}});
@@ -2569,7 +2569,7 @@ TEST_F(MpmdPartitionTest, ReplicateArgumentThroughLoop) {
 }
 
 TEST_F(MpmdPartitionTest, RngColoringFail) {
-  EnableLegateRecomputation(true);
+  EnableMultiMeshRecomputation(true);
   RegisterMatcherTestTask(
       "(layers_\\d+).*", {0, 2}, {1, 1, 2}, {"x", "y", "z"},
       {{"replica", "x"}, {"data", "y"}, {"mdl", "z"}, {"seq", "z"}});
@@ -2596,7 +2596,7 @@ TEST_F(MpmdPartitionTest, RngColoringFail) {
 }
 
 TEST_F(MpmdPartitionTest, InitModelFromSeedFailure) {
-  EnableLegateRecomputation(true);
+  EnableMultiMeshRecomputation(true);
   TF_ASSERT_OK_AND_ASSIGN(
       auto result,
       RunMpmdOnHloTextPath(

@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_instruction_delay_recolor.h"
+#include "xla/pjrt/multimesh/mpmd_instruction_delay_recolor.h"
 
 #include "gmock/gmock.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/utils/hlo_matchers.h"
-#include "xla/pjrt/legate/mpmd_test_base.h"
+#include "xla/pjrt/multimesh/mpmd_test_base.h"
 
 namespace xla {
 namespace {

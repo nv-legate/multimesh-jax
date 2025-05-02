@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_loop.h"
+#include "xla/pjrt/multimesh/mpmd_loop.h"
 
 #include <ostream>
 
 #include "absl/container/flat_hash_map.h"
 #include "src/zuku/mesh.h"
-#include "xla/pjrt/legate/json_utils.h"
+#include "xla/pjrt/multimesh/json_utils.h"
 
 namespace xla {
 

@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_hoist_loop_convert.h"
+#include "xla/pjrt/multimesh/mpmd_hoist_loop_convert.h"
 
 #include "xla/hlo/ir/hlo_clone_context.h"
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/literal_util.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
 
 namespace xla {
 

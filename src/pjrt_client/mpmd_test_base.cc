@@ -3,17 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_test_base.h"
+#include "xla/pjrt/multimesh/mpmd_test_base.h"
 
 #include <fstream>
 
 #include "xla/hlo/builder//xla_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/hlo_partition.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
-#include "xla/pjrt/legate/mpmd_partition.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_partition.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 #include "xla/util.h"
 
 template <class... Ts>
@@ -44,7 +44,7 @@ MpmdTestBase::MpmdTestBase() : HloTestBase() {
 
 void MpmdTestBase::SetUp() {
   HloTestBase::SetUp();
-  EnableLegateRecomputation(false);
+  EnableMultiMeshRecomputation(false);
 }
 
 void MpmdTestBase::TearDown() {

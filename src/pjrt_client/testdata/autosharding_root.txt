@@ -16,5 +16,5 @@ ENTRY main.26 {
   Arg_0.1 = s32[8,8]{1,0} parameter(0), metadata={op_name=""}
   Arg_1.2 = s32[8,8]{1,0} parameter(1), metadata={op_name=""}
   Arg_2.3 = s32[8,8]{1,0} parameter(2), metadata={op_name=""}
-  ROOT custom-call.25 = s32[8,8]{1,0} custom-call(Arg_0.1, Arg_1.2, Arg_2.3), custom_call_target="LegateTask", called_computations={model.impl.15}, backend_config={"name": "model", "devices": [0, 1, 2, 3, 4, 5, 6, 7], "autosharding": {"dims": [8], "device_axes": ["x"], "logical_axes": [["batch", "x"], ["model", "x"]]}}
+  ROOT custom-call.25 = s32[8,8]{1,0} custom-call(Arg_0.1, Arg_1.2, Arg_2.3), custom_call_target="MultiMeshTask", called_computations={model.impl.15}, backend_config={"name": "model", "devices": [0, 1, 2, 3, 4, 5, 6, 7], "autosharding": {"dims": [8], "device_axes": ["x"], "logical_axes": [["batch", "x"], ["model", "x"]]}}
 }

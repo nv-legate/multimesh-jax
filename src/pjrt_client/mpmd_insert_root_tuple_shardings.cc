@@ -3,15 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_insert_root_tuple_shardings.h"
+#include "xla/pjrt/multimesh/mpmd_insert_root_tuple_shardings.h"
 
 #include <optional>
 
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 
 namespace xla {
 

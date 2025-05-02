@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_partition.h"
+#include "xla/pjrt/multimesh/mpmd_partition.h"
 
 #include <optional>
 
@@ -16,40 +16,40 @@
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/hlo/pass/hlo_pass_pipeline.h"
 #include "xla/hlo/transforms/simplifiers/hlo_dce.h"
-#include "xla/pjrt/legate/hlo_partition.h"
-#include "xla/pjrt/legate/iota_sharding_sanitizer.h"
-#include "xla/pjrt/legate/legate_sharding.h"
-#include "xla/pjrt/legate/mpmd_argument_recompute.h"
-#include "xla/pjrt/legate/mpmd_buffer_scheduling_name.h"
-#include "xla/pjrt/legate/mpmd_coloring.h"
-#include "xla/pjrt/legate/mpmd_computation_fusion.h"
-#include "xla/pjrt/legate/mpmd_computation_grouper.h"
-#include "xla/pjrt/legate/mpmd_computation_inliner.h"
-#include "xla/pjrt/legate/mpmd_concatenate_grouper.h"
-#include "xla/pjrt/legate/mpmd_constant_output_copy.h"
-#include "xla/pjrt/legate/mpmd_cross_task_barrier_remover.h"
-#include "xla/pjrt/legate/mpmd_cut_size_minimizer.h"
-#include "xla/pjrt/legate/mpmd_hoist_loop_convert.h"
-#include "xla/pjrt/legate/mpmd_hoist_shard_map_reduce.h"
-#include "xla/pjrt/legate/mpmd_input_output_buffer_alias.h"
-#include "xla/pjrt/legate/mpmd_insert_reshard.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
-#include "xla/pjrt/legate/mpmd_instruction_delay_recolor.h"
-#include "xla/pjrt/legate/mpmd_logical_sharding_propagation.h"
-#include "xla/pjrt/legate/mpmd_logical_to_gspmd_sharding.h"
-#include "xla/pjrt/legate/mpmd_loop_unroll.h"
-#include "xla/pjrt/legate/mpmd_microbatch_loop_canonicalizer.h"
-#include "xla/pjrt/legate/mpmd_parameter_replication.h"
-#include "xla/pjrt/legate/mpmd_repeated_output_copy.h"
-#include "xla/pjrt/legate/mpmd_shard_map_loop_reduce.h"
-#include "xla/pjrt/legate/mpmd_sharding_propagation.h"
-#include "xla/pjrt/legate/mpmd_simple_loop_increment_coloring.h"
-#include "xla/pjrt/legate/mpmd_store.h"
-#include "xla/pjrt/legate/mpmd_reorder_shard_map_transpose.h"
-#include "xla/pjrt/legate/mpmd_uniquify_colors.h"
-#include "xla/pjrt/legate/mpmd_unused_loop_output_remover.h"
-#include "xla/pjrt/legate/mpmd_unused_param_output_remover.h"
-#include "xla/pjrt/legate/scalar_argument.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
+#include "xla/pjrt/multimesh/iota_sharding_sanitizer.h"
+#include "xla/pjrt/multimesh/mm_sharding.h"
+#include "xla/pjrt/multimesh/mpmd_argument_recompute.h"
+#include "xla/pjrt/multimesh/mpmd_buffer_scheduling_name.h"
+#include "xla/pjrt/multimesh/mpmd_coloring.h"
+#include "xla/pjrt/multimesh/mpmd_computation_fusion.h"
+#include "xla/pjrt/multimesh/mpmd_computation_grouper.h"
+#include "xla/pjrt/multimesh/mpmd_computation_inliner.h"
+#include "xla/pjrt/multimesh/mpmd_concatenate_grouper.h"
+#include "xla/pjrt/multimesh/mpmd_constant_output_copy.h"
+#include "xla/pjrt/multimesh/mpmd_cross_task_barrier_remover.h"
+#include "xla/pjrt/multimesh/mpmd_cut_size_minimizer.h"
+#include "xla/pjrt/multimesh/mpmd_hoist_loop_convert.h"
+#include "xla/pjrt/multimesh/mpmd_hoist_shard_map_reduce.h"
+#include "xla/pjrt/multimesh/mpmd_input_output_buffer_alias.h"
+#include "xla/pjrt/multimesh/mpmd_insert_reshard.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_instruction_delay_recolor.h"
+#include "xla/pjrt/multimesh/mpmd_logical_sharding_propagation.h"
+#include "xla/pjrt/multimesh/mpmd_logical_to_gspmd_sharding.h"
+#include "xla/pjrt/multimesh/mpmd_loop_unroll.h"
+#include "xla/pjrt/multimesh/mpmd_microbatch_loop_canonicalizer.h"
+#include "xla/pjrt/multimesh/mpmd_parameter_replication.h"
+#include "xla/pjrt/multimesh/mpmd_repeated_output_copy.h"
+#include "xla/pjrt/multimesh/mpmd_shard_map_loop_reduce.h"
+#include "xla/pjrt/multimesh/mpmd_sharding_propagation.h"
+#include "xla/pjrt/multimesh/mpmd_simple_loop_increment_coloring.h"
+#include "xla/pjrt/multimesh/mpmd_store.h"
+#include "xla/pjrt/multimesh/mpmd_reorder_shard_map_transpose.h"
+#include "xla/pjrt/multimesh/mpmd_uniquify_colors.h"
+#include "xla/pjrt/multimesh/mpmd_unused_loop_output_remover.h"
+#include "xla/pjrt/multimesh/mpmd_unused_param_output_remover.h"
+#include "xla/pjrt/multimesh/scalar_argument.h"
 #include "xla/service/call_inliner.h"
 #include "xla/service/dump.h"
 #include "xla/service/hlo_module_util.h"
@@ -69,18 +69,17 @@ overloaded(Ts...) -> overloaded<Ts...>;
 namespace xla {
 namespace {
 
-constexpr absl::string_view kHoistConvertEnv = "LEGATE_XLA_HOIST_CONVERT";
-constexpr absl::string_view kZeroArgsEnv = "LEGATE_XLA_ZERO_ARGUMENTS";
+constexpr absl::string_view kHoistConvertEnv = "MULTIMESH_HOIST_CONVERT";
+constexpr absl::string_view kZeroArgsEnv = "MULTIMESH_ZERO_ARGUMENTS";
 constexpr absl::string_view kRemoveHoistedReduce =
-    "LEGATE_XLA_REMOVE_HOISTED_REDUCE";
+    "MULTIMESH_REMOVE_HOISTED_REDUCE";
 constexpr absl::string_view kLoopIncrementColorEnv =
-    "LEGATE_XLA_LOOP_INCREMENT_COLOR";
+    "MULTIMESH_LOOP_INCREMENT_COLOR";
 constexpr absl::string_view kArgumentRecomputeEnv =
-    "LEGATE_XLA_ARGUMENT_RECOMPUTE";
-constexpr absl::string_view kCutSizeMinimizeEnv =
-    "LEGATE_XLA_MINIMIZE_CUT_SIZE";
+    "MULTIMESH_ARGUMENT_RECOMPUTE";
+constexpr absl::string_view kCutSizeMinimizeEnv = "MULTIMESH_MINIMIZE_CUT_SIZE";
 constexpr absl::string_view kColorPropagationPriorityEnv =
-    "LEGATE_XLA_COLOR_PROPAGATION_PRIORITY";
+    "MULTIMESH_COLOR_PROPAGATION_PRIORITY";
 
 absl::StatusOr<HloSharding> ToMpmdSharding(
     const Shape& shape, const HloSharding& iota_sharding,
@@ -220,9 +219,9 @@ class MpmdScheduler {
 
     auto color = Color(instruction);
     TF_ASSIGN_OR_RETURN(zuku::ShardedShape sharded_shape,
-                        XlaShapeToLegateShape(instruction->shape(), *devices,
-                                              instruction->sharding_or_default(
-                                                  default_replicated_)));
+                        XlaShapeToZukuShape(instruction->shape(), *devices,
+                                            instruction->sharding_or_default(
+                                                default_replicated_)));
 
     auto allow_sharding_override = [](int64_t index,
                                       absl::Span<const bool> allow) {

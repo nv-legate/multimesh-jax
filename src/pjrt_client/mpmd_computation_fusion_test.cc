@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_computation_fusion.h"
+#include "xla/pjrt/multimesh/mpmd_computation_fusion.h"
 
 #include <utility>
 
 #include "gmock/gmock.h"
 #include "xla/hlo/transforms/simplifiers/hlo_dce.h"
-#include "xla/pjrt/legate/hlo_partition.h"
-#include "xla/pjrt/legate/mpmd_test_base.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
+#include "xla/pjrt/multimesh/mpmd_test_base.h"
 
 namespace xla {
 namespace {

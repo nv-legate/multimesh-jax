@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_MPMD_REPEATED_OUTPUT_COPY_H_
-#define XLA_PJRT_LEGATE_MPMD_REPEATED_OUTPUT_COPY_H_
+#ifndef XLA_PJRT_MULTIMESH_MPMD_REPEATED_OUTPUT_COPY_H_
+#define XLA_PJRT_MULTIMESH_MPMD_REPEATED_OUTPUT_COPY_H_
 
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/hlo/pass/hlo_pass_interface.h"
-#include "xla/pjrt/legate/hlo_partition.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
 #include "xla/util.h"
 
 namespace xla {
@@ -17,7 +17,7 @@ namespace xla {
 // that are repeated. Even if an output is passes multiple times
 // as a root tuple operand, distinct copies in different buffers
 // need to be returned. To simplify the analysis of inputs/outputs
-// in later Legate passes, this creates a copy of each output
+// in later passes, this creates a copy of each output
 // and passes the copy as an operand to the root tuple.
 class MpmdRepeatedOutputCopy : public HloModulePass {
  public:
@@ -45,4 +45,4 @@ class MpmdRepeatedOutputCopy : public HloModulePass {
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_MPMD_REPEATED_OUTPUT_COPY_H_
+#endif  // XLA_PJRT_MULTIMESH_MPMD_REPEATED_OUTPUT_COPY_H_

@@ -2,7 +2,7 @@
 #                         All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from jax_plugins.legate import init_test
+from jax_plugins.multimesh import init_test
 
 init_test()
 
@@ -15,20 +15,19 @@ from jax import config, value_and_grad
 from jax.experimental.pjit import AUTO
 from jax.sharding import Mesh, PartitionSpec as P
 
-from legate.jax import (
+from multimesh.jax import (
     enable_task_fusion,
     microbatch,
-    parallelize,
     register_task,
     task,
     with_sharding_constraint,
 )
-from legate.jax.test_util import LegateJaxTestCase
+from multimesh.jax.test_util import MultiMeshJaxTestCase
 
 config.parse_flags_with_absl()
 
 
-class MicrobatchTest(LegateJaxTestCase):
+class MicrobatchTest(MultiMeshJaxTestCase):
     def _args_maker(self, shape):
         return jnp.arange(np.prod(shape)).reshape(shape)
 

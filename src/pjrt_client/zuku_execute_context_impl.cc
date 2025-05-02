@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/zuku_execute_context_impl.h"
+#include "xla/pjrt/multimesh/zuku_execute_context_impl.h"
 
 #include <unistd.h>
 
@@ -29,8 +29,8 @@
 #include "src/zuku/shape.h"
 #include "src/zuku/store.h"
 #include "src/zuku/stream.h"
-#include "xla/pjrt/legate/legate_utils.h"
-#include "xla/pjrt/legate/store_handle.h"
+#include "xla/pjrt/multimesh/mm_utils.h"
+#include "xla/pjrt/multimesh/store_handle.h"
 
 using zuku::after;
 using zuku::on;
@@ -45,7 +45,7 @@ Realm::Event sync_all_execution_event{Realm::Event::NO_EVENT};
 
 constexpr int kMaxOpenWindows = 8;
 
-void StopLegate() {
+void StopZuku() {
   bool is_not_stopped = false;
   bool is_stopped = true;
   if (rt.has_value() &&
@@ -74,7 +74,7 @@ StoreHandleImpl::~StoreHandleImpl() {
 // NOLINTNEXTLINE(modernize-use-equals-default)
 StoreHandle::~StoreHandle() {}
 
-Realm::Logger log_xla("legate.xla");
+Realm::Logger log_xla("multimesh.jax");
 
 namespace {
 
@@ -211,7 +211,7 @@ void ZukuExecuteContextImpl::OffloadDtoH(
 }
 
 void ZukuExecuteContextImpl::CreateCompileTask(
-    int64_t local_device_id, std::shared_ptr<LegateCompiler> compiler) {
+    int64_t local_device_id, std::shared_ptr<MultiMeshCompiler> compiler) {
   zuku::Processor p = LocalProcessor(local_device_id);
 
   log_xla.debug() << "CreateCompileTask: " << compiler->Name()
@@ -220,7 +220,7 @@ void ZukuExecuteContextImpl::CreateCompileTask(
       zuku::on(p)
           .region("Compile " + compiler->Name())
           .defer(
-              [=](int64_t run_id, std::shared_ptr<LegateCompiler> compiler) {
+              [=](int64_t run_id, std::shared_ptr<MultiMeshCompiler> compiler) {
                 LoadAndCompile(/*run_id=*/0, p, compiler);
               },
               GetRunId(), std::move(compiler));
@@ -230,11 +230,12 @@ void ZukuExecuteContextImpl::CreateCompileTask(
 
 void ZukuExecuteContextImpl::CreateExecuteTask(
     int64_t run_id, int64_t local_device_id, int64_t global_device_id,
-    zuku::DeviceList devices, std::shared_ptr<LegateCompiler> compiler,
+    zuku::DeviceList devices, std::shared_ptr<MultiMeshCompiler> compiler,
     const std::vector<ScalarArgument>& scalars,
     const std::vector<StoreHandle>& inputs,
     const std::vector<StoreHandle>& outputs,
-    zuku::Future<zuku::ArrayTile>& temp_buffer, LegateExecuteOptions options) {
+    zuku::Future<zuku::ArrayTile>& temp_buffer,
+    MultiMeshExecuteOptions options) {
   zuku::Processor p = LocalProcessor(local_device_id);
 
   // if any of the outputs overlap with the inputs, then the inputs should be an
@@ -308,7 +309,7 @@ void ZukuExecuteContextImpl::CreateExecuteTask(
           .defer(
               [](zuku::Stream* zs, int64_t run_id, zuku::Processor p,
                  zuku::DeviceList devices,
-                 std::shared_ptr<LegateCompiler> compiler,
+                 std::shared_ptr<MultiMeshCompiler> compiler,
                  std::vector<ScalarArgument> scalars,
                  zuku::ro_vector<zuku::ShardedArray> inputs,
                  zuku::rw_vector<zuku::ShardedArray> outputs,
@@ -399,7 +400,7 @@ zuku::ShardedShape ZukuExecuteContextImpl::GetStoreShardedShape(
 
 StoreHandle ZukuExecuteContextImpl::AssembleShardsImpl(
     int64_t local_device_id, int64_t global_device_id, zuku::ShardedShape shape,
-    Shard shard, std::shared_ptr<LegateStream> stream,
+    Shard shard, std::shared_ptr<MultiMeshStream> stream,
     std::optional<StoreHandle> existing_store) {
   zuku::Processor p = LocalProcessor(local_device_id);
 
@@ -418,7 +419,7 @@ StoreHandle ZukuExecuteContextImpl::AssembleShardsImpl(
       across(shape.sharding.devices)
           .if_on(p)
           .defer(
-              [](std::shared_ptr<LegateStream> stream, zuku::Processor p,
+              [](std::shared_ptr<MultiMeshStream> stream, zuku::Processor p,
                  Shard shard, zuku::ShardedArray& array) {
                 // TODO: do the slicing
                 if (p.type() == zuku::Processor::Type::CPU) {
@@ -570,11 +571,11 @@ void ZukuExecuteContextImpl::FenceCompilation() {
 
 std::shared_ptr<ZukuExecuteContext> ZukuExecuteContextImpl::Create(
     zuku::RealmConfig config) {
-  std::array argv = {"legate-jax"};
+  std::array argv = {"multimesh-jax"};
   if (!rt.has_value()) {
     rt = zuku::Init(argv.size(), (char**)argv.data(), config);
     // This has to come after PyFinalize
-    atexit(StopLegate);
+    atexit(StopZuku);
   }
 
   if (keep_from_deleting == nullptr) {
@@ -618,10 +619,10 @@ std::set<ZukuExecuteContextImpl*> ZukuExecuteContextImpl::all_contexts_;
 
 }  // namespace xla
 
-extern "C" void LegateShutdown() {
-  // Make sure to clear all handles held by Legate
+extern "C" void ZukuShutdown() {
+  // Make sure to clear all handles held
   // so that nothing gets deleted during program cleanup
   xla::ZukuExecuteContextImpl::ClearAllContexts();
-  StopLegate();
+  StopZuku();
   xla::ClearCachedStreams();
 }

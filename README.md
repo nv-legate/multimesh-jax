@@ -1,12 +1,13 @@
-# Legate-JAX
+# MultiMesh for JAX
 
-This repository contains the wrapper library used to connect XLA (JAX) and the Legate runtime.
+This repository contains an XLA plugin and Python helper APIs
+for defining 
 The repository can be used in two different modes:
 
 ## Getting Started
 
 The easiest way to get started is by building containers
-using [Legate-Jax workflows](https://github.com/nv-legate/legate-jax-workflows).
+using [MultiMesh for Jax workflows](https://github.com/nv-legate/multimesh-jax-workflows).
 
 ## Docs
 
@@ -14,9 +15,9 @@ User documentation including API reference and Jupyter tutorials can be found
 on the [Nvidia docs page](http://sw-mobile-docs/cllr/legate-jax/). 
 
 
-## Building a Legate-JAX container
+## Building a MultiMesh for JAX container
 
-Instructions for building Legate-JAX can be found in the [README](docker/README.md).
+Instructions for building MultiMesh for JAX can be found in the [README](docker/README.md).
 Included in the `docker` folder are scripts showing how to configure, build, and install
 the various components.
 
@@ -28,9 +29,9 @@ that can be loaded in a local browswer:
 
 ```bash
 docker run \
-  -w /opt/legate-jax/docs/notebooks \
+  -w /opt/workspace/multimesh-jax/docs/notebooks \
   -p 8675:8675 \
-  gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev \
+  gitlab-master.nvidia.com:5005/legate/quickstart.internal/multimesh-jax-dev \
   jupyter notebook --allow-root --ip 0.0.0.0 --port=8675
 ```
 The notebook will then be available at the link shown.  
@@ -38,21 +39,21 @@ If GPUs are available, then docker can be launched as:
 
 ```bash
 docker run \
-  -w /opt/legate-jax/docs/notebooks \
+  -w /opt/workspace/multimesh-jax/docs/notebooks \
   -p 8675:8675 \
   --gpus <N> \ 
-  gitlab-master.nvidia.com:5005/legate/quickstart.internal/legate-jax-dev \
+  gitlab-master.nvidia.com:5005/legate/quickstart.internal/multimesh-jax-dev \
   jupyter notebook --allow-root --ip 0.0.0.0 --port=8675
 ```
 where `<N>` is the number of GPUs.
 
 ## Running transformers in MaxText
 
-The main framework integrated with Legate-Jax was MaxText.
+The main framework integrated with MultiMesh for Jax was MaxText.
 Running and configuring MaxText can be challenging given the number of
 options for specifying the models. To aid in running transformer models,
 a helper script has been added with a basic set of options
-for configuring parallelism in the [Legate-Jax workflows](https://github.com/nv-legate/legate-jax-workflows/maxtext/run.py).
+for configuring parallelism in the [MultiMesh for Jax workflows](https://github.com/nv-legate/multimesh-jax-workflows/maxtext/run.py).
 `run.py --help` will give the full set of options.
 
 ### Known Issues
@@ -64,7 +65,7 @@ valid when running with process/GPU rather than process/node.
 
 ## JAX and Jaxlib Compatibility
 
-In the future, a standard JAX and Jaxlib installation should be compatible with Legate-JAX
+In the future, a standard JAX and Jaxlib installation should be compatible with MultiMesh for JAX
 if JAX/Jaxlib are the most recent version and XLA is top-of-tree for the plugin client.
-For now, the Jaxlib will need to be installed from source for the custom XLA fork used to build the Legate-JAX client.
+For now, the Jaxlib will need to be installed from source for the custom XLA fork used to build the MultiMesh for JAX client.
 

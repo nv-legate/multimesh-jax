@@ -3,18 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_ZUKU_EXECUTE_CONTEXT_H_
-#define XLA_PJRT_LEGATE_ZUKU_EXECUTE_CONTEXT_H_
+#ifndef XLA_PJRT_MULTIMESH_ZUKU_EXECUTE_CONTEXT_H_
+#define XLA_PJRT_MULTIMESH_ZUKU_EXECUTE_CONTEXT_H_
 
 #include <optional>
 #include <set>
 #include <string>
 
 #include "src/zuku/tiled_array.h"
-#include "xla/pjrt/legate/legate_buffer_action.h"
-#include "xla/pjrt/legate/legate_computation.h"
-#include "xla/pjrt/legate/scalar_argument.h"
-#include "xla/pjrt/legate/store_handle_fwd.h"
+#include "xla/pjrt/multimesh/mm_buffer_action.h"
+#include "xla/pjrt/multimesh/mm_computation.h"
+#include "xla/pjrt/multimesh/scalar_argument.h"
+#include "xla/pjrt/multimesh/store_handle_fwd.h"
 
 namespace xla {
 
@@ -30,7 +30,7 @@ struct CreateStoreConfig {
   std::optional<int64_t> min_cache_size{std::nullopt};
 };
 
-struct LegateExecuteOptions {
+struct MultiMeshExecuteOptions {
   std::optional<std::string> name{std::nullopt};
   bool strict_ordering{true};
   std::optional<int> priority;
@@ -41,15 +41,15 @@ class ZukuExecuteContext {
   virtual void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                                  int64_t global_device_id,
                                  zuku::DeviceList mesh,
-                                 std::shared_ptr<LegateCompiler> compiler,
+                                 std::shared_ptr<MultiMeshCompiler> compiler,
                                  const std::vector<ScalarArgument>& scalars,
                                  const std::vector<StoreHandle>& inputs,
                                  const std::vector<StoreHandle>& outputs,
                                  zuku::Future<zuku::ArrayTile>& temp_buffer,
-                                 LegateExecuteOptions options) = 0;
+                                 MultiMeshExecuteOptions options) = 0;
 
-  virtual void CreateCompileTask(int64_t local_device_id,
-                                 std::shared_ptr<LegateCompiler> compiler) = 0;
+  virtual void CreateCompileTask(
+      int64_t local_device_id, std::shared_ptr<MultiMeshCompiler> compiler) = 0;
 
   virtual void RunAfterAllTasks(int64_t local_device_id,
                                 std::function<void()> on_done) = 0;
@@ -88,7 +88,7 @@ class ZukuExecuteContext {
   StoreHandle AssembleShards(
       int64_t local_device_id, int64_t global_device_id,
       zuku::ShardedShape shape, Shard shard,
-      std::shared_ptr<LegateStream> stream,
+      std::shared_ptr<MultiMeshStream> stream,
       std::optional<StoreHandle> existing_store = std::nullopt) {
     return AssembleShardsImpl(local_device_id, global_device_id,
                               std::move(shape), std::move(shard),
@@ -130,10 +130,10 @@ class ZukuExecuteContext {
   virtual StoreHandle AssembleShardsImpl(
       int64_t local_device_id, int64_t global_device_id,
       zuku::ShardedShape shape, Shard shard,
-      std::shared_ptr<LegateStream> stream,
+      std::shared_ptr<MultiMeshStream> stream,
       std::optional<StoreHandle> existing_store) = 0;
 };
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_ZUKU_EXECUTE_CONTEXT_H_
+#endif  // XLA_PJRT_MULTIMESH_ZUKU_EXECUTE_CONTEXT_H_

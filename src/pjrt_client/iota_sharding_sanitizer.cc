@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/iota_sharding_sanitizer.h"
+#include "xla/pjrt/multimesh/iota_sharding_sanitizer.h"
 
 #include "xla/util.h"
 

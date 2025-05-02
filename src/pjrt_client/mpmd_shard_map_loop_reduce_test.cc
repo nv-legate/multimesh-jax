@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_shard_map_loop_reduce.h"
+#include "xla/pjrt/multimesh/mpmd_shard_map_loop_reduce.h"
 
 #include "gmock/gmock.h"
 #include "xla/hlo/utils/hlo_matchers.h"
-#include "xla/pjrt/legate/mpmd_test_base.h"
+#include "xla/pjrt/multimesh/mpmd_test_base.h"
 
 namespace xla {
 namespace {

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_logical_to_gspmd_sharding.h"
+#include "xla/pjrt/multimesh/mpmd_logical_to_gspmd_sharding.h"
 
 #include <utility>
 
@@ -11,13 +11,13 @@
 #include "tsl/platform/regexp.h"
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/hlo/utils/hlo_matchers.h"
-#include "xla/pjrt/legate/hlo_partition.h"
-#include "xla/pjrt/legate/logical_sharding_context.h"
-#include "xla/pjrt/legate/mpmd_coloring.h"
-#include "xla/pjrt/legate/mpmd_computation_grouper.h"
-#include "xla/pjrt/legate/mpmd_computation_inliner.h"
-#include "xla/pjrt/legate/mpmd_logical_sharding_propagation.h"
-#include "xla/pjrt/legate/mpmd_test_base.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
+#include "xla/pjrt/multimesh/logical_sharding_context.h"
+#include "xla/pjrt/multimesh/mpmd_coloring.h"
+#include "xla/pjrt/multimesh/mpmd_computation_grouper.h"
+#include "xla/pjrt/multimesh/mpmd_computation_inliner.h"
+#include "xla/pjrt/multimesh/mpmd_logical_sharding_propagation.h"
+#include "xla/pjrt/multimesh/mpmd_test_base.h"
 
 namespace xla {
 namespace {

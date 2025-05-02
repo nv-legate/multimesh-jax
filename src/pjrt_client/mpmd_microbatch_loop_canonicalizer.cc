@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_microbatch_loop_canonicalizer.h"
+#include "xla/pjrt/multimesh/mpmd_microbatch_loop_canonicalizer.h"
 
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
 #include "xla/service/call_inliner.h"
 #include "xla/hlo/transforms/simplifiers//tuple_simplifier.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 
 namespace xla {
 

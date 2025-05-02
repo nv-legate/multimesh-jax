@@ -7,13 +7,14 @@
 
 #include "src/zuku/tiled_array.h"
 #include "src/zuku/vector.h"
-#include "xla/pjrt/legate/legate_computation.h"
-#include "xla/pjrt/legate/scalar_argument.h"
+#include "xla/pjrt/multimesh/mm_computation.h"
+#include "xla/pjrt/multimesh/scalar_argument.h"
 
 namespace xla {
 
 void RunExecutable(zuku::Stream* zs, int64_t run_id, zuku::DeviceList devices,
-                   zuku::Processor p, std::shared_ptr<LegateCompiler> compiler,
+                   zuku::Processor p,
+                   std::shared_ptr<MultiMeshCompiler> compiler,
                    std::vector<ScalarArgument> scalars,
                    zuku::ro_vector<zuku::ShardedArray> inputs,
                    zuku::rw_vector<zuku::ShardedArray> outputs,

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_buffer_scheduling_name.h"
+#include "xla/pjrt/multimesh/mpmd_buffer_scheduling_name.h"
 
 #include <algorithm>
 #include <queue>
@@ -11,9 +11,9 @@
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/legate_sharding.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/mm_sharding.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 
 namespace xla {
 
@@ -143,8 +143,8 @@ absl::StatusOr<bool> MpmdAssignBufferSchedulingName::Run(
     } else {
       TF_ASSIGN_OR_RETURN(
           zuku::ShardedShape user_shape,
-          XlaShapeToLegateShape(output->shape(), devices,
-                                output->sharding_or_default(replicated)));
+          XlaShapeToZukuShape(output->shape(), devices,
+                              output->sharding_or_default(replicated)));
       std::string name =
           allocator.AllocateAtTime(user_shape, time_started, output);
       VLOG(5) << "assigned scheduling name " << name << " to temp "

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_coloring.h"
+#include "xla/pjrt/multimesh/mpmd_coloring.h"
 
 #include <optional>
 
@@ -11,14 +11,14 @@
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/hlo/pass/hlo_pass_pipeline.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 
-#include "xla/pjrt/legate/mpmd_inline_explicit_tasks.h"
-#include "xla/pjrt/legate/mpmd_insert_root_tuple_shardings.h"
-#include "xla/pjrt/legate/mpmd_compute_assigned_colors.h"
-#include "xla/pjrt/legate/mpmd_unpack_optimization_barrier.h"
-#include "xla/pjrt/legate/mpmd_repack_optimization_barrier.h"
+#include "xla/pjrt/multimesh/mpmd_inline_explicit_tasks.h"
+#include "xla/pjrt/multimesh/mpmd_insert_root_tuple_shardings.h"
+#include "xla/pjrt/multimesh/mpmd_compute_assigned_colors.h"
+#include "xla/pjrt/multimesh/mpmd_unpack_optimization_barrier.h"
+#include "xla/pjrt/multimesh/mpmd_repack_optimization_barrier.h"
 
 namespace xla {
 namespace {

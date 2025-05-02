@@ -46,7 +46,7 @@ void DynamicBufferAllocator::Free(void* buf, size_t size) { tiles_.erase(buf); }
 }  // namespace
 
 void LoadAndCompile(int64_t run_id, zuku::Processor p,
-                    const std::shared_ptr<LegateCompiler>& compiler) {
+                    const std::shared_ptr<MultiMeshCompiler>& compiler) {
   // log_xla.debug() << "Compiling " << compiler->Name() << " on "
   //                << p.global_id();
   // only one GPU per node should be running the compilation

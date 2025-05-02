@@ -1,1 +1,1 @@
-legate/jax/_version.py export-subst
+multimesh/jax/_version.py export-subst

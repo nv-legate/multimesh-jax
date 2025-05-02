@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/loop_scheduler.h"
+#include "xla/pjrt/multimesh/loop_scheduler.h"
 
 #include "gmock/gmock.h"
 #include "tsl/platform/regexp.h"
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/hlo/parser/hlo_parser.h"
-#include "xla/pjrt/legate/hlo_partition.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
 #include "xla/util.h"
 
 namespace xla {

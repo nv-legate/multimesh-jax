@@ -1,19 +1,19 @@
-# Contributing to Legate-Jax
+# Contributing to MultiMesh for Jax
 
-Legate-Jax is an open-source project released under the (Apache license, version 2.0)
+MultiMesh for Jax is an open-source project released under the (Apache license, version 2.0)
 [https://www.apache.org/licenses/LICENSE-2.0].  We welcome any and all
 contributions.
 
 ## How to begin
 
 Most of the time, the best thing is to begin by (opening an issue)
-[https://github.com/nv-legate/legate.jax/issues] for us to address.
+[https://github.com/nv-legate/multimesh.jax/issues] for us to address.
 If you wish to start development, plase work on a fork of the
 repository and open a pull request.
 
 ## Developer Certificate of Origin
 
-Legate-Jax is released under the Apache license, version 2.0 and is free to use,
+MultiMesh for Jax is released under the Apache license, version 2.0 and is free to use,
 modify, and redistribute.  To ensure that the license can be exercised without
 encumbrance, we ask you that you only contribute your own work or work to which you
 have the intellectual rights.  To that end, we employ the Developer's Certificate
@@ -92,7 +92,7 @@ reopening them).
 
 ## Code Formatting Requirements
 
-Legate-Jax uses pre-commit to format files. Please use (pre-commit)[https://pre-commit.com/]
+MultiMesh for Jax uses pre-commit to format files. Please use (pre-commit)[https://pre-commit.com/]
 on commits to format any Python or C++ changes.  We hope that the automation of our formatting checks will make it easy to comply
 with our coding standards.  If you encounter problems with code formatting,
  please let us know in a comment on your PR.

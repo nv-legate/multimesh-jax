@@ -3,18 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_MPMD_MICROBATCH_LOOP_CANONICALIZER_H_
-#define XLA_PJRT_LEGATE_MPMD_MICROBATCH_LOOP_CANONICALIZER_H_
+#ifndef XLA_PJRT_MULTIMESH_MPMD_MICROBATCH_LOOP_CANONICALIZER_H_
+#define XLA_PJRT_MULTIMESH_MPMD_MICROBATCH_LOOP_CANONICALIZER_H_
 
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/hlo/pass/hlo_pass_interface.h"
-#include "xla/pjrt/legate/hlo_partition.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
 
 namespace xla {
 
-// Loops through all Legate custom calls defining the microbatching
+// Loops through all MultiMesh custom calls defining the microbatching
 // and loop schedules and records the information. All
-// Legate custom calls for microbatching are removed during the pass.
+// MultiMesh custom calls for microbatching are removed during the pass.
 class MpmdMicrobatchLoopCanonicalizer : public HloModulePass {
  public:
   // The `partition` object contains the mapping from partition color
@@ -44,4 +44,4 @@ class MpmdMicrobatchLoopCanonicalizer : public HloModulePass {
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_MPMD_MICROBATCH_LOOP_CANONICALIZER_H_
+#endif  // XLA_PJRT_MULTIMESH_MPMD_MICROBATCH_LOOP_CANONICALIZER_H_

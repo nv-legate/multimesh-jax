@@ -2,7 +2,7 @@
 #                         All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from jax_plugins.legate import init_test
+from jax_plugins.multimesh import init_test
 
 init_test()
 
@@ -19,13 +19,13 @@ from jax.sharding import (
     PositionalSharding,
 )
 
-import legate.jax
-from legate.jax.test_util import LegateJaxTestCase
+import multimesh.jax
+from multimesh.jax.test_util import MultiMeshJaxTestCase
 
 config.parse_flags_with_absl()
 
 
-class TaskTest(LegateJaxTestCase):
+class TaskTest(MultiMeshJaxTestCase):
     def make_shape(self, *shape, dtype=np.float32):
         size = np.prod(shape)
         return jnp.arange(size, dtype=dtype).reshape(shape)
@@ -55,11 +55,11 @@ class TaskTest(LegateJaxTestCase):
         def jnp_fxn(*arrs):
             res = arrs[:]
             for _ in range(3):
-                res = legate.jax.task(f)(res, arrs)
+                res = multimesh.jax.task(f)(res, arrs)
             return res
 
         # allow the fast path to be chosen as a test that it is NOT taken
-        # when a small module has Legate custom calls
+        # when a small module has MultiMesh custom calls
         self._test_against_reference(
             jnp_fxn, args_maker, enable_fast_path=True
         )
@@ -75,7 +75,7 @@ class TaskTest(LegateJaxTestCase):
             f = jax.checkpoint(
                 f, policy=jax.checkpoint_policies.nothing_saveable
             )
-            f = legate.jax.task(f)
+            f = multimesh.jax.task(f)
 
             x = f(x)
             x = f(x)
@@ -106,7 +106,7 @@ class TaskTest(LegateJaxTestCase):
                 x = layer(x, y, z)
                 return layer(x, y, z)
 
-            f = legate.jax.task(f)
+            f = multimesh.jax.task(f)
 
             x = f(params, x)
             x = f(params, x)
@@ -130,7 +130,7 @@ class TaskTest(LegateJaxTestCase):
             def f(x):
                 return x * x
 
-            f = legate.jax.task(f)
+            f = multimesh.jax.task(f)
             return f(x)
 
         def arg_maker():
@@ -145,12 +145,12 @@ class TaskTest(LegateJaxTestCase):
             def f(x, y, z):
                 return x * x, x * y, z
 
-            f = legate.jax.task(f)
+            f = multimesh.jax.task(f)
 
             def g(x, y, z):
                 return x, x * y, z, x * z
 
-            g = legate.jax.task(g)
+            g = multimesh.jax.task(g)
             return g(*f(x, y, z))
 
         def arg_maker():
@@ -169,12 +169,12 @@ class TaskTest(LegateJaxTestCase):
             def f(x):
                 return x * x
 
-            f = legate.jax.task(f)
+            f = multimesh.jax.task(f)
 
             def g(x, y):
                 return x * x, x * y
 
-            g = legate.jax.task(g)
+            g = multimesh.jax.task(g)
             x = f(x)
             return g(x, y)
 
@@ -205,12 +205,12 @@ class TaskTest(LegateJaxTestCase):
                 def f(x):
                     return x * x
 
-                f = legate.jax.task(f)
+                f = multimesh.jax.task(f)
 
                 def g(x, y):
                     return (x + (y * y)).sum()
 
-                g = legate.jax.task(g)
+                g = multimesh.jax.task(g)
 
                 x = f(x)
                 return g(x, y)
@@ -255,7 +255,7 @@ class TaskTest(LegateJaxTestCase):
         def c(x):
             class Layer:
                 def __call__(self, x):
-                    x = legate.jax.with_sharding_constraint(
+                    x = multimesh.jax.with_sharding_constraint(
                         x, P("batch", "model")
                     )
                     return x * jnp.sin(x)
@@ -263,13 +263,13 @@ class TaskTest(LegateJaxTestCase):
             mesh = Mesh(
                 np.array(jax.devices()[0:4]).reshape(2, 2), ("batch", "model")
             )
-            first_layer = legate.jax.task(Layer, mesh=mesh)()
+            first_layer = multimesh.jax.task(Layer, mesh=mesh)()
             x = first_layer(x)
 
             mesh = Mesh(
                 np.array(jax.devices()[4:8]).reshape(2, 2), ("batch", "model")
             )
-            second_layer = legate.jax.task(Layer, mesh=mesh)()
+            second_layer = multimesh.jax.task(Layer, mesh=mesh)()
             x = second_layer(x)
 
             return (x * x).sum()
@@ -277,7 +277,7 @@ class TaskTest(LegateJaxTestCase):
         def arg_maker():
             # return self.make_shape(4,4)
             return (
-                legate.jax.with_sharding_constraint(
+                multimesh.jax.with_sharding_constraint(
                     self.make_shape(4, 4), P("batch", "model")
                 ),
             )
@@ -303,22 +303,26 @@ class TaskTest(LegateJaxTestCase):
 
         def c(x):
             def f(x):
-                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                x = multimesh.jax.with_sharding_constraint(
+                    x, P("batch", "model")
+                )
                 return x * jnp.sin(x)
 
             mesh = Mesh(
                 np.array(jax.devices()[0:4]).reshape(2, 2), ("batch", "model")
             )
-            f = legate.jax.task(f, mesh=mesh)
+            f = multimesh.jax.task(f, mesh=mesh)
 
             def g(x):
-                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                x = multimesh.jax.with_sharding_constraint(
+                    x, P("batch", "model")
+                )
                 return x * jnp.cos(x)
 
             mesh = Mesh(
                 np.array(jax.devices()[4:8]).reshape(2, 2), ("batch", "model")
             )
-            g = legate.jax.task(g, mesh=mesh)
+            g = multimesh.jax.task(g, mesh=mesh)
 
             x = f(x)
             x = g(x)
@@ -327,7 +331,7 @@ class TaskTest(LegateJaxTestCase):
         def arg_maker():
             # return self.make_shape(4,4)
             return (
-                legate.jax.with_sharding_constraint(
+                multimesh.jax.with_sharding_constraint(
                     self.make_shape(4, 4), P("batch", "model")
                 ),
             )
@@ -357,7 +361,7 @@ class TaskTest(LegateJaxTestCase):
                 devices = np.array(jax.devices()[offset : offset + 2]).reshape(
                     2, 1
                 )
-                return legate.jax.Task(
+                return multimesh.jax.Task(
                     devices=devices,
                     device_axes=("x", "y"),
                     logical_axes=[("batch", "x")],
@@ -365,10 +369,12 @@ class TaskTest(LegateJaxTestCase):
 
         def c(x):
             def f(x, *, iter: int):
-                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                x = multimesh.jax.with_sharding_constraint(
+                    x, P("batch", "model")
+                )
                 return x * x
 
-            f = legate.jax.task(
+            f = multimesh.jax.task(
                 f, configure=Configurable(), configure_args=("iter",)
             )
 
@@ -398,12 +404,12 @@ class TaskTest(LegateJaxTestCase):
             def f(x, scale):
                 return x * x * scale
 
-            f = legate.jax.task(f)
+            f = multimesh.jax.task(f)
 
             def g(x, y):
                 return (jnp.cos(x) + y).sum()
 
-            g = legate.jax.task(g)
+            g = multimesh.jax.task(g)
 
             return g(f(x, scale), x)
 

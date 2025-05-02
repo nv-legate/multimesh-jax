@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_MPMD_LOOP_H_
-#define XLA_PJRT_LEGATE_MPMD_LOOP_H_
+#ifndef XLA_PJRT_MULTIMESH_MPMD_LOOP_H_
+#define XLA_PJRT_MULTIMESH_MPMD_LOOP_H_
 
 #include <cstdint>
 #include <optional>
@@ -14,7 +14,7 @@
 
 namespace xla {
 
-// Encapsulates a Legate-managed loop that slices an input
+// Encapsulates a MultiMesh loop that slices an input
 // into microbatches and aggregates the results over the microbatch dimension.
 struct LoopConfig {
   enum class Schedule {
@@ -98,4 +98,4 @@ absl::StatusOr<LoopConfig> GetMicrobatchConfig(const std::string& name,
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_MPMD_LOOP_H_
+#endif  // XLA_PJRT_MULTIMESH_MPMD_LOOP_H_

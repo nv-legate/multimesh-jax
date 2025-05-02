@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_MPMD_INPUT_OUTPUT_BUFFER_ALIAS_H_
-#define XLA_PJRT_LEGATE_MPMD_INPUT_OUTPUT_BUFFER_ALIAS_H_
+#ifndef XLA_PJRT_MULTIMESH_MPMD_INPUT_OUTPUT_BUFFER_ALIAS_H_
+#define XLA_PJRT_MULTIMESH_MPMD_INPUT_OUTPUT_BUFFER_ALIAS_H_
 
 #include <cstdint>
 
@@ -71,4 +71,4 @@ class MpmdInputOutputBufferAlias : public HloModulePass {
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_MPMD_INPUT_OUTPUT_BUFFER_ALIAS_H_
+#endif  // XLA_PJRT_MULTIMESH_MPMD_INPUT_OUTPUT_BUFFER_ALIAS_H_

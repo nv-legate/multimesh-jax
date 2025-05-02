@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _XLA_PJRT_LEGATE_STORE_HANDLE_FWD_H
-#define _XLA_PJRT_LEGATE_STORE_HANDLE_FWD_H
+#ifndef _XLA_PJRT_MULTIMESH_STORE_HANDLE_FWD_H
+#define _XLA_PJRT_MULTIMESH_STORE_HANDLE_FWD_H
 
 #include <memory>
 

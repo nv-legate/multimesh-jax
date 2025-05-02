@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_argument_recompute.h"
+#include "xla/pjrt/multimesh/mpmd_argument_recompute.h"
 
 #include <utility>
 
 #include "gmock/gmock.h"
 #include "xla/hlo/utils/hlo_matchers.h"
-#include "xla/pjrt/legate/hlo_partition.h"
-#include "xla/pjrt/legate/mpmd_test_base.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
+#include "xla/pjrt/multimesh/mpmd_test_base.h"
 #include "xla/tsl/lib/core/status_test_util.h"
 
 namespace xla {

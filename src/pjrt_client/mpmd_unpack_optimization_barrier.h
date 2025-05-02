@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_MPMD_UNPACK_OPTIMIZATION_BARRIER_H_
-#define XLA_PJRT_LEGATE_MPMD_UNPACK_OPTIMIZATION_BARRIER_H_
+#ifndef XLA_PJRT_MULTIMESH_MPMD_UNPACK_OPTIMIZATION_BARRIER_H_
+#define XLA_PJRT_MULTIMESH_MPMD_UNPACK_OPTIMIZATION_BARRIER_H_
 
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/hlo/ir/hlo_instruction.h"
@@ -38,4 +38,4 @@ class MpmdUnpackOptimizationBarrier : public HloModulePass {
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_MPMD_UNPACK_OPTIMIZATION_BARRIER_H_
+#endif  // XLA_PJRT_MULTIMESH_MPMD_UNPACK_OPTIMIZATION_BARRIER_H_

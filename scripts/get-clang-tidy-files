@@ -4,12 +4,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
-import sys
 
 with open("compile_commands.json") as f:
-  data = json.load(f)
+    data = json.load(f)
 
 for entry in data:
-  path = entry["file"]
-  if path.endswith(".cc") and "pjrt/legate" in path and not path.endswith("cu.cc"):
-    print(path)
+    path = entry["file"]
+    if (
+        path.endswith(".cc")
+        and "pjrt/multimesh" in path
+        and not path.endswith("cu.cc")
+    ):
+        print(path)

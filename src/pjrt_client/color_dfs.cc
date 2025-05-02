@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/color_dfs.h"
+#include "xla/pjrt/multimesh/color_dfs.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
 
 namespace xla {
 

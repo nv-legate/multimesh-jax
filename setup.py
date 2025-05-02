@@ -10,9 +10,9 @@ from skbuild import setup
 import versioneer
 
 setup(
-    name="Legate JAX",
+    name="MultiMesh JAX",
     version=versioneer.get_version(),
-    description="Legate-Jax MPMD execution plugin",
+    description="MultiMesh for Jax MPMD execution plugin",
     url="TBD",
     author="NVIDIA Corporation",
     license="Closed source",
@@ -22,10 +22,10 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
     ],
-    packages=find_namespace_packages(include=["jax_plugins.*", "legate.*"]),
+    packages=find_namespace_packages(include=["jax_plugins.*", "multimesh.*"]),
     include_package_data=True,
     package_data={
-        "legate.jax": ["*.so"],
+        "multimesh.jax": ["*.so"],
     },
     cmdclass=versioneer.get_cmdclass(),
     install_requires=["numpy>=1.22", "pybind11[global]", "gin"],

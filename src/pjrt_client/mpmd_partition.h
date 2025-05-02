@@ -3,16 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_MPMD_PARTITION_H_
-#define XLA_PJRT_LEGATE_MPMD_PARTITION_H_
+#ifndef XLA_PJRT_MULTIMESH_MPMD_PARTITION_H_
+#define XLA_PJRT_MULTIMESH_MPMD_PARTITION_H_
 
 #include <optional>
 
 #include "xla/hlo/ir/hlo_module.h"
-#include "xla/pjrt/legate/hlo_partition.h"
-#include "xla/pjrt/legate/legate_computation.h"
-#include "xla/pjrt/legate/mpmd_store.h"
-#include "xla/pjrt/legate/scalar_argument.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
+#include "xla/pjrt/multimesh/mm_computation.h"
+#include "xla/pjrt/multimesh/mpmd_store.h"
+#include "xla/pjrt/multimesh/scalar_argument.h"
 #include "xla/pjrt/pjrt_executable.h"
 
 namespace xla {
@@ -29,7 +29,7 @@ struct SpmdModule {
 
 struct SpmdHloModuleTask {
   std::shared_ptr<SpmdModule> module;
-  std::shared_ptr<LegateCompiler> compiler;
+  std::shared_ptr<MultiMeshCompiler> compiler;
   zuku::DeviceList device_assignment;
   std::vector<Store> inputs;
   std::vector<Store> outputs;
@@ -95,4 +95,4 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
 
 extern "C" void SetHostOffloadMinSize(int64_t size);
 
-#endif  // XLA_PJRT_LEGATE_MPMD_PARTITION_H_
+#endif  // XLA_PJRT_MULTIMESH_MPMD_PARTITION_H_

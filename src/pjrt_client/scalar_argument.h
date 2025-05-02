@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_SCALAR_ARGUMENT_H_
-#define XLA_PJRT_LEGATE_SCALAR_ARGUMENT_H_
+#ifndef XLA_PJRT_MULTIMESH_SCALAR_ARGUMENT_H_
+#define XLA_PJRT_MULTIMESH_SCALAR_ARGUMENT_H_
 
 #include <cstdint>
 #include <variant>
@@ -20,4 +20,4 @@ struct ScalarArgument {
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_LEGATE_DEVICE_ASSIGNMENT_H_
+#endif  // XLA_PJRT_MULTIMESH_MM_DEVICE_ASSIGNMENT_H_

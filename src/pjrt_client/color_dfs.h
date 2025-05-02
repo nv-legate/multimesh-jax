@@ -2,8 +2,8 @@
  * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef XLA_PJRT_LEGATE_COLOR_DFS_H_
-#define XLA_PJRT_LEGATE_COLOR_DFS_H_
+#ifndef XLA_PJRT_MULTIMESH_COLOR_DFS_H_
+#define XLA_PJRT_MULTIMESH_COLOR_DFS_H_
 
 #include "absl/status/status.h"
 #include "src/zuku/mesh.h"

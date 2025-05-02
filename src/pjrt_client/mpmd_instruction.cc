@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
 
 #include <optional>
 
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_module.h"
-#include "xla/pjrt/legate/json_utils.h"
-#include "xla/pjrt/legate/logical_sharding_context.h"
+#include "xla/pjrt/multimesh/json_utils.h"
+#include "xla/pjrt/multimesh/logical_sharding_context.h"
 
 namespace xla {
 namespace {

@@ -69,7 +69,8 @@ void TempBufferAllocator::Free(void* buf, size_t size) {
 }  // namespace
 
 void RunExecutable(zuku::Stream* zs, int64_t run_id, zuku::DeviceList devices,
-                   zuku::Processor p, std::shared_ptr<LegateCompiler> compiler,
+                   zuku::Processor p,
+                   std::shared_ptr<MultiMeshCompiler> compiler,
                    std::vector<ScalarArgument> scalars,
                    zuku::ro_vector<zuku::ShardedArray> inputs,
                    zuku::rw_vector<zuku::ShardedArray> outputs,
@@ -143,16 +144,16 @@ void RunExecutable(zuku::Stream* zs, int64_t run_id, zuku::DeviceList devices,
   }
 
   const int64_t num_local_devices = p.NumLocalInDeviceList(devices, p.type());
-  LegateDeviceAssignment device_assignment{
+  MultiMeshDeviceAssignment device_assignment{
       {.local_device_id = p.local_id(),
        .global_device_id = p.global_id(),
        .replica_count = exe->ReplicaCount(),
        .num_partitions = exe->NumPartitions()},
       std::move(devices)};
 
-  LegateExecutable::Platform platform = p.type() == zuku::Processor::Type::GPU
-                                            ? LegateExecutable::GPU
-                                            : LegateExecutable::CPU;
+  MultiMeshExecutable::Platform platform =
+      p.type() == zuku::Processor::Type::GPU ? MultiMeshExecutable::GPU
+                                             : MultiMeshExecutable::CPU;
 
   static bool blocking = false;  // BlockingExecution();
 

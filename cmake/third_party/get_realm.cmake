@@ -5,7 +5,7 @@
 
 function(find_or_configure_realm)
 
-  set(PKG_VERSION ${LegateJAX_VERSION})
+  set(PKG_VERSION ${MultiMeshJAX_VERSION})
   include("${rapids-cmake-dir}/export/detail/parse_version.cmake")
   rapids_export_parse_version(${PKG_VERSION} realm PKG_VERSION)
 
@@ -24,8 +24,8 @@ function(find_or_configure_realm)
 
   set(FIND_PKG_ARGS
       GLOBAL_TARGETS Legion::Realm Legion::RealmRuntime
-      BUILD_EXPORT_SET   legate-jax-exports
-      INSTALL_EXPORT_SET legate-jax-exports)
+      BUILD_EXPORT_SET   multimesh-jax-exports
+      INSTALL_EXPORT_SET multimesh-jax-exports)
 
   if (NOT DEFINED Legion_ROOT AND DEFINED realm_ROOT)
     set(Legion_ROOT ${realm_ROOT})
@@ -39,7 +39,7 @@ function(find_or_configure_realm)
     rapids_find_package(Legion ${version} EXACT CONFIG ${_find_mode} ${FIND_PKG_ARGS})
   endif()
 
-  if(legate_core_FOUND)
+  if(Legion_FOUND)
     message(STATUS "CPM: using local package Realm@${version}")
   else()
     rapids_cpm_find(Legion ${version} ${FIND_PKG_ARGS}

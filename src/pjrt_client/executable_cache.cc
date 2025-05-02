@@ -13,7 +13,7 @@ static std::mutex cache_lock;
 
 bool ExecutableCache::compile_executable(
     uint64_t hlo_id,
-    std::function<std::unique_ptr<LegateExecutable>()> invoke) {
+    std::function<std::unique_ptr<MultiMeshExecutable>()> invoke) {
   cache_lock.lock();
   auto& entry = executables_[hlo_id];
   cache_lock.unlock();
@@ -27,7 +27,7 @@ bool ExecutableCache::compile_executable(
   return true;
 }
 
-LegateExecutable* ExecutableCache::find_executable(uint64_t hlo_id) {
+MultiMeshExecutable* ExecutableCache::find_executable(uint64_t hlo_id) {
   std::lock_guard<std::mutex> guard(cache_lock);
   auto finder = executables_.find(hlo_id);
   if (executables_.end() == finder) {
@@ -43,11 +43,11 @@ static ExecutableCache& get_executable_cache() {
 
 bool compile_executable(
     uint64_t hlo_id,
-    std::function<std::unique_ptr<LegateExecutable>()> invoke) {
+    std::function<std::unique_ptr<MultiMeshExecutable>()> invoke) {
   return get_executable_cache().compile_executable(hlo_id, std::move(invoke));
 }
 
-LegateExecutable* find_executable(uint64_t hlo_id) {
+MultiMeshExecutable* find_executable(uint64_t hlo_id) {
   return get_executable_cache().find_executable(hlo_id);
 }
 

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/json_utils.h"
+#include "xla/pjrt/multimesh/json_utils.h"
 
 namespace xla {
 

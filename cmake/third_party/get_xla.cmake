@@ -7,8 +7,8 @@ function(find_or_configure_xla)
   include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
   rapids_cpm_package_details(OpenXLA version git_repo git_branch shallow exclude_from_all)
 
-  set(LegateJAX_BAZEL_REMOTE_CACHE "" CACHE STRING "An optional remote cache for bazel builds")
-  set(LegateJAX_XLA_LINKER "" CACHE STRING "The linker to override the default linker chosen by Bazel")
+  set(MultiMeshJAX_BAZEL_REMOTE_CACHE "" CACHE STRING "An optional remote cache for bazel builds")
+  set(MultiMeshJAX_XLA_LINKER "" CACHE STRING "The linker to override the default linker chosen by Bazel")
 
 
   if (xla_REPOSITORY)
@@ -21,18 +21,18 @@ function(find_or_configure_xla)
 
   rapids_cpm_find(xla ${version}
       GLOBAL_TARGETS     xla::xla
-      BUILD_EXPORT_SET   legate-jax-exports
-      INSTALL_EXPORT_SET legate-jax-exports
+      BUILD_EXPORT_SET   multimesh-jax-exports
+      INSTALL_EXPORT_SET multimesh-jax-exports
       CPM_ARGS
         GIT_REPOSITORY ${git_repo}
         GIT_TAG        ${git_tag}
         DOWNLOAD_ONLY
   )
 
-  set(xla_client_library_name liblegate_xla_client.so)
-  set(xla_compiler_library_name legate_xla_compiler.so)
-  set(xla_client_library "${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${xla_client_library_name}")
-  set(xla_compiler_library "${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${xla_compiler_library_name}")
+  set(xla_client_library_name libmultimesh_xla_client.so)
+  set(xla_compiler_library_name multimesh_xla_compiler.so)
+  set(xla_client_library "${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/multimesh/${xla_client_library_name}")
+  set(xla_compiler_library "${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/multimesh/${xla_compiler_library_name}")
 
   file(GLOB xla_source_files
        "${PROJECT_SOURCE_DIR}/src/pjrt_client/*.cc"
@@ -42,24 +42,24 @@ function(find_or_configure_xla)
   set(xla_symlink_files)
   foreach(PATH ${xla_source_files})
     get_filename_component(FILE_NAME ${PATH} NAME)
-    list(APPEND xla_symlink_files "${xla_SOURCE_DIR}/xla/pjrt/legate/${FILE_NAME}")
+    list(APPEND xla_symlink_files "${xla_SOURCE_DIR}/xla/pjrt/multimesh/${FILE_NAME}")
   endforeach()
 
   add_custom_command(
       OUTPUT ${xla_symlink_files}
       COMMAND ${CMAKE_COMMAND} -E create_symlink
               ${PROJECT_SOURCE_DIR}/src/pjrt_client
-              ${xla_SOURCE_DIR}/xla/pjrt/legate
+              ${xla_SOURCE_DIR}/xla/pjrt/multimesh
       COMMENT "Symlink plugin client code into XLA source tree at ${xla_SOURCE_DIR}"
   )
 
   set(test_names
     mpmd_partition_test
-    legate_buffer_action_test
-    legate_sharding_test
+    mm_buffer_action_test
+    mm_sharding_test
     loop_scheduler_test
-    legate_pjrt_client_test
-    legate_pjrt_executable_test
+    mm_pjrt_client_test
+    mm_pjrt_executable_test
     mpmd_sharding_propagation_test
     mpmd_simple_loop_increment_coloring_test
     mpmd_unpack_optimization_barrier_test
@@ -87,13 +87,13 @@ function(find_or_configure_xla)
   )
 
   set(target_names
-    "//xla/pjrt/legate:liblegate_xla_client.so"
-    "//xla/pjrt/legate:legate_xla_compiler.so"
+    "//xla/pjrt/multimesh:libmultimesh_xla_client.so"
+    "//xla/pjrt/multimesh:multimesh_xla_compiler.so"
   )
-  if (LegateJAX_ENABLE_TESTS)
+  if (MultiMeshJAX_ENABLE_TESTS)
     foreach(test ${test_names})
-      list(APPEND target_names "//xla/pjrt/legate:${test}")
-      list(APPEND xla_source_files "${xla_SOURCE_DIR}/xla/pjrt/legate/${test}.cc")
+      list(APPEND target_names "//xla/pjrt/multimesh:${test}")
+      list(APPEND xla_source_files "${xla_SOURCE_DIR}/xla/pjrt/multimesh/${test}.cc")
     endforeach()
   endif()
 
@@ -104,24 +104,24 @@ function(find_or_configure_xla)
    --config=cuda
  )
 
- if (LegateJAX_XLA_LINKER)
+ if (MultiMeshJAX_XLA_LINKER)
    list(APPEND _bazel_options 
-     --linkopt=-fuse-ld=${LegateJAX_XLA_LINKER})
-   if (${LegateJAX_XLA_LINKER} STREQUAL "lld")
+     --linkopt=-fuse-ld=${MultiMeshJAX_XLA_LINKER})
+   if (${MultiMeshJAX_XLA_LINKER} STREQUAL "lld")
      list(APPEND _bazel_options
        --linkopt -Wl,--undefined-version)
    endif()
  endif()
  
- if (LegateJAX_ASAN)
+ if (MultiMeshJAX_ASAN)
    list (APPEND _bazel_options
      --copt -fsanitize=address
      --linkopt -fsanitize=address)
  endif()
 
- if (LegateJAX_BAZEL_REMOTE_CACHE)
+ if (MultiMeshJAX_BAZEL_REMOTE_CACHE)
     list (APPEND _bazel_options
-     --remote_cache ${LegateJAX_BAZEL_REMOTE_CACHE})
+     --remote_cache ${MultiMeshJAX_BAZEL_REMOTE_CACHE})
  endif()
 
  if (DEFINED zuku_SOURCE_DIR)
@@ -134,15 +134,15 @@ function(find_or_configure_xla)
  set(_bazel_startup_options 
  #  --batch
  )
- if (LegateJAX_BAZEL_OUTPUT_BASE)
+ if (MultiMeshJAX_BAZEL_OUTPUT_BASE)
    list(APPEND _bazel_startup_options
-     --output_base=${LegateJAX_BAZEL_OUTPUT_BASE})
+     --output_base=${MultiMeshJAX_BAZEL_OUTPUT_BASE})
  endif()
 
  add_library(xla SHARED IMPORTED GLOBAL)
  add_library(xla_compiler_plugin SHARED IMPORTED GLOBAL)
 
- option(LegateJAX_BUILD_XLA ON)
+ option(MultiMeshJAX_BUILD_XLA ON)
 
  if (CMAKE_LIBRARY_OUTPUT_DIRECTORY)
    set(LIB_FOLDER ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
@@ -154,7 +154,7 @@ function(find_or_configure_xla)
    OUTPUT  ${xla_client_library}
    OUTPUT  ${xla_compiler_library}
    COMMENT "Building XLA components ${target_names}..."
-   COMMAND rm -rf "${xla_SOURCE_DIR}/bazel-bin" && XLA_LEGATE_SOURCE_DIR=${CMAKE_SOURCE_DIR} bazel ${_bazel_startup_option} build ${_bazel_options} ${target_names} --check_visibility=false
+   COMMAND rm -rf "${xla_SOURCE_DIR}/bazel-bin" && bazel ${_bazel_startup_option} build ${_bazel_options} ${target_names} --check_visibility=false
    WORKING_DIRECTORY ${xla_SOURCE_DIR}
    DEPENDS ${xla_symlink_files}
    USES_TERMINAL
@@ -184,7 +184,7 @@ function(find_or_configure_xla)
   set(xla_symlink_files)
   foreach(PATH ${xla_source_files})
     get_filename_component(FILE_NAME ${PATH} NAME)
-    list(APPEND xla_symlink_files "${xla_SOURCE_DIR}/xla/pjrt/legate/${FILE_NAME}")
+    list(APPEND xla_symlink_files "${xla_SOURCE_DIR}/xla/pjrt/multimesh/${FILE_NAME}")
   endforeach()
 
   add_custom_target(xla_build ALL
@@ -215,10 +215,10 @@ function(find_or_configure_xla)
 
   include(GoogleTest)
 
-  if (LegateJAX_ENABLE_TESTS)
+  if (MultiMeshJAX_ENABLE_TESTS)
     foreach(test_exe ${test_names})
       add_executable(${test_exe} IMPORTED)
-      set_target_properties(${test_exe} PROPERTIES IMPORTED_LOCATION ${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/legate/${test_exe})
+      set_target_properties(${test_exe} PROPERTIES IMPORTED_LOCATION ${xla_SOURCE_DIR}/bazel-bin/xla/pjrt/multimesh/${test_exe})
       add_dependencies(${test_exe} xla_build)
       gtest_discover_tests(${test_exe}
          WORKING_DIRECTORY ${xla_SOURCE_DIR}

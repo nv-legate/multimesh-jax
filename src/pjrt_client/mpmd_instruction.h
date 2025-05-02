@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_MPMD_INSTRUCTION_H_
-#define XLA_PJRT_LEGATE_MPMD_INSTRUCTION_H_
+#ifndef XLA_PJRT_MULTIMESH_MPMD_INSTRUCTION_H_
+#define XLA_PJRT_MULTIMESH_MPMD_INSTRUCTION_H_
 
 #include <optional>
 #include <type_traits>
 
 #include "xla/hlo/ir/hlo_instruction.h"
-#include "xla/pjrt/legate/logical_sharding_context.h"
+#include "xla/pjrt/multimesh/logical_sharding_context.h"
 
 namespace xla {
 
@@ -116,4 +116,4 @@ void AddAttribute(HloInstruction* instruction, std::string name, const T& t) {
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_MPMD_INSTRUCTION_H_
+#endif  // XLA_PJRT_MULTIMESH_MPMD_INSTRUCTION_H_

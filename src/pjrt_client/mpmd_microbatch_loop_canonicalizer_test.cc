@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_microbatch_loop_canonicalizer.h"
+#include "xla/pjrt/multimesh/mpmd_microbatch_loop_canonicalizer.h"
 
 #include "gmock/gmock.h"
 #include "xla/hlo/utils/hlo_matchers.h"
-#include "xla/pjrt/legate/mpmd_test_base.h"
+#include "xla/pjrt/multimesh/mpmd_test_base.h"
 #include "xla/service/call_inliner.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 
 namespace xla {
 namespace {
@@ -100,13 +100,13 @@ None.55 {
   multiply.76 = f32[2,4]{1,0} multiply(custom-call.69, custom-call.74)
   Arg_2.58 = f32[4]{0} parameter(2)
   call.77 = f32[2,4]{1,0} call(multiply.76, Arg_2.58), to_apply=f.impl.11
-  custom-call.78 = f32[2,4]{1,0} custom-call(multiply.76, Arg_2.58), custom_call_target="LegateTask", called_computations={f.impl.19}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.78 = f32[2,4]{1,0} custom-call(multiply.76, Arg_2.58), custom_call_target="MultiMeshTask", called_computations={f.impl.19}, backend_config={"name": "f", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   Arg_3.59 = f32[4]{0} parameter(3)
   call.79 = f32[] call(custom-call.78, Arg_3.59), to_apply=g.impl.31
   constant.62 = s32[] constant(2)
   add.75 = s32[] add(Arg_4.60, constant.62)
   Arg_5.61 = f32[] parameter(5)
-  custom-call.80 = f32[] custom-call(custom-call.78, Arg_3.59), custom_call_target="LegateTask", called_computations={g.impl.45}, backend_config={"name": "g", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
+  custom-call.80 = f32[] custom-call(custom-call.78, Arg_3.59), custom_call_target="MultiMeshTask", called_computations={g.impl.45}, backend_config={"name": "g", "devices": [0], "autosharding": {"dims": [1], "device_axes": [], "logical_axes": []}}
   add.81 = f32[] add(Arg_5.61, custom-call.80)
   ROOT tuple.82 = (s32[], f32[]) tuple(add.75, add.81)
 } // None.55

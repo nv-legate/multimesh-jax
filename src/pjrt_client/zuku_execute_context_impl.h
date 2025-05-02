@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_ZUKU_EXECUTE_CONTEXT_IMPL_H_
-#define XLA_PJRT_LEGATE_ZUKU_EXECUTE_CONTEXT_IMPL_H_
+#ifndef XLA_PJRT_MULTIMESH_ZUKU_EXECUTE_CONTEXT_IMPL_H_
+#define XLA_PJRT_MULTIMESH_ZUKU_EXECUTE_CONTEXT_IMPL_H_
 
-#include "xla/pjrt/legate/zuku_execute_context.h"
+#include "xla/pjrt/multimesh/zuku_execute_context.h"
 
 namespace xla {
 
@@ -16,15 +16,15 @@ class ZukuExecuteContextImpl final : public ZukuExecuteContext {
 
   void CreateExecuteTask(int64_t run_id, int64_t local_device_id,
                          int64_t global_device_id, zuku::DeviceList devices,
-                         std::shared_ptr<LegateCompiler> compiler,
+                         std::shared_ptr<MultiMeshCompiler> compiler,
                          const std::vector<ScalarArgument>& scalars,
                          const std::vector<StoreHandle>& inputs,
                          const std::vector<StoreHandle>& outputs,
                          zuku::Future<zuku::ArrayTile>& temp_buffer,
-                         LegateExecuteOptions options) override;
+                         MultiMeshExecuteOptions options) override;
 
   void CreateCompileTask(int64_t local_device_id,
-                         std::shared_ptr<LegateCompiler> compiler) override;
+                         std::shared_ptr<MultiMeshCompiler> compiler) override;
 
   void RunAfterAllTasks(int64_t local_device_id,
                         std::function<void()> on_done) override;
@@ -64,7 +64,7 @@ class ZukuExecuteContextImpl final : public ZukuExecuteContext {
   StoreHandle AssembleShards(
       int64_t local_device_id, int64_t global_device_id,
       zuku::ShardedShape shape, Shard shard,
-      std::shared_ptr<LegateStream> stream,
+      std::shared_ptr<MultiMeshStream> stream,
       std::optional<StoreHandle> existing_store = std::nullopt) {
     return AssembleShardsImpl(local_device_id, global_device_id,
                               std::move(shape), std::move(shard),
@@ -100,7 +100,7 @@ class ZukuExecuteContextImpl final : public ZukuExecuteContext {
   StoreHandle AssembleShardsImpl(
       int64_t local_device_id, int64_t global_device_id,
       zuku::ShardedShape shape, Shard shard,
-      std::shared_ptr<LegateStream> stream,
+      std::shared_ptr<MultiMeshStream> stream,
       std::optional<StoreHandle> existing_store) override;
 
   StoreHandle CreateStoreImpl(int64_t local_device_id, int64_t global_device_id,
@@ -135,4 +135,4 @@ class ZukuExecuteContextImpl final : public ZukuExecuteContext {
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_ZUKU_EXECUTE_CONTEXT_IMPL_H_
+#endif  // XLA_PJRT_MULTIMESH_ZUKU_EXECUTE_CONTEXT_IMPL_H_

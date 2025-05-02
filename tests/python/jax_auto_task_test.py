@@ -2,7 +2,7 @@
 #                         All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from jax_plugins.legate import init_test
+from jax_plugins.multimesh import init_test
 
 init_test()
 
@@ -25,9 +25,9 @@ from jax.sharding import (
     PositionalSharding,
 )
 
-import legate.jax
-from legate.jax import MeshWrapper
-from legate.jax.test_util import LegateJaxTestCase
+import multimesh.jax
+from multimesh.jax import MeshWrapper
+from multimesh.jax.test_util import MultiMeshJaxTestCase
 
 config.parse_flags_with_absl()
 
@@ -37,7 +37,7 @@ def make_shape(*shape, dtype=np.float32):
     return jnp.arange(size, dtype=dtype).reshape(shape)
 
 
-class TaskTest(LegateJaxTestCase):
+class TaskTest(MultiMeshJaxTestCase):
     def _test_register_task(self):
         def c(x):
             with jax.named_scope("task0"):
@@ -85,14 +85,14 @@ class TaskTest(LegateJaxTestCase):
             ("batch", "x"),
             ("model", "y"),
         ]
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "task0",
             devices=[0, 1],
             dims=[2, 1],
             device_axes=["x", "y"],
             logical_axes=logical_axes,
         )
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "task1",
             devices=[0, 1],
             dims=[2, 1],
@@ -105,20 +105,20 @@ class TaskTest(LegateJaxTestCase):
         if jax.device_count() != 2:
             self.skipTest("need 2 devices")
 
-        with legate.jax.context(autoshard=True):
+        with multimesh.jax.context(autoshard=True):
             logical_axes = [
                 ("batch", "x"),
                 ("model", "y"),
             ]
 
-            legate.jax.register_task(
+            multimesh.jax.register_task(
                 "task0",
                 devices=[0, 1],
                 dims=[2, 1],
                 device_axes=["x", "y"],
                 logical_axes=logical_axes,
             )
-            legate.jax.register_task(
+            multimesh.jax.register_task(
                 "task1",
                 devices=[0, 1],
                 dims=[2, 1],
@@ -131,19 +131,19 @@ class TaskTest(LegateJaxTestCase):
         if jax.device_count() != 2:
             self.skipTest("need 2 devices")
 
-        with legate.jax.context(autoshard=True):
+        with multimesh.jax.context(autoshard=True):
             logical_axes = [
                 ("batch", "x"),
                 ("model", "y"),
             ]
-            legate.jax.register_task(
+            multimesh.jax.register_task(
                 "task0",
                 devices=[0, 1],
                 dims=[2, 1],
                 device_axes=["x", "y"],
                 logical_axes=logical_axes,
             )
-            legate.jax.register_task(
+            multimesh.jax.register_task(
                 "task1",
                 devices=[0, 1],
                 dims=[2, 1],
@@ -151,13 +151,13 @@ class TaskTest(LegateJaxTestCase):
                 logical_axes=logical_axes,
             )
 
-            with legate.jax.only_fuse_loop_tasks(True):
+            with multimesh.jax.only_fuse_loop_tasks(True):
                 self._test_register_task()
-            with legate.jax.only_fuse_loop_tasks(False):
+            with multimesh.jax.only_fuse_loop_tasks(False):
                 self._test_register_task()
 
     def tearDown(self):
-        legate.jax.clear_tasks()
+        multimesh.jax.clear_tasks()
 
     def test_register_factory(self):
         if jax.device_count() != 2:
@@ -171,7 +171,7 @@ class TaskTest(LegateJaxTestCase):
         def device_factory(name: str, backprop: bool) -> List[int]:
             return [0, 2], "bwd." + name if backprop else name
 
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             r"(task\d+)",
             callback=device_factory,
             dims=[2, 1],
@@ -181,12 +181,18 @@ class TaskTest(LegateJaxTestCase):
 
         def c(x):
             with jax.named_scope("task0"):
-                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                x = multimesh.jax.with_sharding_constraint(
+                    x, P("batch", "model")
+                )
                 x = x * jnp.sin(x)
-                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                x = multimesh.jax.with_sharding_constraint(
+                    x, P("batch", "model")
+                )
             with jax.named_scope("task1"):
                 x = x * x
-                return legate.jax.with_sharding_constraint(x, P("batch", None))
+                return multimesh.jax.with_sharding_constraint(
+                    x, P("batch", None)
+                )
 
         mesh = Mesh(np.array(jax.devices()).reshape(2, 1), ("batch", "model"))
         with mesh:
@@ -215,7 +221,7 @@ class TaskTest(LegateJaxTestCase):
                 c, arg_maker, arg_shardings=arg_shardings
             )
 
-        legate.jax.clear_tasks()
+        multimesh.jax.clear_tasks()
 
     def test_fully_replicated_sharding(self):
         if jax.device_count() != 4:
@@ -226,14 +232,14 @@ class TaskTest(LegateJaxTestCase):
             ("model", "y"),
         ]
 
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "task0",
             devices=[0, 1],
             dims=[2, 1],
             device_axes=["x", "y"],
             logical_axes=logical_axes,
         )
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "task1",
             devices=[2, 3],
             dims=[2, 1],
@@ -243,16 +249,22 @@ class TaskTest(LegateJaxTestCase):
 
         def c(x, y):
             with jax.named_scope("task0"):
-                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                x = multimesh.jax.with_sharding_constraint(
+                    x, P("batch", "model")
+                )
                 x = x * jnp.sin(x)
-                x = legate.jax.with_sharding_constraint(x, P("batch", "model"))
+                x = multimesh.jax.with_sharding_constraint(
+                    x, P("batch", "model")
+                )
             with jax.named_scope("task1"):
-                y = legate.jax.with_sharding_constraint(y, P(None, None))
+                y = multimesh.jax.with_sharding_constraint(y, P(None, None))
                 x = x * y
-                return legate.jax.with_sharding_constraint(x, P("batch", None))
+                return multimesh.jax.with_sharding_constraint(
+                    x, P("batch", None)
+                )
 
         mesh = Mesh(np.array(jax.devices()).reshape(4, 1), ("batch", "model"))
-        with mesh, legate.jax.autoshard(True):
+        with mesh, multimesh.jax.autoshard(True):
             f = jax.jit(
                 c,
                 in_shardings=(AUTO(mesh), AUTO(mesh)),
@@ -291,7 +303,7 @@ class TaskTest(LegateJaxTestCase):
             ("model", "y"),
         ]
 
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "layer0",
             devices=[0, 1, 2, 3],
             dims=[4, 1],
@@ -299,7 +311,7 @@ class TaskTest(LegateJaxTestCase):
             logical_axes=logical_axes,
         )
 
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "layer1",
             devices=[0, 1],
             dims=[2, 1],
@@ -312,21 +324,21 @@ class TaskTest(LegateJaxTestCase):
                 (batch0, batch1) = batch
                 (fc0, fc1) = params
                 with jax.named_scope("layer0"):
-                    batch = legate.jax.with_sharding_constraint(
+                    batch = multimesh.jax.with_sharding_constraint(
                         batch0, P("batch", "cxn")
                     )
-                    fc0 = legate.jax.with_sharding_constraint(
+                    fc0 = multimesh.jax.with_sharding_constraint(
                         fc0, P("cxn", "ext")
                     )
                     x = jnp.einsum("bc,ce->be", batch, fc0)
                 with jax.named_scope("layer1"):
-                    x = legate.jax.with_sharding_constraint(
+                    x = multimesh.jax.with_sharding_constraint(
                         x, P("batch", "cxn")
                     )
-                    batch = legate.jax.with_sharding_constraint(
+                    batch = multimesh.jax.with_sharding_constraint(
                         batch1, P("batch", "cxn")
                     )
-                    fc1 = legate.jax.with_sharding_constraint(
+                    fc1 = multimesh.jax.with_sharding_constraint(
                         fc1, P("cxn", "ext")
                     )
                     scaled_batch = x * batch
@@ -336,7 +348,7 @@ class TaskTest(LegateJaxTestCase):
 
         batch_size = 8
         model_dim = 4
-        with mesh, legate.jax.autoshard(True):
+        with mesh, multimesh.jax.autoshard(True):
             f = jax.jit(
                 c,
                 in_shardings=(
@@ -389,7 +401,7 @@ class TaskTest(LegateJaxTestCase):
             4, 1
         )
 
-        legate_shardings = (
+        mm_shardings = (
             (full_mesh_sharding, full_mesh_sharding),
             (None, fc1_sharding),
         )
@@ -398,9 +410,9 @@ class TaskTest(LegateJaxTestCase):
             (None, None),
         )
 
-        with mesh, legate.jax.autoshard(True):
+        with mesh, multimesh.jax.autoshard(True):
             self._test_against_reference(
-                c, arg_maker, legate_shardings, reference_shardings
+                c, arg_maker, mm_shardings, reference_shardings
             )
 
     def test_reshard_explicitly_sharded_argument(self):
@@ -421,18 +433,20 @@ class TaskTest(LegateJaxTestCase):
         devices = np.array(jax.devices())
 
         def f(batch, param):
-            param = legate.jax.with_sharding_constraint(param, P("cxn", "ext"))
+            param = multimesh.jax.with_sharding_constraint(
+                param, P("cxn", "ext")
+            )
             return jnp.einsum("bc,ce->be", batch, param)
 
         def c(batch, params):
-            layer0 = legate.jax.task(
+            layer0 = multimesh.jax.task(
                 f,
                 name="layer0",
                 devices=devices[:2].reshape(2, 1),
                 device_axes=("x", "y"),
                 logical_axes=logical_axes,
             )
-            layer1 = legate.jax.task(
+            layer1 = multimesh.jax.task(
                 f,
                 name="layer1",
                 devices=devices[2:].reshape(2, 1),
@@ -451,10 +465,10 @@ class TaskTest(LegateJaxTestCase):
 
         batch_size = 8
         model_dim = 4
-        with mesh, legate.jax.autoshard(True):
-            # use the legate jax mjit to annotate all arguments
+        with mesh, multimesh.jax.autoshard(True):
+            # use the MultiMesh mjit to annotate all arguments
             # with logical autosharding annotations
-            jf = legate.jax.mjit(
+            jf = multimesh.jax.mjit(
                 c,
                 in_shardings=(
                     batch_sharding,
@@ -468,7 +482,7 @@ class TaskTest(LegateJaxTestCase):
             # make sure the complication succeeds
             _ = jf.lower(batch, (fc0, fc1)).compile()
 
-        with mesh, legate.jax.autoshard(True):
+        with mesh, multimesh.jax.autoshard(True):
             # use standard jit so that arguments are explicitly sharded
             # without logical autosharding annotations
             jf = jax.jit(
@@ -495,7 +509,7 @@ class TaskTest(LegateJaxTestCase):
             ("model", "y"),
         ]
 
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "embeddings",
             devices=[0, 1, 2, 3, 4, 5, 6, 7],
             dims=[4, 2],
@@ -503,7 +517,7 @@ class TaskTest(LegateJaxTestCase):
             logical_axes=logical_axes,
         )
 
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "layer0",
             devices=[0, 1, 2, 3],
             dims=[2, 2],
@@ -519,23 +533,23 @@ class TaskTest(LegateJaxTestCase):
         def f(params, batch):
             embed, fc = params
             with jax.named_scope("embeddings"):
-                batch = legate.jax.with_sharding_constraint(
+                batch = multimesh.jax.with_sharding_constraint(
                     batch, P(("batch", "model"), "seq")
                 )
-                embed = legate.jax.with_sharding_constraint(
+                embed = multimesh.jax.with_sharding_constraint(
                     embed, P("vocab", "embed")
                 )
                 batch = jax.nn.one_hot(batch, num_classes=vocab)
                 x = jnp.einsum("bsv,ve->bse", batch, embed)
             with jax.named_scope("layer0"):
-                x = legate.jax.with_sharding_constraint(
+                x = multimesh.jax.with_sharding_constraint(
                     x, P(("batch", "model"), "seq", "embed")
                 )
-                fc = legate.jax.with_sharding_constraint(
+                fc = multimesh.jax.with_sharding_constraint(
                     fc, P("hidden", "embed")
                 )
                 x = jnp.einsum("bsh,eh->bsh", x, fc)
-                x = legate.jax.with_sharding_constraint(
+                x = multimesh.jax.with_sharding_constraint(
                     x, P("batch", "seq", "embed")
                 )
                 return x
@@ -545,7 +559,7 @@ class TaskTest(LegateJaxTestCase):
             ("batch", "model", "embed"),
         )
 
-        with mesh, legate.jax.autoshard(True):
+        with mesh, multimesh.jax.autoshard(True):
             f = jax.jit(
                 f,
                 in_shardings=(AUTO(mesh), AUTO(mesh)),
@@ -597,14 +611,14 @@ class TaskTest(LegateJaxTestCase):
             ("embed", "y"),
         ]
 
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "embeddings",
             devices=[0, 1, 2, 3, 4, 5, 6, 7],
             dims=[8, 1],
             device_axes=["x", "y"],
             logical_axes=logical_axes,
         )
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "loss",
             devices=[0, 1, 2, 3, 4, 5, 6, 7],
             dims=[8, 1],
@@ -612,14 +626,14 @@ class TaskTest(LegateJaxTestCase):
             logical_axes=logical_axes,
         )
 
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "layer0",
             devices=[0, 1, 2, 3, 4, 5, 6, 7],
             dims=[8, 1],
             device_axes=["x", "y"],
             logical_axes=logical_axes,
         )
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "layer1",
             devices=[0, 1, 2, 3, 4, 5, 6, 7],
             dims=[8, 1],
@@ -636,35 +650,35 @@ class TaskTest(LegateJaxTestCase):
             def f(params, batch):
                 embed, fc0, fc1, scale = params
                 with jax.named_scope("embeddings"):
-                    batch = legate.jax.with_sharding_constraint(
+                    batch = multimesh.jax.with_sharding_constraint(
                         batch, P("batch", "seq")
                     )
-                    embed = legate.jax.with_sharding_constraint(
+                    embed = multimesh.jax.with_sharding_constraint(
                         embed, P("vocab", "embed")
                     )
                     batch = jax.nn.one_hot(batch, num_classes=vocab)
                     x = jnp.einsum("bsv,ve->bse", batch, embed)
                 with jax.named_scope("layer0"):
-                    fc0 = legate.jax.with_sharding_constraint(
+                    fc0 = multimesh.jax.with_sharding_constraint(
                         fc0, P("embed-fc", "hidden")
                     )
-                    x = legate.jax.with_sharding_constraint(
+                    x = multimesh.jax.with_sharding_constraint(
                         x, P("batch", "seq", "embed")
                     )
                     x = jnp.einsum("bsh,eh->bsh", x, fc0)
                 with jax.named_scope("layer1"):
-                    fc1 = legate.jax.with_sharding_constraint(
+                    fc1 = multimesh.jax.with_sharding_constraint(
                         fc1, P("embed-fc", "hidden")
                     )
-                    x = legate.jax.with_sharding_constraint(
+                    x = multimesh.jax.with_sharding_constraint(
                         x, P("batch", "seq", "embed")
                     )
                     x = jnp.einsum("bse,eh->bsh", x, fc1)
                 with jax.named_scope("loss"):
-                    x = legate.jax.with_sharding_constraint(
+                    x = multimesh.jax.with_sharding_constraint(
                         x, P("batch", "seq", "embed")
                     )
-                    scale = legate.jax.with_sharding_constraint(
+                    scale = multimesh.jax.with_sharding_constraint(
                         scale, P("batch", "seq", "embed")
                     )
                     loss = (x * scale).sum()
@@ -678,7 +692,7 @@ class TaskTest(LegateJaxTestCase):
         )
 
         def make_lowered(mesh):
-            with mesh, legate.jax.autoshard(True):
+            with mesh, multimesh.jax.autoshard(True):
                 f = jax.jit(
                     c,
                     in_shardings=(AUTO(mesh), AUTO(mesh)),
@@ -720,14 +734,14 @@ class TaskTest(LegateJaxTestCase):
         self.assertTrue(scale_sharding.is_equivalent_to(batch_sharding, 3))
 
         logical_axes.append(("hidden", "x"))
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "layer0",
             devices=[0, 1, 2, 3],
             dims=[2, 2],
             device_axes=["x", "y"],
             logical_axes=logical_axes,
         )
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "layer1",
             devices=[4, 5, 6, 7],
             dims=[2, 2],
@@ -793,7 +807,7 @@ class TaskTest(LegateJaxTestCase):
 
             return f()
 
-        with mesh, legate.jax.autoshard(True):
+        with mesh, multimesh.jax.autoshard(True):
             self._test_against_reference(
                 c,
                 arg_maker,
@@ -811,14 +825,14 @@ class TaskTest(LegateJaxTestCase):
             ("embed", "z"),
         ]
 
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "layer0",
             devices=[0, 1, 2, 3],
             dims=[2, 1, 2],
             device_axes=["x", "y", "z"],
             logical_axes=logical_axes,
         )
-        legate.jax.register_task(
+        multimesh.jax.register_task(
             "layer1",
             devices=[4, 5, 6, 7],
             dims=[2, 1, 2],
@@ -861,12 +875,12 @@ class TaskTest(LegateJaxTestCase):
         def c(x):
             def f(x):
                 with jax.named_scope("layer0"):
-                    x = legate.jax.with_sharding_constraint(
+                    x = multimesh.jax.with_sharding_constraint(
                         x, P("batch", "seq", "embed")
                     )
                     x = layer(x)
                 with jax.named_scope("layer1"):
-                    x = legate.jax.with_sharding_constraint(
+                    x = multimesh.jax.with_sharding_constraint(
                         x, P("batch", "seq", "embed")
                     )
                     x = layer(x)
@@ -878,17 +892,17 @@ class TaskTest(LegateJaxTestCase):
             np.array(jax.devices()).reshape(4, 1, 2),
             ("batch", "seq", "embed"),
         )
-        legate_mesh = MeshWrapper(jax_mesh, (2, 1, 2))
+        mm_mesh = MeshWrapper(jax_mesh, (2, 1, 2))
 
         batch = 8
         seq = 10
         embed = 8
 
-        with legate_mesh, legate.jax.autoshard(True):
+        with mm_mesh, multimesh.jax.autoshard(True):
             c = jax.jit(
                 c,
-                in_shardings=(AUTO(legate_mesh),),
-                out_shardings=(AUTO(legate_mesh)),
+                in_shardings=(AUTO(mm_mesh),),
+                out_shardings=(AUTO(mm_mesh)),
             )
             batch = jax.core.ShapedArray((batch, seq, embed), np.float32)
             with MeshWrapper.lower_mode():

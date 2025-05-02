@@ -9,7 +9,7 @@
 #include <memory>
 #include <optional>
 
-#include "legate_computation.h"
+#include "xla/pjrt/multimesh/mm_computation.h"
 #include "src/zuku/processor.h"
 
 namespace xla {
@@ -21,7 +21,7 @@ struct HloLoaderOptions {
 };
 
 void LoadAndCompile(int64_t run_id, zuku::Processor p,
-                    const std::shared_ptr<LegateCompiler>& compiler);
+                    const std::shared_ptr<MultiMeshCompiler>& compiler);
 
 }  // namespace xla
 

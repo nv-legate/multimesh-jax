@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_MPMD_INLINE_EXPLICIT_TASKS_H_
-#define XLA_PJRT_LEGATE_MPMD_INLINE_EXPLICIT_TASKS_H_
+#ifndef XLA_PJRT_MULTIMESH_MPMD_INLINE_EXPLICIT_TASKS_H_
+#define XLA_PJRT_MULTIMESH_MPMD_INLINE_EXPLICIT_TASKS_H_
 
 #include <cstdint>
 #include <optional>
@@ -13,8 +13,8 @@
 #include "absl/status/status.h"
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/hlo/pass/hlo_pass_interface.h"
-#include "xla/pjrt/legate/hlo_partition.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 
 namespace xla {
 
@@ -39,7 +39,7 @@ class MpmdInlineExplicitTasks : public HloModulePass {
 
  private:
   // For a given `computation`, iterate through and inline all explicit
-  // Legate task blocks. This is equivalent to running the CallInliner
+  // task blocks. This is equivalent to running the CallInliner
   // on the computation and assigning the scope color as a frontend attribute.
   absl::StatusOr<bool> InlineExplicitTasks(HloComputation* computation);
 
@@ -48,4 +48,4 @@ class MpmdInlineExplicitTasks : public HloModulePass {
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_MPMD_INLINE_EXPLICIT_TASKS_H_
+#endif  // XLA_PJRT_MULTIMESH_MPMD_INLINE_EXPLICIT_TASKS_H_

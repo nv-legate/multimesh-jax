@@ -18,9 +18,9 @@ package(
 )
 
 cc_library(
-    name = "legate_utils",
-    srcs = ["legate_utils.cc"],
-    hdrs = ["legate_utils.h"],
+    name = "mm_utils",
+    srcs = ["mm_utils.cc"],
+    hdrs = ["mm_utils.h"],
     deps = [
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:flat_hash_set",
@@ -37,9 +37,9 @@ cc_library(
 )
 
 cc_library(
-    name = "legate_computation",
-    srcs = ["legate_computation.cc"],
-    hdrs = ["legate_computation.h"],
+    name = "mm_computation",
+    srcs = ["mm_computation.cc"],
+    hdrs = ["mm_computation.h"],
     deps = [
         "@com_google_absl//absl/base:core_headers",
         "//xla/client:local_client",
@@ -53,18 +53,18 @@ cc_library(
         "//xla/pjrt:pjrt_executable",
         "//xla/tools:hlo_module_loader",
         "@tsl//tsl/platform:status",
-        ":legate_utils",
+        ":mm_utils",
         ":cuda_utils",
         ":hlo_partition",
-        ":legate_device_assignment",
+        ":mm_device_assignment",
     ],
     alwayslink = True,
 )
 
 cc_library(
-    name = "legate_sharding",
-    srcs = ["legate_sharding.cc"],
-    hdrs = ["legate_sharding.h"],
+    name = "mm_sharding",
+    srcs = ["mm_sharding.cc"],
+    hdrs = ["mm_sharding.h"],
     deps = [
         "@tsl//tsl/platform:status",
         "@tsl//tsl/platform:errors",
@@ -114,7 +114,7 @@ cc_library(
         "@zuku",
         "//xla:status_macros",
         ":mpmd_instruction",
-        ":legate_sharding",
+        ":mm_sharding",
         ":hlo_partition",
     ],
 )
@@ -128,7 +128,7 @@ cc_library(
         "@zuku",
         "//xla/hlo/pass:hlo_pass_pipeline",
         ":hlo_partition",
-        ":legate_sharding",
+        ":mm_sharding",
         ":mpmd_instruction",
     ]
 )
@@ -213,7 +213,7 @@ cc_library(
         "@zuku",
         "//xla/hlo/pass:hlo_pass_pipeline",
         ":hlo_partition",
-        ":legate_sharding",
+        ":mm_sharding",
         ":mpmd_instruction",
     ],
 )
@@ -259,7 +259,7 @@ cc_library(
         "@zuku",
         ":mpmd_instruction",
         ":hlo_partition",
-        ":legate_sharding",
+        ":mm_sharding",
     ],
 )
 
@@ -272,7 +272,7 @@ cc_library(
         "@zuku",
         "//xla/hlo/pass:hlo_pass_pipeline",
         ":hlo_partition",
-        ":legate_sharding",
+        ":mm_sharding",
         ":mpmd_instruction",
     ],
 )
@@ -301,7 +301,7 @@ cc_library(
         "@zuku",
         ":mpmd_instruction",
         ":hlo_partition",
-        ":legate_sharding",
+        ":mm_sharding",
     ],
 )
 
@@ -314,7 +314,7 @@ cc_library(
         "@zuku",
         "//xla/hlo/pass:hlo_pass_pipeline",
         ":hlo_partition",
-        ":legate_sharding",
+        ":mm_sharding",
         ":mpmd_instruction",
     ],
 )
@@ -604,7 +604,7 @@ cc_library(
         "@tsl//tsl/platform:errors",
         "//xla/hlo/ir:hlo",
         ":hlo_partition",
-        ":legate_computation",
+        ":mm_computation",
     ],
 )
 
@@ -710,7 +710,7 @@ cc_library(
     deps = [
         "@com_google_absl//absl/status",
         ":json_utils",
-        ":legate_sharding",
+        ":mm_sharding",
         ":logical_sharding_context",
         ":mpmd_instruction",
         ":mpmd_utils",
@@ -730,15 +730,15 @@ cc_library(
         ":mpmd_instruction",
         ":mpmd_store",
         ":mpmd_utils",
-        ":legate_computation",
+        ":mm_computation",
         "//xla/service:hlo_module_util",
         "//xla/tools:hlo_module_loader",
         "//xla/pjrt:compile_options_proto_cc",
         "//xla/pjrt:execute_options_proto_cc",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/transforms/simplifiers:hlo_dce",
-        ":legate_sharding",
-        ":legate_utils",
+        ":mm_sharding",
+        ":mm_utils",
         ":mpmd_input_output_buffer_alias",
         ":mpmd_sharding_propagation",
         ":mpmd_logical_to_gspmd_sharding",
@@ -784,26 +784,26 @@ cc_library(
         "//xla/hlo/ir:hlo",
         "@com_google_absl//absl/algorithm:container",
         "@com_google_absl//absl/container:flat_hash_set",
-        ":legate_sharding",
+        ":mm_sharding",
     ],
 )
 
 cc_library(
-    name = "legate_pjrt_executable",
-    srcs = ["legate_pjrt_executable.cc"],
-    hdrs = ["legate_pjrt_executable.h"],
+    name = "mm_pjrt_executable",
+    srcs = ["mm_pjrt_executable.cc"],
+    hdrs = ["mm_pjrt_executable.h"],
     deps = [
         "@com_google_absl//absl/status",
         "@tsl//tsl/platform:fingerprint",
         "//xla/pjrt:pjrt_client",
         "//xla/service:computation_placer",
-        "//xla/pjrt/legate:legate_computation",
+        "//xla/pjrt/multimesh:mm_computation",
         "//xla/pjrt:pjrt_stream_executor_client",
         "//xla/service/gpu:gpu_executable",
         ":hlo_partition",
         ":cuda_utils",
-        ":legate_utils",
-        ":legate_pjrt_buffer",
+        ":mm_utils",
+        ":mm_pjrt_buffer",
         ":zuku_execute_context",
         ":loop_scheduler",
         "@zuku",
@@ -812,16 +812,16 @@ cc_library(
 )
 
 cc_library(
-    name = "legate_pjrt_buffer",
-    srcs = ["legate_pjrt_buffer.cc"],
-    hdrs = ["legate_pjrt_buffer.h"],
+    name = "mm_pjrt_buffer",
+    srcs = ["mm_pjrt_buffer.cc"],
+    hdrs = ["mm_pjrt_buffer.h"],
     deps = [
         "//xla/pjrt:pjrt_stream_executor_client",
         "//xla/pjrt/cpu:tracked_tfrt_cpu_device_buffer",
         "//xla/pjrt:tfrt_cpu_pjrt_client",
         "//xla/service/cpu:cpu_event",
-        ":legate_buffer_action",
-        ":legate_utils",
+        ":mm_buffer_action",
+        ":mm_utils",
         ":zuku_execute_context",
         "@zuku",
     ],
@@ -829,9 +829,9 @@ cc_library(
 )
 
 cc_library(
-    name = "legate_buffer_action",
-    srcs = ["legate_buffer_action.cc"],
-    hdrs = ["legate_buffer_action.h"],
+    name = "mm_buffer_action",
+    srcs = ["mm_buffer_action.cc"],
+    hdrs = ["mm_buffer_action.h"],
     deps = [
         "//xla/pjrt:pjrt_client",
         "//xla/pjrt:pjrt_stream_executor_client",
@@ -857,8 +857,8 @@ cc_library(
     deps = [
         "@zuku",
         "@realm",
-        ":legate_utils",
-        ":legate_computation",
+        ":mm_utils",
+        ":mm_computation",
     ],
 )
 
@@ -870,7 +870,7 @@ cc_library(
     "@zuku",
     "@realm",
     ":allocator",
-    ":legate_computation",
+    ":mm_computation",
     ":scalar_argument",
   ]
 )
@@ -882,7 +882,7 @@ cc_library(
     deps = [
       "@zuku",
       "@realm",
-      ":legate_computation",
+      ":mm_computation",
       ":allocator",
       ":executable_cache",
     ]
@@ -909,9 +909,9 @@ cc_library(
 )
 
 cc_library(
-    name = "legate_device_assignment",
-    hdrs = ["legate_device_assignment.h"],
-    srcs = ["legate_device_assignment.cc"],
+    name = "mm_device_assignment",
+    hdrs = ["mm_device_assignment.h"],
+    srcs = ["mm_device_assignment.cc"],
     deps = [
         "@zuku",
         "@realm",
@@ -931,7 +931,7 @@ cc_library(
         "@zuku",
         "@realm",
         ":scalar_argument",
-        ":legate_buffer_action",
+        ":mm_buffer_action",
         ":allocator",
         ":store_handle_fwd",
     ],
@@ -945,8 +945,8 @@ cc_library(
         "@zuku",
         "@realm",
         ":zuku_execute_context",
-        ":legate_computation",
-        ":legate_utils",
+        ":mm_computation",
+        ":mm_utils",
         ":hlo_executor",
         ":hlo_loader",
         ":store_handle",
@@ -954,16 +954,16 @@ cc_library(
 )
 
 cc_library(
-    name = "legate_pjrt_client",
-    srcs = ["legate_pjrt_client.cc", "legate_pjrt_executable.cc", "legate_pjrt_buffer.cc"],
-    hdrs = ["legate_pjrt_client.h", "legate_pjrt_executable.h", "legate_pjrt_buffer.h"],
+    name = "mm_pjrt_client",
+    srcs = ["mm_pjrt_client.cc", "mm_pjrt_executable.cc", "mm_pjrt_buffer.cc"],
+    hdrs = ["mm_pjrt_client.h", "mm_pjrt_executable.h", "mm_pjrt_buffer.h"],
     deps = [
         "//xla/pjrt:pjrt_client",
         "//xla/pjrt:pjrt_stream_executor_client",
         "//xla/client:local_client",
-        ":legate_buffer_action",
-        ":legate_utils",
-        ":legate_computation",
+        ":mm_buffer_action",
+        ":mm_utils",
+        ":mm_computation",
         ":zuku_execute_context",
         ":mpmd_partition",
         "//xla/pjrt/gpu:se_gpu_pjrt_client",
@@ -974,13 +974,13 @@ cc_library(
 )
 
 cc_library(
-    name = "legate_c_api_client",
-    srcs = ["legate_c_api_client.cc"],
+    name = "mm_c_api_client",
+    srcs = ["mm_c_api_client.cc"],
     deps = [
         "//xla/pjrt:pjrt_client",
         "//xla/pjrt:pjrt_stream_executor_client",
         "//xla/client:local_client",
-        ":legate_pjrt_client",
+        ":mm_pjrt_client",
         ":zuku_execute_context_impl",
         "//xla/pjrt/gpu:se_gpu_pjrt_client",
         "//xla/pjrt/c:pjrt_c_api_hdrs",
@@ -1027,7 +1027,7 @@ cuda_library(
 )
 
 tsl_pybind_extension(
-    name = "legate_xla_compiler",
+    name = "multimesh_xla_compiler",
     srcs = ["xla_compiler.cc"],
     deps = [
         "@nanobind",
@@ -1042,17 +1042,17 @@ tsl_pybind_extension(
 )
 
 tsl_pybind_extension(
-    name = "liblegate_xla_client",
+    name = "libmultimesh_xla_client",
     additional_exported_symbols = [
-        "GetLegatePjrtApi",
+        "GetMultiMeshPjRtApi",
         "CompileHloModuleFromFile",
-        "LegateShutdown",
+        "ZukuShutdown",
         "ClearMetadataNameTasks",
         "SetEnableMetadataNameTasks",
         "EnableFastPath",
         "EnableTaskFusion",
         "EnableOnlyFuseLoopTasks",
-        "EnableLegateRecomputation",
+        "EnableMultiMeshRecomputation",
         "RegisterMetadataNameTask",
         "ReplicateParametersSmallerThanNumElements",
         "SetHostOffloadMinReuseDistance",
@@ -1067,10 +1067,10 @@ tsl_pybind_extension(
     ],
     deps = [
         ":cuda_utils",
-        ":legate_computation",
-        ":legate_utils",
-        ":legate_pjrt_client",
-        ":legate_c_api_client",
+        ":mm_computation",
+        ":mm_utils",
+        ":mm_pjrt_client",
+        ":mm_c_api_client",
         ":zuku_execute_context_impl",
         "//xla:xla_data_proto_cc",
         "//xla/pjrt/gpu:se_gpu_pjrt_client",
@@ -1176,25 +1176,25 @@ tsl_pybind_extension(
 )
 
 cc_library(
-    name = "legate_mock_legate_xla",
-    srcs = ["legate_mock_legate_xla.cc"],
-    hdrs = ["legate_mock_legate_xla.h"],
+    name = "mm_mock_mm_xla",
+    srcs = ["mm_mock_mm_xla.cc"],
+    hdrs = ["mm_mock_mm_xla.h"],
     deps = [
-        ":legate_utils",
-        ":legate_computation",
+        ":mm_utils",
+        ":mm_computation",
         ":zuku_execute_context",
     ],
     testonly = True,
 )
 
 cc_library(
-    name = "legate_test_base",
-    srcs = ["legate_test_base.cc"],
-    hdrs = ["legate_test_base.h"],
+    name = "mm_test_base",
+    srcs = ["mm_test_base.cc"],
+    hdrs = ["mm_test_base.h"],
     deps = [
-        ":legate_utils",
-        ":legate_pjrt_client",
-        ":legate_mock_legate_xla",
+        ":mm_utils",
+        ":mm_pjrt_client",
+        ":mm_mock_mm_xla",
         ":hlo_partition",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/parser:hlo_parser",
@@ -1224,14 +1224,14 @@ cc_library(
 )
 
 xla_cc_test(
-    name = "legate_pjrt_executable_test",
-    srcs = ["legate_pjrt_executable_test.cc"],
+    name = "mm_pjrt_executable_test",
+    srcs = ["mm_pjrt_executable_test.cc"],
     deps = [
-        ":legate_mock_legate_xla",
-        ":legate_pjrt_client",
+        ":mm_mock_mm_xla",
+        ":mm_pjrt_client",
         ":hlo_partition",
         ":mpmd_test_base",
-        ":legate_test_base",
+        ":mm_test_base",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/utils:hlo_matchers",
         "//xla/hlo/parser:hlo_parser",
@@ -1242,13 +1242,13 @@ xla_cc_test(
 )
 
 xla_cc_test(
-    name = "legate_pjrt_client_test",
-    srcs = ["legate_pjrt_client_test.cc"],
+    name = "mm_pjrt_client_test",
+    srcs = ["mm_pjrt_client_test.cc"],
     deps = [
-        ":legate_mock_legate_xla",
-        ":legate_pjrt_client",
+        ":mm_mock_mm_xla",
+        ":mm_pjrt_client",
         ":hlo_partition",
-        ":legate_test_base",
+        ":mm_test_base",
         ":mpmd_test_base",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/utils:hlo_matchers",
@@ -1264,7 +1264,7 @@ xla_cc_test(
     deps = [
         ":mpmd_partition",
         ":mpmd_test_base",
-        ":legate_mock_legate_xla",
+        ":mm_mock_mm_xla",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/utils:hlo_matchers",
         "//xla/tests:hlo_test_base",
@@ -1609,10 +1609,10 @@ xla_cc_test(
 )
 
 xla_cc_test(
-    name = "legate_sharding_test",
-    srcs = ["legate_sharding_test.cc"],
+    name = "mm_sharding_test",
+    srcs = ["mm_sharding_test.cc"],
     deps = [
-        ":legate_sharding",
+        ":mm_sharding",
         "@tsl//tsl/platform:test_main",
         "//xla:xla_data_proto_cc",
     ],
@@ -1623,7 +1623,7 @@ xla_cc_test(
     srcs = ["loop_scheduler_test.cc"],
     deps = [
         ":loop_scheduler",
-        ":legate_mock_legate_xla",
+        ":mm_mock_mm_xla",
         "//xla/hlo/parser:hlo_parser",
         "//xla/tests:hlo_test_base",
         "@tsl//tsl/platform:test_main",
@@ -1631,10 +1631,10 @@ xla_cc_test(
 )
 
 xla_cc_test(
-    name = "legate_buffer_action_test",
-    srcs = ["legate_buffer_action_test.cc"],
+    name = "mm_buffer_action_test",
+    srcs = ["mm_buffer_action_test.cc"],
     deps = [
-        ":legate_buffer_action",
+        ":mm_buffer_action",
         "//xla/pjrt/gpu:se_gpu_pjrt_client",
         "@xla//xla/tsl/platform:test",
         "@tsl//tsl/platform:test_main",

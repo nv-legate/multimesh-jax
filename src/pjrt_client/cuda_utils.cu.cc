@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/cuda_utils.h"
+#include "xla/pjrt/multimesh/cuda_utils.h"
 
 #include <iostream>
 

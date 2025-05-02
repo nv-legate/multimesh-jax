@@ -3,7 +3,7 @@
  * SPDX-FileCopyrightText: Copyright (c) The OpenXLA Authors.
  * SPDX-License-Identifier: Apache-2.0
  */
-#include "xla/pjrt/legate/mpmd_input_output_buffer_alias.h"
+#include "xla/pjrt/multimesh/mpmd_input_output_buffer_alias.h"
 
 #include <cstdint>
 #include <vector>
@@ -16,7 +16,7 @@
 #include "xla/hlo/ir/hlo_input_output_alias_config.h"
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/legate_sharding.h"
+#include "xla/pjrt/multimesh/mm_sharding.h"
 #include "xla/shape.h"
 #include "xla/shape_util.h"
 
@@ -161,7 +161,7 @@ absl::Status MpmdInputOutputBufferAlias::FindBestMatch(
       module->entry_computation()->parameter_instruction(0)->shape().IsTuple();
   if (tupled_args) {
     return InvalidArgumentStrCat(
-        "Legate buffer donation does not suppoort tupled args");
+        "MultiMesh buffer donation does not suppoort tupled args");
   }
 
   auto is_donor_parameter = [&](HloInstruction* operand) {

@@ -4,9 +4,9 @@ import sys
 sys.path.insert(0, os.path.abspath(".."))
 
 
-project = "Legate-JAX"
-copyright = "2024, The Legate-JAX Authors."
-author = "The Legate-JAX authors"
+project = "MultiMesh-JAX"
+copyright = "2024, The MultiMesh-JAX Authors."
+author = "The MultiMesh-JAX authors"
 
 version = ""
 release = ""
@@ -51,7 +51,7 @@ main_doc = "index"
 
 language = "en"
 
-exclude_patterns = [ ]
+exclude_patterns = []
 
 pygments_style = None
 
@@ -62,7 +62,7 @@ html_theme = "sphinx_book_theme"
 
 html_theme_options = {
     "show_toc_level": 2,
-    "repository_url": "https://github.com/nv-legate/legate-jax",
+    "repository_url": "https://github.com/nv-legate/multimesh-jax",
     "use_repository_button": True,  # add a "link to repository" button
     "navigation_with_keys": False,
 }
@@ -91,7 +91,7 @@ nb_execution_excludepatterns = []
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "LegateJAXdoc"
+htmlhelp_basename = "MultiMeshJAXdoc"
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -153,7 +153,7 @@ def linkcode_resolve(domain, info):
         return None
     if not info["fullname"]:
         return None
-    if not info["module"].startswith("legate.jax"):
+    if not info["module"].startswith("multimesh.jax"):
         return None
 
     return None

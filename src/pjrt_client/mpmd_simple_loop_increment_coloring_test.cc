@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_simple_loop_increment_coloring.h"
+#include "xla/pjrt/multimesh/mpmd_simple_loop_increment_coloring.h"
 
 #include "gmock/gmock.h"
-#include "xla/pjrt/legate/mpmd_microbatch_loop_canonicalizer.h"
-#include "xla/pjrt/legate/mpmd_test_base.h"
+#include "xla/pjrt/multimesh/mpmd_microbatch_loop_canonicalizer.h"
+#include "xla/pjrt/multimesh/mpmd_test_base.h"
 
 namespace xla {
 namespace {

@@ -3,15 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_insert_reshard.h"
+#include "xla/pjrt/multimesh/mpmd_insert_reshard.h"
 
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/hlo/ir/hlo_sharding.h"
-#include "xla/pjrt/legate/legate_sharding.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/mm_sharding.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 #include "xla/util.h"
 
 namespace xla {
@@ -82,7 +82,7 @@ absl::StatusOr<bool> MpmdInsertReshard::Run(
                      operand->sharding_or_default(replicated),
                      user->sharding_or_default(replicated))) {
       // see if there exists a resharding of this operand
-      zuku::ShardedShape parameter_shape = *std::move(XlaShapeToLegateShape(
+      zuku::ShardedShape parameter_shape = *std::move(XlaShapeToZukuShape(
           user->shape(), devices, user->sharding_or_default(replicated)));
       HloInstruction* reshard = [&] {
         auto iter = reshard_map.find({parameter_shape, operand});

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_computation_fusion.h"
+#include "xla/pjrt/multimesh/mpmd_computation_fusion.h"
 
 #include <algorithm>
 #include <limits>
@@ -14,9 +14,9 @@
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/hlo/transforms/simplifiers/hlo_dce.h"
-#include "xla/pjrt/legate/color_dfs.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/color_dfs.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 #include "xla/tsl/platform/errors.h"
 #include "xla/util.h"
 

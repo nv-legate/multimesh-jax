@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_JSON_UTILS_H_
-#define XLA_PJRT_LEGATE_JSON_UTILS_H_
+#ifndef XLA_PJRT_MULTIMESH_JSON_UTILS_H_
+#define XLA_PJRT_MULTIMESH_JSON_UTILS_H_
 
 #include <optional>
 #include <string>

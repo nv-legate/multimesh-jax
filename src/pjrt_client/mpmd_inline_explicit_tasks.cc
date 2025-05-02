@@ -3,16 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/mpmd_inline_explicit_tasks.h"
+#include "xla/pjrt/multimesh/mpmd_inline_explicit_tasks.h"
 
 #include <optional>
 
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/legate/json_utils.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/json_utils.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 #include "xla/service/call_inliner.h"
 #include "xla/service/tuple_simplifier.h"
 
@@ -67,7 +67,7 @@ absl::StatusOr<bool> MpmdInlineExplicitTasks::InlineExplicitTasks(
     HloComputation* computation) {
   bool changed = false;
   for (auto* instruction : computation->MakeInstructionPostOrder()) {
-    if (instruction->IsCustomCall("LegateTask")) {
+    if (instruction->IsCustomCall("MultiMeshTask")) {
       VLOG(5) << "coloring explicit task instruction " << instruction->name();
 
       changed = true;

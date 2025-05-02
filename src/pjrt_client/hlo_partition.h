@@ -3,20 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_HLO_PARTITION_H_
-#define XLA_PJRT_LEGATE_HLO_PARTITION_H_
+#ifndef XLA_PJRT_MULTIMESH_HLO_PARTITION_H_
+#define XLA_PJRT_MULTIMESH_HLO_PARTITION_H_
 
 #include <optional>
 #include <functional>
 
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_module.h"
-#include "xla/pjrt/legate/logical_sharding_context.h"
+#include "xla/pjrt/multimesh/logical_sharding_context.h"
 
 namespace xla {
 
-// Returns whether a given HLO module contains any Legate custom calls.
-bool ContainsLegateCustomCall(const HloModuleProto& proto);
+// Returns whether a given HLO module contains any MultiMesh custom calls.
+bool ContainsMultiMeshCustomCall(const HloModuleProto& proto);
 
 class HloPartition {
  public:
@@ -144,8 +144,8 @@ extern "C" void SetEnableMetadataNameTasks(bool flag);
 // Clear all previously registerd implicit tasks
 extern "C" void ClearMetadataNameTasks();
 
-extern "C" void EnableLegateRecomputation(bool enable);
+extern "C" void EnableMultiMeshRecomputation(bool enable);
 
 extern "C" void SetHostOffloadMinReuseDistance(int64_t reuse_distance);
 
-#endif  // XLA_PJRT_LEGATE_HLO_PARTITION_H_
+#endif  // XLA_PJRT_MULTIMESH_HLO_PARTITION_H_

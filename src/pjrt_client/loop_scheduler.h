@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef XLA_PJRT_LEGATE_LOOP_SCHEDULER_H_
-#define XLA_PJRT_LEGATE_LOOP_SCHEDULER_H_
+#ifndef XLA_PJRT_MULTIMESH_LOOP_SCHEDULER_H_
+#define XLA_PJRT_MULTIMESH_LOOP_SCHEDULER_H_
 
 #include <vector>
 
 #include "xla/hlo/ir/hlo_instruction.h"
-#include "xla/pjrt/legate/hlo_partition.h"
-#include "xla/pjrt/legate/mpmd_loop.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
+#include "xla/pjrt/multimesh/mpmd_loop.h"
 
 namespace xla {
 
@@ -20,4 +20,4 @@ absl::StatusOr<std::vector<std::vector<HloInstruction*>>> ScheduleLoops(
 
 }  // namespace xla
 
-#endif  // XLA_PJRT_LEGATE_LOOP_SCHEDULER_H_
+#endif  // XLA_PJRT_MULTIMESH_LOOP_SCHEDULER_H_

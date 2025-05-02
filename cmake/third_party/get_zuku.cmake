@@ -5,7 +5,7 @@
 
 function(find_or_configure_zuku)
 
-  set(PKG_VERSION ${LegateJAX_VERSION})
+  set(PKG_VERSION ${MultiMeshJAX_VERSION})
   include("${rapids-cmake-dir}/export/detail/parse_version.cmake")
   rapids_export_parse_version(${PKG_VERSION} zuku PKG_VERSION)
 
@@ -24,8 +24,8 @@ function(find_or_configure_zuku)
 
   set(FIND_PKG_ARGS
       GLOBAL_TARGETS zuku::zuku
-      BUILD_EXPORT_SET   legate-jax-exports
-      INSTALL_EXPORT_SET legate-jax-exports)
+      BUILD_EXPORT_SET   multimesh-jax-exports
+      INSTALL_EXPORT_SET multimesh-jax-exports)
 
   if((NOT CPM_zuku_SOURCE) AND (NOT CPM_DOWNLOAD_zuku))
     set(_find_mode QUIET)

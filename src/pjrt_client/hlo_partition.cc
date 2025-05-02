@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "xla/pjrt/legate/hlo_partition.h"
+#include "xla/pjrt/multimesh/hlo_partition.h"
 
 #include <exception>
 #include <functional>
@@ -19,11 +19,11 @@
 #include "tsl/platform/logging.h"
 #include "tsl/platform/regexp.h"
 #include "xla/hlo/ir/hlo_instruction.h"
-#include "xla/pjrt/legate/json_utils.h"
-#include "xla/pjrt/legate/legate_sharding.h"
-#include "xla/pjrt/legate/logical_sharding_context.h"
-#include "xla/pjrt/legate/mpmd_instruction.h"
-#include "xla/pjrt/legate/mpmd_utils.h"
+#include "xla/pjrt/multimesh/json_utils.h"
+#include "xla/pjrt/multimesh/mm_sharding.h"
+#include "xla/pjrt/multimesh/logical_sharding_context.h"
+#include "xla/pjrt/multimesh/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_utils.h"
 #include "xla/util.h"
 
 namespace xla {
@@ -35,14 +35,14 @@ bool enable_recomputation = false;
 
 constexpr absl::string_view kLoopIncrementColor = "loop_increment";
 constexpr absl::string_view kJvpTransposeMetadata = "transpose(jvp";
-constexpr char kLegateTaskCustomCallTarget[] = "LegateTask";
+constexpr char kMultiMeshTaskCustomCallTarget[] = "MultiMeshTask";
 constexpr char kMicrobatchCustomCallTarget[] = "Microbatch";
 constexpr char kMicrobatchInitCustomCallTarget[] = "MicrobatchInit";
 constexpr char kMicrobatchSliceCustomCallTarget[] = "MicrobatchSlice";
 constexpr char kAutoShardingCustomCallTarget[] = "AutoSharding";
 
-const absl::flat_hash_set<std::string> kLegateCustomCallTargets = {
-    kLegateTaskCustomCallTarget, kMicrobatchCustomCallTarget,
+const absl::flat_hash_set<std::string> kMultiMeshCustomCallTargets = {
+    kMultiMeshTaskCustomCallTarget, kMicrobatchCustomCallTarget,
     kMicrobatchInitCustomCallTarget, kMicrobatchSliceCustomCallTarget,
     kAutoShardingCustomCallTarget};
 
@@ -437,11 +437,11 @@ HloPartition::ComputeMetadataNameColor(HloInstruction* instruction) {
   return std::nullopt;
 }
 
-bool ContainsLegateCustomCall(const HloModuleProto& proto) {
+bool ContainsMultiMeshCustomCall(const HloModuleProto& proto) {
   for (const HloComputationProto& comp : proto.computations()) {
     for (const HloInstructionProto& instr : comp.instructions()) {
       if (instr.opcode() == "custom-call" &&
-          kLegateCustomCallTargets.contains(instr.custom_call_target())) {
+          kMultiMeshCustomCallTargets.contains(instr.custom_call_target())) {
         return true;
       }
     }
@@ -480,7 +480,7 @@ extern "C" void RegisterMetadataNameTask(
   xla::NamedTaskContexts().push_back(std::move(task));
 }
 
-extern "C" void EnableLegateRecomputation(bool enable) {
+extern "C" void EnableMultiMeshRecomputation(bool enable) {
   xla::enable_recomputation = enable;
 }
 
