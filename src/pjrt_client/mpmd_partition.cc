@@ -790,7 +790,7 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
   const bool hoist_convert =
       GetEnvOption(kHoistConvertEnv, config.hoist_loop_convert);
   const bool zero_out_arguments = GetEnvOption(kZeroArgsEnv, false);
-  const bool loop_increment_color = GetEnvOption(kLoopIncrementColorEnv, true);
+  const bool loop_increment_color = GetEnvOption(kLoopIncrementColorEnv, false);
   const bool recompute_arguments = GetEnvOption(kArgumentRecomputeEnv, true);
   const bool minimize_cut_size = GetEnvOption(kCutSizeMinimizeEnv, true);
   const bool remove_hoisted_reduces = GetEnvOption(
