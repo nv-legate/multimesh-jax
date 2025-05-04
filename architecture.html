@@ -367,12 +367,11 @@ document.write(`
 <h1>MultiMesh for JAX Architeture Overview<a class="headerlink" href="#multimesh-for-jax-architeture-overview" title="Link to this heading">#</a></h1>
 <p>MultiMesh works through a combination of compiler and runtime support
 for multiple-program, multiple data (MPMD). In contrast to
-single-program, multiple data (SPMD) where all processors are executing
-the same work on different partitions of the data, MPMD
-enable complex task pipelines with processor submeshes executing different
+single-program, multiple data (SPMD), MPMD
+enables complex task pipelines with processor submeshes executing different
 tasks within a workflow. In deep learning, SPMD strategies
 encompass things like data parallelism, tensor parallelism,
-<a class="reference external" href="https://arxiv.org/abs/2304.11277">fully-sharded data parallelism</a>. Pipeline parallelism strategies
+or <a class="reference external" href="https://arxiv.org/abs/2304.11277">fully-sharded data parallelism</a>. Pipeline parallelism strategies
 such as <a class="reference external" href="https://arxiv.org/abs/2104.04473">1F1B</a> or <a class="reference external" href="https://arxiv.org/abs/2401.10241">zero-bubble</a>, however, require MPMD programs.
 The MultiMesh stack augments Jax and XLA with with the ability
 to express MPMD pipelines. This MPMD parallelism can be combined
@@ -384,7 +383,7 @@ with <a class="reference external" href="https://github.com/AI-Hypercomputer/max
 <section id="python-apis">
 <h2>Python APIs<a class="headerlink" href="#python-apis" title="Link to this heading">#</a></h2>
 <p>MultiMesh relies on ahead-of-time compilation in Jax using <code class="docutils literal notranslate"><span class="pre">AUTO</span></code> shardings.
-Rather than binding shards directly to a physical mesh prior JIT compilation,
+Rather than binding shards directly to a physical mesh prior to JIT compilation,
 MultiMesh captures “logical shardings” for tensors and translates them
 to submesh shardings within a global JIT computation. Jax model code
 is either minimimally modified or not modified at all. At the framework-level
@@ -393,7 +392,7 @@ the ahead-of-time, AUTO compilation.</p>
 <p>Generally, when <code class="docutils literal notranslate"><span class="pre">jax_plugins.multimesh.init</span></code> is invoked, it
 patches Jax functions to map to MPMD-compatible versions
 (e.g. <code class="docutils literal notranslate"><span class="pre">with_sharding_contraints</span></code>). MultMesh-specific calls are then
-insrted into the StableHLO module that gets passed to the compiler backend.</p>
+inserted into the StableHLO module that gets passed to the compiler backend.</p>
 </section>
 <section id="pjrt-plugin">
 <h2>PjRt Plugin<a class="headerlink" href="#pjrt-plugin" title="Link to this heading">#</a></h2>
@@ -437,7 +436,7 @@ into a common event loop.</p>
 <section id="patches-for-jax-and-jaxlib">
 <h2>Patches for Jax and Jaxlib<a class="headerlink" href="#patches-for-jax-and-jaxlib" title="Link to this heading">#</a></h2>
 <p>At present, the MPMD shardings used are not natively supported by Jax and Jaxlib.
-Patches are therefore currently required to support submeshes Jax.
+Patches are therefore currently required to support submeshes in Jax.
 Efforts are underway to support this submesh sharding model within upstream Jax,
 but more design and implementation work is required.</p>
 </section>
