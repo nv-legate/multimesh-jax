@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>MultiMesh for JAX: MPMD workflows for JAX &#8212; MultiMesh for JAX  documentation</title>
+    <title>MultiMesh for JAX Architeture Overview &#8212; MultiMesh for JAX  documentation</title>
   
   
   
@@ -49,10 +49,11 @@
     <script src="_static/copybutton.js?v=f281be69"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
     <script src="_static/design-tabs.js?v=f930bc37"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'architecture';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="MultiMesh for JAX Architeture Overview" href="architecture.html" />
+    <link rel="next" title="Getting Started" href="getting-started.html" />
+    <link rel="prev" title="MultiMesh for JAX: MPMD workflows for JAX" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -115,8 +116,6 @@
       
       
       
-        
-      
       <div class="bd-sidebar-primary bd-sidebar">
         
 
@@ -135,7 +134,7 @@
     
   
 
-<a class="navbar-brand logo" href="#">
+<a class="navbar-brand logo" href="index.html">
   
   
   
@@ -159,8 +158,8 @@
         <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
     <div class="bd-toc-item navbar-nav active">
         <p aria-level="2" class="caption" role="heading"><span class="caption-text">Architecture Overview</span></p>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="architecture.html">MultiMesh for JAX Architeture Overview</a></li>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">MultiMesh for JAX Architeture Overview</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul class="nav bd-sidenav">
@@ -251,7 +250,7 @@
       
       
       
-      <li><a href="_sources/index.rst" target="_blank"
+      <li><a href="_sources/architecture.md" target="_blank"
    class="btn btn-sm btn-download-source-button dropdown-item"
    title="Download source file"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -261,7 +260,7 @@
 <span class="btn__icon-container">
   <i class="fas fa-file"></i>
   </span>
-<span class="btn__text-container">.rst</span>
+<span class="btn__text-container">.md</span>
 </a>
 </li>
       
@@ -322,7 +321,9 @@ document.write(`
   </button>
 `);
 </script>
-
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
 </div></div>
       
     </div>
@@ -333,11 +334,26 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>MultiMesh for JAX: MPMD workflows for JAX</h1>
+    <h1>MultiMesh for JAX Architeture Overview</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
             
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#python-apis">Python APIs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pjrt-plugin">PjRt Plugin</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#compiler">Compiler</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#sharded-array-runtime-zuku">Sharded Array Runtime (Zuku)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#realm">Realm</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#patches-for-jax-and-jaxlib">Patches for Jax and Jaxlib</a></li>
+</ul>
+            </nav>
         </div>
     </div>
 </div>
@@ -347,46 +363,84 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="multimesh-for-jax-mpmd-workflows-for-jax">
-<h1>MultiMesh for JAX: MPMD workflows for JAX<a class="headerlink" href="#multimesh-for-jax-mpmd-workflows-for-jax" title="Link to this heading">#</a></h1>
-<p>MultiMesh for JAX provides a framework for creating <cite>task</cite> contexts within jitted computations,
-allowing different subcomputations to be placed on different GPU submeshes. These
-<cite>task</cite> computations can be combined inside a global <cite>jit</cite> with data resharding across submeshes
-occurring automatically. MultiMesh therefore enables pipeline parallelism to be easily expressed.
-Standard Jax SPMD sharding idioms can be used within each <cite>task</cite>,
-enabling full N-dimensional parallelism.
-Readers can find more <a class="reference external" href="architecture.html">architecture details</a>
-or <a class="reference external" href="getting-started.html">get started</a> using it.</p>
-<div class="sd-container-fluid sd-sphinx-override sd-m-0 sd-p-0 docutils">
-<div class="sd-row sd-row-cols-2 sd-row-cols-xs-2 sd-row-cols-sm-2 sd-row-cols-md-2 sd-row-cols-lg-2 sd-g-0 sd-g-xs-0 sd-g-sm-0 sd-g-md-0 sd-g-lg-0 docutils">
-<div class="sd-col sd-d-flex-row sd-col-12 sd-col-xs-12 sd-col-sm-6 sd-col-md-6 sd-col-lg-4 docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-none sd-border-0 docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Familiar Transformation API</div>
-<p class="sd-card-text">MultiMesh for JAX uses idiomatic JAX transforms to assign submesh contexts to functions or Flax modules</p>
-</div>
-</div>
-</div>
-<div class="sd-col sd-d-flex-row sd-col-12 sd-col-xs-12 sd-col-sm-6 sd-col-md-6 sd-col-lg-4 docutils">
-<div class="sd-card sd-sphinx-override sd-w-100 sd-shadow-none sd-border-0 docutils">
-<div class="sd-card-body docutils">
-<div class="sd-card-title sd-font-weight-bold docutils">
-Plugin Installation</div>
-<p class="sd-card-text">MultiMesh for JAX adds compiler and runtime functionality via the <cite>jax_plugins</cite> interface</p>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
+  <section class="tex2jax_ignore mathjax_ignore" id="multimesh-for-jax-architeture-overview">
+<h1>MultiMesh for JAX Architeture Overview<a class="headerlink" href="#multimesh-for-jax-architeture-overview" title="Link to this heading">#</a></h1>
+<p>MultiMesh works through a combination of compiler and runtime support
+for multiple-program, multiple data (MPMD). In contrast to
+single-program, multiple data (SPMD) where all processors are executing
+the same work on different partitions of the data, MPMD
+enable complex task pipelines with processor submeshes executing different
+tasks within a workflow. In deep learning, SPMD strategies
+encompass things like data parallelism, tensor parallelism,
+<a class="reference external" href="https://arxiv.org/abs/2304.11277">fully-sharded data parallelism</a>. Pipeline parallelism strategies
+such as <a class="reference external" href="https://arxiv.org/abs/2104.04473">1F1B</a> or <a class="reference external" href="https://arxiv.org/abs/2401.10241">zero-bubble</a>, however, require MPMD programs.
+The MultiMesh stack augments Jax and XLA with with the ability
+to express MPMD pipelines. This MPMD parallelism can be combined
+with existing supporting for SPMD parallelism to express strategies
+like <a class="reference external" href="https://docs.nvidia.com/nemo-framework/user-guide/24.09/nemotoolkit/features/parallelisms.html">3D parallelism</a>.
+Here we show the basic architecture of MultiMesh
+with <a class="reference external" href="https://github.com/AI-Hypercomputer/maxtext">MaxText</a>.</p>
+<p><img alt="MultiMesh Stack Diagram" src="_images/MultiMeshStackDiagram.png" /></p>
+<section id="python-apis">
+<h2>Python APIs<a class="headerlink" href="#python-apis" title="Link to this heading">#</a></h2>
+<p>MultiMesh relies on ahead-of-time compilation in Jax using <code class="docutils literal notranslate"><span class="pre">AUTO</span></code> shardings.
+Rather than binding shards directly to a physical mesh prior JIT compilation,
+MultiMesh captures “logical shardings” for tensors and translates them
+to submesh shardings within a global JIT computation. Jax model code
+is either minimimally modified or not modified at all. At the framework-level
+in MaxText, we apply modest patches for converting MaxText to use
+the ahead-of-time, AUTO compilation.</p>
+<p>Generally, when <code class="docutils literal notranslate"><span class="pre">jax_plugins.multimesh.init</span></code> is invoked, it
+patches Jax functions to map to MPMD-compatible versions
+(e.g. <code class="docutils literal notranslate"><span class="pre">with_sharding_contraints</span></code>). MultMesh-specific calls are then
+insrted into the StableHLO module that gets passed to the compiler backend.</p>
+</section>
+<section id="pjrt-plugin">
+<h2>PjRt Plugin<a class="headerlink" href="#pjrt-plugin" title="Link to this heading">#</a></h2>
+<p>Most of the functionality of MultiMesh is contained within a
+<a class="reference external" href="https://opensource.googleblog.com/2024/03/pjrt-plugin-to-accelerate-machine-learning.html">PjRt plugin</a>.
+Similar to the way CUDA and other device-specific backends are built and used,
+MultiMesh is installed as a <code class="docutils literal notranslate"><span class="pre">jax_plugins</span></code> namespace module and loaded as the
+backend by jaxlib when <code class="docutils literal notranslate"><span class="pre">JAX_PLATFORMS=multimesh</span></code> is given.</p>
+<section id="compiler">
+<h3>Compiler<a class="headerlink" href="#compiler" title="Link to this heading">#</a></h3>
+<p>Only the MultiMesh plugin can compile and run the modules produced
+when MultiMesh is imported and initialized since non-standard
+custom calls are introduced. The compiler splits the MPMD
+HLO module into a pipeline of SPMD tasks with data movement
+and scheduling across SPMD tasks handled by the underlying MPMD
+runtime (see figure).</p>
+<p><img alt="MultiMesh Compiler Diagram" src="_images/MultiMeshCompilerPipeline.png" /></p>
+</section>
+<section id="sharded-array-runtime-zuku">
+<h3>Sharded Array Runtime (Zuku)<a class="headerlink" href="#sharded-array-runtime-zuku" title="Link to this heading">#</a></h3>
+<p>Each task in the MPMD pipeline can execute across multiple processors
+with internal SPMD parallelism. Instead of submitting single-processor
+tasks and point-to-point communication to the runtime, the runtime
+<em>gang-schedules</em> multi-processor operations and plans <a class="reference external" href="https://arxiv.org/abs/2211.05322"><em>cross-mesh resharding</em></a>
+of sharded arrays from one submesh to another. Within the plugin,
+this is handled by an in-house runtime called Zuku. The runtime
+translates bulk, multi-processor operations into a computation and
+communication schedule for each processor.</p>
+</section>
+<section id="realm">
+<h3>Realm<a class="headerlink" href="#realm" title="Link to this heading">#</a></h3>
+<p>MultiMesh (and the runtime Zuku) do not directly interact with CUDA or
+other device-specific libraries. Instead they manage operations
+through a hardware-abstraction layer provided by the <a class="reference external" href="https://gitlab.com/StanfordLegion/legion">Realm runtime</a>
+(distributd within the Legion project).
+Realm provides control- and data-plane operations with a simple
+event-based model that unifies all the different device libraries
+into a common event loop.</p>
+</section>
+</section>
+<section id="patches-for-jax-and-jaxlib">
+<h2>Patches for Jax and Jaxlib<a class="headerlink" href="#patches-for-jax-and-jaxlib" title="Link to this heading">#</a></h2>
+<p>At present, the MPMD shardings used are not natively supported by Jax and Jaxlib.
+Patches are therefore currently required to support submeshes Jax.
+Efforts are underway to support this submesh sharding model within upstream Jax,
+but more design and implementation work is required.</p>
+</section>
 </section>
 
 
@@ -400,12 +454,21 @@ Plugin Installation</div>
                 <footer class="prev-next-footer d-print-none">
                   
 <div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">MultiMesh for JAX: MPMD workflows for JAX</p>
+      </div>
+    </a>
     <a class="right-next"
-       href="architecture.html"
+       href="getting-started.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">MultiMesh for JAX Architeture Overview</p>
+        <p class="prev-next-title">Getting Started</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -415,6 +478,28 @@ Plugin Installation</div>
             </div>
             
             
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#python-apis">Python APIs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pjrt-plugin">PjRt Plugin</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#compiler">Compiler</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#sharded-array-runtime-zuku">Sharded Array Runtime (Zuku)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#realm">Realm</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#patches-for-jax-and-jaxlib">Patches for Jax and Jaxlib</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
               
             
           </div>

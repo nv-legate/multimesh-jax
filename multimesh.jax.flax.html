@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Public API: multimesh.jax.flax package &#8212; MultiMesh-JAX  documentation</title>
+    <title>Public API: multimesh.jax.flax package &#8212; MultiMesh for JAX  documentation</title>
   
   
   
@@ -52,7 +52,7 @@
     <script>DOCUMENTATION_OPTIONS.pagename = 'multimesh.jax.flax';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="multimesh.jax.task" href="_autosummary/multimesh.jax.task.html" />
+    <link rel="next" title="multimesh.jax.flax.task" href="_autosummary/multimesh.jax.flax.task.html" />
     <link rel="prev" title="Public API: multimesh.jax package" href="api.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -141,7 +141,7 @@
   
   
   
-    <p class="title logo__title">MultiMesh-JAX  documentation</p>
+    <p class="title logo__title">MultiMesh for JAX  documentation</p>
   
 </a></div>
         <div class="sidebar-primary-item">
@@ -173,8 +173,8 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="tutorials.html">Tutorials</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
-<li class="toctree-l2"><a class="reference internal" href="notebooks/flax-mpmd.html">Pipeline example with simple MLP layers</a></li>
-<li class="toctree-l2"><a class="reference internal" href="notebooks/implicit-flax-tasks.html">Pipeline example with simple MLP layers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/flax-mpmd.html">MLP pipeline example with task transforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/implicit-flax-tasks.html">MLP pipeline with external task registration</a></li>
 </ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
 </details></li>
 </ul>
@@ -340,8 +340,12 @@ document.write(`
             </div>
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#task-transformations">Task transformations</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#logical-sharding-annotations">Logical sharding annotations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#task-transformations">Task transformations</a><ul class="simple visible nav section-nav flex-column">
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#logical-sharding-annotations">Logical sharding annotations</a><ul class="simple visible nav section-nav flex-column">
+</ul>
+</li>
 </ul>
             </nav>
         </div>
@@ -406,11 +410,11 @@ document.write(`
       </div>
     </a>
     <a class="right-next"
-       href="_autosummary/multimesh.jax.task.html"
+       href="_autosummary/multimesh.jax.flax.task.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">multimesh.jax.task</p>
+        <p class="prev-next-title">multimesh.jax.flax.task</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -430,8 +434,12 @@ document.write(`
   </div>
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#task-transformations">Task transformations</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#logical-sharding-annotations">Logical sharding annotations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#task-transformations">Task transformations</a><ul class="simple visible nav section-nav flex-column">
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#logical-sharding-annotations">Logical sharding annotations</a><ul class="simple visible nav section-nav flex-column">
+</ul>
+</li>
 </ul>
   </nav></div>
 
@@ -446,7 +454,7 @@ document.write(`
   <div class="footer-item">
     
 <p class="component-author">
-By The MultiMesh-JAX authors
+By The MultiMesh for JAX authors
 </p>
 
   </div>
@@ -456,7 +464,7 @@ By The MultiMesh-JAX authors
 
   <p class="copyright">
     
-      © Copyright 2025, The MultiMesh-JAX Authors..
+      © Copyright 2025, The MultiMesh for JAX Authors..
       <br/>
     
   </p>

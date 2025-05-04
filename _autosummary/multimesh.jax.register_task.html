@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>multimesh.jax.register_task &#8212; MultiMesh-JAX  documentation</title>
+    <title>multimesh.jax.register_task &#8212; MultiMesh for JAX  documentation</title>
   
   
   
@@ -141,7 +141,7 @@
   
   
   
-    <p class="title logo__title">MultiMesh-JAX  documentation</p>
+    <p class="title logo__title">MultiMesh for JAX  documentation</p>
   
 </a></div>
         <div class="sidebar-primary-item">
@@ -173,8 +173,8 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials.html">Tutorials</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../notebooks/flax-mpmd.html">Pipeline example with simple MLP layers</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../notebooks/implicit-flax-tasks.html">Pipeline example with simple MLP layers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/flax-mpmd.html">MLP pipeline example with task transforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/implicit-flax-tasks.html">MLP pipeline with external task registration</a></li>
 </ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
 </details></li>
 </ul>
@@ -366,7 +366,7 @@ This should match the name of a Flax module or a name passed to
 <code class="docutils literal notranslate"><span class="pre">jax.with_named_scope</span></code>.</p></li>
 <li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em> | </em><em>None</em>) – optional, a metadata name to assign to the task context</p></li>
 <li><p><strong>mesh</strong> (<em>Mesh</em><em> | </em><em>None</em>) – optional, a Mesh context defining the devices and mesh shape</p></li>
-<li><p><strong>callback</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><em>Callable</em></a><em>[</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>] </em><em>| </em><em>None</em>) – optional, a function that takes are arguments the match group from
+<li><p><strong>callback</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><em>Callable</em></a><em>[</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><em>bool</em></a><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>] </em><em>| </em><em>None</em>) – optional, a function that takes are arguments the match group from
 the <code class="docutils literal notranslate"><span class="pre">regex</span></code> and a boolean indicating whether the task is
 a backprop (generated from autograd). The function returns a
 [start,stop) tuple defining the range devices for the task
@@ -428,12 +428,13 @@ but no <code class="docutils literal notranslate"><span class="pre">device_axes<
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_task</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span><span class="p">,</span> <span class="n">Mesh</span>
 <span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">callback</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span><span class="nb">int</span><span class="p">],</span><span class="nb">str</span><span class="p">]:</span>
-<span class="gp">... </span>  <span class="n">layer_num</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)][</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">callback</span><span class="p">(</span><span class="n">match</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">bwd</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span><span class="nb">int</span><span class="p">],</span><span class="nb">str</span><span class="p">]:</span>
+<span class="gp">... </span>  <span class="n">layer_num</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)][</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
 <span class="gp">... </span>  <span class="n">devices_per_layer</span> <span class="o">=</span> <span class="mi">4</span>
 <span class="gp">... </span>  <span class="n">start</span> <span class="o">=</span> <span class="n">layer_num</span> <span class="o">*</span> <span class="n">devices_per_layer</span>
 <span class="gp">... </span>  <span class="n">stop</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">device_per_layer</span>
-<span class="gp">... </span>  <span class="k">return</span> <span class="p">[</span><span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">],</span> <span class="sa">f</span><span class="s2">&quot;lyr_</span><span class="si">{</span><span class="n">layer_num</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="gp">... </span>  <span class="n">name</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;bwd.&quot;</span> <span class="k">if</span> <span class="n">bwd</span> <span class="k">else</span> <span class="s2">&quot;fwd.&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;layer_</span><span class="si">{</span><span class="n">layer_num</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="gp">... </span>  <span class="k">return</span> <span class="p">[</span><span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">],</span> <span class="n">name</span>
 <span class="gp">&gt;&gt;&gt;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
 <span class="gp">... </span>  <span class="n">x</span> <span class="o">=</span> <span class="n">with_sharding_constraint</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;model&quot;</span><span class="p">))</span>
@@ -545,7 +546,7 @@ to different submeshes</p>
   <div class="footer-item">
     
 <p class="component-author">
-By The MultiMesh-JAX authors
+By The MultiMesh for JAX authors
 </p>
 
   </div>
@@ -555,7 +556,7 @@ By The MultiMesh-JAX authors
 
   <p class="copyright">
     
-      © Copyright 2025, The MultiMesh-JAX Authors..
+      © Copyright 2025, The MultiMesh for JAX Authors..
       <br/>
     
   </p>
