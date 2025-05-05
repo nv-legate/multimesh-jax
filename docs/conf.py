@@ -4,9 +4,9 @@ import sys
 sys.path.insert(0, os.path.abspath(".."))
 
 
-project = "MultiMesh-JAX"
-copyright = "2024, The MultiMesh-JAX Authors."
-author = "The MultiMesh-JAX authors"
+project = "MultiMesh for JAX"
+copyright = "2025, The MultiMesh for JAX Authors."
+author = "The MultiMesh for JAX authors"
 
 version = ""
 release = ""

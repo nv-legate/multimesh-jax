@@ -639,7 +639,7 @@ def register_task(
     name: Optional[str] = None,
     mesh: Optional[Mesh] = None,
     dims: Optional[Sequence[int]] = None,
-    callback: Optional[Callable[[str], Tuple[Tuple[int, int], str]]] = None,
+    callback: Optional[Callable[[str, bool], Tuple[Tuple[int, int], str]]] = None,
     devices: np.ndarray | Sequence[xc.Device] | Sequence[int] | None = None,
     device_axes: Optional[Sequence[str]] = None,
     logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
@@ -714,12 +714,13 @@ def register_task(
       >>> from multimesh.jax import register_task
       >>> from jax.sharding import PartitionSpec as P, Mesh
       >>>
-      >>> def callback(name) -> Tuple[Tuple[int,int],str]:
-      ...   layer_num = int(name.split(".")][-1])
+      >>> def callback(match: str, bwd: bool) -> Tuple[Tuple[int,int],str]:
+      ...   layer_num = int(match.split(".")][-1])
       ...   devices_per_layer = 4
       ...   start = layer_num * devices_per_layer
       ...   stop = start + device_per_layer
-      ...   return [start, stop], f"lyr_{layer_num}"
+      ...   name = ("bwd." if bwd else "fwd.") + f"layer_{layer_num}"
+      ...   return [start, stop], name
       >>>
       >>> def f(x):
       ...   x = with_sharding_constraint(x, P("batch", "model"))

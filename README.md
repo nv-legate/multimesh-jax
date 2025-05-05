@@ -1,8 +1,12 @@
 # MultiMesh for JAX
 
-This repository contains an XLA plugin and Python helper APIs
-for defining 
-The repository can be used in two different modes:
+MultiMesh for JAX provides a framework for creating `task` contexts within jitted computations,
+allowing different subcomputations to be placed on different GPU submeshes. These
+`task` computations can be combined inside a global `jit` with data resharding across submeshes
+occurring automatically. MultiMesh therefore enables pipeline parallelism to be easily expressed.
+Standard Jax SPMD sharding idioms can be used within each `task`,
+enabling full N-dimensional parallelism.
+This repository contains a PjRt plugin and Python helper APIs.
 
 ## Getting Started
 
@@ -11,27 +15,23 @@ using [MultiMesh for Jax workflows](https://github.com/nv-legate/multimesh-jax-w
 
 ## Docs
 
-User documentation including API reference and Jupyter tutorials can be found
-on the [Nvidia docs page](http://sw-mobile-docs/cllr/legate-jax/). 
+User documentation including [API reference](http://nv-legate.github.io/multimesh-jax/api.html)
+, [Jupyter tutorials](http://nv-legate.github.io/multimesh-jax/tutorials.html),
+and [architecture overview](http://nv-legate.github.io/multimesh-jax/architecture.html)
+can be found on the [docs page](http://nv-legate.github.io/multimesh-jax).
 
-
-## Building a MultiMesh for JAX container
-
-Instructions for building MultiMesh for JAX can be found in the [README](docker/README.md).
-Included in the `docker` folder are scripts showing how to configure, build, and install
-the various components.
 
 ## Running Jupyter tutorials with Docker
 
 The recommended way to run the examples is through Docker.
-To launch a Jupyter notebook in the container for running on CPU 
-that can be loaded in a local browswer:
+To launch a Jupyter notebook in the container built using [the build workflows](https://github.com/nv-legate/multimesh-jax-workflows)
+for running on CPU:
 
 ```bash
 docker run \
   -w /opt/workspace/multimesh-jax/docs/notebooks \
   -p 8675:8675 \
-  gitlab-master.nvidia.com:5005/legate/quickstart.internal/multimesh-jax-dev \
+  <image> \
   jupyter notebook --allow-root --ip 0.0.0.0 --port=8675
 ```
 The notebook will then be available at the link shown.  
@@ -42,14 +42,14 @@ docker run \
   -w /opt/workspace/multimesh-jax/docs/notebooks \
   -p 8675:8675 \
   --gpus <N> \ 
-  gitlab-master.nvidia.com:5005/legate/quickstart.internal/multimesh-jax-dev \
+  <image> \
   jupyter notebook --allow-root --ip 0.0.0.0 --port=8675
 ```
 where `<N>` is the number of GPUs.
 
 ## Running transformers in MaxText
 
-The main framework integrated with MultiMesh for Jax was MaxText.
+The main framework integrated with MultiMesh for Jax is [MaxText](https://github.com/AI-Hypercomputer/maxtext.git).
 Running and configuring MaxText can be challenging given the number of
 options for specifying the models. To aid in running transformer models,
 a helper script has been added with a basic set of options
@@ -65,7 +65,6 @@ valid when running with process/GPU rather than process/node.
 
 ## JAX and Jaxlib Compatibility
 
-In the future, a standard JAX and Jaxlib installation should be compatible with MultiMesh for JAX
-if JAX/Jaxlib are the most recent version and XLA is top-of-tree for the plugin client.
-For now, the Jaxlib will need to be installed from source for the custom XLA fork used to build the MultiMesh for JAX client.
+In the future, a standard JAX and Jaxlib installation should be compatible with MultiMesh.
+For now, patches will have to be applied to Jax and Jaxlib to work with the MultiMesh for JAX client.
 
