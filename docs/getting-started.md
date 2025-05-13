@@ -20,7 +20,7 @@ that can be loaded in a local browser:
 docker run \
   -w /opt/workspace/multimesh-jax/docs/notebooks \
   -p 8675:8675 \
-  gitlab-master.nvidia.com:5005/legate/quickstart.internal/multimesh-jax-dev \
+  <image> \
   jupyter notebook --allow-root --ip 0.0.0.0 --port=8675
 ```
 The notebook will then be available at the link shown.  
@@ -31,14 +31,14 @@ docker run \
   -w /opt/workspace/multimesh-jax/docs/notebooks \
   -p 8675:8675 \
   --gpus <N> \ 
-  gitlab-master.nvidia.com:5005/legate/quickstart.internal/multimesh-jax-dev \
+  <image> \
   jupyter notebook --allow-root --ip 0.0.0.0 --port=8675
 ```
 where `<N>` is the number of GPUs.
 
 ## Building Images
 
-Instructions for building MultiMesh for JAX can be found in the [README](https://github.com/nv-legate/multimesh-jax-workflows/blob/main/README.md),
-which is a monorepo that handles all of the components required for building the plugin.
+Instructions for building MultiMesh for JAX can be found in the [README](https://github.com/nv-legate/multimesh-jax-workflows/blob/release-v0.1/README.md),
+for the monorepo that handles all of the components required for building the plugin.
 
 
