@@ -265,6 +265,11 @@ auto Users(const Matcher& matcher) {
   return Property(&HloInstruction::users, matcher);
 }
 
+template <class Matcher>
+auto Operands(const Matcher& matcher) {
+  return Property(&HloInstruction::operands, matcher);
+}
+
 ::testing::Matcher<const ::xla::HloInstruction*> HasLogicalAxes();
 
 ::testing::Matcher<const SpmdHloModuleTask&> AnyTask();
