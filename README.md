@@ -53,7 +53,7 @@ The main framework integrated with MultiMesh for Jax is [MaxText](https://github
 Running and configuring MaxText can be challenging given the number of
 options for specifying the models. To aid in running transformer models,
 a helper script has been added with a basic set of options
-for configuring parallelism in the [MultiMesh for Jax workflows](https://github.com/nv-legate/multimesh-jax-workflows/maxtext/run.py).
+for configuring parallelism in the [MultiMesh for Jax workflows](https://github.com/nv-legate/multimesh-jax-workflows/blob/release-v0.1/maxtext/run.py)
 `run.py --help` will give the full set of options.
 
 ### Known Issues
