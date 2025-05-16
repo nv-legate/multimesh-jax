@@ -205,7 +205,9 @@ void MultiMeshExecutableTest::Execute(absl::string_view hlo_module_text,
   TF_ASSERT_OK_AND_ASSIGN(
       std::unique_ptr<MultiMeshPjRtExecutable> exe,
       Compile(hlo_module_text,
-              /*num_devices=*/num_devices, {.use_auto_input_sharding = true}));
+              /*num_devices=*/num_devices,
+              {.use_module_config_auto_param_sharding = true,
+               .use_auto_input_sharding = true}));
 
   const std::vector<Shape>& parameter_shapes =
       exe->program_shape().parameters();
@@ -498,7 +500,7 @@ TEST_F(MultiMeshExecutableTest, Pipeline2x8StagesReplicateSmallParams) {
   static constexpr int kDevicesPerStage = 8;
   static constexpr int kTotalDevices = 16;
   static constexpr int kNumDeviceGroups = 2;
-  static constexpr int64_t kMaxBytesAllocated = 29500000000;
+  static constexpr int64_t kMaxBytesAllocated = 29700000000;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},

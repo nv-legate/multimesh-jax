@@ -170,7 +170,7 @@ MultiMeshTestBase::Compile(absl::string_view hlo_string, int num_devices,
   absl::Span<const bool> allow_sharding_propagation_to_outputs =
       module->config().allow_spmd_sharding_propagation_to_output();
   absl::Span<const bool> allow_sharding_propagation_to_params =
-      module->config().allow_spmd_sharding_propagation_to_output();
+      module->config().allow_spmd_sharding_propagation_to_parameters();
   bool allow[] = {true};
   if (!cfg.use_module_config_auto_output_sharding) {
     // if not specified, set to
