@@ -58,8 +58,6 @@ MultiMeshPjRtBuffer::CopyToMemorySpace(PjRtMemorySpace* dst_memory_space) {
           << dst_device->global_device_id().value();
   auto new_variant = [&]() -> absl::StatusOr<data_variant_t> {
     if (has_native_buffer()) {
-      TF_ASSIGN_OR_RETURN(auto* memory_space,
-                          dst_device->default_memory_space());
       TF_ASSIGN_OR_RETURN(auto new_buf,
                           native_buffer()->CopyToMemorySpace(dst_memory_space));
       return std::move(new_buf);

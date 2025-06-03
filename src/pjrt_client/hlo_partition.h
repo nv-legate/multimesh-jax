@@ -92,6 +92,8 @@ class HloPartition {
 
   const ColorConfig& ConfigForColor(const std::string& color) const;
 
+  std::string OriginalColor(const std::string& color) const;
+
   const zuku::DeviceList& Devices() const { return devices_; }
 
   std::shared_ptr<LogicalShardingContext> GetLogicalShardingContext(
@@ -115,6 +117,7 @@ class HloPartition {
   absl::flat_hash_map<std::string, ColorConfig> colors_;
   absl::flat_hash_map<std::pair<std::string, bool>, std::string>
       matched_colors_;
+  absl::flat_hash_map<std::string, std::string> original_color_;
 
   absl::flat_hash_map<zuku::DeviceList, absl::InlinedVector<std::string, 2>>
       device_list_to_colors_;

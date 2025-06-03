@@ -254,8 +254,6 @@ absl::StatusOr<bool> MpmdHoistLoopConvert::Run(
         for (auto* user : condition_arg_tuple->users()) {
           // converts in the body must also be hoistable in the condition!
           if (hoistable_converts.contains(user->tuple_index())) {
-            auto* loop_input =
-                input_tuple->mutable_operand(user->tuple_index());
             if (user->users().size() > 1 ||
                 (user->users().size() == 1 &&
                  user->users().front()->opcode() != HloOpcode::kConvert)) {

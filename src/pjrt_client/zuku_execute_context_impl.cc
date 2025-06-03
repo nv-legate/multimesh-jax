@@ -271,10 +271,10 @@ void ZukuExecuteContextImpl::CreateExecuteTask(
   if (devices.Contains(global_device_id)) {
     for (auto&& output : outputs) {
       if (!output.impl->array->HasTile()) {
-        std::cerr << "ouput " << output.impl->name << " has no tile on "
+        std::cerr << "output " << output.impl->name << " has no tile on "
                   << global_device_id
                   << ", tensor_id=" << output.impl->array->mesh_unique_id()
-                  << std::endl;
+                  << " for task " << compiler->Name() << std::endl;
         abort();
       }
     }
@@ -283,7 +283,7 @@ void ZukuExecuteContextImpl::CreateExecuteTask(
         std::cerr << "input " << input.impl->name << " has no tile on "
                   << global_device_id
                   << ", tensor_id=" << input.impl->array->mesh_unique_id()
-                  << std::endl;
+                  << " for task " << compiler->Name() << std::endl;
         abort();
       }
     }

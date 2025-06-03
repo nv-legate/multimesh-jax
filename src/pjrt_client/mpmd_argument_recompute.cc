@@ -173,11 +173,19 @@ absl::StatusOr<bool> MpmdArgumentRecompute::MaybeRecomputeOperandFromArguments(
         // assume we can do this efficiently and it adds little extra cost
         break;
       case HloOpcode::kReduce:
-        total_recompute_cost +=
-            ShapeUtil::ElementsIn(GetSpmdShape(next->operand(0)));
+        if (!next->shape().IsTuple()) {
+          // TODO: for now, just ignore the cost for tuple reductions
+          // since XLA no longer provides a way to automatically count
+          // the number of elements recursively in a tuple
+          total_recompute_cost +=
+              ShapeUtil::ElementsIn(GetSpmdShape(next->operand(0)));
+        }
         break;
       default:
-        total_recompute_cost += ShapeUtil::ElementsIn(GetSpmdShape(next));
+        // only add costs for non-tuples
+        if (!next->shape().IsTuple()) {
+          total_recompute_cost += ShapeUtil::ElementsIn(GetSpmdShape(next));
+        }
         break;
     }
 

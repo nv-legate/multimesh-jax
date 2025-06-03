@@ -70,14 +70,12 @@ absl::Status ScheduleWavefront(
     const LoopConfig& loop_config,
     std::vector<std::vector<HloInstruction*>>& schedule) {
   if (tasks.empty()) {
-    return;
+    return absl::OkStatus();
   }
 
   if (schedule.size() != 1) {
     return InvalidArgumentStrCat("Schedule must be a single vector");
   }
-
-  const int last_iteration = loop_config.num_iterations - 1;
 
   VLOG(5) << "Have loop config num_stages="
           << loop_config.num_stages.value_or(-1)

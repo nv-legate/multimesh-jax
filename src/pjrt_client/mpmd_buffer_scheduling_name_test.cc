@@ -50,11 +50,11 @@ TEST_F(MpmdAssignBufferSchedulingNameTest, BasicTasks) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kBasicTasksHlo, /*num_devices=*/4));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
           "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
           "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
@@ -148,11 +148,11 @@ TEST_F(MpmdAssignBufferSchedulingNameTest, ScheduleReshard) {
   TF_ASSERT_OK_AND_ASSIGN(auto module, GetHloModuleFromText(kScheduleReshardHlo,
                                                             /*num_devices=*/8));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
           "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
           "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
@@ -184,59 +184,59 @@ TEST_F(MpmdAssignBufferSchedulingNameTest, AliasBufferAssignment) {
       auto module,
       GetHloModuleFromPath("alias-buffer-assignment.txt", /*num_devices=*/8));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto li, partition_->AllocateColor(
                    "loop_increment",
                    zuku::DeviceList{{.start = 0, .num_devices = 8}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto pr, partition_->AllocateColor(
                    "replicated-params",
                    zuku::DeviceList{{.start = 0, .num_devices = 8}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto emb,
       partition_->AllocateColor(
           "emb", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto decoder_norm,
       partition_->AllocateColor(
           "decoder_norm", zuku::DeviceList{{.start = 4, .num_devices = 4}},
           nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto layers_0,
       partition_->AllocateColor(
           "layers_0", zuku::DeviceList{{.start = 0, .num_devices = 4}},
           nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto layers_1,
       partition_->AllocateColor(
           "layers_1", zuku::DeviceList{{.start = 4, .num_devices = 4}},
           nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto layers_2,
       partition_->AllocateColor(
           "layers_2", zuku::DeviceList{{.start = 0, .num_devices = 4}},
           nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto layers_3,
       partition_->AllocateColor(
           "layers_3", zuku::DeviceList{{.start = 4, .num_devices = 4}},
           nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto layers_4,
       partition_->AllocateColor(
           "layers_4", zuku::DeviceList{{.start = 0, .num_devices = 4}},
           nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto layers_5,
       partition_->AllocateColor(
           "layers_5", zuku::DeviceList{{.start = 4, .num_devices = 4}},
           nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto layers_6,
       partition_->AllocateColor(
           "layers_6", zuku::DeviceList{{.start = 0, .num_devices = 4}},
           nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto layers_7,
       partition_->AllocateColor(
           "layers_7", zuku::DeviceList{{.start = 4, .num_devices = 4}},
@@ -281,11 +281,11 @@ TEST_F(MpmdAssignBufferSchedulingNameTest, SubsetDeviceSkipReshard) {
                           GetHloModuleFromText(kSubsetDeviceSkipReshardHlo,
                                                /*num_devices=*/8));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
           "task_f", zuku::DeviceList{{.start = 0, .num_devices = 8}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
           "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));

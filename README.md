@@ -10,7 +10,13 @@ This repository contains a PjRt plugin and Python helper APIs.
 
 ## Getting Started
 
-The easiest way to get started is by building containers
+The easiest way to get started is by using the prebuilt containers
+
+```bash
+$ docker pull ghcr.io/nv-legate/multimesh-jax:v0.1.1
+```
+
+Containers can be also be built
 using [MultiMesh for Jax workflows](https://github.com/nv-legate/multimesh-jax-workflows).
 
 ## Docs
@@ -29,9 +35,10 @@ for running on CPU:
 
 ```bash
 docker run \
-  -w /opt/workspace/multimesh-jax/docs/notebooks \
+  --mount type=bind,source=$(pwd)/docs/notebooks,target=/opt/notebooks \
+  -w /opt/notebooks \
   -p 8675:8675 \
-  <image> \
+  ghcr.io/nv-legate/multimesh-jax:v0.1.1 \
   jupyter notebook --allow-root --ip 0.0.0.0 --port=8675
 ```
 The notebook will then be available at the link shown.  
@@ -39,10 +46,11 @@ If GPUs are available, then docker can be launched as:
 
 ```bash
 docker run \
-  -w /opt/workspace/multimesh-jax/docs/notebooks \
+  --mount type=bind,source=$(pwd)/docs/notebooks,target=/opt/notebooks \
+  -w /opt/notebooks \
   -p 8675:8675 \
   --gpus <N> \ 
-  <image> \
+  ghcr.io/nv-legate/multimesh-jax:v0.1.1 \
   jupyter notebook --allow-root --ip 0.0.0.0 --port=8675
 ```
 where `<N>` is the number of GPUs.
@@ -53,7 +61,7 @@ The main framework integrated with MultiMesh for Jax is [MaxText](https://github
 Running and configuring MaxText can be challenging given the number of
 options for specifying the models. To aid in running transformer models,
 a helper script has been added with a basic set of options
-for configuring parallelism in the [MultiMesh for Jax workflows](https://github.com/nv-legate/multimesh-jax-workflows/blob/release-v0.1/maxtext/run.py)
+for configuring parallelism in the [MultiMesh for Jax workflows](https://github.com/nv-legate/multimesh-jax-workflows/blob/release-v0.1.1/maxtext/run.py)
 `run.py --help` will give the full set of options.
 
 ### Known Issues
@@ -62,6 +70,8 @@ for configuring parallelism in the [MultiMesh for Jax workflows](https://github.
 processes will not have addressable shards.
 * For running with external libraries like TransformerEngine, parallelism is only
 valid when running with process/GPU rather than process/node.
+* The plugin is experimental and may not work correctly if used outside of the tutorials or documented MaxText examples.
+
 
 ## JAX and Jaxlib Compatibility
 

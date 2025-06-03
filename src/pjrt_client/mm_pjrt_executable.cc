@@ -128,7 +128,7 @@ std::vector<std::unique_ptr<PjRtBuffer>> WrapperPjRtExecutable::Wrap(
     wrapped.push_back(std::move(mm_buffer));
     ++output_index;
   }
-  return std::move(wrapped);
+  return wrapped;
 }
 
 std::vector<std::vector<std::unique_ptr<PjRtBuffer>>>
@@ -139,7 +139,7 @@ WrapperPjRtExecutable::Wrap(
   for (auto& vec : outputs) {
     wrapped.push_back(Wrap(std::move(vec)));
   }
-  return std::move(wrapped);
+  return wrapped;
 }
 
 class TaskTempMemoryAllocator {
@@ -305,8 +305,6 @@ MultiMeshPjRtExecutable::Execute(
     }
     return true;
   }();
-
-  size_t num_handles = argument_handles[0].size();
 
   bool all_native_buffer_inputs = true;
   for (auto&& argument_vec : argument_handles) {

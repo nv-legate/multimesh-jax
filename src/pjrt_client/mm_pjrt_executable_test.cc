@@ -93,17 +93,15 @@ std::pair<std::pair<int64_t, int64_t>, std::string> TaskCallback(
         absl::StrCat("failed to parse layer number from", name));
   }
 
-  std::string color = [&] {
-    if (backprop) {
-      return absl::StrCat("bwd.", name);
-    }
-    return name;
-  }();
-
+  const int64_t pipeline_stage = layer_num / layers_per_stage;
   const int64_t num_device_groups = total_devices / devices_per_stage;
   const int64_t offset =
       ((layer_num / layers_per_stage) % num_device_groups) * devices_per_stage;
   auto devices = std::make_pair(offset, offset + devices_per_stage);
+
+  std::string color =
+      absl::StrCat("stage_", pipeline_stage, "_", backprop ? "bwd" : "fwd");
+
   return std::make_pair(devices, std::move(color));
 };
 
@@ -205,7 +203,9 @@ void MultiMeshExecutableTest::Execute(absl::string_view hlo_module_text,
   TF_ASSERT_OK_AND_ASSIGN(
       std::unique_ptr<MultiMeshPjRtExecutable> exe,
       Compile(hlo_module_text,
-              /*num_devices=*/num_devices, {.use_auto_input_sharding = true}));
+              /*num_devices=*/num_devices,
+              {.use_module_config_auto_param_sharding = true,
+               .use_auto_input_sharding = true}));
 
   const std::vector<Shape>& parameter_shapes =
       exe->program_shape().parameters();
@@ -484,8 +484,7 @@ TEST_F(MultiMeshExecutableTest, Pipeline2x8Stages) {
       "(layers_\\d+)",
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {4, 1, 2},
       {"x", "y", "z"}, transformer_axes);
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
-                         "(compute_loss).*"}) {
+  for (auto&& matcher : {"(emb).*", "(final_ln).*", "(compute_loss).*"}) {
     RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -498,7 +497,7 @@ TEST_F(MultiMeshExecutableTest, Pipeline2x8StagesReplicateSmallParams) {
   static constexpr int kDevicesPerStage = 8;
   static constexpr int kTotalDevices = 16;
   static constexpr int kNumDeviceGroups = 2;
-  static constexpr int64_t kMaxBytesAllocated = 29500000000;
+  static constexpr int64_t kMaxBytesAllocated = 29800000000;
 
   std::vector<std::pair<std::string, std::string>> embeddings_axes = {
       {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
@@ -514,7 +513,7 @@ TEST_F(MultiMeshExecutableTest, Pipeline2x8StagesReplicateSmallParams) {
       "(layers_\\d+)",
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 8},
       {"x", "y", "z"}, transformer_axes);
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(default)"}) {
+  for (auto&& matcher : {"(emb).*", "(default)"}) {
     RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {1, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -553,7 +552,7 @@ TEST_F(MultiMeshExecutableTest, Pipeline2x8Stages24LayersReplicateSmallParams) {
       "(layers_\\d+)",
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 8},
       {"x", "y", "z"}, transformer_axes);
-  for (auto&& matcher : {"(emb_lookup).*", "(position_emb).*", "default"}) {
+  for (auto&& matcher : {"(emb).*", "default"}) {
     RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {1, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -589,7 +588,7 @@ TEST_F(MultiMeshExecutableTest, Opt175ReplicateSmallParams) {
       "(layers_\\d+)",
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 8},
       {"x", "y", "z"}, transformer_axes);
-  for (auto&& matcher : {"(emb_lookup).*", "(position_emb).*", "default"}) {
+  for (auto&& matcher : {"(emb).*", "default"}) {
     RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {1, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -626,8 +625,8 @@ TEST_F(MultiMeshExecutableTest, Pipeline2x8StagesMicrobatch8) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {4, 1, 2},
       {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
-                         "(compute_loss).*", "default"}) {
+  for (auto&& matcher :
+       {"(emb).*", "(final_ln).*", "(compute_loss).*", "default"}) {
     RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {4, 1, 2},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -659,8 +658,7 @@ TEST_F(MultiMeshExecutableTest, Pipeline2x8StagesCircularScheduling) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {4, 1, 2},
       {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
-                         "(compute_loss).*"}) {
+  for (auto&& matcher : {"(emb).*", "(final_ln).*", "(compute_loss).*"}) {
     RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -692,8 +690,7 @@ TEST_F(MultiMeshExecutableTest,
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {4, 1, 2},
       {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
-                         "(compute_loss).*"}) {
+  for (auto&& matcher : {"(emb).*", "(final_ln).*", "(compute_loss).*"}) {
     RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -735,8 +732,7 @@ TEST_F(MultiMeshExecutableTest, Pipeline4x2Stages) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {2, 1, 1},
       {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
-                         "(compute_loss).*"}) {
+  for (auto&& matcher : {"(emb).*", "(final_ln).*", "(compute_loss).*"}) {
     RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 4},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -766,7 +762,7 @@ TEST_F(MultiMeshExecutableTest, Pipeline4x2Stages1F1B) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 8},
       {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
+  for (auto&& matcher : {"(emb).*", "default"}) {
     RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {1, 1, 8},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -802,7 +798,7 @@ TEST_F(MultiMeshExecutableTest, MaximalDeviceSharding4x1Stages) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 1},
       {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
+  for (auto&& matcher : {"(emb).*", "default"}) {
     RegisterMatcherTestTask(matcher, {0, 1}, {1, 1, 1}, {"x", "y", "z"},
                             embeddings_axes);
   }
@@ -837,8 +833,8 @@ TEST_F(MultiMeshExecutableTest, ShardedPipeline4x2Stages) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {2, 1, 1},
       {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
-                         "(compute_loss).*", "default"}) {
+  for (auto&& matcher :
+       {"(emb).*", "(final_ln).*", "(compute_loss).*", "default"}) {
     RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 4},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -871,7 +867,7 @@ TEST_F(MultiMeshExecutableTest, DP2_PP2_TP8_4nodes) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {2, 1, 8},
       {"x", "y", "z"}, axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
+  for (auto&& matcher : {"(emb).*", "default"}) {
     RegisterMatcherTestTask(matcher, {0, kEmbeddingsDevices}, {2, 1, 8},
                             {"x", "y", "z"}, axes);
   }
@@ -905,8 +901,8 @@ TEST_F(MultiMeshExecutableTest, ShardedPipeline2x4StagesSmallMicrobatch) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {2, 1, 2},
       {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
-                         "(compute_loss).*", "default"}) {
+  for (auto&& matcher :
+       {"(emb).*", "(final_ln).*", "(compute_loss).*", "default"}) {
     RegisterMatcherTestTask(matcher, {0, kTotalDevices}, {2, 1, 4},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -934,7 +930,7 @@ TEST_F(MultiMeshExecutableTest, PP2_TP4_TransformerEngine) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 4},
       {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
+  for (auto&& matcher : {"(emb).*", "default"}) {
     RegisterMatcherTestTask(matcher, {0, kDevicesPerStage}, {1, 1, 4},
                             {"x", "y", "z"}, embeddings_axes);
   }
@@ -968,7 +964,7 @@ TEST_F(MultiMeshExecutableTest, TransformerTwoNodes) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
       {1, 1, kDevicesPerStage}, {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
+  for (auto&& matcher : {"(emb).*", "default"}) {
     RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"},
                             embeddings_axes);
@@ -981,6 +977,46 @@ TEST_F(MultiMeshExecutableTest, TransformerTwoNodes) {
 
   ReplicateParametersSmallerThanNumElements(16 * 2048);
   ExecutePath("2nodes_transformer.txt", /*num_devices=*/kTotalDevices);
+}
+
+TEST_F(MultiMeshExecutableTest, PP4_TP2_CustomSchedule) {
+  static constexpr int kTotalDevices = 8;
+  static constexpr int kDevicesPerStage = 2;
+  static constexpr int kLayersPerStage = 2;
+
+  std::vector<std::pair<std::string, std::string>> embeddings_axes = {
+      {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
+      {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
+  };
+
+  std::vector<std::pair<std::string, std::string>> transformer_axes = {
+      {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
+      {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
+  };
+
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {1, 1, kDevicesPerStage}, {"x", "y", "z"}, transformer_axes);
+
+  for (auto&& matcher : {"(emb).*", "default"}) {
+    RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
+                            {1, 1, kDevicesPerStage}, {"x", "y", "z"},
+                            embeddings_axes);
+  }
+  for (auto&& matcher : {"(final_ln).*", "(compute_loss).*"}) {
+    RegisterMatcherTestTask(
+        matcher, {kTotalDevices - kDevicesPerStage, kTotalDevices},
+        {1, 1, kDevicesPerStage}, {"x", "y", "z"}, embeddings_axes);
+  }
+
+  ReplicateParametersSmallerThanNumElements(16 * 2048);
+  ExecutePath("pp_4_tp_2_dp_1_1f1b.txt", /*num_devices=*/kTotalDevices);
+  auto mem_1f1b = DeviceBytesHighWatermark(0);
+  ExecutePath("pp_4_tp_2_dp_1_gpipe.txt", /*num_devices=*/kTotalDevices);
+  auto mem_gpipe = DeviceBytesHighWatermark(0);
+  // This shows that GPipe uses more memory than the 1F1B case
+  EXPECT_LT(mem_1f1b, mem_gpipe);
 }
 
 TEST_F(MultiMeshExecutableTest, TransformerTwoNodesHostOffload) {
@@ -1007,7 +1043,7 @@ TEST_F(MultiMeshExecutableTest, TransformerTwoNodesHostOffload) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
       {1, 1, kDevicesPerStage}, {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "default"}) {
+  for (auto&& matcher : {"(emb).*", "default"}) {
     RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"},
                             embeddings_axes);
@@ -1056,8 +1092,7 @@ TEST_F(MultiMeshExecutableTest, ShardingMismatchLoadBalanced) {
       "(layers_\\d+)",
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
       {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
-  for (auto&& matcher :
-       {"(position_emb).*", "(emb_lookup).*", "(token_embedder).*"}) {
+  for (auto&& matcher : {"(emb).*", "(token_embedder).*"}) {
     RegisterMatcherTestTask(matcher, {0, kTotalDevices},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
@@ -1089,7 +1124,7 @@ TEST_F(MultiMeshExecutableTest, HostOffloadCrash) {
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
       {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*"}) {
+  for (auto&& matcher : {"(emb).*"}) {
     RegisterMatcherTestTask(matcher, {0, kTotalDevices},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
@@ -1126,7 +1161,7 @@ TEST_F(MultiMeshExecutableTest,
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
       {1, 1, kDevicesPerStage}, {"x", "y", "z"}, transformer_axes);
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*"}) {
+  for (auto&& matcher : {"(emb).*"}) {
     RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"},
                             embeddings_axes);
@@ -1158,8 +1193,7 @@ TEST_F(MultiMeshExecutableTest, Gpt3_16nodes) {
       "(layers_\\d+)",
       TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
       {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
-  for (auto&& matcher :
-       {"(position_emb).*", "(emb_lookup).*", "(token_embedder).*"}) {
+  for (auto&& matcher : {"(emb).*", "(token_embedder).*"}) {
     RegisterMatcherTestTask(matcher, {0, kDevicesPerStage},
                             {1, 1, kDevicesPerStage}, {"x", "y", "z"}, axes);
   }
@@ -1334,12 +1368,38 @@ TEST_F(MultiMeshExecutableTest, SingleNodeTransformer) {
                                                            {"seq", "y"},
                                                            {"seq", "z"}};
 
-  for (auto&& matcher : {"(position_emb).*", "(emb_lookup).*", "(final_ln).*",
-                         "(compute_loss).*", "default", "(layers_\\d+)"}) {
+  for (auto&& matcher : {"(emb).*", "(final_ln).*", "(compute_loss).*",
+                         "default", "(layers_\\d+)"}) {
     RegisterMatcherTestTask(matcher, {0, kTotalDevices}, dims, {"x", "y", "z"},
                             axes);
   }
   ExecutePath("single-node-opt.txt", /*num_devices=*/kTotalDevices);
+}
+
+TEST_F(MultiMeshExecutableTest, Gpt3_gradient_clipping) {
+  std::vector<std::pair<std::string, std::string>> axes = {
+      {"data", "x"},
+      {"tensor", "z"},
+  };
+
+  constexpr int kTotalDevices = 32;
+  constexpr int kLayersPerStage = 1;
+  constexpr int kNumGroups = 8;
+  constexpr int kDevicesPerStage = 16;
+  constexpr int kDP = 2;
+  constexpr int kTP = 8;
+
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {kDP, 1, kTP}, {"x", "y", "z"}, axes);
+
+  ReplicateParametersSmallerThanNumElements(128 * 2048);
+  RecomputeArgumentsIfCostLessThan(1024 * 1024);
+  ExecutePath("gpt3_gradient_clipping.txt",
+              /*num_devices=*/kTotalDevices);
+
+  EXPECT_LT(DeviceBytesHighWatermark(0), 52000000000);
 }
 
 }  // namespace

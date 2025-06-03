@@ -210,6 +210,16 @@ bool MpmdComputationFusion::FusionMatch(const HloInstruction* lhs,
     CHECK(lhs_color.has_value() && rhs_color.has_value());
     return *lhs_color == *rhs_color;
   }
+  if (type_ == FusionType::kOriginalColor) {
+    auto lhs_color = *Color(lhs);
+    auto rhs_color = *Color(rhs);
+    auto lhs_orig_color = partition_->OriginalColor(lhs_color);
+    auto rhs_orig_color = partition_->OriginalColor(rhs_color);
+    VLOG(5) << "comparing " << lhs->name() << "," << lhs_color << "->"
+            << lhs_orig_color << " to " << rhs->name() << "," << rhs_color
+            << "->" << rhs_orig_color;
+    return lhs_orig_color == rhs_orig_color;
+  }
   return partition_->SameMesh(lhs, rhs);
 }
 

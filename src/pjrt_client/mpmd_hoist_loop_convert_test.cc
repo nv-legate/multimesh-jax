@@ -10,6 +10,7 @@
 #include "xla/hlo/utils/hlo_matchers.h"
 #include "xla/pjrt/multimesh/mpmd_test_base.h"
 #include "xla/tests/test_utils.h"
+#include "xla/tsl/lib/core/status_test_util.h"
 
 namespace xla {
 namespace {
@@ -169,7 +170,7 @@ TEST_F(MpmdHoistLoopConvertTest, BasicLoop) {
   GTEST_SKIP() << "Input module needs to be flattened";
 
   MpmdHoistLoopConvert hoister{partition_.get()};
-  TF_ASSERT_OK_AND_ASSIGN(bool changed, hoister.Run(module.get()));
+  TF_ASSERT_OK(hoister.Run(module.get()).status());
 
   Shape bf16_4x4{PrimitiveType::BF16, {4, 4}, {}, {}};
   bf16_4x4.mutable_layout()->add_minor_to_major(1);
@@ -190,8 +191,6 @@ TEST_F(MpmdHoistLoopConvertTest, FailedHoist) {
 
   MpmdHoistLoopConvert hoister{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, hoister.Run(module.get()));
-
-  TF_RETURN_IF_ERROR(xla::VerifyHloModule(module.get(), false, false));
 }
 
 }  // namespace

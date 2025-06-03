@@ -6,6 +6,7 @@
 #include "xla/pjrt/multimesh/mpmd_coloring.h"
 
 #include <optional>
+#include "absl/container/btree_map.h"
 
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
@@ -76,79 +77,106 @@ void ColorBackwards(const std::string& color, HloInstruction* instruction,
   }
 }
 
+absl::flat_hash_map<const HloInstruction*, int64_t> ComputeDepthMap(
+    const HloComputation* computation) {
+  absl::flat_hash_map<const HloInstruction*, int64_t> depth;
+  for (auto* instruction : computation->MakeInstructionPostOrder()) {
+    depth[instruction] = 0;
+    for (auto* operand : instruction->operands()) {
+      depth[instruction] = std::max(depth[instruction], depth[operand] + 1);
+    }
+  }
+  return depth;
+}
+
+absl::btree_map<int64_t, std::string> ComputeColorDepthMap(
+    const HloComputation* computation,
+    const absl::flat_hash_map<const HloInstruction*, int64_t>& depth) {
+  absl::flat_hash_map<std::string, int64_t> color_depth;
+  absl::btree_map<int64_t, std::string> depth_to_color;
+
+  for (auto* instruction : computation->MakeInstructionPostOrder()) {
+    auto inst_color = Color(instruction);
+    if (inst_color.has_value()) {
+      color_depth[*inst_color] =
+          std::max(value_or(color_depth, *inst_color, int64_t(0)),
+                   depth.at(instruction));
+    }
+  }
+
+  for (const auto& [color, depth] : color_depth) {
+    // We should never have any collisions because each
+    // instruction has a unique depth and color.
+    // So each depth maps to only 1 color.
+    depth_to_color[depth] = color;
+  }
+
+  return depth_to_color;
+}
+
+absl::flat_hash_map<const HloInstruction*, int64_t> CreateTopologicalIndexMap(
+    const HloComputation* computation) {
+  absl::flat_hash_map<const HloInstruction*, int64_t> instruction_to_topo_index;
+  const std::vector<HloInstruction*> topological_order =
+      computation->MakeInstructionPostOrder();
+  for (int64_t i = 0; i < topological_order.size(); ++i) {
+    instruction_to_topo_index[topological_order[i]] = i;
+  }
+  return instruction_to_topo_index;
+}
+
 }  // namespace
 
-bool MpmdColoring::PropagateFromUsersAndOperandsColorDepth(
-    HloInstruction* instruction, const InstructionProperties& properties,
-    FilterVisitFn if_visit,
-    const absl::flat_hash_map<std::string, int64_t>& color_depth,
-    absl::flat_hash_map<HloInstruction*, bool>& recolorable_instructions) {
-  auto color = Color(instruction);
+bool MpmdColoring::PropagateDirectionally(
+    const std::vector<HloInstruction*> postorder, const std::string color,
+    const InstructionProperties& properties, FilterVisitFn if_visit,
+    const absl::flat_hash_set<HloInstruction*>& fixed_colored_instructions,
+    bool propagate_forward) {
+  // propagate_forward is true if we are propagating forward, false if we are
+  // propagating backward
+  bool changed = false;
 
-  // Check if non-recolorable instruction is already assigned a color
-  if (color.has_value() && !recolorable_instructions.contains(instruction)) {
-    return false;
-  }
-
-  std::optional<std::string> operand_candidate_color = std::nullopt;
-  std::optional<std::string> user_candidate_color = std::nullopt;
-
-  for (auto* operand : properties.Operands(instruction)) {
-    const auto operand_color = Color(operand);
-    if (if_visit(operand) && operand_color.has_value() &&
-        color_depth.contains(*operand_color)) {
-      if (!operand_candidate_color.has_value() ||
-          color_depth.at(*operand_candidate_color) <
-              color_depth.at(*operand_color)) {
-        operand_candidate_color = operand_color;
+  auto process_instruction = [&](HloInstruction* instruction,
+                                 auto related_instructions) {
+    if (ColorOrDefault(instruction) == color) {
+      for (auto* related_instruction : related_instructions) {
+        VLOG(5) << "propagating color " << color << " from "
+                << instruction->name() << " to " << related_instruction->name();
+        VLOG(5) << "if_visit=" << if_visit(related_instruction)
+                << ", fixed_colored_instructions="
+                << fixed_colored_instructions.contains(related_instruction);
+        if (if_visit(related_instruction) &&
+            !fixed_colored_instructions.contains(related_instruction)) {
+          VLOG(5) << "propagating color " << color << " to "
+                  << related_instruction->name();
+          AssignColor(related_instruction, color);
+          properties.ForEachAlias(related_instruction, [&](HloInstruction* i) {
+            if (!IsAssignedColor(i) ||
+                !fixed_colored_instructions.contains(i)) {
+              VLOG(5) << "propagating color " << color << " to " << i->name();
+              AssignColor(i, color);
+            }
+          });
+          changed = true;
+        }
+        if (related_instruction->opcode() == HloOpcode::kTuple) {
+          ColorTuple(related_instruction);
+        }
       }
+    }
+  };
+
+  if (propagate_forward) {
+    for (auto it = postorder.begin(); it != postorder.end(); ++it) {
+      process_instruction(*it, (*it)->users());
+    }
+  } else {
+    for (auto it = postorder.rbegin(); it != postorder.rend(); ++it) {
+      process_instruction(*it, (*it)->operands());
     }
   }
 
-  for (auto* user : properties.Users(instruction)) {
-    const auto user_color = Color(user);
-    if (if_visit(user) && user_color.has_value() &&
-        color_depth.contains(*user_color)) {
-      if (!user_candidate_color.has_value() ||
-          color_depth.at(*user_candidate_color) > color_depth.at(*user_color)) {
-        user_candidate_color = user_color;
-      }
-    }
-  }
-
-  bool prefer_users_over_operands = false;
-  if (recolorable_instructions.contains(instruction)) {
-    prefer_users_over_operands = recolorable_instructions.at(instruction);
-  } else if (user_candidate_color.has_value()) {
-    prefer_users_over_operands = true;
-  }
-
-  std::optional<std::string> candidate_color = prefer_users_over_operands
-                                                   ? user_candidate_color
-                                                   : operand_candidate_color;
-  // Check if the candidate color is deeper than the user candidate color. Not
-  // ok to use in that case.
-  if (candidate_color.has_value() && user_candidate_color.has_value()) {
-    if (color_depth.at(*candidate_color) >
-        color_depth.at(*user_candidate_color)) {
-      candidate_color = user_candidate_color;
-    }
-  }
-
-  if (candidate_color.has_value()) {
-    VLOG(5) << "propagating color " << *candidate_color << " for "
-            << instruction->name();
-    AssignColor(instruction, *candidate_color);
-    properties.ForEachAlias(instruction, [&](HloInstruction* i) {
-      if (!IsAssignedColor(i)) {
-        AssignColor(i, *candidate_color);
-      }
-    });
-    recolorable_instructions[instruction] = prefer_users_over_operands;
-    return candidate_color != color;
-  }
-
-  return false;
+  return changed;
 }
 
 bool MpmdColoring::PropagateFromUsersAndOperands(
@@ -283,9 +311,6 @@ MpmdColoring::GetColorPropagationPriorityFromString(
   } else if (priority_str == "TOPOLOGICAL") {
     VLOG(5) << "using topological priority for color propagation.";
     return MpmdColoring::ColorPropagationPriority::kTopological;
-  } else if (priority_str == "COLOR_DEPTH") {
-    VLOG(5) << "using color depth priority for color propagation.";
-    return MpmdColoring::ColorPropagationPriority::kColorDepth;
   } else {
     VLOG(5) << "invalid priority string, using weight priority for color "
                "propagation.";
@@ -293,53 +318,12 @@ MpmdColoring::GetColorPropagationPriorityFromString(
   }
 }
 
-static absl::flat_hash_map<const HloInstruction*, int64_t> ComputeDepthMap(
-    const HloComputation* computation) {
-  absl::flat_hash_map<const HloInstruction*, int64_t> depth;
-  for (auto* instruction : computation->MakeInstructionPostOrder()) {
-    depth[instruction] = 0;
-    for (auto* operand : instruction->operands()) {
-      depth[instruction] = std::max(depth[instruction], depth[operand] + 1);
-    }
-  }
-  return depth;
-}
-
-static absl::flat_hash_map<std::string, int64_t> ComputeColorDepthMap(
-    const HloComputation* computation,
-    const absl::flat_hash_map<const HloInstruction*, int64_t>& depth) {
-  absl::flat_hash_map<std::string, int64_t> color_depth;
-  for (auto* instruction : computation->MakeInstructionPostOrder()) {
-    auto inst_color = Color(instruction);
-    if (inst_color.has_value()) {
-      color_depth[*inst_color] =
-          std::max(value_or(color_depth, *inst_color, int64_t(0)),
-                   depth.at(instruction));
-    }
-  }
-  return color_depth;
-}
-
-static absl::flat_hash_map<const HloInstruction*, int64_t>
-CreateTopologicalIndexMap(const HloComputation* computation) {
-  absl::flat_hash_map<const HloInstruction*, int64_t> instruction_to_topo_index;
-  const std::vector<HloInstruction*> topological_order =
-      computation->MakeInstructionPostOrder();
-  for (int64_t i = 0; i < topological_order.size(); ++i) {
-    instruction_to_topo_index[topological_order[i]] = i;
-  }
-  return instruction_to_topo_index;
-}
-
 absl::StatusOr<bool> MpmdColoring::PropagateIf(
     HloComputation* computation, const InstructionProperties& properties,
-    FilterVisitFn if_visit, bool microbatch_loop) {
+    FilterVisitFn if_visit) {
   auto postorder = computation->MakeInstructionPostOrder();
   auto depth = ComputeDepthMap(computation);
   auto topological_index = CreateTopologicalIndexMap(computation);
-  auto color_depth = ComputeColorDepthMap(computation, depth);
-
-  absl::flat_hash_map<HloInstruction*, bool> recolorable_instructions;
 
   bool propagated = true;
   bool changed = false;
@@ -353,33 +337,89 @@ absl::StatusOr<bool> MpmdColoring::PropagateIf(
         continue;
       }
 
-      if (if_visit(instruction) &&
-          (!IsAssignedColor(instruction) ||
-           recolorable_instructions.contains(instruction))) {
+      if (if_visit(instruction) && !IsAssignedColor(instruction)) {
         VLOG(5) << "visiting " << instruction->name()
                 << " in color propagation from operands/users";
-        propagated |= [&]() {
-          if (color_propagation_priority_ ==
-              ColorPropagationPriority::kColorDepth) {
-            return PropagateFromUsersAndOperandsColorDepth(
-                instruction, properties, if_visit, color_depth,
-                recolorable_instructions);
-          } else {
-            return PropagateFromUsersAndOperands(
-                instruction, properties, if_visit, depth, topological_index);
-          }
-        }();
+        propagated |= PropagateFromUsersAndOperands(
+            instruction, properties, if_visit, depth, topological_index);
       }
       if (instruction->opcode() == HloOpcode::kWhile) {
-        TF_ASSIGN_OR_RETURN(
-            bool comp_propagated,
-            PropagateIf(instruction->called_computations()[0], properties,
-                        if_visit, /*microbatch_loop=*/microbatch_loop ||
-                                      instruction->has_backend_config()));
+        TF_ASSIGN_OR_RETURN(bool comp_propagated,
+                            PropagateIf(instruction->called_computations()[0],
+                                        properties, if_visit));
         propagated |= comp_propagated;
       }
     }
     changed |= propagated;
+  }
+
+  return changed;
+}
+
+absl::StatusOr<bool> MpmdColoring::PropagateLoopColorDepth(
+    HloComputation* computation, const InstructionProperties& properties,
+    FilterVisitFn if_visit) {
+  bool changed = false;
+  absl::flat_hash_set<HloInstruction*> fixed_colored_instructions;
+  HloComputation* while_computation = nullptr;
+
+  // First preprocess pass: collect fixed colored instructions outside the
+  // loop and propagate their colors to their aliases inside if applicable.
+  for (auto* instruction : computation->MakeInstructionPostOrder()) {
+    if (IsAssignedColor(instruction)) {
+      fixed_colored_instructions.insert(instruction);
+      properties.ForEachAlias(instruction, [&](HloInstruction* i) {
+        if (!IsAssignedColor(i)) {
+          changed = true;
+          AssignColor(i, *Color(instruction));
+        }
+      });
+    }
+    if (instruction->opcode() == HloOpcode::kWhile) {
+      while_computation = instruction->called_computations()[0];
+    }
+  }
+
+  if (while_computation == nullptr) {
+    return changed;
+  }
+
+  // Second preprocess pass: collect fixed colored instructions inside the
+  // loop and propagate their colors to their aliases outside if applicable.
+  const std::vector<HloInstruction*> while_postorder =
+      while_computation->MakeInstructionPostOrder();
+  for (auto* while_instruction : while_postorder) {
+    if (IsAssignedColor(while_instruction)) {
+      fixed_colored_instructions.insert(while_instruction);
+      properties.ForEachAlias(while_instruction, [&](HloInstruction* i) {
+        if (!IsAssignedColor(i)) {
+          AssignColor(i, *Color(while_instruction));
+        }
+      });
+    }
+  }
+
+  const absl::flat_hash_map<const HloInstruction*, int64_t> loop_depth =
+      ComputeDepthMap(while_computation);
+  const absl::btree_map<int64_t, std::string> depth_to_colors =
+      ComputeColorDepthMap(while_computation, loop_depth);
+
+  // Pass 1: Propagate colors forward
+  for (auto it = depth_to_colors.begin(); it != depth_to_colors.end(); ++it) {
+    const auto& [depth, color] = *it;
+    VLOG(5) << "propagating color " << color << " forward";
+    changed |=
+        PropagateDirectionally(while_postorder, color, properties, if_visit,
+                               fixed_colored_instructions, true);
+  }
+
+  // Pass 2: Propagate colors backward
+  for (auto it = depth_to_colors.rbegin(); it != depth_to_colors.rend(); ++it) {
+    const auto& [depth, color] = *it;
+    VLOG(5) << "propagating color " << color << " backward";
+    changed |=
+        PropagateDirectionally(while_postorder, color, properties, if_visit,
+                               fixed_colored_instructions, false);
   }
 
   return changed;
@@ -396,48 +436,48 @@ absl::StatusOr<bool> MpmdColoring::Run(
   preprocess_pipeline.AddPass<MpmdUnpackOptimizationBarrier>();
   TF_RETURN_IF_ERROR(preprocess_pipeline.Run(module).status());
 
-  TF_ASSIGN_OR_RETURN(bool enforce_bijective_tasks,
-                      EnforceBijectiveTasks(module->entry_computation()));
-  if (enforce_bijective_tasks) {
-    color_propagation_priority_ = ColorPropagationPriority::kColorDepth;
-  }
-
   auto properties = InstructionProperties::Create(module);
+
+  TF_ASSIGN_OR_RETURN(
+      bool propagated_depth_ordering,
+      PropagateLoopColorDepth(
+          module->entry_computation(), properties, [](const HloInstruction* i) {
+            return i->opcode() != HloOpcode::kConstant &&
+                   (!i->shape().IsTuple() ||
+                    i->opcode() == HloOpcode::kRngBitGenerator);
+          }));
+
   // first only visit elementwise propagation
-  TF_ASSIGN_OR_RETURN(bool propagated_elementwise,
-                      PropagateIf(
-                          module->entry_computation(), properties,
-                          [](const HloInstruction* i) {
-                            return i->opcode() != HloOpcode::kConstant &&
-                                   !i->shape().IsTuple() &&
-                                   (i->IsElementwise() ||
-                                    i->opcode() == HloOpcode::kParameter ||
-                                    i->opcode() == HloOpcode::kReduce);
-                          },
-                          /*microbatch_loop=*/false));
+  TF_ASSIGN_OR_RETURN(
+      bool propagated_elementwise,
+      PropagateIf(module->entry_computation(), properties,
+                  [](const HloInstruction* i) {
+                    return i->opcode() != HloOpcode::kConstant &&
+                           !i->shape().IsTuple() &&
+                           (i->IsElementwise() ||
+                            i->opcode() == HloOpcode::kParameter ||
+                            i->opcode() == HloOpcode::kReduce);
+                  }));
 
   // next only visit non-trivial instructions
-  TF_ASSIGN_OR_RETURN(bool propagated_nontrivial_shapes,
-                      PropagateIf(
-                          module->entry_computation(), properties,
-                          [](const HloInstruction* i) {
-                            return i->opcode() != HloOpcode::kConstant &&
-                                   !i->shape().IsTuple() &&
-                                   ShapeUtil::ElementsIn(i->shape()) > 1;
-                          },
-                          /*microbatch_loop=*/false));
+  TF_ASSIGN_OR_RETURN(
+      bool propagated_nontrivial_shapes,
+      PropagateIf(module->entry_computation(), properties,
+                  [](const HloInstruction* i) {
+                    return i->opcode() != HloOpcode::kConstant &&
+                           !i->shape().IsTuple() &&
+                           ShapeUtil::ElementsIn(i->shape()) > 1;
+                  }));
 
   // now visit everything
   TF_ASSIGN_OR_RETURN(
       bool propagated_any,
-      PropagateIf(
-          module->entry_computation(), properties,
-          [](const HloInstruction* i) {
-            return i->opcode() != HloOpcode::kConstant &&
-                   (i->opcode() == HloOpcode::kRngBitGenerator ||
-                    !i->shape().IsTuple());
-          },
-          /*microbatch_loop=*/false));
+      PropagateIf(module->entry_computation(), properties,
+                  [](const HloInstruction* i) {
+                    return i->opcode() != HloOpcode::kConstant &&
+                           (i->opcode() == HloOpcode::kRngBitGenerator ||
+                            !i->shape().IsTuple());
+                  }));
 
   auto color_root = [&](HloInstruction* i) {
     if (!IsAssignedColor(i)) {

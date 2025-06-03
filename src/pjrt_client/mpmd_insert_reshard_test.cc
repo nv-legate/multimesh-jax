@@ -79,11 +79,11 @@ TEST_F(MpmdInsertReshardTest, BasicTasks) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kBasicTasksHlo, /*num_devices=*/4));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
           "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
           "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
@@ -135,11 +135,11 @@ TEST_F(MpmdInsertReshardTest, CommonReshard) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kCommonReshardHlo, /*num_devices=*/4));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
           "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
           "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
@@ -186,11 +186,11 @@ TEST_F(MpmdInsertReshardTest, ShardingChangeSameDevices) {
       auto module,
       GetHloModuleFromText(kShardingChangeSameDevicesHlo, /*num_devices=*/4));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
           "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
           "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
@@ -241,11 +241,11 @@ TEST_F(MpmdInsertReshardTest, ScalarReshard) {
       auto module,
       GetHloModuleFromText(kReshardOutputScalar, /*num_devices=*/8));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
           "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
           "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
@@ -345,23 +345,23 @@ TEST_F(MpmdInsertReshardTest, RootTupleRecolor) {
       auto module,
       GetHloModuleFromText(kRootTupleRecolorHlo, /*num_devices=*/2));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
           "f", zuku::DeviceList{{.start = 0, .num_devices = 1}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
           "g", zuku::DeviceList{{.start = 1, .num_devices = 1}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto f_bwd,
       partition_->AllocateColor(
           "f.bwd", zuku::DeviceList{{.start = 0, .num_devices = 1}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto g_bwd,
       partition_->AllocateColor(
           "g.bwd", zuku::DeviceList{{.start = 1, .num_devices = 1}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto global,
       partition_->AllocateColor(
           "sharding", zuku::DeviceList{{.start = 0, .num_devices = 2}},

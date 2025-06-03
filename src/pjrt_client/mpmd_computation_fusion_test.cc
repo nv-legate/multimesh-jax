@@ -237,11 +237,11 @@ TEST_F(MpmdComputationFusionTest, NestedWhileLoopDeviceFusion) {
       auto module, GetHloModuleFromText(kNestedWhileDifferentColorsInLoopHlo,
                                         /*num_devices=*/2));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
           "task_f", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
           "task_g", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
@@ -263,11 +263,11 @@ TEST_F(MpmdComputationFusionTest, NestedWhileLoopMismatchedDeviceNoFusion) {
       auto module, GetHloModuleFromText(kNestedWhileDifferentColorsInLoopHlo,
                                         /*num_devices=*/2));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
           "task_f", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
           "task_g", zuku::DeviceList{{.start = 2, .num_devices = 4}}, nullptr));
@@ -323,11 +323,11 @@ TEST_F(MpmdComputationFusionTest, OnlyFuseForward) {
   TF_ASSERT_OK_AND_ASSIGN(auto module, GetHloModuleFromText(kOnlyFuseForwardHlo,
                                                             /*num_devices=*/4));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto red,
       partition_->AllocateColor(
           "red", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto blue,
       partition_->AllocateColor(
           "blue", zuku::DeviceList{{.start = 2, .num_devices = 2}}, nullptr));
@@ -384,11 +384,11 @@ TEST_F(MpmdComputationFusionTest, DoNotFuseBackwards) {
       auto module,
       GetHloModuleFromText(kDoNotFuseBackwardsHlo, /*num_devices=*/4));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto red,
       partition_->AllocateColor(
           "red", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto blue,
       partition_->AllocateColor(
           "blue", zuku::DeviceList{{.start = 2, .num_devices = 2}}, nullptr));
@@ -412,21 +412,21 @@ TEST_F(MpmdComputationFusionTest, FuseSplitBackpropLayers) {
   for (int i = 0; i < 24; ++i) {
     std::string color = absl::StrCat("layers_", i);
     int offset = 2 * (i % 2);
-    TF_ASSIGN_OR_RETURN(
+    TF_ASSERT_OK_AND_ASSIGN(
         auto _, partition_->AllocateColor(
                     std::move(color),
                     zuku::DeviceList{{.start = offset, .num_devices = 2}}));
   }
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto emb,
       partition_->AllocateColor(
           "emb", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto loss,
       partition_->AllocateColor(
           "compute_loss", zuku::DeviceList{{.start = 2, .num_devices = 2}},
           nullptr));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto final,
       partition_->AllocateColor(
           "final_ln", zuku::DeviceList{{.start = 2, .num_devices = 2}},

@@ -84,6 +84,7 @@ function(find_or_configure_xla)
     mpmd_loop_unroll_test
     mpmd_insert_reshard_test
     mpmd_buffer_scheduling_name_test
+    mpmd_inplace_collectives_test
   )
 
   set(target_names
@@ -212,6 +213,7 @@ function(find_or_configure_xla)
   )
 
   install(IMPORTED_RUNTIME_ARTIFACTS xla)
+  install(IMPORTED_RUNTIME_ARTIFACTS xla_compiler_plugin)
 
   include(GoogleTest)
 

@@ -41,6 +41,7 @@ struct TestConfig {
   int interleave{1};
   bool add_embeddings_and_logits{false};
   bool loop_submesh_embeddings_logits{false};
+  std::vector<std::vector<std::pair<int64_t, std::string>>> custom_schedule{};
 };
 
 struct TestSetup {
@@ -49,6 +50,7 @@ struct TestSetup {
   std::unique_ptr<HloModule> module;
   HloPartition partition;
   int num_layers{};
+  int num_devices{};
 };
 
 HloComputation* GetDummyComputation(HloModule& module) {
@@ -75,7 +77,8 @@ TestSetup CreateTest(TestConfig config) {
                  .unique_id = 0,
                  .schedule = config.schedule,
                  .interleave = config.interleave,
-                 .num_stages = config.num_layers});
+                 .num_stages = config.num_layers,
+                 .custom_schedule = config.custom_schedule});
 
   const int num_fwd_bwd_layers = [=] {
     int num_layers = config.num_layers;
@@ -146,10 +149,11 @@ TestSetup CreateTest(TestConfig config) {
   }
 
   return TestSetup{.loop_config = std::move(loop_config),
-                   .module = std::move(module),
                    .tasks = std::move(tasks),
+                   .module = std::move(module),
                    .partition = *std::move(partition),
-                   .num_layers = total_num_layers};
+                   .num_layers = total_num_layers,
+                   .num_devices = num_groups};
 }
 
 auto GetLayerInfo(absl::string_view name) {
@@ -270,6 +274,256 @@ void Run1F1BTest(TestConfig config,
 
   EXPECT_THAT(num_fwd_tasks_done, Each(Eq(config.num_iterations)));
   EXPECT_THAT(num_bwd_tasks_done, Each(Eq(config.num_iterations)));
+}
+
+void RunCustomScheduleTest(TestConfig config) {
+  // For custom schedule testing, we just really care
+  // that (a) the custom schedule call actually returned
+  // and (b) the tasks were scheduled as we specified.
+  config.schedule = LoopConfig::Schedule::kCustom;
+  TestSetup test = CreateTest(config);
+
+  absl::flat_hash_map<int, int> max_fwd_iter_visited_for_layer;
+  absl::flat_hash_map<int, int> max_bwd_iter_visited_for_layer;
+
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto scheduled_tasks,
+      ScheduleLoops(test.partition, *test.loop_config, test.tasks));
+  std::vector<int> num_fwd_tasks_done(test.num_layers, 0);
+  std::vector<int> num_bwd_tasks_done(test.num_layers, 0);
+  for (int device = 0; device < test.num_devices; ++device) {
+    absl::flat_hash_map<int, int> max_fwd_layer_visited_for_iter;
+    for (auto&& scheduled_task : scheduled_tasks[device]) {
+      VLOG(3) << scheduled_task->name();
+      auto [matched, type, layer_num, iter] =
+          GetLayerInfo(scheduled_task->name());
+
+      if (type == kFwdPrefix) {
+        EXPECT_LE(max_fwd_iter_visited_for_layer[layer_num], iter);
+        EXPECT_LE(max_fwd_layer_visited_for_iter[iter], layer_num);
+        max_fwd_iter_visited_for_layer[layer_num] =
+            std::max(max_fwd_iter_visited_for_layer[layer_num], iter);
+        max_fwd_layer_visited_for_iter[iter] =
+            std::max(max_fwd_layer_visited_for_iter[iter], layer_num);
+      } else if (type == kBwdPrefix) {
+        EXPECT_LE(max_bwd_iter_visited_for_layer[layer_num], iter);
+        max_bwd_iter_visited_for_layer[layer_num] =
+            std::max(max_bwd_iter_visited_for_layer[layer_num], iter);
+      }
+
+      ASSERT_TRUE(matched);
+      if (type == kFwdPrefix) {
+        num_fwd_tasks_done[layer_num]++;
+      } else if (type == kBwdPrefix) {
+        num_bwd_tasks_done[layer_num]++;
+      } else if (type == kLastLayerPrefix) {
+        num_fwd_tasks_done[layer_num]++;
+        num_bwd_tasks_done[layer_num]++;
+      }
+
+      ::testing::ScopedTrace scope{__FILE__, __LINE__, scheduled_task->name()};
+
+      // there must be at least as many bwd layers as fwd layers
+      EXPECT_GE(num_fwd_tasks_done[layer_num], num_bwd_tasks_done[layer_num]);
+    }
+  }
+
+  EXPECT_THAT(num_fwd_tasks_done, Each(Eq(config.num_iterations)));
+  EXPECT_THAT(num_bwd_tasks_done, Each(Eq(config.num_iterations)));
+}
+
+TEST(LoopSchedulerTest, CustomScheduleSimple) {
+  TestConfig config = {
+      .num_layers = 2,
+      .num_iterations = 2,
+      .custom_schedule = {
+          {{0, "fwd-0"}, {1, "fwd-0"}, {0, "bwd-0"}, {1, "bwd-0"}},
+          {{0, "fwd-1"}, {1, "fwd-1"}, {0, "bwd-1"}, {1, "bwd-1"}}}};
+  RunCustomScheduleTest(config);
+}
+
+static const std::vector<std::vector<std::pair<int64_t, std::string>>>
+    kCustomScheduleGPipe = {
+        {{0, "fwd-0"},
+         {1, "fwd-0"},
+         {2, "fwd-0"},
+         {3, "fwd-0"},
+         {4, "fwd-0"},
+         {5, "fwd-0"},
+         {6, "fwd-0"},
+         {7, "fwd-0"},
+         {0, "bwd-0"},
+         {1, "bwd-0"},
+         {2, "bwd-0"},
+         {3, "bwd-0"},
+         {4, "bwd-0"},
+         {5, "bwd-0"},
+         {6, "bwd-0"},
+         {7, "bwd-0"}},
+        {{0, "fwd-1"},
+         {1, "fwd-1"},
+         {2, "fwd-1"},
+         {3, "fwd-1"},
+         {4, "fwd-1"},
+         {5, "fwd-1"},
+         {6, "fwd-1"},
+         {7, "fwd-1"},
+         {0, "bwd-1"},
+         {1, "bwd-1"},
+         {2, "bwd-1"},
+         {3, "bwd-1"},
+         {4, "bwd-1"},
+         {5, "bwd-1"},
+         {6, "bwd-1"},
+         {7, "bwd-1"}},
+        {{0, "fwd-2"},
+         {1, "fwd-2"},
+         {2, "fwd-2"},
+         {3, "fwd-2"},
+         {4, "fwd-2"},
+         {5, "fwd-2"},
+         {6, "fwd-2"},
+         {7, "fwd-2"},
+         {0, "bwd-2"},
+         {1, "bwd-2"},
+         {2, "bwd-2"},
+         {3, "bwd-2"},
+         {4, "bwd-2"},
+         {5, "bwd-2"},
+         {6, "bwd-2"},
+         {7, "bwd-2"}},
+        {{0, "fwd-3"},
+         {1, "fwd-3"},
+         {2, "fwd-3"},
+         {3, "fwd-3"},
+         {4, "fwd-3"},
+         {5, "fwd-3"},
+         {6, "fwd-3"},
+         {7, "fwd-3"},
+         {0, "bwd-3"},
+         {1, "bwd-3"},
+         {2, "bwd-3"},
+         {3, "bwd-3"},
+         {4, "bwd-3"},
+         {5, "bwd-3"},
+         {6, "bwd-3"},
+         {7, "bwd-3"}},
+};
+TEST(LoopSchedulerTest, CustomScheduleGPipe) {
+  TestConfig config = {.num_layers = 4,
+                       .num_iterations = 8,
+                       .custom_schedule = kCustomScheduleGPipe};
+  RunCustomScheduleTest(config);
+}
+
+static const std::vector<std::vector<std::pair<int64_t, std::string>>>
+    kCustomSchedule1F1B = {{{0, "fwd-0"},
+                            {1, "fwd-0"},
+                            {2, "fwd-0"},
+                            {3, "fwd-0"},
+                            {0, "bwd-0"},
+                            {4, "fwd-0"},
+                            {1, "bwd-0"},
+                            {5, "fwd-0"},
+                            {2, "bwd-0"},
+                            {6, "fwd-0"},
+                            {3, "bwd-0"},
+                            {7, "fwd-0"},
+                            {4, "bwd-0"},
+                            {5, "bwd-0"},
+                            {6, "bwd-0"},
+                            {7, "bwd-0"}},
+                           {{0, "fwd-1"},
+                            {1, "fwd-1"},
+                            {2, "fwd-1"},
+                            {3, "fwd-1"},
+                            {0, "bwd-1"},
+                            {1, "bwd-1"},
+                            {4, "fwd-1"},
+                            {2, "bwd-1"},
+                            {5, "fwd-1"},
+                            {3, "bwd-1"},
+                            {6, "fwd-1"},
+                            {4, "bwd-1"},
+                            {7, "fwd-1"},
+                            {5, "bwd-1"},
+                            {6, "bwd-1"},
+                            {7, "bwd-1"}},
+                           {{0, "fwd-2"},
+                            {1, "fwd-2"},
+                            {2, "fwd-2"},
+                            {3, "fwd-2"},
+                            {0, "bwd-2"},
+                            {1, "bwd-2"},
+                            {2, "bwd-2"},
+                            {4, "fwd-2"},
+                            {3, "bwd-2"},
+                            {5, "fwd-2"},
+                            {4, "bwd-2"},
+                            {6, "fwd-2"},
+                            {5, "bwd-2"},
+                            {7, "fwd-2"},
+                            {6, "bwd-2"},
+                            {7, "bwd-2"}},
+                           {{0, "fwd-3"},
+                            {0, "bwd-3"},
+                            {1, "fwd-3"},
+                            {1, "bwd-3"},
+                            {2, "fwd-3"},
+                            {2, "bwd-3"},
+                            {3, "fwd-3"},
+                            {3, "bwd-3"},
+                            {4, "fwd-3"},
+                            {4, "bwd-3"},
+                            {5, "fwd-3"},
+                            {5, "bwd-3"},
+                            {6, "fwd-3"},
+                            {6, "bwd-3"},
+                            {7, "fwd-3"},
+                            {7, "bwd-3"}}};
+TEST(LoopSchedulerTest, CustomSchedule1F1B) {
+  TestConfig config = {.num_layers = 4,
+                       .num_iterations = 8,
+                       .custom_schedule = kCustomSchedule1F1B};
+  RunCustomScheduleTest(config);
+}
+
+static const std::vector<std::vector<std::pair<int64_t, std::string>>>
+    kCustomSchedule1F1BInterleaved = {
+        {{0, "fwd-0"}, {1, "fwd-0"}, {2, "fwd-0"}, {3, "fwd-0"}, {0, "fwd-4"},
+         {1, "fwd-4"}, {2, "fwd-4"}, {3, "fwd-4"}, {4, "fwd-0"}, {5, "fwd-0"},
+         {6, "fwd-0"}, {0, "bwd-4"}, {7, "fwd-0"}, {1, "bwd-4"}, {4, "fwd-4"},
+         {2, "bwd-4"}, {5, "fwd-4"}, {3, "bwd-4"}, {6, "fwd-4"}, {0, "bwd-0"},
+         {7, "fwd-4"}, {1, "bwd-0"}, {2, "bwd-0"}, {3, "bwd-0"}, {4, "bwd-4"},
+         {5, "bwd-4"}, {6, "bwd-4"}, {7, "bwd-4"}, {4, "bwd-0"}, {5, "bwd-0"},
+         {6, "bwd-0"}, {7, "bwd-0"}},
+        {{0, "fwd-1"}, {1, "fwd-1"}, {2, "fwd-1"}, {3, "fwd-1"}, {0, "fwd-5"},
+         {1, "fwd-5"}, {2, "fwd-5"}, {3, "fwd-5"}, {4, "fwd-1"}, {0, "bwd-5"},
+         {5, "fwd-1"}, {1, "bwd-5"}, {6, "fwd-1"}, {2, "bwd-5"}, {7, "fwd-1"},
+         {3, "bwd-5"}, {4, "fwd-5"}, {1, "bwd-1"}, {5, "fwd-5"}, {1, "bwd-1"},
+         {6, "fwd-5"}, {2, "bwd-1"}, {7, "fwd-5"}, {3, "bwd-1"}, {4, "bwd-5"},
+         {5, "bwd-5"}, {6, "bwd-5"}, {7, "bwd-5"}, {4, "bwd-1"}, {5, "bwd-1"},
+         {6, "bwd-1"}, {7, "bwd-1"}},
+        {{0, "fwd-2"}, {1, "fwd-2"}, {2, "fwd-2"}, {3, "fwd-2"}, {0, "fwd-6"},
+         {1, "fwd-6"}, {2, "fwd-6"}, {0, "bwd-6"}, {3, "fwd-6"}, {1, "bwd-6"},
+         {4, "fwd-2"}, {2, "bwd-6"}, {5, "fwd-2"}, {3, "bwd-6"}, {6, "fwd-2"},
+         {0, "bwd-2"}, {7, "fwd-2"}, {1, "bwd-2"}, {4, "fwd-6"}, {2, "bwd-2"},
+         {5, "fwd-6"}, {3, "bwd-2"}, {6, "fwd-6"}, {4, "bwd-6"}, {7, "fwd-6"},
+         {5, "bwd-6"}, {6, "bwd-6"}, {7, "bwd-6"}, {4, "bwd-2"}, {5, "bwd-2"},
+         {6, "bwd-2"}, {7, "bwd-2"}},
+        {{0, "fwd-3"}, {1, "fwd-3"}, {2, "fwd-3"}, {3, "fwd-3"}, {0, "fwd-7"},
+         {0, "bwd-7"}, {1, "fwd-7"}, {1, "bwd-7"}, {2, "fwd-7"}, {2, "bwd-7"},
+         {3, "fwd-7"}, {3, "bwd-7"}, {4, "fwd-3"}, {0, "bwd-3"}, {5, "fwd-3"},
+         {1, "bwd-3"}, {6, "fwd-3"}, {2, "bwd-3"}, {7, "fwd-3"}, {3, "bwd-3"},
+         {4, "fwd-7"}, {4, "bwd-7"}, {5, "fwd-7"}, {5, "bwd-7"}, {6, "fwd-7"},
+         {6, "bwd-7"}, {7, "fwd-7"}, {7, "bwd-7"}, {4, "bwd-3"}, {5, "bwd-3"},
+         {6, "bwd-3"}, {7, "bwd-3"}}};
+TEST(LoopSchedulerTest, CustomSchedule1F1BInterleaved) {
+  TestConfig config = {.num_layers = 8,
+                       .num_iterations = 8,
+                       .interleave = 2,
+                       .custom_schedule = kCustomSchedule1F1BInterleaved};
+  RunCustomScheduleTest(config);
 }
 
 TEST(LoopSchedulerTest, EvenWavefront) {

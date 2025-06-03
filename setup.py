@@ -23,6 +23,11 @@ setup(
         "Programming Language :: Python :: 3.10",
     ],
     packages=find_namespace_packages(include=["jax_plugins.*", "multimesh.*"]),
+    entry_points={
+        "jax_plugins": [
+            "multimesh=jax_plugins.multimesh",
+        ],
+    },
     include_package_data=True,
     package_data={
         "multimesh.jax": ["*.so"],

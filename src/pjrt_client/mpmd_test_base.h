@@ -87,8 +87,8 @@ class MpmdHloInstructionMatcher
                                  ::testing::MatchResultListener* listener)>;
 
   explicit MpmdHloInstructionMatcher(std::string description, fxn f)
-      : description_(std::move(description)),
-        match_and_explain_(std::move(f)) {}
+      : match_and_explain_(std::move(f)),
+        description_(std::move(description)) {}
 
   bool MatchAndExplain(const HloInstruction* instruction,
                        ::testing::MatchResultListener* listener) const override;
@@ -107,8 +107,8 @@ class MpmdTaskMatcher
                                  ::testing::MatchResultListener* listener)>;
 
   explicit MpmdTaskMatcher(std::string description, fxn f)
-      : description_(std::move(description)),
-        match_and_explain_(std::move(f)) {}
+      : match_and_explain_(std::move(f)),
+        description_(std::move(description)) {}
 
   bool MatchAndExplain(const SpmdHloModuleTask&,
                        ::testing::MatchResultListener* listener) const override;
@@ -126,8 +126,8 @@ class MpmdStoreMatcher : public ::testing::MatcherInterface<const Store&> {
                                  ::testing::MatchResultListener* listener)>;
 
   explicit MpmdStoreMatcher(std::string description, fxn f)
-      : description_(std::move(description)),
-        match_and_explain_(std::move(f)) {}
+      : match_and_explain_(std::move(f)),
+        description_(std::move(description)) {}
 
   bool MatchAndExplain(const Store&,
                        ::testing::MatchResultListener* listener) const override;
@@ -263,6 +263,11 @@ auto MetadataSchedulingNames(const Matcher& matcher) {
 template <class Matcher>
 auto Users(const Matcher& matcher) {
   return Property(&HloInstruction::users, matcher);
+}
+
+template <class Matcher>
+auto Operands(const Matcher& matcher) {
+  return Property(&HloInstruction::operands, matcher);
 }
 
 ::testing::Matcher<const ::xla::HloInstruction*> HasLogicalAxes();

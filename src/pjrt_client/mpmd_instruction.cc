@@ -125,8 +125,6 @@ void ColorTuple(HloInstruction* instruction) {
             << instruction->name();
     AssignColor(instruction, *std::move(uniform_color));
   }
-
-  return absl::OkStatus();
 }
 
 bool IsAssignedColor(const HloInstruction* instruction) {

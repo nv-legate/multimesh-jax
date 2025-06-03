@@ -104,11 +104,9 @@ absl::StatusOr<CompileOutput> CreateTasks(
 
   size_t num_roots = 0;
   size_t num_parameters = 0;
-  const HloComputationProto* entry_comp = nullptr;
   const HloInstructionProto* root_instr = nullptr;
   for (const auto& comp : computation.proto().computations()) {
     if (comp.id() == computation.proto().entry_computation_id()) {
-      entry_comp = &comp;
       for (const auto& instr : comp.instructions()) {
         if (instr.opcode() == "parameter") {
           if (instr.shape().element_type() == PrimitiveType::TUPLE) {

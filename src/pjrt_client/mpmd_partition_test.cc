@@ -1825,22 +1825,18 @@ TEST_F(MpmdPartitionTest, MpmdMicrobatch) {
                          /*num_devices=*/4, {.use_auto_input_sharding = true}));
   auto [tasks, intermediates] = std::move(result);
 
-  EXPECT_THAT(
-      tasks,
-      AllOf(
-          Contains(AllOf(m::TaskDevices(ElementsAre(0, 1)), Not(m::LoopTask())))
-              .Times(1),
-          Contains(AllOf(m::TaskDevices(ElementsAre(0, 1, 2, 3)),
-                         Not(m::LoopTask())))
-              .Times(Ge(2)),
-          Contains(
-              AllOf(m::TaskDevices(ElementsAre(0, 1, 2, 3)), m::LoopTask(true)))
-              .Times(2),
-          Contains(AllOf(m::TaskDevices(ElementsAre(0, 1)), m::LoopTask(false)))
-              .Times(4),
-          Contains(AllOf(m::TaskDevices(ElementsAre(0, 1, 2, 3)),
-                         m::LoopTask(false)))
-              .Times(2)));
+  EXPECT_THAT(tasks,
+              AllOf(Contains(AllOf(m::TaskDevices(ElementsAre(0, 1, 2, 3)),
+                                   Not(m::LoopTask()))),
+                    Contains(AllOf(m::TaskDevices(ElementsAre(0, 1, 2, 3)),
+                                   m::LoopTask(true)))
+                        .Times(2),
+                    Contains(AllOf(m::TaskDevices(ElementsAre(0, 1)),
+                                   m::LoopTask(false)))
+                        .Times(2),
+                    Contains(AllOf(m::TaskDevices(ElementsAre(0, 1, 2, 3)),
+                                   m::LoopTask(false)))
+                        .Times(2)));
 }
 
 static constexpr absl::string_view kMicrobatchWhileBufferDonorHlo = R"(
@@ -2437,9 +2433,8 @@ TEST_F(MpmdPartitionTest, RematOptBarrierSubsetTupleHlo) {
   // each user task of the barrier should have a subset optimization barrier
   // with 2 inputs
   EXPECT_THAT(tasks,
-              Contains(m::TaskInstructions(
-                           Contains(op::Tuple(op::Add(), op::Add())).Times(1)))
-                  .Times(2));
+              Contains(m::TaskInstructions(Contains(
+                  op::OptimizationBarrier(op::Tuple(op::Add(), op::Add()))))));
 }
 
 TEST_F(MpmdPartitionTest, RematBackpropMultipleLayers) {

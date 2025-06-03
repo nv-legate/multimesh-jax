@@ -49,6 +49,7 @@
 #include "xla/pjrt/multimesh/mpmd_uniquify_colors.h"
 #include "xla/pjrt/multimesh/mpmd_unused_loop_output_remover.h"
 #include "xla/pjrt/multimesh/mpmd_unused_param_output_remover.h"
+#include "xla/pjrt/multimesh/mpmd_inplace_collectives.h"
 #include "xla/pjrt/multimesh/scalar_argument.h"
 #include "xla/service/call_inliner.h"
 #include "xla/service/dump.h"
@@ -878,7 +879,7 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
       &partition, /*remove_parameters=*/true);
   mpmd_pipeline.AddPass<MpmdUnusedParamOutputRemover>(&partition);
   mpmd_pipeline.AddPass<MpmdComputationFusion>(
-      &partition, MpmdComputationFusion::FusionType::kMatchingColor,
+      &partition, MpmdComputationFusion::FusionType::kOriginalColor,
       /*only_fuse_loop_tasks=*/false);
   mpmd_pipeline.AddPass<MpmdComputationFusion>(
       &partition, MpmdComputationFusion::FusionType::kMatchingDevices,
@@ -886,6 +887,7 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
   mpmd_pipeline.AddPass<HloDCE>();
   mpmd_pipeline.AddPass<MpmdLoopUnroll>(&partition);
   mpmd_pipeline.AddPass<MpmdInsertReshard>(&partition);
+  mpmd_pipeline.AddPass<MpmdInPlaceCollectives>(&partition);
   mpmd_pipeline.AddPass<MpmdAssignBufferSchedulingName>(&partition);
   TF_ASSIGN_OR_RETURN(bool mpmd_changed, mpmd_pipeline.Run(module.get()));
 

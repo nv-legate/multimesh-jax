@@ -25,7 +25,6 @@ class MpmdColoring : public HloModulePass {
     kWeight,
     kDepth,
     kTopological,
-    kColorDepth,
   };
 
   static ColorPropagationPriority GetColorPropagationPriorityFromString(
@@ -61,8 +60,17 @@ class MpmdColoring : public HloModulePass {
   // The coloring is identified as belonging to a `microbatch_loop`.
   absl::StatusOr<bool> PropagateIf(HloComputation* computation,
                                    const InstructionProperties& properties,
-                                   FilterVisitFn if_visit,
-                                   bool microbatch_loop);
+                                   FilterVisitFn if_visit);
+
+  absl::StatusOr<bool> PropagateLoopColorDepth(
+      HloComputation* computation, const InstructionProperties& properties,
+      FilterVisitFn if_visit);
+
+  bool PropagateDirectionally(
+      const std::vector<HloInstruction*> postorder, const std::string color,
+      const InstructionProperties& properties, FilterVisitFn if_visit,
+      const absl::flat_hash_set<HloInstruction*>& fixed_colored_instructions,
+      bool propagate_forward);
 
   // For a given `instruction` based on the global module `properties`,
   // choose a best possible partition color from all the users and
@@ -76,12 +84,6 @@ class MpmdColoring : public HloModulePass {
       const absl::flat_hash_map<const HloInstruction*, int64_t>& depth,
       const absl::flat_hash_map<const HloInstruction*, int64_t>&
           topological_index);
-
-  bool PropagateFromUsersAndOperandsColorDepth(
-      HloInstruction* instruction, const InstructionProperties& properties,
-      FilterVisitFn if_visit,
-      const absl::flat_hash_map<std::string, int64_t>& color_depth,
-      absl::flat_hash_map<HloInstruction*, bool>& recolorable_instructions);
 
   HloPartition* partition_;
   ColorPropagationPriority color_propagation_priority_;

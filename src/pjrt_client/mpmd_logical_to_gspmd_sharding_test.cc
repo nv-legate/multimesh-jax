@@ -405,32 +405,42 @@ TEST_F(MpmdLogicalShardingTest, LargeParametersNotSharded) {
   auto context48_ptr =
       std::make_shared<LogicalShardingContext>(std::move(context48));
 
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto emb, partition_->AllocateColor("emb", devices04, context04_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer0, partition_->AllocateColor(
-                                       "layers_0", devices04, context04_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer2, partition_->AllocateColor(
-                                       "layers_2", devices04, context04_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer4, partition_->AllocateColor(
-                                       "layers_4", devices04, context04_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer6, partition_->AllocateColor(
-                                       "layers_6", devices04, context04_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer0,
+      partition_->AllocateColor("layers_0", devices04, context04_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer2,
+      partition_->AllocateColor("layers_2", devices04, context04_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer4,
+      partition_->AllocateColor("layers_4", devices04, context04_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer6,
+      partition_->AllocateColor("layers_6", devices04, context04_ptr));
 
-  TF_ASSIGN_OR_RETURN(auto layer1, partition_->AllocateColor(
-                                       "layers_1", devices48, context48_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer3, partition_->AllocateColor(
-                                       "layers_3", devices48, context48_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer5, partition_->AllocateColor(
-                                       "layers_5", devices48, context48_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer7, partition_->AllocateColor(
-                                       "layers_7", devices48, context48_ptr));
-  TF_ASSIGN_OR_RETURN(auto loss, partition_->AllocateColor(
-                                     "compute_loss", devices48, context48_ptr));
-  TF_ASSIGN_OR_RETURN(auto final_ln, partition_->AllocateColor(
-                                         "final_ln", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer1,
+      partition_->AllocateColor("layers_1", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer3,
+      partition_->AllocateColor("layers_3", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer5,
+      partition_->AllocateColor("layers_5", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer7,
+      partition_->AllocateColor("layers_7", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto loss,
+      partition_->AllocateColor("compute_loss", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto final_ln,
+      partition_->AllocateColor("final_ln", devices48, context48_ptr));
 
   MpmdLogicalToGSPMDSharding autoshard{partition_.get()};
-  TF_ASSIGN_OR_RETURN(bool changed, autoshard.Run(module.get()));
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, autoshard.Run(module.get()));
 }
 
 }  // namespace

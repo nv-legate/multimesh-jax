@@ -20,7 +20,7 @@ namespace xla {
 // of parameter instructions and new set of outputs.
 class MpmdComputationFusion : public HloModulePass {
  public:
-  enum FusionType { kMatchingDevices, kMatchingColor };
+  enum FusionType { kMatchingDevices, kMatchingColor, kOriginalColor };
 
   // The `partition` object containing the mapping from partition color
   // to the assigned submesh. Different fusions will be allowed

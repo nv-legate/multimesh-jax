@@ -12,6 +12,7 @@
 #include "xla/pjrt/multimesh/hlo_partition.h"
 #include "xla/pjrt/multimesh/mpmd_test_base.h"
 #include "xla/tsl/lib/core/status_test_util.h"
+#include "xla/tsl/platform/statusor.h"
 
 namespace xla {
 namespace {
@@ -42,12 +43,12 @@ ENTRY main.117 {
 TEST_F(MpmdArgumentRecomputeTest, BasicRecomputeFromArguments) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kBasicRecomputeHlo, /*num_devices=*/2));
-  TF_ASSIGN_OR_RETURN(auto red,
-                      partition_->AllocateColor(
-                          "red", {{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSIGN_OR_RETURN(auto blue,
-                      partition_->AllocateColor(
-                          "blue", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto red, partition_->AllocateColor(
+                    "red", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto blue, partition_->AllocateColor(
+                     "blue", {{.start = 0, .num_devices = 2}}, nullptr));
   // no rec
   {
     // set a low recompute cost and make sure nothing is recomputed
@@ -100,12 +101,12 @@ TEST_F(MpmdArgumentRecomputeTest, RecomputeSharedClone) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module,
       GetHloModuleFromText(kRecomputeSharedCloneHlo, /*num_devices=*/2));
-  TF_ASSIGN_OR_RETURN(auto red,
-                      partition_->AllocateColor(
-                          "red", {{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSIGN_OR_RETURN(auto blue,
-                      partition_->AllocateColor(
-                          "blue", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto red, partition_->AllocateColor(
+                    "red", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto blue, partition_->AllocateColor(
+                     "blue", {{.start = 0, .num_devices = 2}}, nullptr));
   MpmdArgumentRecompute recompute{partition_.get(),
                                   /*max_recompute_cost=*/8192};
 
@@ -150,12 +151,12 @@ TEST_F(MpmdArgumentRecomputeTest, RecomputeFromReplicatedArgument) {
       auto module,
       GetHloModuleFromText(kReplicatedArgumentHlo, /*num_devices=*/2));
 
-  TF_ASSIGN_OR_RETURN(auto red,
-                      partition_->AllocateColor(
-                          "red", {{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSIGN_OR_RETURN(auto blue,
-                      partition_->AllocateColor(
-                          "blue", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto red, partition_->AllocateColor(
+                    "red", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto blue, partition_->AllocateColor(
+                     "blue", {{.start = 0, .num_devices = 2}}, nullptr));
   MpmdArgumentRecompute recompute{partition_.get(),
                                   /*max_recompute_cost=*/4096};
 
@@ -203,35 +204,45 @@ TEST_F(MpmdArgumentRecomputeTest, DynamicSliceWrongSizeSharding) {
   auto context48_ptr =
       std::make_shared<LogicalShardingContext>(std::move(context48));
 
-  TF_ASSIGN_OR_RETURN(auto li, partition_->AllocateLoopIncrementColor());
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(auto li, partition_->AllocateLoopIncrementColor());
+  TF_ASSERT_OK_AND_ASSIGN(
       auto rp, partition_->AllocateColor("replicated-params", devices08));
-  TF_ASSIGN_OR_RETURN(
+  TF_ASSERT_OK_AND_ASSIGN(
       auto emb, partition_->AllocateColor("emb", devices04, context04_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer0, partition_->AllocateColor(
-                                       "layers_0", devices04, context04_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer2, partition_->AllocateColor(
-                                       "layers_2", devices04, context04_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer4, partition_->AllocateColor(
-                                       "layers_4", devices04, context04_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer6, partition_->AllocateColor(
-                                       "layers_6", devices04, context04_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer0,
+      partition_->AllocateColor("layers_0", devices04, context04_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer2,
+      partition_->AllocateColor("layers_2", devices04, context04_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer4,
+      partition_->AllocateColor("layers_4", devices04, context04_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer6,
+      partition_->AllocateColor("layers_6", devices04, context04_ptr));
 
-  TF_ASSIGN_OR_RETURN(auto layer1, partition_->AllocateColor(
-                                       "layers_1", devices48, context48_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer3, partition_->AllocateColor(
-                                       "layers_3", devices48, context48_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer5, partition_->AllocateColor(
-                                       "layers_5", devices48, context48_ptr));
-  TF_ASSIGN_OR_RETURN(auto layer7, partition_->AllocateColor(
-                                       "layers_7", devices48, context48_ptr));
-  TF_ASSIGN_OR_RETURN(auto loss, partition_->AllocateColor(
-                                     "compute_loss", devices48, context48_ptr));
-  TF_ASSIGN_OR_RETURN(auto final_ln, partition_->AllocateColor(
-                                         "final_ln", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer1,
+      partition_->AllocateColor("layers_1", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer3,
+      partition_->AllocateColor("layers_3", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer5,
+      partition_->AllocateColor("layers_5", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto layer7,
+      partition_->AllocateColor("layers_7", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto loss,
+      partition_->AllocateColor("compute_loss", devices48, context48_ptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto final_ln,
+      partition_->AllocateColor("final_ln", devices48, context48_ptr));
 
   MpmdArgumentRecompute recompute{partition_.get(), 1024 * 1024};
-  TF_ASSIGN_OR_RETURN(bool changed, recompute.Run(module.get()));
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, recompute.Run(module.get()));
   TF_ASSERT_OK(VerifyHloModule(*module, *partition_));
 }
 

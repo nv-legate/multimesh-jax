@@ -123,6 +123,16 @@ absl::Status HloPartition::Recolor(
                                    ", has not been created");
     }
     new_configs[new_color] = iter->second;
+    {
+      auto iter = original_color_.find(old_color);
+      if (iter != original_color_.end()) {
+        // absl pointer stability
+        std::string mapped_color = iter->second;
+        original_color_[new_color] = std::move(mapped_color);
+      } else {
+        original_color_[new_color] = old_color;
+      }
+    }
   }
   colors_ = std::move(new_configs);
   return absl::OkStatus();
@@ -346,6 +356,14 @@ absl::StatusOr<std::string> HloPartition::AllocateColor(
   config.name = name;
   config.devices = std::move(devices);
   return name;
+}
+
+std::string HloPartition::OriginalColor(const std::string& color) const {
+  auto iter = original_color_.find(color);
+  if (iter != original_color_.end()) {
+    return iter->second;
+  }
+  return color;
 }
 
 const HloPartition::ColorConfig& HloPartition::ConfigForColor(

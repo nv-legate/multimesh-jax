@@ -15,6 +15,10 @@
 namespace xla {
 namespace {
 
+struct B64 {
+  std::array<char, 64> data;
+};
+
 constexpr int64_t kMaxScalarArguments = 64;
 
 class TempBufferAllocator : public TaskMemoryAllocator {
@@ -80,8 +84,10 @@ void RunExecutable(zuku::Stream* zs, int64_t run_id, zuku::DeviceList devices,
 
   TempBufferAllocator allocator{temp};
 
-  using max_size_scalar_t = int64_t;
-  max_size_scalar_t host_scalar_arguments[kMaxScalarArguments];
+  // scalars have to be 64-byte aligned
+  using max_size_scalar_t = B64;
+  static_assert(sizeof(B64) == 64);
+  alignas(64) max_size_scalar_t host_scalar_arguments[kMaxScalarArguments];
   max_size_scalar_t* device_scalar_buffer = [&]() {
     if (scalars.empty()) {
       return (max_size_scalar_t*)nullptr;

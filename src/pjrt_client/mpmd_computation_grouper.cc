@@ -424,7 +424,12 @@ absl::Status MpmdComputationGrouper::GroupComputationIntoTasks(
       // these should never be grouped into a computation
       // but their operand will be a root output of their task
       HloInstruction* operand = instruction->mutable_operand(0);
-      builder_assignments[operand]->AddRoot(operand);
+      auto iter = builder_assignments.find(operand);
+      if (iter == builder_assignments.end()) {
+        return InvalidArgumentStrCat("instruction ", operand->name(),
+                                     " was not assigned to a builder");
+      }
+      iter->second->AddRoot(operand);
       continue;
     }
     if (IsMicrobatchLoop(instruction)) {
@@ -438,8 +443,10 @@ absl::Status MpmdComputationGrouper::GroupComputationIntoTasks(
           iter->second->AddRoot(operand);
         }
       }
+      builder_assignments[instruction] = builders.back().get();
       for (auto* user : instruction->users()) {
         gte_root_clones[user] = user;
+        builder_assignments[user] = builders.back().get();
       }
       last_color = std::nullopt;
       continue;
@@ -492,8 +499,10 @@ absl::Status MpmdComputationGrouper::GroupComputationIntoTasks(
 
   // Replace all uses of the original instructions with their new task outputs
   for (auto&& builder : builders) {
-    TF_RETURN_IF_ERROR(
-        builder->ReplaceRootsWithCallOutputs(computation, gte_root_clones));
+    if (!builder->IsParentCallInstruction()) {
+      TF_RETURN_IF_ERROR(
+          builder->ReplaceRootsWithCallOutputs(computation, gte_root_clones));
+    }
   }
 
   TF_RETURN_IF_ERROR(RemoveUnusedInstructions(computation));

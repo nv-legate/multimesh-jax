@@ -126,6 +126,66 @@ TEST_F(MpmdColoringTest, NestedWhileColoring) {
               Each(Not(AllOf(op::Add(), Not(m::HasColor())))));
 }
 
+static constexpr absl::string_view kNestedWhileCustomScheduleHlo = R"(
+HloModule jit_c, entry_computation_layout={(f32[4,4]{1,0}, f32[4,4]{1,0}, f32[4]{0}, f32[4]{0})->f32[]}
+
+region_0.83 {
+  arg_tuple.84 = (f32[4,4]{1,0}, f32[4,4]{1,0}) parameter(0)
+  get-tuple-element.10 = f32[4,4]{1,0} get-tuple-element(arg_tuple.84), index=0
+  get-tuple-element.11 = f32[4,4]{1,0} get-tuple-element(arg_tuple.84), index=1
+  multiply.10 = f32[4,4]{1,0} multiply(get-tuple-element.10, get-tuple-element.11), frontend_attributes={color="task_f"}
+  multiply.11 = f32[4,4]{1,0} multiply(multiply.10, multiply.10)
+  multiply.12 = f32[4,4]{1,0} multiply(multiply.11, get-tuple-element.10), frontend_attributes={color="task_g"}
+  multiply.13 = f32[4,4]{1,0} multiply(multiply.12, multiply.10)
+  ROOT tuple.97 = (f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(multiply.12, multiply.13)
+} // region_0.83
+
+region_2.98 {
+  arg_tuple.99 = (f32[4,4]{1,0}, f32[4,4]{1,0}) parameter(0)
+  constant.106 = s32[] constant(2)
+  constant.107 = s32[] constant(2)
+  ROOT compare.108 = pred[] compare(constant.106, constant.107), direction=LT
+} // region_2.98
+
+ENTRY main.117 {
+  Arg_0.1 = f32[4,4]{1,0} parameter(0)
+  Arg_1.2 = f32[4,4]{1,0} parameter(1)
+  tuple.10 = (f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(Arg_0.1, Arg_1.2)
+  while.109 = f32[4,4]{1,0} while(tuple.10), condition=region_2.98, body=region_0.83, backend_config="{\"schedule\":\"custom\"}"
+  get-tuple-element.2 = f32[4,4]{1,0} get-tuple-element(while.109), index=0
+  get-tuple-element.3 = f32[4,4]{1,0} get-tuple-element(while.109), index=1
+  add.2 = f32[4,4]{1,0} add(get-tuple-element.2, Arg_0.1)
+  add.3 = f32[4,4]{1,0} add(get-tuple-element.3, Arg_0.1)
+  ROOT tuple = (f32[4,4]{1,0}, f32[4,4]{1,0}) tuple(add.2, add.3)
+} // main.117
+)";
+
+TEST_F(MpmdColoringTest, NestedWhileCustomScheduleColoring) {
+  TF_ASSERT_OK_AND_ASSIGN(auto module,
+                          GetHloModuleFromText(kNestedWhileCustomScheduleHlo,
+                                               /*num_devices=*/4));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto f, partition_->AllocateColor(
+                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto g, partition_->AllocateColor(
+                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
+  MpmdColoring coloring{partition_.get()};
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
+
+  auto instructions = module->entry_computation()->instructions();
+  HloComputation* while_computation = nullptr;
+  for (auto* instruction : instructions) {
+    if (instruction->opcode() == HloOpcode::kWhile) {
+      while_computation = instruction->called_computations()[0];
+    }
+  }
+
+  EXPECT_THAT(while_computation->instructions(),
+              Not(Contains(AllOf(m::Users(Contains(m::Color("task_f"))),
+                                 m::Operands(Contains(m::Color("task_g")))))));
+}
+
 TEST_F(MpmdColoringTest, TransformerColoring) {
   TF_ASSERT_OK_AND_ASSIGN(auto module, GetHloModuleFromPath("opt_8layers.txt",
                                                             /*num_devices=*/8));

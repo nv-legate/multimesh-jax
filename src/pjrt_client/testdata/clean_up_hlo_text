@@ -1,0 +1,55 @@
+#! /usr/bin/env python
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
+#                         All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+import glob
+import re
+import sys
+
+source_file_re = re.compile(r'source_file=".*?" ')
+source_line_re = re.compile(r"source_line=\d+")
+op_name_re = re.compile(r'op_name="(.*?)"')
+layer_re = re.compile(r"(layers_\d+)")
+
+
+def fix_op_name(match):
+    name = match.groups()[0]
+    lyr_match = layer_re.search(name)
+    prefix = "transpose(jvp/" if "transpose(jvp" in name else ""
+    if lyr_match:
+        return f'op_name="{prefix}{lyr_match.groups()[0]})"'
+    candidate = None
+    for task in (
+        "position_emb",
+        "token_embedder",
+        "emb_lookup",
+        "compute_loss",
+        "final_ln",
+        "decoder_norm",
+        "logits_dense",
+    ):
+        if task in name:
+            if candidate is not None:
+                raise Exception("multiple hits: ", candidate, task, name)
+            candidate = task
+    if candidate:
+        repl = prefix + candidate
+    else:
+        repl = prefix
+    return f'op_name="{repl}"'
+
+
+if len(sys.argv) > 1:
+    files = sys.argv[1:]
+else:
+    files = glob.glob("*.txt")
+
+for f in files:
+    print(f)
+    text = open(f).read()
+    text = source_file_re.sub("", text)
+    text = source_line_re.sub("", text)
+    text = op_name_re.sub(fix_op_name, text)
+    with open(f, "w") as obj:
+        obj.write(text)

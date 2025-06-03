@@ -3,7 +3,7 @@
 
 load("//xla/tsl/platform:rules_cc.bzl", "cc_library")
 
-load("//xla/tsl:tsl.default.bzl", "tsl_pybind_extension")
+load("//xla/tsl:tsl.bzl", "tsl_pybind_extension_opensource")
 
 load("@local_config_cuda//cuda:build_defs.bzl", "if_cuda", "cuda_default_copts", "cuda_library")
 
@@ -537,6 +537,21 @@ cc_library(
 )
 
 cc_library(
+    name = "mpmd_inplace_collectives",
+    srcs = ["mpmd_inplace_collectives.cc"],
+    hdrs = ["mpmd_inplace_collectives.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@zuku",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/pass:hlo_pass_pipeline",
+        "//xla/service:hlo_pass_pipeline",
+        ":mpmd_instruction",
+        ":hlo_partition",
+    ],
+)
+
+cc_library(
     name = "mpmd_coloring",
     srcs = ["mpmd_coloring.cc"],
     hdrs = ["mpmd_coloring.h"],
@@ -767,6 +782,7 @@ cc_library(
         ":mpmd_loop_unroll",
         ":mpmd_insert_reshard",
         ":mpmd_buffer_scheduling_name",
+        ":mpmd_inplace_collectives",
         ":iota_sharding_sanitizer",
         ":scalar_argument",
     ],
@@ -1016,17 +1032,14 @@ cuda_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
-        "//xla/tsl/cuda",  # buildcleaner: keep
-        "//xla/tsl/cuda:cudart",  # buildcleaner: keep
         "//xla/stream_executor/gpu:gpu_stream",
         "@local_config_cuda//cuda:cuda_headers",
-        "@local_config_cuda//cuda:cudart",
         "@zuku",
     ],
     alwayslink = True
 )
 
-tsl_pybind_extension(
+tsl_pybind_extension_opensource(
     name = "multimesh_xla_compiler",
     srcs = ["xla_compiler.cc"],
     deps = [
@@ -1041,7 +1054,35 @@ tsl_pybind_extension(
     ]
 )
 
-tsl_pybind_extension(
+cc_library(
+    name = "gpu_plugin_extension",
+    srcs = ["gpu_plugin_extension.cc"],
+    hdrs = ["gpu_plugin_extension.h"],
+    copts = [
+        "-fexceptions",
+        "-fno-strict-aliasing",
+    ],
+    features = ["-use_header_modules"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/strings:string_view",
+        "@nanobind",
+        "//xla:util",
+        "//xla/ffi/api:c_api",
+        "//xla/pjrt:status_casters",
+        "//xla/pjrt/c:pjrt_c_api_ffi_extension_hdrs",
+        "//xla/pjrt/c:pjrt_c_api_gpu_extension_hdrs",
+        "//xla/pjrt/c:pjrt_c_api_hdrs",
+        "//xla/pjrt/c:pjrt_c_api_helpers",
+        "//xla/pjrt/c:pjrt_c_api_triton_extension_hdrs",
+        "//xla/python:py_client_gpu",
+        "//xla/tsl/python/lib/core:numpy",
+    ],
+)
+
+tsl_pybind_extension_opensource(
     name = "libmultimesh_xla_client",
     additional_exported_symbols = [
         "GetMultiMeshPjRtApi",
@@ -1084,8 +1125,6 @@ tsl_pybind_extension(
         "//xla/service/gpu/model:gpu_hlo_cost_analysis",
         "//xla/service:gpu_plugin",
         "//xla/pjrt/gpu:nccl_id_store",
-        "//xla/tsl/cuda",  # buildcleaner: keep
-        "//xla/tsl/cuda:cudart",  # buildcleaner: keep
         "//xla/stream_executor/cuda:cublas_plugin",
         "//xla/stream_executor/cuda:cuda_platform",
         "//xla/stream_executor/cuda:cudnn_plugin",
@@ -1093,32 +1132,6 @@ tsl_pybind_extension(
         "//xla/service/gpu:gpu_executable_run_options",
         "@tsl//tsl/platform:bfloat16",
         "//xla:xla_data_proto_cc_impl",
-        "//xla/python:config",
-        "//xla/python:custom_call_sharding",
-        "//xla/python:dlpack",
-        "//xla/python:guard_lib",
-        "//xla/python:jax_jit",
-        "//xla/python:logging",
-        "//xla/python:mlir",
-        "//xla/python:nb_absl_flat_hash_map",
-        "//xla/python:nb_absl_span",
-        "//xla/python:nb_class_ptr",
-        "//xla/python:ops",
-        "//xla/python:pjit",
-        "//xla/python:pmap_lib",
-        "//xla/python:pprof_profile_builder",
-        "//xla/python:profiler",
-        "//xla/python:py_client",
-        "//xla/python:python_ref_manager",
-        "//xla/python:pytree",
-        "//xla/python:refine_polymorphic_shapes",
-        "//xla/python:sdy",
-        "//xla/python:traceback",
-        "//xla/python:types",
-        "//xla/python:util",
-        "//xla/python:weakref_lru_cache",
-        "//xla/python:xla_compiler",
-        # placeholder for index annotation deps
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/hash",
@@ -1133,7 +1146,6 @@ tsl_pybind_extension(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@nanobind",
-        "@local_config_python//:python_headers",  # buildcleaner: keep
         "//xla:literal",
         "//xla:shape_util",
         "//xla:types",
@@ -1157,15 +1169,7 @@ tsl_pybind_extension(
         "//xla/pjrt/distributed:service",
         "//xla/pjrt/plugin/xla_cpu:cpu_client_options",
         "//xla/pjrt/plugin/xla_cpu:xla_cpu_pjrt_client",
-        "//xla/python/ifrt",
-        "//xla/python/ifrt:plugin_program",
-        "//xla/python/ifrt:plugin_program_serdes",
-        "//xla/python/ifrt_proxy/client:py_module",
-        "//xla/python/pjrt_ifrt",
-        "//xla/python/pjrt_ifrt:pjrt_attribute_map_util",
-        "//xla/python/pjrt_ifrt:xla_ifrt",
         "//xla/tsl/concurrency:ref_count",
-        "//xla/tsl/distributed_runtime/preemption:preemption_sync_manager",
         "//xla/tsl/platform:logging",
         "//xla/tsl/platform:status",
         "//xla/tsl/platform:statusor",
@@ -1522,6 +1526,20 @@ xla_cc_test(
     srcs = ["mpmd_cut_size_minimizer_test.cc"],
     deps = [
         ":mpmd_cut_size_minimizer",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/utils:hlo_matchers",
+        "@tsl//tsl/platform:test_main",
+        "@zuku",
+        ":hlo_partition",
+        ":mpmd_test_base",
+    ],
+)
+
+xla_cc_test(
+    name = "mpmd_inplace_collectives_test",
+    srcs = ["mpmd_inplace_collectives_test.cc"],
+    deps = [
+        ":mpmd_inplace_collectives",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/utils:hlo_matchers",
         "@tsl//tsl/platform:test_main",

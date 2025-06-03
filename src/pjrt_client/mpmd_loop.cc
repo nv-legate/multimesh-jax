@@ -10,6 +10,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "src/zuku/mesh.h"
 #include "xla/pjrt/multimesh/json_utils.h"
+#include "xla/tsl/platform/statusor.h"
 
 namespace xla {
 
