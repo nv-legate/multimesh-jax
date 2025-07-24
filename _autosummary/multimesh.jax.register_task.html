@@ -29,9 +29,9 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
 
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
-    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="../_static/plot_directive.css?v=7f9a90b1" />
-    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css?v=be8a1c11" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="../_static/style.css?v=3cbd6ad6" />
@@ -43,7 +43,7 @@
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
     <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
-    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../_static/copybutton.js?v=f281be69"></script>
@@ -52,7 +52,7 @@
     <script>DOCUMENTATION_OPTIONS.pagename = '_autosummary/multimesh.jax.register_task';</script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="multimesh.jax.autoshard" href="multimesh.jax.autoshard.html" />
+    <link rel="next" title="multimesh.jax.MultiMesh" href="multimesh.jax.MultiMesh.html" />
     <link rel="prev" title="multimesh.jax.with_sharding_constraint" href="multimesh.jax.with_sharding_constraint.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -157,25 +157,30 @@
  </script></div>
         <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
     <div class="bd-toc-item navbar-nav active">
-        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Architecture Overview</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">MultiMesh for JAX Architeture Overview</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="../getting-started.html">Getting Started</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../api.html">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api.html">Public API: multimesh.jax package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</ul>
 </details></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials.html">Tutorials</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/flax-mpmd.html">MLP pipeline example with task transforms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/implicit-flax-tasks.html">MLP pipeline with external task registration</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/mpmd-multimesh.html">MultiMesh contexts for MPMD</a></li>
+</ul>
 </details></li>
 </ul>
 
@@ -356,55 +361,32 @@ document.write(`
 <h1>multimesh.jax.register_task<a class="headerlink" href="#multimesh-jax-register-task" title="Link to this heading">#</a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="multimesh.jax.register_task">
-<span class="sig-prename descclassname"><span class="pre">multimesh.jax.</span></span><span class="sig-name descname"><span class="pre">register_task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">regex</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dims</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">devices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device_axes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logical_axes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimesh.jax.register_task" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">multimesh.jax.</span></span><span class="sig-name descname"><span class="pre">register_task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">matcher</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimesh.jax.register_task" title="Link to this definition">#</a></dt>
 <dd><p>Registers a name or regex-based task autosharding context</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>regex</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – A full name or regular expression with match group.
+<li><p><strong>matcher</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – A name or regular expression with match group.
 This should match the name of a Flax module or a name passed to
 <code class="docutils literal notranslate"><span class="pre">jax.with_named_scope</span></code>.</p></li>
-<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em> | </em><em>None</em>) – optional, a metadata name to assign to the task context</p></li>
-<li><p><strong>mesh</strong> (<em>Mesh</em><em> | </em><em>None</em>) – optional, a Mesh context defining the devices and mesh shape</p></li>
-<li><p><strong>callback</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><em>Callable</em></a><em>[</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><em>bool</em></a><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>] </em><em>| </em><em>None</em>) – optional, a function that takes are arguments the match group from
-the <code class="docutils literal notranslate"><span class="pre">regex</span></code> and a boolean indicating whether the task is
-a backprop (generated from autograd). The function returns a
-[start,stop) tuple defining the range devices for the task
-and a unique color (string) for the task. For the device range
-[start, stop), stop is exclusive.</p></li>
-<li><p><strong>dims</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>] </em><em>| </em><em>None</em>) – optional, the submesh dimensions for the task. Only one
-of <code class="docutils literal notranslate"><span class="pre">mesh</span></code> or <code class="docutils literal notranslate"><span class="pre">dims</span></code> should be given.</p></li>
-<li><p><strong>devices</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.2)"><em>ndarray</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><em>Device</em><em>] </em><em>| </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>] </em><em>| </em><em>None</em>) – optional, a numpy array or list of jax devices
-specifying the devices to include in the task submesh.
-One of <code class="docutils literal notranslate"><span class="pre">mesh</span></code> or <code class="docutils literal notranslate"><span class="pre">devices</span></code> or <code class="docutils literal notranslate"><span class="pre">callback</span></code> must be given.
-If <code class="docutils literal notranslate"><span class="pre">devices</span></code> is a numpy array, the mesh shape is inferred from the shape
-of the device array.  If both <code class="docutils literal notranslate"><span class="pre">mesh</span></code> and <code class="docutils literal notranslate"><span class="pre">devices</span></code> are given,
-then <code class="docutils literal notranslate"><span class="pre">mesh</span></code> is considered to define a submesh of the <code class="docutils literal notranslate"><span class="pre">devices</span></code>
-for task instances within a loop. The function will then infer
-a <code class="docutils literal notranslate"><span class="pre">loop_submesh_size</span></code>.  Similarly, <code class="docutils literal notranslate"><span class="pre">dims</span></code> can specify
-a submesh smaller than <code class="docutils literal notranslate"><span class="pre">devices</span></code>.</p></li>
-<li><p><strong>device_axes</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – optional, a list of names to assign to each device axis.
-The number of names must match the shape of <code class="docutils literal notranslate"><span class="pre">devices</span></code>.
-User must give only one of <code class="docutils literal notranslate"><span class="pre">mesh</span></code> or <code class="docutils literal notranslate"><span class="pre">device_axes</span></code>.
-If this and <code class="docutils literal notranslate"><span class="pre">mesh</span></code> are not given, logical sharding constraints
-will be translated to replicated sharding.</p></li>
-<li><p><strong>logical_axes</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>] </em><em>| </em><em>None</em>) – optional, a list of string pairs (‘logical’, ‘device’)
-giving the translation from logical names to physical device names.
-The logical names should match those passed to
-<code class="docutils literal notranslate"><span class="pre">with_sharding_constraint</span></code> calls within the task. If None,
-the device axis names are used directly for autosharding.
-Raises a <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> if <code class="docutils literal notranslate"><span class="pre">logical_axes</span></code> are given
-but no <code class="docutils literal notranslate"><span class="pre">device_axes</span></code> or <code class="docutils literal notranslate"><span class="pre">mesh</span></code> are specified.</p></li>
+<li><p><strong>callback</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><em>Callable</em></a><em>[</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><em>bool</em></a><em>]</em><em>, </em><a class="reference internal" href="../api.html#multimesh.jax.Task" title="multimesh.jax.task.Task"><em>Task</em></a><em>] </em><em>| </em><em>None</em>) – optional, a callback taking the match group from <code class="docutils literal notranslate"><span class="pre">matcher</span></code>
+and a bool indicating whether it is backprop. The
+callback must return a <code class="docutils literal notranslate"><span class="pre">Task</span></code> defining
+the mesh and other attributes of the task scope</p></li>
+<li><p><strong>task</strong> (<a class="reference internal" href="../api.html#multimesh.jax.Task" title="multimesh.jax.task.Task"><em>Task</em></a><em> | </em><em>None</em>) – optional, a <code class="docutils literal notranslate"><span class="pre">Task</span></code> defining the mesh and other attributes
+of the task scope</p></li>
 </ul>
 </dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
 </dl>
-<p>Returns: None</p>
 <p class="rubric">Examples</p>
 <p>Basic usage with mesh argument is:</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_task</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span><span class="p">,</span> <span class="n">Mesh</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span><span class="p">,</span> <span class="n">AbstractMesh</span><span class="p">,</span> <span class="n">Mesh</span>
 <span class="gp">&gt;&gt;&gt;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
 <span class="gp">... </span>  <span class="k">with</span> <span class="n">jax</span><span class="o">.</span><span class="n">named_scope</span><span class="p">(</span><span class="s2">&quot;subtask&quot;</span><span class="p">):</span>
@@ -412,74 +394,10 @@ but no <code class="docutils literal notranslate"><span class="pre">device_axes<
 <span class="gp">... </span>    <span class="n">out</span> <span class="o">=</span> <span class="n">x</span><span class="o">*</span><span class="n">x</span>
 <span class="gp">... </span>    <span class="k">return</span> <span class="n">with_sharding_constraint</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;model&quot;</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">devices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">())</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">mesh</span> <span class="o">=</span> <span class="n">Mesh</span><span class="p">(</span><span class="n">devices</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">register_task</span><span class="p">(</span><span class="s2">&quot;subtask&quot;</span><span class="p">,</span>
-<span class="gp">... </span>              <span class="n">mesh</span><span class="o">=</span><span class="n">mesh</span><span class="p">,</span>
-<span class="gp">... </span>              <span class="n">logical_axes</span><span class="o">=</span><span class="p">(</span>
-<span class="gp">... </span>                <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
-<span class="gp">... </span>                <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
-<span class="gp">... </span>              <span class="p">))</span>
-</pre></div>
-</div>
-<p>A callback function can be used to dynamically compute devices:</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_task</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span><span class="p">,</span> <span class="n">Mesh</span>
-<span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">callback</span><span class="p">(</span><span class="n">match</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">bwd</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span><span class="nb">int</span><span class="p">],</span><span class="nb">str</span><span class="p">]:</span>
-<span class="gp">... </span>  <span class="n">layer_num</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)][</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-<span class="gp">... </span>  <span class="n">devices_per_layer</span> <span class="o">=</span> <span class="mi">4</span>
-<span class="gp">... </span>  <span class="n">start</span> <span class="o">=</span> <span class="n">layer_num</span> <span class="o">*</span> <span class="n">devices_per_layer</span>
-<span class="gp">... </span>  <span class="n">stop</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">device_per_layer</span>
-<span class="gp">... </span>  <span class="n">name</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;bwd.&quot;</span> <span class="k">if</span> <span class="n">bwd</span> <span class="k">else</span> <span class="s2">&quot;fwd.&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;layer_</span><span class="si">{</span><span class="n">layer_num</span><span class="si">}</span><span class="s2">&quot;</span>
-<span class="gp">... </span>  <span class="k">return</span> <span class="p">[</span><span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">],</span> <span class="n">name</span>
-<span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-<span class="gp">... </span>  <span class="n">x</span> <span class="o">=</span> <span class="n">with_sharding_constraint</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;model&quot;</span><span class="p">))</span>
-<span class="gp">... </span>  <span class="n">out</span> <span class="o">=</span> <span class="n">x</span><span class="o">*</span><span class="n">x</span>
-<span class="gp">... </span>  <span class="k">return</span> <span class="n">with_sharding_constraint</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;model&quot;</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">c</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-<span class="gp">... </span>  <span class="k">with</span> <span class="n">jax</span><span class="o">.</span><span class="n">named_scope</span><span class="p">(</span><span class="s2">&quot;layer.0&quot;</span><span class="p">):</span>
-<span class="gp">... </span>    <span class="n">x</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-<span class="gp">... </span>  <span class="k">with</span> <span class="n">jax</span><span class="o">.</span><span class="n">named_scope</span><span class="p">(</span><span class="s2">&quot;layer.1&quot;</span><span class="p">):</span>
-<span class="gp">... </span>    <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">register_task</span><span class="p">(</span><span class="s2">&quot;subtask&quot;</span><span class="p">,</span>
-<span class="gp">... </span>              <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">,</span>
-<span class="gp">... </span>              <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">),</span>
-<span class="gp">... </span>              <span class="n">device_axes</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span><span class="s2">&quot;y&quot;</span><span class="p">),</span>
-<span class="gp">... </span>              <span class="n">logical_axes</span><span class="o">=</span><span class="p">(</span>
-<span class="gp">... </span>                <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
-<span class="gp">... </span>                <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
-<span class="gp">... </span>              <span class="p">))</span>
-</pre></div>
-</div>
-<p>A submesh and global device list can be given to indicate that
-multiple instances of the task within a loop should be rotated
-to different submeshes</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_task</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span><span class="p">,</span> <span class="n">Mesh</span>
-<span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-<span class="gp">... </span>  <span class="k">with</span> <span class="n">jax</span><span class="o">.</span><span class="n">named_scope</span><span class="p">(</span><span class="s2">&quot;subtask&quot;</span><span class="p">):</span>
-<span class="gp">... </span>    <span class="n">x</span> <span class="o">=</span> <span class="n">with_sharding_constraint</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;model&quot;</span><span class="p">))</span>
-<span class="gp">... </span>    <span class="n">out</span> <span class="o">=</span> <span class="n">x</span><span class="o">*</span><span class="n">x</span>
-<span class="gp">... </span>    <span class="k">return</span> <span class="n">with_sharding_constraint</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;model&quot;</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">devices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">())</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">mesh</span> <span class="o">=</span> <span class="n">Mesh</span><span class="p">(</span><span class="n">devices</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">register_task</span><span class="p">(</span><span class="s2">&quot;subtask&quot;</span><span class="p">,</span>
-<span class="gp">... </span>              <span class="n">mesh</span><span class="o">=</span><span class="n">mesh</span><span class="p">,</span>
-<span class="gp">... </span>              <span class="n">devices</span><span class="o">=</span><span class="n">devices</span><span class="p">,</span>
-<span class="gp">... </span>              <span class="n">logical_axes</span><span class="o">=</span><span class="p">(</span>
-<span class="gp">... </span>                <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
-<span class="gp">... </span>                <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
-<span class="gp">... </span>              <span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">callback</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">backprop</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
+<span class="gp">&gt;&gt;&gt; </span>   <span class="n">mesh</span> <span class="o">=</span> <span class="n">TaskMesh</span><span class="p">(</span><span class="n">devices</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">axis_names</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span> <span class="n">axis_sizes</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span>   <span class="k">return</span> <span class="n">Task</span><span class="p">(</span><span class="n">mesh</span><span class="o">=</span><span class="n">mesh</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">register_task</span><span class="p">(</span><span class="s2">&quot;subtask&quot;</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -507,11 +425,11 @@ to different submeshes</p>
       </div>
     </a>
     <a class="right-next"
-       href="multimesh.jax.autoshard.html"
+       href="multimesh.jax.MultiMesh.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">multimesh.jax.autoshard</p>
+        <p class="prev-next-title">multimesh.jax.MultiMesh</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>

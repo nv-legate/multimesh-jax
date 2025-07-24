@@ -29,9 +29,9 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
 
     <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=8f2a1f02" />
-    <link rel="stylesheet" type="text/css" href="../../../../../_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="../../../../../_static/plot_directive.css?v=7f9a90b1" />
-    <link rel="stylesheet" type="text/css" href="../../../../../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css?v=be8a1c11" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../../../../../_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="../../../../../_static/style.css?v=3cbd6ad6" />
@@ -43,7 +43,7 @@
   <script src="../../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
     <script src="../../../../../_static/documentation_options.js?v=9eb32ce0"></script>
-    <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
@@ -167,19 +167,20 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../api.html">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../api.html">Public API: multimesh.jax package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</ul>
 </details></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../tutorials.html">Tutorials</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../tutorials.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/flax-mpmd.html">MLP pipeline example with task transforms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/implicit-flax-tasks.html">MLP pipeline with external task registration</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/mpmd-multimesh.html">MultiMesh contexts for MPMD</a></li>
+</ul>
 </details></li>
 </ul>
 
@@ -345,9 +346,9 @@ document.write(`
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for-jax">Initialize MultiMesh for Jax</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#assigning-task-contexts-to-submeshes-in-multimesh-for">Assigning task contexts to submeshes in MultiMesh for</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#assigning-task-contexts-to-submeshes-in-multimesh-for-jax">Assigning task contexts to submeshes in MultiMesh for Jax</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#appendix-input-batches-sharded-over-all-devices">Appendix: input batches sharded over all devices</a></li>
 </ul>
             </nav>
@@ -370,9 +371,9 @@ document.write(`
 <li><p>The “logical autosharding for SPMD” tutorial</p></li>
 </ol>
 </section>
-<section id="initialize-multimesh-for">
-<h2>Initialize MultiMesh for<a class="headerlink" href="#initialize-multimesh-for" title="Link to this heading">#</a></h2>
-<p>As before, the first thing we need to is to initialize MultiMesh for.</p>
+<section id="initialize-multimesh-for-jax">
+<h2>Initialize MultiMesh for Jax<a class="headerlink" href="#initialize-multimesh-for-jax" title="Link to this heading">#</a></h2>
+<p>As before, the first thing we need to is to initialize MultiMesh for Jax.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.multimesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
@@ -385,7 +386,7 @@ document.write(`
 </section>
 <section id="import-jax-packages">
 <h2>Import Jax packages<a class="headerlink" href="#import-jax-packages" title="Link to this heading">#</a></h2>
-<p>Once MultiMesh for has been initialized, a standard set of Jax imports can be done.</p>
+<p>Once MultiMesh for Jax has been initialized, a standard set of Jax imports can be done.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
@@ -393,15 +394,15 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mesh</span><span class="p">,</span> <span class="n">NamedSharding</span><span class="p">,</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax.debug</span><span class="w"> </span><span class="kn">import</span> <span class="n">visualize_array_sharding</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">with_sharding_constraint</span><span class="p">,</span> <span class="n">parallelize</span><span class="p">,</span> <span class="n">task</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">with_sharding_constraint</span><span class="p">,</span> <span class="n">parallelize</span><span class="p">,</span> <span class="n">task</span><span class="p">,</span> <span class="n">TaskMesh</span>
 </pre></div>
 </div>
 </div>
 </div>
 </section>
-<section id="assigning-task-contexts-to-submeshes-in-multimesh-for">
-<h2>Assigning task contexts to submeshes in MultiMesh for<a class="headerlink" href="#assigning-task-contexts-to-submeshes-in-multimesh-for" title="Link to this heading">#</a></h2>
-<p>MultiMesh for follows a model of <em>logical autosharding</em>, which slighly changes the usual Jax flow.
+<section id="assigning-task-contexts-to-submeshes-in-multimesh-for-jax">
+<h2>Assigning task contexts to submeshes in MultiMesh for Jax<a class="headerlink" href="#assigning-task-contexts-to-submeshes-in-multimesh-for-jax" title="Link to this heading">#</a></h2>
+<p>MultiMesh for Jax follows a model of <em>logical autosharding</em>, which slighly changes the usual Jax flow.
 Previously we did an SPMD problem, which used a uniform mesh across the whole model. We now add <code class="docutils literal notranslate"><span class="pre">task</span></code> annotations that assign different subcomputations to different submeshes.  The order of steps is now:</p>
 <ol class="arabic simple">
 <li><p>Writing numpy-like code that implements the model</p></li>
@@ -431,16 +432,15 @@ Previously we did an SPMD problem, which used a uniform mesh across the whole mo
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">devices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">())</span>
+<span class="n">task_mesh</span> <span class="o">=</span> <span class="n">TaskMesh</span><span class="p">(</span><span class="n">devices</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">axis_names</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span><span class="s2">&quot;y&quot;</span><span class="p">),</span> <span class="n">axis_sizes</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">))</span>
 <span class="n">layer1</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> 
-             <span class="n">devices</span><span class="o">=</span><span class="n">devices</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> 
-             <span class="n">device_axes</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
+             <span class="n">mesh</span><span class="o">=</span><span class="n">task_mesh</span><span class="p">,</span>
              <span class="n">logical_axes</span><span class="o">=</span><span class="p">(</span>
                <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
                <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
              <span class="p">))</span>
 <span class="n">layer2</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">f</span><span class="p">,</span>
-             <span class="n">devices</span><span class="o">=</span><span class="n">devices</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">8</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> 
-             <span class="n">device_axes</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
+             <span class="n">mesh</span><span class="o">=</span><span class="n">task_mesh</span><span class="o">.</span><span class="n">place</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">7</span><span class="p">)),</span>
              <span class="n">logical_axes</span><span class="o">=</span><span class="p">(</span>
                <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
                <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
@@ -458,7 +458,7 @@ Previously we did an SPMD problem, which used a uniform mesh across the whole mo
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-05-01 21:20:41,934:jax._src.xla_bridge:1004: Platform &#39;multimesh&#39; is experimental and not all JAX functionality may be correctly supported!
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-07-17 19:00:31,283:jax._src.xla_bridge:830: Platform &#39;multimesh&#39; is experimental and not all JAX functionality may be correctly supported!
 </pre></div>
 </div>
 </div>
@@ -487,7 +487,7 @@ Previously we did an SPMD problem, which used a uniform mesh across the whole mo
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-05-01 21:20:43.544764: W ./xla/service/hlo_module_config.h:193] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-07-17 19:00:32.877750: W ./xla/service/hlo_module_config.h:194] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
 </pre></div>
 </div>
 </div>
@@ -559,7 +559,7 @@ Param 2
 </section>
 <section id="appendix-input-batches-sharded-over-all-devices">
 <h2>Appendix: input batches sharded over all devices<a class="headerlink" href="#appendix-input-batches-sharded-over-all-devices" title="Link to this heading">#</a></h2>
-<p>As in the SPMD example, a dataset loader may generate sharded input batches, e.g. one shard per device. In this case, the input batch could be sharded over all devices 0-7. The first layer (<code class="docutils literal notranslate"><span class="pre">layer1</span></code>) expects the input batch to be sharded only across devices 0-3, though. MultiMesh for automatically handles this resharding.</p>
+<p>As in the SPMD example, a dataset loader may generate sharded input batches, e.g. one shard per device. In this case, the input batch could be sharded over all devices 0-7. The first layer (<code class="docutils literal notranslate"><span class="pre">layer1</span></code>) expects the input batch to be sharded only across devices 0-3, though. MultiMesh for Jax automatically handles this resharding.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">mesh</span> <span class="o">=</span> <span class="n">Mesh</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">()),</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,))</span>
@@ -601,7 +601,7 @@ Param 2
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-05-01 21:20:45.058192: W ./xla/service/hlo_module_config.h:193] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-07-17 19:00:34.531269: W ./xla/service/hlo_module_config.h:194] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
 </pre></div>
 </div>
 </div>
@@ -637,9 +637,9 @@ Param 2
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for-jax">Initialize MultiMesh for Jax</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#assigning-task-contexts-to-submeshes-in-multimesh-for">Assigning task contexts to submeshes in MultiMesh for</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#assigning-task-contexts-to-submeshes-in-multimesh-for-jax">Assigning task contexts to submeshes in MultiMesh for Jax</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#appendix-input-batches-sharded-over-all-devices">Appendix: input batches sharded over all devices</a></li>
 </ul>
   </nav></div>

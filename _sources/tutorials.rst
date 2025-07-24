@@ -21,3 +21,8 @@ or deployed codebases.
    notebooks/flax-mpmd
    notebooks/implicit-flax-tasks
 
+.. toctree::
+   :maxdepth: 1
+   :caption: MultiMesh contexts
+
+   notebooks/mpmd-multimesh

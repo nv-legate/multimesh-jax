@@ -29,9 +29,9 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
 
     <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=8f2a1f02" />
-    <link rel="stylesheet" type="text/css" href="../../../../../_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="../../../../../_static/plot_directive.css?v=7f9a90b1" />
-    <link rel="stylesheet" type="text/css" href="../../../../../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css?v=be8a1c11" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../../../../../_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="../../../../../_static/style.css?v=3cbd6ad6" />
@@ -43,7 +43,7 @@
   <script src="../../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
     <script src="../../../../../_static/documentation_options.js?v=9eb32ce0"></script>
-    <script src="../../../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
@@ -167,19 +167,20 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../api.html">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../api.html">Public API: multimesh.jax package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</ul>
 </details></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../tutorials.html">Tutorials</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../tutorials.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/flax-mpmd.html">MLP pipeline example with task transforms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/implicit-flax-tasks.html">MLP pipeline with external task registration</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../notebooks/mpmd-multimesh.html">MultiMesh contexts for MPMD</a></li>
+</ul>
 </details></li>
 </ul>
 
@@ -345,7 +346,7 @@ document.write(`
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for-jax">Initialize MultiMesh for Jax</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#regular-jax-create-layers-with-explicit-spmd-sharding-annotations">Regular Jax: create layers with explicit SPMD sharding annotations</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#appendix">Appendix</a><ul class="visible nav section-nav flex-column">
@@ -373,9 +374,9 @@ document.write(`
 <li><p>Familiarity with the concepts of tensor sharding and parallelism</p></li>
 </ol>
 </section>
-<section id="initialize-multimesh-for">
-<h2>Initialize MultiMesh for<a class="headerlink" href="#initialize-multimesh-for" title="Link to this heading">#</a></h2>
-<p>The first step in a MultiMesh for program is to initialize the environment. Before any other imports, <code class="docutils literal notranslate"><span class="pre">jax_plugins.multimesh.init</span></code> should be called with the appropriate arguments for configuring MultiMesh. This does violate the common Python style rule of top-level imports coming before all code. It is possible to configure MultiMesh ahead-of-time with environment variables, but the programmatic method here is generally cleaner and easier.  The parameters for MultiMesh must be configured before importing any Jax functions.</p>
+<section id="initialize-multimesh-for-jax">
+<h2>Initialize MultiMesh for Jax<a class="headerlink" href="#initialize-multimesh-for-jax" title="Link to this heading">#</a></h2>
+<p>The first step in a MultiMesh for Jax program is to initialize the environment. Before any other imports, <code class="docutils literal notranslate"><span class="pre">jax_plugins.multimesh.init</span></code> should be called with the appropriate arguments for configuring MultiMesh. This does violate the common Python style rule of top-level imports coming before all code. It is possible to configure MultiMesh ahead-of-time with environment variables, but the programmatic method here is generally cleaner and easier.  The parameters for MultiMesh must be configured before importing any Jax functions.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.multimesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
@@ -396,7 +397,7 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mesh</span><span class="p">,</span> <span class="n">NamedSharding</span><span class="p">,</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax.debug</span><span class="w"> </span><span class="kn">import</span> <span class="n">visualize_array_sharding</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">with_sharding_constraint</span><span class="p">,</span> <span class="n">parallelize</span><span class="p">,</span> <span class="n">task</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">with_sharding_constraint</span><span class="p">,</span> <span class="n">parallelize</span><span class="p">,</span> <span class="n">task</span><span class="p">,</span> <span class="n">TaskMesh</span>
 </pre></div>
 </div>
 </div>
@@ -457,7 +458,7 @@ and run the init function to generate the sharded inputs/parameters.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-05-01 21:20:16,662:jax._src.xla_bridge:1004: Platform &#39;multimesh&#39; is experimental and not all JAX functionality may be correctly supported!
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-07-17 19:01:12,972:jax._src.xla_bridge:830: Platform &#39;multimesh&#39; is experimental and not all JAX functionality may be correctly supported!
 </pre></div>
 </div>
 </div>
@@ -540,7 +541,7 @@ The order of steps is now:</p>
 </div>
 </div>
 </div>
-<p>MultiMesh for provides a helper function to simplify the workflow.
+<p>MultiMesh for Jax provides a helper function to simplify the workflow.
 The <code class="docutils literal notranslate"><span class="pre">multimesh.jax.parallelize</span></code> function takes the <code class="docutils literal notranslate"><span class="pre">get_input_batch</span></code> and <code class="docutils literal notranslate"><span class="pre">init_params</span></code> functions as inputs. It executes an ahead-of-time compilation with autosharding and returns the <code class="docutils literal notranslate"><span class="pre">get_sharded_batch</span></code> and <code class="docutils literal notranslate"><span class="pre">get_sharded_params</span></code> functions.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -551,7 +552,7 @@ The <code class="docutils literal notranslate"><span class="pre">multimesh.jax.p
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-05-01 21:20:19.284722: W ./xla/service/hlo_module_config.h:193] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-07-17 19:01:15.646895: W ./xla/service/hlo_module_config.h:194] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
 </pre></div>
 </div>
 </div>
@@ -596,9 +597,8 @@ Params
 <p>What we see in the debug output and the visualization is replicated sharding - a single block replicated to all CPUs. In the previous compilation, there was no logical task context to define how <em>logical autosharding</em> should be converted to physical shardings. <code class="docutils literal notranslate"><span class="pre">multimesh.jax</span></code> provides the <code class="docutils literal notranslate"><span class="pre">task</span></code> transformation to create this context. We define a 1-D mesh and map the logical <code class="docutils literal notranslate"><span class="pre">batch</span></code> and <code class="docutils literal notranslate"><span class="pre">model</span></code> axis to the device <code class="docutils literal notranslate"><span class="pre">x</span></code> axis.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">mm_model</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> 
-                <span class="n">devices</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">()),</span>
-                <span class="n">device_axes</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,),</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">task_mesh</span> <span class="o">=</span> <span class="n">TaskMesh</span><span class="p">(</span><span class="n">devices</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">8</span><span class="p">),</span> <span class="n">axis_names</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,),</span> <span class="n">axis_sizes</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,))</span>
+<span class="n">mm_model</span> <span class="o">=</span> <span class="n">task</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">mesh</span><span class="o">=</span><span class="n">task_mesh</span><span class="p">,</span>
                 <span class="n">logical_axes</span><span class="o">=</span><span class="p">(</span>
                   <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
                   <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
@@ -610,7 +610,7 @@ Params
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-05-01 21:20:20.362020: W ./xla/service/hlo_module_config.h:193] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-07-17 19:01:16.787629: W ./xla/service/hlo_module_config.h:194] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
 </pre></div>
 </div>
 </div>
@@ -736,7 +736,7 @@ Params
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for-jax">Initialize MultiMesh for Jax</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#regular-jax-create-layers-with-explicit-spmd-sharding-annotations">Regular Jax: create layers with explicit SPMD sharding annotations</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#appendix">Appendix</a><ul class="visible nav section-nav flex-column">

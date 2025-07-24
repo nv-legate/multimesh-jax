@@ -29,9 +29,9 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
 
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="_static/plot_directive.css?v=7f9a90b1" />
-    <link rel="stylesheet" type="text/css" href="_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css?v=be8a1c11" />
+    <link rel="stylesheet" type="text/css" href="_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="_static/style.css?v=3cbd6ad6" />
@@ -43,7 +43,7 @@
   <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
     <script src="_static/documentation_options.js?v=9eb32ce0"></script>
-    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="_static/copybutton.js?v=f281be69"></script>
@@ -53,7 +53,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Public API: multimesh.jax package" href="api.html" />
-    <link rel="prev" title="MultiMesh for JAX: MPMD workflows for JAX" href="index.html" />
+    <link rel="prev" title="MultiMesh for JAX Architeture Overview" href="architecture.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -157,25 +157,30 @@
  </script></div>
         <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
     <div class="bd-toc-item navbar-nav active">
-        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Architecture Overview</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">MultiMesh for JAX Architeture Overview</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul class="current nav bd-sidenav">
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">Getting Started</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="api.html">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="api.html">Public API: multimesh.jax package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</ul>
 </details></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="tutorials.html">Tutorials</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="tutorials.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/flax-mpmd.html">MLP pipeline example with task transforms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/implicit-flax-tasks.html">MLP pipeline with external task registration</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/mpmd-multimesh.html">MultiMesh contexts for MPMD</a></li>
+</ul>
 </details></li>
 </ul>
 
@@ -361,8 +366,11 @@ There is a full development container which includes all source files and enable
 rebuilding each component.</p>
 <section id="docker-images">
 <h2>Docker Images<a class="headerlink" href="#docker-images" title="Link to this heading">#</a></h2>
-<p>The easiest way to get started is by building images
-using <a class="reference external" href="https://github.com/nv-legate/multimesh-jax-workflows">MultiMesh for Jax workflows</a>.</p>
+<p>The easiest way to get started is by using the prebuilt container images:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>pull<span class="w"> </span>ghcr.io/nv-legate/multimesh-jax:v0.2
+</pre></div>
+</div>
+<p>Containers can also be built using <a class="reference external" href="https://github.com/nv-legate/multimesh-jax-workflows">MultiMesh for Jax workflows</a>.</p>
 </section>
 <section id="running-jupyter-tutorials-with-docker">
 <h2>Running Jupyter tutorials with Docker<a class="headerlink" href="#running-jupyter-tutorials-with-docker" title="Link to this heading">#</a></h2>
@@ -373,7 +381,7 @@ that can be loaded in a local browser:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-w<span class="w"> </span>/opt/workspace/multimesh-jax/docs/notebooks<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-p<span class="w"> </span><span class="m">8675</span>:8675<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>gitlab-master.nvidia.com:5005/legate/quickstart.internal/multimesh-jax-dev<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>ghcr.io/nv-legate/multimesh-jax:v0.2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>jupyter<span class="w"> </span>notebook<span class="w"> </span>--allow-root<span class="w"> </span>--ip<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="o">=</span><span class="m">8675</span>
 </pre></div>
 </div>
@@ -383,7 +391,7 @@ If GPUs are available, then docker can be launched as:</p>
 <span class="w">  </span>-w<span class="w"> </span>/opt/workspace/multimesh-jax/docs/notebooks<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-p<span class="w"> </span><span class="m">8675</span>:8675<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--gpus<span class="w"> </span>&lt;N&gt;<span class="w"> </span><span class="se">\ </span>
-<span class="w">  </span>gitlab-master.nvidia.com:5005/legate/quickstart.internal/multimesh-jax-dev<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>ghcr.io/nv-legate/multimesh-jax:v0.2<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>jupyter<span class="w"> </span>notebook<span class="w"> </span>--allow-root<span class="w"> </span>--ip<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="o">=</span><span class="m">8675</span>
 </pre></div>
 </div>
@@ -391,8 +399,8 @@ If GPUs are available, then docker can be launched as:</p>
 </section>
 <section id="building-images">
 <h2>Building Images<a class="headerlink" href="#building-images" title="Link to this heading">#</a></h2>
-<p>Instructions for building MultiMesh for JAX can be found in the <a class="reference external" href="https://github.com/nv-legate/multimesh-jax-workflows/blob/main/README.md">README</a>,
-which is a monorepo that handles all of the components required for building the plugin.</p>
+<p>Instructions for building MultiMesh for JAX can be found in the <a class="reference external" href="https://github.com/nv-legate/multimesh-jax-workflows">build monorepo</a>
+that handles all of the components required for building the plugin.</p>
 </section>
 </section>
 
@@ -408,12 +416,12 @@ which is a monorepo that handles all of the components required for building the
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="index.html"
+       href="architecture.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">MultiMesh for JAX: MPMD workflows for JAX</p>
+        <p class="prev-next-title">MultiMesh for JAX Architeture Overview</p>
       </div>
     </a>
     <a class="right-next"

@@ -29,9 +29,9 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
 
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="_static/plot_directive.css?v=7f9a90b1" />
-    <link rel="stylesheet" type="text/css" href="_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css?v=be8a1c11" />
+    <link rel="stylesheet" type="text/css" href="_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="_static/style.css?v=3cbd6ad6" />
@@ -43,7 +43,7 @@
   <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
     <script src="_static/documentation_options.js?v=9eb32ce0"></script>
-    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="_static/copybutton.js?v=f281be69"></script>
@@ -157,25 +157,30 @@
  </script></div>
         <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
     <div class="bd-toc-item navbar-nav active">
-        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Architecture Overview</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">MultiMesh for JAX Architeture Overview</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul class="nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="getting-started.html">Getting Started</a></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current nav bd-sidenav">
-<li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">Public API: multimesh.jax package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
-</ul><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</ul>
 </details></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="tutorials.html">Tutorials</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="tutorials.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/flax-mpmd.html">MLP pipeline example with task transforms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/implicit-flax-tasks.html">MLP pipeline with external task registration</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/mpmd-multimesh.html">MultiMesh contexts for MPMD</a></li>
+</ul>
 </details></li>
 </ul>
 
@@ -344,6 +349,18 @@ document.write(`
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#task-transformations">Task transformations</a><ul class="simple visible nav section-nav flex-column">
 </ul>
 </li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#task-classes">Task classes</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh.jax.MultiMesh"><code class="docutils literal notranslate"><span class="pre">MultiMesh</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh.jax.MultiMesh.slice"><code class="docutils literal notranslate"><span class="pre">MultiMesh.slice()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh.jax.Task"><code class="docutils literal notranslate"><span class="pre">Task</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh.jax.TaskMesh"><code class="docutils literal notranslate"><span class="pre">TaskMesh</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh.jax.TaskMesh.place"><code class="docutils literal notranslate"><span class="pre">TaskMesh.place()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compiler-contexts">Compiler contexts</a><ul class="simple visible nav section-nav flex-column">
 </ul>
 </li>
@@ -372,7 +389,7 @@ document.write(`
 <h2>Task transformations<a class="headerlink" href="#task-transformations" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.task.html#multimesh.jax.task" title="multimesh.jax.task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">task</span></code></a>(fun[, name, mesh, devices, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.task.html#multimesh.jax.task" title="multimesh.jax.task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">task</span></code></a>(fun[, name, task])</p></td>
 <td><p>Wraps a function in an auto-sharding task context</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.microbatch.html#multimesh.jax.microbatch" title="multimesh.jax.microbatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">microbatch</span></code></a>(fun, dim, size[, argnum, ...])</p></td>
@@ -384,12 +401,138 @@ document.write(`
 <tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.with_sharding_constraint.html#multimesh.jax.with_sharding_constraint" title="multimesh.jax.with_sharding_constraint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">with_sharding_constraint</span></code></a>(x, axis_resources)</p></td>
 <td><p>Applies logical sharding annotations to the input(s)</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.register_task.html#multimesh.jax.register_task" title="multimesh.jax.register_task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_task</span></code></a>(regex, *[, name, mesh, dims, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.register_task.html#multimesh.jax.register_task" title="multimesh.jax.register_task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_task</span></code></a>(matcher, *[, callback, task])</p></td>
 <td><p>Registers a name or regex-based task autosharding context</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#multimesh.jax.MultiMesh" title="multimesh.jax.MultiMesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiMesh</span></code></a>(*[, axis_sizes, axis_names, ...])</p></td>
+<td><p>MultiMesh represents a global mesh with named submeshes</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#multimesh.jax.Task" title="multimesh.jax.Task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Task</span></code></a>([name, mesh, logical_axes, mesh_slice, ...])</p></td>
+<td><p>Task dataclass defining all options for a named task context</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#multimesh.jax.TaskMesh" title="multimesh.jax.TaskMesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TaskMesh</span></code></a>(*, devices[, axis_sizes, ...])</p></td>
+<td><p>TaskMesh representing a submesh within the global mesh</p></td>
 </tr>
 </tbody>
 </table>
 </div>
+</section>
+<section id="task-classes">
+<h2>Task classes<a class="headerlink" href="#task-classes" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="multimesh.jax.MultiMesh">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">multimesh.jax.</span></span><span class="sig-name descname"><span class="pre">MultiMesh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis_sizes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">devices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimesh.jax.MultiMesh" title="Link to this definition">#</a></dt>
+<dd><p>MultiMesh represents a global mesh with named submeshes</p>
+<p>MultiMesh defines a global mesh with named submeshes. The mesh can
+can be sliced along certain dimensions to create submeshes with a
+specific subshape. The MultiMesh can either create a new global
+mesh or wrap an existing jax.sharding.Mesh.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>axis_sizes</strong> (<em>Optional</em><em>[</em><em>Sequence</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>]</em><em>]</em>) – The sizes of each
+global mesh axis. Defaults to None. Ignored if <cite>global_mesh</cite>
+is given.</p></li>
+<li><p><strong>axis_names</strong> (<em>Optional</em><em>[</em><em>Sequence</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>]</em>) – The names of each
+global mesh axis. Defaults to None. Ignored if <cite>global_mesh</cite>
+is given.</p></li>
+<li><p><strong>devices</strong> (<em>Optional</em><em>[</em><em>np.array</em><em>[</em><em>xc.Device</em><em>]</em><em>]</em>) – The shaped array of devices
+to include in the global mesh. The shape should match
+<cite>axis_sizes</cite>. Defaults to None. If not specified,
+the default <cite>jax.devices()</cite> will be used and reshaped to
+match the <cite>axis_sizes</cite>. Ignored if <cite>global_mesh</cite> is given.</p></li>
+<li><p><strong>global_mesh</strong> (<em>Optional</em><em>[</em><em>Mesh</em><em>]</em>) – A Jax Mesh
+defining devices, axis_sizes, and axis_names. Defaults to None.
+If given, all other parameters will be ignored. If not
+given, then <cite>axis_sizes</cite> and <cite>axis_names</cite> must be given.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="multimesh.jax.MultiMesh.slice">
+<span class="sig-name descname"><span class="pre">slice</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimesh.jax.MultiMesh.slice" title="Link to this definition">#</a></dt>
+<dd><p>Slice the global mesh along the specified axis.</p>
+<p>Slices a mesh along the given named dimensions as
+defined by the kwargs map.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>kwargs</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Mapping" title="(in Python v3.13)"><em>Mapping</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>]</em>) – (Mapping[str,int]). A mapping defining</p></li>
+<li><p><strong>axis</strong> – value pairs that will be sliced out of</p></li>
+<li><p><strong>mesh.</strong> (<em>the global</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A submesh sliced along the specified dimensions.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Mesh</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="multimesh.jax.Task">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">multimesh.jax.</span></span><span class="sig-name descname"><span class="pre">Task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logical_axes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh_slice</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_axes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">split_backprop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loop_dependent_mesh_slice</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimesh.jax.Task" title="Link to this definition">#</a></dt>
+<dd><p>Task dataclass defining all options for a named task context</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>mesh</strong> (<a class="reference internal" href="#multimesh.jax.TaskMesh" title="multimesh.jax.task.TaskMesh"><em>TaskMesh</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>logical_axes</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>mesh_slice</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Mapping" title="(in Python v3.13)"><em>Mapping</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>extra_axes</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>split_backprop</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>loop_dependent_mesh_slice</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><em>Callable</em></a><em>[</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Mapping" title="(in Python v3.13)"><em>Mapping</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>]</em><em>] </em><em>| </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="multimesh.jax.TaskMesh">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">multimesh.jax.</span></span><span class="sig-name descname"><span class="pre">TaskMesh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">devices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis_sizes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">abstract</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimesh.jax.TaskMesh" title="Link to this definition">#</a></dt>
+<dd><p>TaskMesh representing a submesh within the global mesh</p>
+<p>TaskMesh define the submesh devices, axis names, and axis sizes
+for a task that runs on a subset or slice of the global mesh</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>devices</strong> (<em>Sequence</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>]</em>) – The list of device numbers to include in
+the task. Device numbers correspond to a [O,N) relative
+numbering of devices within the executable, not global device
+numbers.</p></li>
+<li><p><strong>axis_sizes</strong> (<em>Optional</em><em>[</em><em>Sequence</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>]</em><em>]</em>) – The sizes of each
+task mesh axis. Defaults to None.</p></li>
+<li><p><strong>axis_names</strong> (<em>Optional</em><em>[</em><em>Sequence</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>]</em>) – The names of each
+task mesh axis. Defaults to None.</p></li>
+<li><p><strong>abstract</strong> (<em>Optional</em><em>[</em><em>AbstractMesh</em><em>]</em>) – A Jax AbstractMesh
+defining both axis_sizes and axis_names. Defaults to None.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="multimesh.jax.TaskMesh.place">
+<span class="sig-name descname"><span class="pre">place</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">devices</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#multimesh.jax.TaskMesh.place" title="Link to this definition">#</a></dt>
+<dd><p>Creates an equivalent task mesh placed on new devices</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>devices</strong> (<em>Sequence</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>]</em>) – The new devices to use for the mesh</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A task mesh with the same axes placed on new devices</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#multimesh.jax.TaskMesh" title="multimesh.jax.TaskMesh">TaskMesh</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </section>
 <section id="compiler-contexts">
 <h2>Compiler contexts<a class="headerlink" href="#compiler-contexts" title="Link to this heading">#</a></h2>
@@ -406,12 +549,6 @@ document.write(`
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.enable_recomputation.html#multimesh.jax.enable_recomputation" title="multimesh.jax.enable_recomputation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_recomputation</span></code></a>([enable, context_value])</p></td>
 <td><p>(dis|en)ables comm-avoiding recompute of inter-task intermediates.</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.enable_task_fusion.html#multimesh.jax.enable_task_fusion" title="multimesh.jax.enable_task_fusion"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_task_fusion</span></code></a>([enable, context_value])</p></td>
-<td><p>Sets whether tasks should be allowed to fuse.</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.only_fuse_loop_tasks.html#multimesh.jax.only_fuse_loop_tasks" title="multimesh.jax.only_fuse_loop_tasks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">only_fuse_loop_tasks</span></code></a>([enable, context_value])</p></td>
-<td><p>Sets whether tasks outside microbatch loops should be allowed to fuse.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.ignore_transforms.html#multimesh.jax.ignore_transforms" title="multimesh.jax.ignore_transforms"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ignore_transforms</span></code></a>([ignore])</p></td>
 <td><p>Sets debug context where all MultiMesh transformations are no-ops.</p></td>
@@ -469,6 +606,18 @@ document.write(`
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#subpackages">Subpackages</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#task-transformations">Task transformations</a><ul class="simple visible nav section-nav flex-column">
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#task-classes">Task classes</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh.jax.MultiMesh"><code class="docutils literal notranslate"><span class="pre">MultiMesh</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh.jax.MultiMesh.slice"><code class="docutils literal notranslate"><span class="pre">MultiMesh.slice()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh.jax.Task"><code class="docutils literal notranslate"><span class="pre">Task</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh.jax.TaskMesh"><code class="docutils literal notranslate"><span class="pre">TaskMesh</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#multimesh.jax.TaskMesh.place"><code class="docutils literal notranslate"><span class="pre">TaskMesh.place()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compiler-contexts">Compiler contexts</a><ul class="simple visible nav section-nav flex-column">

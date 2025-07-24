@@ -28,9 +28,9 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
 
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="_static/plot_directive.css?v=7f9a90b1" />
-    <link rel="stylesheet" type="text/css" href="_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css?v=be8a1c11" />
+    <link rel="stylesheet" type="text/css" href="_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="_static/style.css?v=3cbd6ad6" />
@@ -42,7 +42,7 @@
   <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
     <script src="_static/documentation_options.js?v=9eb32ce0"></script>
-    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="_static/copybutton.js?v=f281be69"></script>
@@ -166,19 +166,20 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="api.html">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="api.html">Public API: multimesh.jax package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</ul>
 </details></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="tutorials.html">Tutorials</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="tutorials.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/flax-mpmd.html">MLP pipeline example with task transforms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/implicit-flax-tasks.html">MLP pipeline with external task registration</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/mpmd-multimesh.html">MultiMesh contexts for MPMD</a></li>
+</ul>
 </details></li>
 </ul>
 
@@ -301,12 +302,12 @@ document.write(`
 <h1 id="index">Index</h1>
 
 <div class="genindex-jumpbox">
- <a href="#A"><strong>A</strong></a>
+ <a href="#_"><strong>_</strong></a>
+ | <a href="#A"><strong>A</strong></a>
  | <a href="#C"><strong>C</strong></a>
  | <a href="#E"><strong>E</strong></a>
  | <a href="#I"><strong>I</strong></a>
  | <a href="#M"><strong>M</strong></a>
- | <a href="#O"><strong>O</strong></a>
  | <a href="#P"><strong>P</strong></a>
  | <a href="#R"><strong>R</strong></a>
  | <a href="#S"><strong>S</strong></a>
@@ -314,6 +315,20 @@ document.write(`
  | <a href="#W"><strong>W</strong></a>
  
 </div>
+<h2 id="_">_</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/multimesh.jax.MultiMesh.html#multimesh.jax.MultiMesh.__init__">__init__() (multimesh.jax.MultiMesh method)</a>
+
+      <ul>
+        <li><a href="_autosummary/multimesh.jax.Task.html#multimesh.jax.Task.__init__">(multimesh.jax.Task method)</a>
+</li>
+        <li><a href="_autosummary/multimesh.jax.TaskMesh.html#multimesh.jax.TaskMesh.__init__">(multimesh.jax.TaskMesh method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
 <h2 id="A">A</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
@@ -339,8 +354,6 @@ document.write(`
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="_autosummary/multimesh.jax.enable_recomputation.html#multimesh.jax.enable_recomputation">enable_recomputation() (in module multimesh.jax)</a>
 </li>
-      <li><a href="_autosummary/multimesh.jax.enable_task_fusion.html#multimesh.jax.enable_task_fusion">enable_task_fusion() (in module multimesh.jax)</a>
-</li>
   </ul></td>
 </tr></table>
 
@@ -358,12 +371,8 @@ document.write(`
       <li><a href="_autosummary/multimesh.jax.microbatch.html#multimesh.jax.microbatch">microbatch() (in module multimesh.jax)</a>
 </li>
   </ul></td>
-</tr></table>
-
-<h2 id="O">O</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/multimesh.jax.only_fuse_loop_tasks.html#multimesh.jax.only_fuse_loop_tasks">only_fuse_loop_tasks() (in module multimesh.jax)</a>
+      <li><a href="_autosummary/multimesh.jax.MultiMesh.html#multimesh.jax.MultiMesh">MultiMesh (class in multimesh.jax)</a>, <a href="api.html#multimesh.jax.MultiMesh">[1]</a>
 </li>
   </ul></td>
 </tr></table>
@@ -376,6 +385,8 @@ document.write(`
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="_autosummary/multimesh.jax.flax.parallelize_step.html#multimesh.jax.flax.parallelize_step">parallelize_step() (in module multimesh.jax.flax)</a>
+</li>
+      <li><a href="api.html#multimesh.jax.TaskMesh.place">place() (multimesh.jax.TaskMesh method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -394,17 +405,27 @@ document.write(`
       <li><a href="_autosummary/multimesh.jax.flax.shard_axes.html#multimesh.jax.flax.shard_axes">shard_axes() (in module multimesh.jax.flax)</a>
 </li>
   </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#multimesh.jax.MultiMesh.slice">slice() (multimesh.jax.MultiMesh method)</a>
+</li>
+  </ul></td>
 </tr></table>
 
 <h2 id="T">T</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/multimesh.jax.Task.html#multimesh.jax.Task">Task (class in multimesh.jax)</a>, <a href="api.html#multimesh.jax.Task">[1]</a>
+</li>
       <li><a href="_autosummary/multimesh.jax.task.html#multimesh.jax.task">task() (in module multimesh.jax)</a>
 
       <ul>
         <li><a href="_autosummary/multimesh.jax.flax.task.html#multimesh.jax.flax.task">(in module multimesh.jax.flax)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/multimesh.jax.TaskMesh.html#multimesh.jax.TaskMesh">TaskMesh (class in multimesh.jax)</a>, <a href="api.html#multimesh.jax.TaskMesh">[1]</a>
+</li>
   </ul></td>
 </tr></table>
 

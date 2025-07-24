@@ -29,9 +29,9 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
 
     <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
-    <link rel="stylesheet" type="text/css" href="../../../_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
     <link rel="stylesheet" type="text/css" href="../../../_static/plot_directive.css?v=7f9a90b1" />
-    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css?v=be8a1c11" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
     <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="../../../_static/style.css?v=3cbd6ad6" />
@@ -43,7 +43,7 @@
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
     <script src="../../../_static/documentation_options.js?v=9eb32ce0"></script>
-    <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../../../_static/copybutton.js?v=f281be69"></script>
@@ -167,19 +167,20 @@
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../../../api.html">Public API: multimesh.jax package</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../api.html">Public API: multimesh.jax package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../multimesh.jax.flax.html">Public API: multimesh.jax.flax package</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</ul>
 </details></li>
 </ul>
 <p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1 has-children"><a class="reference internal" href="../../../tutorials.html">Tutorials</a><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../tutorials.html">Tutorials</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/spmd-autosharding.html">Logical autosharding for SPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/mpmd-autosharding.html">Logical autosharding for MPMD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/flax-mpmd.html">MLP pipeline example with task transforms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/implicit-flax-tasks.html">MLP pipeline with external task registration</a></li>
-</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/mpmd-multimesh.html">MultiMesh contexts for MPMD</a></li>
+</ul>
 </details></li>
 </ul>
 
@@ -346,7 +347,7 @@ document.write(`
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#optional-but-helpful-to-know">Optional, but helpful, to know</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for-jax">Initialize MultiMesh for Jax</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-single-layer-with-sharding-annotations">Create single layer with sharding annotations</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-full-model-with-pipelined-layers">Create full model with pipelined layers</a></li>
@@ -384,9 +385,9 @@ document.write(`
 <li><p>Optax package with different optimizers</p></li>
 </ol>
 </section>
-<section id="initialize-multimesh-for">
-<h2>Initialize MultiMesh for<a class="headerlink" href="#initialize-multimesh-for" title="Link to this heading">#</a></h2>
-<p>As in the previous examples, the first step in a MultiMesh for program is to initialize the environment.</p>
+<section id="initialize-multimesh-for-jax">
+<h2>Initialize MultiMesh for Jax<a class="headerlink" href="#initialize-multimesh-for-jax" title="Link to this heading">#</a></h2>
+<p>As in the previous examples, the first step in a MultiMesh for Jax program is to initialize the environment.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax_plugins.multimesh</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
@@ -399,7 +400,7 @@ document.write(`
 </section>
 <section id="import-jax-packages">
 <h2>Import Jax packages<a class="headerlink" href="#import-jax-packages" title="Link to this heading">#</a></h2>
-<p>Once MultiMesh for has been initialized, the standard set of Jax imports can be done. In this case, we are also importing:</p>
+<p>Once MultiMesh for Jax has been initialized, the standard set of Jax imports can be done. In this case, we are also importing:</p>
 <ol class="arabic simple">
 <li><p>Flax, which is used to define modules with parameters</p></li>
 <li><p>Optax, which provides optimizers for updating parameters</p></li>
@@ -411,7 +412,7 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">optax</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">multimesh.jax</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">clear_tasks</span><span class="p">,</span> <span class="n">register_task</span><span class="p">,</span> <span class="n">Task</span><span class="p">,</span> <span class="n">TaskMesh</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mesh</span><span class="p">,</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax.lax</span><span class="w"> </span><span class="kn">import</span> <span class="n">with_sharding_constraint</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">multimesh.jax.flax</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallelize_step</span>
@@ -471,28 +472,29 @@ document.write(`
 <p>The Flax modules are defined with names <code class="docutils literal notranslate"><span class="pre">layer_0</span></code>, <code class="docutils literal notranslate"><span class="pre">layer_1</span></code>, etc. If these Flax names are globally unique, we can that unique name to define a task scope.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">multimesh</span><span class="o">.</span><span class="n">jax</span><span class="o">.</span><span class="n">register_task</span><span class="p">(</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">task_mesh</span> <span class="o">=</span> <span class="n">TaskMesh</span><span class="p">(</span><span class="n">devices</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">axis_names</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span><span class="s2">&quot;y&quot;</span><span class="p">),</span> <span class="n">axis_sizes</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">))</span>
+<span class="n">register_task</span><span class="p">(</span>
   <span class="s2">&quot;layer_0&quot;</span><span class="p">,</span>
-  <span class="n">devices</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">],</span>
-  <span class="n">device_axes</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span><span class="s2">&quot;y&quot;</span><span class="p">],</span>
-  <span class="n">dims</span> <span class="o">=</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-  <span class="n">logical_axes</span><span class="o">=</span><span class="p">[</span>
-    <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
-  <span class="p">]</span>
+  <span class="n">task</span><span class="o">=</span><span class="n">Task</span><span class="p">(</span> 
+      <span class="n">mesh</span><span class="o">=</span><span class="n">task_mesh</span><span class="p">,</span>
+      <span class="n">logical_axes</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
+      <span class="p">]</span>
+  <span class="p">)</span>
 <span class="p">)</span>
 
-<span class="n">multimesh</span><span class="o">.</span><span class="n">jax</span><span class="o">.</span><span class="n">register_task</span><span class="p">(</span>
+<span class="n">register_task</span><span class="p">(</span>
   <span class="s2">&quot;layer_1&quot;</span><span class="p">,</span>
-  <span class="n">devices</span><span class="o">=</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">7</span><span class="p">],</span>
-  <span class="n">device_axes</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span><span class="s2">&quot;y&quot;</span><span class="p">],</span>
-  <span class="n">dims</span> <span class="o">=</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-  <span class="n">logical_axes</span><span class="o">=</span><span class="p">[</span>
-    <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
-  <span class="p">]</span>
+  <span class="n">task</span><span class="o">=</span><span class="n">Task</span><span class="p">(</span> 
+      <span class="n">mesh</span><span class="o">=</span><span class="n">task_mesh</span><span class="o">.</span><span class="n">place</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">7</span><span class="p">)),</span>
+      <span class="n">logical_axes</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
+      <span class="p">]</span>
+  <span class="p">)</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -501,7 +503,7 @@ document.write(`
 </section>
 <section id="initialize-parameters-and-create-parallel-training-function">
 <h2>Initialize parameters and create parallel training function<a class="headerlink" href="#initialize-parameters-and-create-parallel-training-function" title="Link to this heading">#</a></h2>
-<p>So far the code looks almost the same as standard Flax code with a few extra annotations. The full power of MultiMesh for comes from its auto-parallelizing compiler that reads all the submesh annotations and transforms the global computation into a series of submesh tasks. Managing Jax training state and shardings can be difficult when directly calling <code class="docutils literal notranslate"><span class="pre">jax.jit</span></code>. The MultiMesh for Flax wrappers provides a <code class="docutils literal notranslate"><span class="pre">parallelize_step</span></code> for training that allows users to generate MPMD auto-sharded models for Flax modules, similar to the previous MPMD example. The user simply passes in the <code class="docutils literal notranslate"><span class="pre">model</span></code>, a standard <code class="docutils literal notranslate"><span class="pre">optax</span></code> optimizer, and an example input batch. MultiMesh for does all the work to derive all the shardings, compile the model, and initialize all the sharded training state. <code class="docutils literal notranslate"><span class="pre">parallelize_step</span></code> returns back the four objects necessary to run a training loop:</p>
+<p>So far the code looks almost the same as standard Flax code with a few extra annotations. The full power of MultiMesh for Jax comes from its auto-parallelizing compiler that reads all the submesh annotations and transforms the global computation into a series of submesh tasks. Managing Jax training state and shardings can be difficult when directly calling <code class="docutils literal notranslate"><span class="pre">jax.jit</span></code>. The MultiMesh Flax wrappers provides a <code class="docutils literal notranslate"><span class="pre">parallelize_step</span></code> for training that allows users to generate MPMD auto-sharded models for Flax modules, similar to the previous MPMD example. The user simply passes in the <code class="docutils literal notranslate"><span class="pre">model</span></code>, a standard <code class="docutils literal notranslate"><span class="pre">optax</span></code> optimizer, and an example input batch. MultiMesh for Jax does all the work to derive all the shardings, compile the model, and initialize all the sharded training state. <code class="docutils literal notranslate"><span class="pre">parallelize_step</span></code> returns back the four objects necessary to run a training loop:</p>
 <ol class="arabic simple">
 <li><p>A <code class="docutils literal notranslate"><span class="pre">step_fn</span></code> for computing gradients and updating parameters</p></li>
 <li><p>The randomly initialized sharded parameters</p></li>
@@ -519,8 +521,8 @@ document.write(`
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-05-01 21:27:25,842:jax._src.xla_bridge:1004: Platform &#39;multimesh&#39; is experimental and not all JAX functionality may be correctly supported!
-2025-05-01 21:27:28.385816: W ./xla/service/hlo_module_config.h:193] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>WARNING:2025-07-17 18:58:28,206:jax._src.xla_bridge:830: Platform &#39;multimesh&#39; is experimental and not all JAX functionality may be correctly supported!
+2025-07-17 18:58:30.324074: W ./xla/service/hlo_module_config.h:194] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
 </pre></div>
 </div>
 </div>
@@ -570,7 +572,7 @@ document.write(`
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>()
-REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=PartitionSpec(), memory_kind=unpinned_host)
+REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1, axis_types=(Auto, Auto)), spec=PartitionSpec(), memory_kind=unpinned_host)
 (4,)
 (16, 4)
 (4,)
@@ -617,26 +619,27 @@ REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=Partiti
 <p>We can repeat the example above, but use a factory function instead to generate the task contexts. Rather than specifying a different task for <code class="docutils literal notranslate"><span class="pre">layer_0</span></code>, <code class="docutils literal notranslate"><span class="pre">layer_1</span></code>… we can register a single factory that dynamically computes the task context.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">multimesh</span><span class="o">.</span><span class="n">jax</span><span class="o">.</span><span class="n">clear_tasks</span><span class="p">()</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">clear_tasks</span><span class="p">()</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">factory</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">backprop</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">callback</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">backprop</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
     <span class="n">n_per_stage</span> <span class="o">=</span> <span class="mi">4</span>
     <span class="n">layer</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
     <span class="n">start</span> <span class="o">=</span> <span class="n">layer</span> <span class="o">*</span> <span class="n">n_per_stage</span>
     <span class="n">end</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">n_per_stage</span>
-    <span class="c1"># must return a list</span>
-    <span class="k">return</span> <span class="p">(</span><span class="n">start</span><span class="p">,</span><span class="n">end</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;layer_</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">task_mesh</span> <span class="o">=</span> <span class="n">TaskMesh</span><span class="p">(</span><span class="n">devices</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span><span class="n">end</span><span class="p">),</span> <span class="n">axis_names</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span><span class="s2">&quot;y&quot;</span><span class="p">),</span> <span class="n">axis_sizes</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">Task</span><span class="p">(</span>
+      <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;layer_</span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+      <span class="n">mesh</span><span class="o">=</span><span class="n">task_mesh</span><span class="p">,</span>
+      <span class="n">logical_axes</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
+      <span class="p">]</span>
+    <span class="p">)</span>
 
-<span class="n">multimesh</span><span class="o">.</span><span class="n">jax</span><span class="o">.</span><span class="n">register_task</span><span class="p">(</span>
+<span class="n">register_task</span><span class="p">(</span>
   <span class="sa">r</span><span class="s2">&quot;(layer_\d+)&quot;</span><span class="p">,</span>
-  <span class="n">callback</span><span class="o">=</span><span class="n">factory</span><span class="p">,</span>
-  <span class="n">device_axes</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span><span class="s2">&quot;y&quot;</span><span class="p">],</span>
-  <span class="n">dims</span> <span class="o">=</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
-  <span class="n">logical_axes</span><span class="o">=</span><span class="p">[</span>
-    <span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">),</span>
-  <span class="p">]</span>
+  <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="n">x</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
@@ -648,7 +651,7 @@ REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=Partiti
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-05-01 21:27:33.644394: W ./xla/service/hlo_module_config.h:193] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2025-07-17 18:58:32.751950: W ./xla/service/hlo_module_config.h:194] Warning: Using auto_spmd_partitioning. It is experimental and may contain bugs!
 </pre></div>
 </div>
 </div>
@@ -669,7 +672,7 @@ REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=Partiti
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>()
-REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=PartitionSpec(), memory_kind=unpinned_host)
+REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1, axis_types=(Auto, Auto)), spec=PartitionSpec(), memory_kind=unpinned_host)
 (4,)
 (16, 4)
 (4,)
@@ -741,7 +744,7 @@ REPLICATED NamedSharding(mesh=Mesh(&#39;x&#39;: 8, &#39;y&#39;: 1), spec=Partiti
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-you-need-to-know-for-this-tutorial">What you need to know for this tutorial</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#optional-but-helpful-to-know">Optional, but helpful, to know</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for">Initialize MultiMesh for</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-multimesh-for-jax">Initialize MultiMesh for Jax</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#import-jax-packages">Import Jax packages</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-single-layer-with-sharding-annotations">Create single layer with sharding annotations</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#create-full-model-with-pipelined-layers">Create full model with pipelined layers</a></li>
