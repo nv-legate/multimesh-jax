@@ -26,7 +26,7 @@ from jax.sharding import (
 )
 
 import multimesh.jax
-from multimesh.jax import MeshWrapper
+from multimesh.jax import Context, MultiMesh, Task, TaskMesh
 from multimesh.jax.test_util import MultiMeshJaxTestCase
 
 config.parse_flags_with_absl()
@@ -85,21 +85,21 @@ class TaskTest(MultiMeshJaxTestCase):
             ("batch", "x"),
             ("model", "y"),
         ]
-        multimesh.jax.register_task(
-            "task0",
-            devices=[0, 1],
-            dims=[2, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
-        )
-        multimesh.jax.register_task(
-            "task1",
-            devices=[0, 1],
-            dims=[2, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
-        )
-        self._test_register_task()
+
+        def callback(name, backprop):
+            return Task(
+                name=name,
+                mesh=TaskMesh(
+                    axis_sizes=(2, 1), axis_names=("x", "y"), devices=(0, 1)
+                ),
+                logical_axes=logical_axes,
+            )
+
+        context = Context()
+        context.register_task("task0", callback=callback)
+        context.register_task("task1", callback=callback)
+        with context:
+            self._test_register_task()
 
     def test_register_task_context(self):
         if jax.device_count() != 2:
@@ -111,49 +111,32 @@ class TaskTest(MultiMeshJaxTestCase):
                 ("model", "y"),
             ]
 
-            multimesh.jax.register_task(
+            context = Context()
+            context.register_task(
                 "task0",
-                devices=[0, 1],
-                dims=[2, 1],
-                device_axes=["x", "y"],
-                logical_axes=logical_axes,
+                task=Task(
+                    name="task0",
+                    mesh=TaskMesh(
+                        axis_names=("x", "y"),
+                        axis_sizes=(2, 1),
+                        devices=(0, 1),
+                    ),
+                    logical_axes=logical_axes,
+                ),
             )
-            multimesh.jax.register_task(
+            context.register_task(
                 "task1",
-                devices=[0, 1],
-                dims=[2, 1],
-                device_axes=["x", "y"],
-                logical_axes=logical_axes,
+                task=Task(
+                    name="task1",
+                    mesh=TaskMesh(
+                        axis_names=("x", "y"),
+                        axis_sizes=(2, 1),
+                        devices=(0, 1),
+                    ),
+                    logical_axes=logical_axes,
+                ),
             )
-            self._test_register_task()
-
-    def test_only_fuse_loop_tasks(self):
-        if jax.device_count() != 2:
-            self.skipTest("need 2 devices")
-
-        with multimesh.jax.context(autoshard=True):
-            logical_axes = [
-                ("batch", "x"),
-                ("model", "y"),
-            ]
-            multimesh.jax.register_task(
-                "task0",
-                devices=[0, 1],
-                dims=[2, 1],
-                device_axes=["x", "y"],
-                logical_axes=logical_axes,
-            )
-            multimesh.jax.register_task(
-                "task1",
-                devices=[0, 1],
-                dims=[2, 1],
-                device_axes=["x", "y"],
-                logical_axes=logical_axes,
-            )
-
-            with multimesh.jax.only_fuse_loop_tasks(True):
-                self._test_register_task()
-            with multimesh.jax.only_fuse_loop_tasks(False):
+            with context:
                 self._test_register_task()
 
     def tearDown(self):
@@ -163,20 +146,24 @@ class TaskTest(MultiMeshJaxTestCase):
         if jax.device_count() != 2:
             self.skipTest("need 2 devices")
 
-        logical_axes = [
+        logical_axes = (
             ("batch", "x"),
             ("model", "y"),
-        ]
+        )
 
-        def device_factory(name: str, backprop: bool) -> List[int]:
-            return [0, 2], "bwd." + name if backprop else name
+        def callback(name: str, backprop: bool) -> List[int]:
+            return Task(
+                name="bwd." + name if backprop else name,
+                mesh=TaskMesh(
+                    axis_sizes=(2, 1), axis_names=("x", "y"), devices=(0, 1)
+                ),
+                logical_axes=logical_axes,
+            )
 
-        multimesh.jax.register_task(
+        context = Context()
+        context.register_task(
             r"(task\d+)",
-            callback=device_factory,
-            dims=[2, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            callback=callback,
         )
 
         def c(x):
@@ -195,7 +182,7 @@ class TaskTest(MultiMeshJaxTestCase):
                 )
 
         mesh = Mesh(np.array(jax.devices()).reshape(2, 1), ("batch", "model"))
-        with mesh:
+        with context, mesh:
             f = jax.jit(
                 c, in_shardings=(AUTO(mesh),), out_shardings=(AUTO(mesh))
             )
@@ -216,7 +203,7 @@ class TaskTest(MultiMeshJaxTestCase):
 
             return jax.jit(f, out_shardings=(arg_shardings))()
 
-        with mesh:
+        with context, mesh:
             self._test_against_reference(
                 c, arg_maker, arg_shardings=arg_shardings
             )
@@ -232,19 +219,29 @@ class TaskTest(MultiMeshJaxTestCase):
             ("model", "y"),
         ]
 
-        multimesh.jax.register_task(
-            "task0",
-            devices=[0, 1],
-            dims=[2, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+        mesh = MultiMesh(
+            devices=np.array(jax.devices()).reshape(4, 1),
+            axis_names=("batch", "model"),
         )
-        multimesh.jax.register_task(
+        mesh.register_task(
+            "task0",
+            task=Task(
+                name="task0",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"), axis_sizes=(2, 1), devices=(0, 1)
+                ),
+                logical_axes=logical_axes,
+            ),
+        )
+        mesh.register_task(
             "task1",
-            devices=[2, 3],
-            dims=[2, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            task=Task(
+                name="task1",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"), axis_sizes=(2, 1), devices=(0, 1)
+                ),
+                logical_axes=logical_axes,
+            ),
         )
 
         def c(x, y):
@@ -264,7 +261,7 @@ class TaskTest(MultiMeshJaxTestCase):
                 )
 
         mesh = Mesh(np.array(jax.devices()).reshape(4, 1), ("batch", "model"))
-        with mesh, multimesh.jax.autoshard(True):
+        with mesh:
             f = jax.jit(
                 c,
                 in_shardings=(AUTO(mesh), AUTO(mesh)),
@@ -292,7 +289,7 @@ class TaskTest(MultiMeshJaxTestCase):
         if jax.device_count() != 4:
             self.skipTest("need 4 devices")
 
-        mesh = Mesh(
+        mesh = MultiMesh(
             np.array(jax.devices()).reshape(4, 1, 1),
             ("batch", "cxn", "ext"),
         )
@@ -303,20 +300,28 @@ class TaskTest(MultiMeshJaxTestCase):
             ("model", "y"),
         ]
 
-        multimesh.jax.register_task(
+        mesh.register_task(
             "layer0",
-            devices=[0, 1, 2, 3],
-            dims=[4, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            task=Task(
+                name="layer0",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"),
+                    axis_sizes=(4, 1),
+                    devices=[0, 1, 2, 3],
+                ),
+                logical_axes=logical_axes,
+            ),
         )
 
-        multimesh.jax.register_task(
+        mesh.register_task(
             "layer1",
-            devices=[0, 1],
-            dims=[2, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            task=Task(
+                name="layer1",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"), axis_sizes=(2, 1), devices=[0, 1]
+                ),
+                logical_axes=logical_axes,
+            ),
         )
 
         def c(batch, params):
@@ -348,7 +353,7 @@ class TaskTest(MultiMeshJaxTestCase):
 
         batch_size = 8
         model_dim = 4
-        with mesh, multimesh.jax.autoshard(True):
+        with mesh:
             f = jax.jit(
                 c,
                 in_shardings=(
@@ -410,7 +415,7 @@ class TaskTest(MultiMeshJaxTestCase):
             (None, None),
         )
 
-        with mesh, multimesh.jax.autoshard(True):
+        with mesh:
             self._test_against_reference(
                 c, arg_maker, mm_shardings, reference_shardings
             )
@@ -419,9 +424,9 @@ class TaskTest(MultiMeshJaxTestCase):
         if jax.device_count() != 4:
             self.skipTest("need 4 devices")
 
-        mesh = Mesh(
-            np.array(jax.devices()).reshape(4, 1, 1),
-            ("batch", "cxn", "ext"),
+        mesh = MultiMesh(
+            devices=np.array(jax.devices()).reshape(4, 1, 1),
+            axis_names=("batch", "cxn", "ext"),
         )
 
         logical_axes = [
@@ -430,8 +435,6 @@ class TaskTest(MultiMeshJaxTestCase):
             ("model", "y"),
         ]
 
-        devices = np.array(jax.devices())
-
         def f(batch, param):
             param = multimesh.jax.with_sharding_constraint(
                 param, P("cxn", "ext")
@@ -439,18 +442,19 @@ class TaskTest(MultiMeshJaxTestCase):
             return jnp.einsum("bc,ce->be", batch, param)
 
         def c(batch, params):
+            task_mesh = TaskMesh(
+                devices=(0, 1), axis_names=("x", "y"), axis_sizes=(2, 1)
+            )
             layer0 = multimesh.jax.task(
                 f,
                 name="layer0",
-                devices=devices[:2].reshape(2, 1),
-                device_axes=("x", "y"),
+                mesh=task_mesh,
                 logical_axes=logical_axes,
             )
             layer1 = multimesh.jax.task(
                 f,
                 name="layer1",
-                devices=devices[2:].reshape(2, 1),
-                device_axes=("x", "y"),
+                mesh=task_mesh.place(devices=(2, 3)),
                 logical_axes=logical_axes,
             )
 
@@ -465,7 +469,7 @@ class TaskTest(MultiMeshJaxTestCase):
 
         batch_size = 8
         model_dim = 4
-        with mesh, multimesh.jax.autoshard(True):
+        with mesh:
             # use the MultiMesh mjit to annotate all arguments
             # with logical autosharding annotations
             jf = multimesh.jax.mjit(
@@ -482,7 +486,7 @@ class TaskTest(MultiMeshJaxTestCase):
             # make sure the complication succeeds
             _ = jf.lower(batch, (fc0, fc1)).compile()
 
-        with mesh, multimesh.jax.autoshard(True):
+        with mesh:
             # use standard jit so that arguments are explicitly sharded
             # without logical autosharding annotations
             jf = jax.jit(
@@ -509,20 +513,35 @@ class TaskTest(MultiMeshJaxTestCase):
             ("model", "y"),
         ]
 
-        multimesh.jax.register_task(
-            "embeddings",
-            devices=[0, 1, 2, 3, 4, 5, 6, 7],
-            dims=[4, 2],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+        mesh = MultiMesh(
+            devices=np.array(jax.devices()).reshape(8, 1, 1),
+            axis_names=("batch", "model", "embed"),
         )
 
-        multimesh.jax.register_task(
+        mesh.register_task(
+            "embeddings",
+            task=Task(
+                name="embeddings",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"),
+                    axis_sizes=(4, 2),
+                    devices=[0, 1, 2, 3, 4, 5, 6, 7],
+                ),
+                logical_axes=logical_axes,
+            ),
+        )
+
+        mesh.register_task(
             "layer0",
-            devices=[0, 1, 2, 3],
-            dims=[2, 2],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            task=Task(
+                name="layer0",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"),
+                    axis_sizes=(2, 2),
+                    devices=[0, 1, 2, 3],
+                ),
+                logical_axes=logical_axes,
+            ),
         )
 
         vocab = 2
@@ -554,12 +573,7 @@ class TaskTest(MultiMeshJaxTestCase):
                 )
                 return x
 
-        mesh = Mesh(
-            np.array(jax.devices()).reshape(8, 1, 1),
-            ("batch", "model", "embed"),
-        )
-
-        with mesh, multimesh.jax.autoshard(True):
+        with mesh:
             f = jax.jit(
                 f,
                 in_shardings=(AUTO(mesh), AUTO(mesh)),
@@ -611,34 +625,59 @@ class TaskTest(MultiMeshJaxTestCase):
             ("embed", "y"),
         ]
 
-        multimesh.jax.register_task(
-            "embeddings",
-            devices=[0, 1, 2, 3, 4, 5, 6, 7],
-            dims=[8, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
-        )
-        multimesh.jax.register_task(
-            "loss",
-            devices=[0, 1, 2, 3, 4, 5, 6, 7],
-            dims=[8, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+        mesh = MultiMesh(
+            np.array(jax.devices()).reshape(8, 1, 1, 1, 1, 1, 1),
+            ("batch", "model", "seq", "hidden", "vocab", "embed", "embed-fc"),
         )
 
-        multimesh.jax.register_task(
-            "layer0",
-            devices=[0, 1, 2, 3, 4, 5, 6, 7],
-            dims=[8, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+        mesh.register_task(
+            "embeddings",
+            task=Task(
+                name="embeddings",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"),
+                    axis_sizes=(8, 1),
+                    devices=[0, 1, 2, 3, 4, 5, 6, 7],
+                ),
+                logical_axes=logical_axes,
+            ),
         )
-        multimesh.jax.register_task(
+        mesh.register_task(
+            "loss",
+            task=Task(
+                name="loss",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"),
+                    axis_sizes=(8, 1),
+                    devices=[0, 1, 2, 3, 4, 5, 6, 7],
+                ),
+                logical_axes=logical_axes,
+            ),
+        )
+
+        mesh.register_task(
+            "layer0",
+            task=Task(
+                name="layer0",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"),
+                    axis_sizes=(8, 1),
+                    devices=[0, 1, 2, 3, 4, 5, 6, 7],
+                ),
+                logical_axes=logical_axes,
+            ),
+        )
+        mesh.register_task(
             "layer1",
-            devices=[0, 1, 2, 3, 4, 5, 6, 7],
-            dims=[8, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            task=Task(
+                name="layer1",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"),
+                    axis_sizes=(8, 1),
+                    devices=[0, 1, 2, 3, 4, 5, 6, 7],
+                ),
+                logical_axes=logical_axes,
+            ),
         )
 
         vocab = 2
@@ -686,13 +725,8 @@ class TaskTest(MultiMeshJaxTestCase):
 
             return f(params, batch)
 
-        mesh = Mesh(
-            np.array(jax.devices()).reshape(8, 1, 1, 1, 1, 1, 1),
-            ("batch", "model", "seq", "hidden", "vocab", "embed", "embed-fc"),
-        )
-
         def make_lowered(mesh):
-            with mesh, multimesh.jax.autoshard(True):
+            with mesh:
                 f = jax.jit(
                     c,
                     in_shardings=(AUTO(mesh), AUTO(mesh)),
@@ -734,19 +768,34 @@ class TaskTest(MultiMeshJaxTestCase):
         self.assertTrue(scale_sharding.is_equivalent_to(batch_sharding, 3))
 
         logical_axes.append(("hidden", "x"))
-        multimesh.jax.register_task(
-            "layer0",
-            devices=[0, 1, 2, 3],
-            dims=[2, 2],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+
+        mesh = MultiMesh(
+            np.array(jax.devices()).reshape(8, 1, 1, 1, 1, 1, 1),
+            ("batch", "model", "seq", "hidden", "vocab", "embed", "embed-fc"),
         )
-        multimesh.jax.register_task(
+        mesh.register_task(
+            "layer0",
+            task=Task(
+                name="layer0",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"),
+                    axis_sizes=(2, 1),
+                    devices=[0, 1, 2, 3],
+                ),
+                logical_axes=logical_axes,
+            ),
+        )
+        mesh.register_task(
             "layer1",
-            devices=[4, 5, 6, 7],
-            dims=[2, 2],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            task=Task(
+                name="layer1",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"),
+                    axis_sizes=(2, 1),
+                    devices=[4, 5, 6, 7],
+                ),
+                logical_axes=logical_axes,
+            ),
         )
 
         jax.clear_caches()
@@ -807,7 +856,7 @@ class TaskTest(MultiMeshJaxTestCase):
 
             return f()
 
-        with mesh, multimesh.jax.autoshard(True):
+        with mesh:
             self._test_against_reference(
                 c,
                 arg_maker,
@@ -820,24 +869,32 @@ class TaskTest(MultiMeshJaxTestCase):
             self.skipTest("need 8 devices")
 
         logical_axes = [
+            ("stage", "w"),
             ("batch", "x"),
             ("seq", "y"),
             ("embed", "z"),
         ]
 
-        multimesh.jax.register_task(
-            "layer0",
-            devices=[0, 1, 2, 3],
-            dims=[2, 1, 2],
-            device_axes=["x", "y", "z"],
-            logical_axes=logical_axes,
+        mesh = MultiMesh(
+            devices=np.array(jax.devices()).reshape(2, 2, 1, 2),
+            axis_names=("w", "x", "y", "z"),
         )
-        multimesh.jax.register_task(
-            "layer1",
-            devices=[4, 5, 6, 7],
-            dims=[2, 1, 2],
-            device_axes=["x", "y", "z"],
-            logical_axes=logical_axes,
+
+        mesh.register_task(
+            "(layer0)",
+            task=Task(
+                name="layer0",
+                mesh_slice={"stage": 0},
+                logical_axes=logical_axes,
+            ),
+        )
+        mesh.register_task(
+            "(layer1)",
+            task=Task(
+                name="layer1",
+                mesh_slice={"stage": 1},
+                logical_axes=logical_axes,
+            ),
         )
 
         def partition(mesh, arg_shapes, result_shape):
@@ -854,9 +911,6 @@ class TaskTest(MultiMeshJaxTestCase):
             )
 
         def infer_sharding_from_operands(mesh, arg_shapes, result_shape):
-            print(mesh)
-            print(arg_shapes)
-            print(result_shape)
             return arg_shapes[0].sharding
 
         def propagate_user_sharding(mesh, user_shape):
@@ -876,39 +930,31 @@ class TaskTest(MultiMeshJaxTestCase):
             def f(x):
                 with jax.named_scope("layer0"):
                     x = multimesh.jax.with_sharding_constraint(
-                        x, P("batch", "seq", "embed")
+                        x, P(None, "seq", "embed")
                     )
                     x = layer(x)
                 with jax.named_scope("layer1"):
                     x = multimesh.jax.with_sharding_constraint(
-                        x, P("batch", "seq", "embed")
+                        x, P(None, "seq", "embed")
                     )
                     x = layer(x)
                 return x
 
             return f(x)
 
-        jax_mesh = Mesh(
-            np.array(jax.devices()).reshape(4, 1, 2),
-            ("batch", "seq", "embed"),
-        )
-        mm_mesh = MeshWrapper(jax_mesh, (2, 1, 2))
-
         batch = 8
         seq = 10
         embed = 8
 
-        with mm_mesh, multimesh.jax.autoshard(True):
+        with mesh:
             c = jax.jit(
                 c,
-                in_shardings=(AUTO(mm_mesh),),
-                out_shardings=(AUTO(mm_mesh)),
+                in_shardings=(AUTO(mesh),),
+                out_shardings=(AUTO(mesh)),
             )
             batch = jax.core.ShapedArray((batch, seq, embed), np.float32)
-            with MeshWrapper.lower_mode():
-                lowered = c.lower(batch)
-            with MeshWrapper.compile_mode():
-                compiled = lowered.compile()  # noqa: F841
+            lowered = c.lower(batch)
+            compiled = lowered.compile()  # noqa: F841
 
 
 if __name__ == "__main__":

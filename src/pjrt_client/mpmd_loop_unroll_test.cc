@@ -8,6 +8,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "xla/hlo/ir/hlo_instruction.h"
+#include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/hlo/utils/hlo_matchers.h"
 #include "xla/pjrt/multimesh/mpmd_test_base.h"
 
@@ -87,6 +88,13 @@ TEST_F(MpmdLoopUnrollTest, BasicLoop) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto module, GetHloModuleFromText(kBasicLoopHlo, /*num_devices=*/1));
 
+  TF_ASSERT_OK_AND_ASSIGN(auto color_f,
+                          partition_->AllocateColor(
+                              "task_f", {{.start = 0, .num_devices = 1}}, {}));
+  TF_ASSERT_OK_AND_ASSIGN(auto color_g,
+                          partition_->AllocateColor(
+                              "task_g", {{.start = 1, .num_devices = 1}}, {}));
+
   // body, condition, f, g, init, entry
   EXPECT_EQ(module->computation_count(), 6);
 
@@ -112,6 +120,69 @@ TEST_F(MpmdLoopUnrollTest, BasicLoop) {
 
   HloPrintOptions options = HloPrintOptions::Default();
   options.set_print_control_dependencies(true);
+}
+
+TEST_F(MpmdLoopUnrollTest, LoopIterDependent) {
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto module, GetHloModuleFromText(kBasicLoopHlo, /*num_devices=*/1));
+
+  // make both tasks' devices loop iteration dependent, over one device
+  auto f_iter_dev = [](int64_t i) -> std::vector<int64_t> { return {i}; };
+  auto g_iter_dev = [](int64_t i) -> std::vector<int64_t> { return {1 - i}; };
+
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto color_f,
+      partition_->AllocateColor("task_f", {{.start = 0, .num_devices = 1}},
+                                {.loop_dependent_devices = f_iter_dev}));
+  TF_ASSERT_OK_AND_ASSIGN(
+      auto color_g,
+      partition_->AllocateColor("task_g", {{.start = 1, .num_devices = 1}},
+                                {.loop_dependent_devices = g_iter_dev}));
+
+  // body, condition, f, g, init, entry
+  EXPECT_EQ(module->computation_count(), 6);
+
+  MpmdLoopUnroll unroller{partition_.get()};
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, unroller.Run(module.get()));
+
+  // f, g, init, entry
+  EXPECT_EQ(module->computation_count(), 4);
+
+  EXPECT_THAT(
+      module->entry_computation()->instructions(),
+      AllOf(Contains(op::Call()).Times(5),     // init, 2xf, 2xg
+            Contains(op::Tuple()).Times(1)));  // only root tuple is left
+
+  // only pre-loop loop-carried variables should have scheduling name
+  EXPECT_THAT(
+      module->entry_computation()->instructions(),
+      AllOf(
+          Contains(m::MetadataSchedulingNames("get-tuple-element.4")).Times(1),
+          Contains(m::MetadataSchedulingNames("get-tuple-element.5"))
+              .Times(1)));
+
+  // create set of task call + device pairs and ensure unrolling hit them all
+  // we expect only one of each
+  absl::flat_hash_set<std::pair<std::string, int64_t>> comp_devs{
+      {"task_init", 0},
+      {"task_f", 0},
+      {"task_f", 1},
+      {"task_g", 0},
+      {"task_g", 1}};
+
+  for (auto* instr : module->entry_computation()->MakeInstructionPostOrder()) {
+    if (instr->opcode() == HloOpcode::kCall) {
+      auto comp_name = instr->called_computations()[0]->name();
+      int64_t device = partition_->DevicesForInstruction(instr).start();
+
+      std::pair<std::string, int64_t> key{comp_name, device};
+      EXPECT_TRUE(comp_devs.contains(key));
+      comp_devs.erase(key);
+    }
+  }
+
+  // check that {call, device} pairs in entry computation bijected comp_devs
+  EXPECT_EQ(comp_devs.size(), 0);
 }
 
 }  // namespace

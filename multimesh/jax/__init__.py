@@ -18,17 +18,25 @@ from .lib import (
     context,
     enable_fast_path,
     enable_recomputation,
-    enable_task_fusion,
-    only_fuse_loop_tasks,
     ignore_transforms,
     with_sharding_constraint,
     tasks,
     mjit,
 )
 
-from .task import task, microbatch, parallelize, register_task
-
-from .mesh import MeshWrapper
+from .task import (
+    task,
+    microbatch,
+    parallelize,
+    register_task,
+    shard_map,
+    custom_partitioning,
+    slice_global_mesh,
+    Task,
+    TaskMesh,
+    Context,
+    MultiMesh,
+)
 
 from . import _version
 

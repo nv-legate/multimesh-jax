@@ -8,6 +8,7 @@
 #include <ostream>
 
 #include "absl/container/flat_hash_map.h"
+#include "mpmd_loop.h"
 #include "src/zuku/mesh.h"
 #include "xla/pjrt/multimesh/json_utils.h"
 #include "xla/tsl/platform/statusor.h"
@@ -56,6 +57,7 @@ absl::StatusOr<LoopConfig> GetMicrobatchConfig(const std::string& name,
           {"gpipe", LoopConfig::Schedule::kFillDrain},
           {"wavefront", LoopConfig::Schedule::kWavefront},
           {"prefetch-wavefront", LoopConfig::Schedule::kPrefetchWavefront},
+          {"zero-bubble-h2", LoopConfig::Schedule::kZeroBubbleH2},
           {"custom", LoopConfig::Schedule::kCustom}};
 
   if (!schedule_string.empty()) {

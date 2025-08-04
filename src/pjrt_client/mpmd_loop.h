@@ -22,7 +22,8 @@ struct LoopConfig {
     k1F1B,
     kWavefront,
     kPrefetchWavefront,
-    kCustom
+    kCustom,
+    kZeroBubbleH2,
   };
 
   // The number of iterations

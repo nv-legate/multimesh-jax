@@ -13,6 +13,7 @@
 #include "xla/service/service_executable_run_options.h"
 #include "xla/stream_executor/device_memory_allocator.h"
 #include "xla/stream_executor/stream_executor.h"
+#include "xla/pjrt/pjrt_stream_executor_client.h"
 
 namespace xla {
 
@@ -24,7 +25,6 @@ absl::StatusOr<se::Stream*> GetCachedStream(se::StreamExecutor* se,
 
 void ClearCachedStreams();
 
-std::shared_ptr<DistributedRuntimeClient> MultiMeshRuntimeClient();
 class TaskDeviceMemoryAllocator : public se::DeviceMemoryAllocator {
  public:
   // Parameter platform indicates which platform the allocator allocates memory
@@ -54,7 +54,8 @@ class TaskDeviceMemoryAllocator : public se::DeviceMemoryAllocator {
 
 class StreamWrapper {
  public:
-  StreamWrapper(uint64_t run_id, int device_ordinal, se::Stream* stream,
+  StreamWrapper(PjRtStreamExecutorClient* client, uint64_t run_id,
+                int device_ordinal, se::Stream* stream,
                 DeviceAssignment device_assignment, xla::Backend* backend,
                 TaskMemoryAllocator* allocator = nullptr);
 
@@ -80,10 +81,6 @@ class StreamWrapper {
   ServiceExecutableRunOptions service_run_options_;
   ExecutionProfile execution_profile_;
 };
-
-absl::Status InitDistributedRuntimeParams(
-    int num_procs, int node_id, int gpus_per_node,
-    std::shared_ptr<KeyValueStoreInterface> kv_store);
 
 }  // namespace xla
 

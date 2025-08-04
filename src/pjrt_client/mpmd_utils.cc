@@ -5,6 +5,8 @@
 
 #include "xla/pjrt/multimesh/mpmd_utils.h"
 
+#include "absl/container/btree_map.h"
+
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
@@ -63,11 +65,18 @@ absl::string_view GetEnvOption(absl::string_view name,
 }
 
 bool IsReplicatedOrNotSharded(const HloInstruction* instruction) {
-  return !instruction->has_sharding() || instruction->sharding().IsReplicated();
+  return !instruction->has_sharding() ||
+         instruction->sharding().IsReplicated() ||
+         instruction->sharding().IsManual() ||
+         instruction->sharding().IsTileMaximal();
 }
 
-bool IsNontriviallySharded(const HloInstruction* instruction) {
-  return instruction->has_sharding() && instruction->sharding().IsReplicated();
+bool ShardingHasTileAssignment(const HloInstruction* instruction) {
+  return instruction->has_sharding() &&
+         !(instruction->sharding().IsReplicated() ||
+           instruction->sharding().IsManual() ||
+           instruction->sharding().IsTuple() ||
+           instruction->sharding().IsTileMaximal());
 }
 
 HloInstruction* GetTupleOrComputationAlias(HloInstruction* instruction) {
@@ -823,7 +832,8 @@ absl::StatusOr<bool> EnforceBijectiveTasks(HloComputation* computation) {
           std::string schedule_string,
           GetOptionalTaskValue<std::string>(
               json, std::string(instruction->name()), "schedule", ""));
-      return (schedule_string == "custom");
+      return (schedule_string == "custom" ||
+              schedule_string == "zero-bubble-h2");
     }
   }
   return false;
@@ -844,6 +854,29 @@ bool AllowOverride(int64_t index, absl::Span<const bool> override) {
     return false;
   }
   return override[0];
+}
+
+absl::flat_hash_map<const HloInstruction*, int64_t> ComputeDepthMap(
+    const HloComputation* computation) {
+  absl::flat_hash_map<const HloInstruction*, int64_t> depth;
+  for (auto* instruction : computation->MakeInstructionPostOrder()) {
+    depth[instruction] = 0;
+    for (auto* operand : instruction->operands()) {
+      depth[instruction] = std::max(depth[instruction], depth[operand] + 1);
+    }
+  }
+  return depth;
+}
+
+absl::flat_hash_map<const HloInstruction*, int64_t> CreateTopologicalIndexMap(
+    const HloComputation* computation) {
+  absl::flat_hash_map<const HloInstruction*, int64_t> instruction_to_topo_index;
+  const std::vector<HloInstruction*> topological_order =
+      computation->MakeInstructionPostOrder();
+  for (int64_t i = 0; i < topological_order.size(); ++i) {
+    instruction_to_topo_index[topological_order[i]] = i;
+  }
+  return instruction_to_topo_index;
 }
 
 }  // namespace xla

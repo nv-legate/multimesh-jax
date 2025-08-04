@@ -10,9 +10,11 @@
 #include <type_traits>
 
 #include "xla/hlo/ir/hlo_instruction.h"
-#include "xla/pjrt/multimesh/logical_sharding_context.h"
 
 namespace xla {
+
+using LogicalShardingAxes =
+    absl::InlinedVector<absl::InlinedVector<std::string, 6>, 6>;
 
 // If the `source` instruction has been assigned a color and the
 // `target` instruction has not been assigned a color, assign

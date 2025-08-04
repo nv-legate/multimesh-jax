@@ -8,9 +8,9 @@
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/pjrt/multimesh/hlo_partition.h"
 #include "xla/pjrt/multimesh/mm_sharding.h"
-#include "xla/pjrt/multimesh/logical_sharding_context.h"
 #include "xla/pjrt/multimesh/mpmd_instruction.h"
 #include "xla/pjrt/multimesh/mpmd_utils.h"
+#include "xla/pjrt/multimesh/pycallback_types.h"
 
 namespace xla {
 namespace {
@@ -20,7 +20,8 @@ namespace {
 // `context`.
 absl::StatusOr<OpSharding> LogicalShardingToOpSharding(
     const HloPartition& partition, HloInstruction* instruction,
-    const LogicalShardingContext& context,
+    const zuku::DeviceList& sharding_devices,
+    const multimesh::TaskOptions& context,
     const LogicalShardingAxes& logical_axis_names) {
   IndexVector<int64_t> dims{context.dims.begin(), context.dims.end()};
   int64_t dim_product = 1;
@@ -29,15 +30,15 @@ absl::StatusOr<OpSharding> LogicalShardingToOpSharding(
   }
 
   IndexVector<IndexVector<int>> logical_to_device_axes;
-  logical_to_device_axes.resize(logical_axis_names.axes.size());
+  logical_to_device_axes.resize(logical_axis_names.size());
 
-  logical_to_device_axes.reserve(logical_axis_names.axes.size());
+  logical_to_device_axes.reserve(logical_axis_names.size());
   absl::flat_hash_set<int> device_axes_used;
 
-  IndexVector<int> sharding_on_axis(logical_axis_names.axes.size(), 1);
+  IndexVector<int> sharding_on_axis(logical_axis_names.size(), 1);
   for (const auto& [logical_ax, device_ax] : context.logical_axes) {
     int logical_axis_index = 0;
-    for (const auto& axis : logical_axis_names.axes) {
+    for (const auto& axis : logical_axis_names) {
       for (const auto& logical_name : axis) {
         VLOG(5) << instruction->name() << " comparing logical name "
                 << logical_name << " for axis " << logical_axis_index
@@ -45,7 +46,7 @@ absl::StatusOr<OpSharding> LogicalShardingToOpSharding(
         if (logical_name == logical_ax) {
           int device_axis_index = 0;
           bool axis_found = false;
-          for (auto&& ax : context.device_axes) {
+          for (auto&& ax : context.axes) {
             if (ax == device_ax) {
               axis_found = true;
               break;
@@ -84,13 +85,6 @@ absl::StatusOr<OpSharding> LogicalShardingToOpSharding(
   const bool list_all_devices =
       context.devices.size() < partition.Devices().size();
 
-  zuku::DeviceList sharding_devices = [&] {
-    if (context.loop_submesh.has_value()) {
-      return context.loop_submesh->SubmeshForIteration(0);
-    }
-    return context.devices;
-  }();
-
   TF_ASSIGN_OR_RETURN(
       auto op_sharding,
       LogicalToPhysicalSharding(logical_to_device_axes, sharding_devices, dims,
@@ -122,10 +116,11 @@ absl::StatusOr<OpSharding> LogicalShardingToOpSharding(
   if (VLOG_IS_ON(5)) {
     TF_ASSIGN_OR_RETURN(auto sharding, HloSharding::FromProto(op_sharding));
     VLOG(5) << "autosharding " << instruction->name() << ":"
-            << instruction->shape() << " -> " << sharding;
+            << instruction->shape() << " -> " << sharding << " over "
+            << partition.DevicesForInstruction(instruction);
   }
 
-  return std::move(op_sharding);
+  return op_sharding;
 }
 
 }  // namespace
@@ -135,14 +130,17 @@ absl::StatusOr<bool> MpmdLogicalToGSPMDSharding::ApplySharding(
   if (!instruction->has_sharding()) {
     std::optional<LogicalShardingAxes> axes = GetAxes(instruction);
     if (axes.has_value()) {
-      VLOG(5) << "trying to apply sharding to " << instruction->name();
       auto color = Color(instruction);
       if (color.has_value()) {
-        auto context = partition_->GetLogicalShardingContext(*color);
-        if (context) {
-          TF_ASSIGN_OR_RETURN(OpSharding op_sharding,
-                              LogicalShardingToOpSharding(
-                                  *partition_, instruction, *context, *axes));
+        VLOG(5) << "trying to apply sharding to " << instruction->name()
+                << " on color " << *color;
+        const auto& context = partition_->GetTaskOptions(*color);
+        if (!context.logical_axes.empty()) {
+          TF_ASSIGN_OR_RETURN(
+              OpSharding op_sharding,
+              LogicalShardingToOpSharding(*partition_, instruction,
+                                          partition_->DevicesForColor(*color),
+                                          context, *axes));
           TF_ASSIGN_OR_RETURN(auto hlo_sharding,
                               HloSharding::FromProto(op_sharding));
           instruction->set_sharding(hlo_sharding);

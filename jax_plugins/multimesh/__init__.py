@@ -20,7 +20,6 @@ def initialize():
     )
 
     from jax._src.lib import xla_client
-    from jaxlib import xla_extension as xe
 
     xla_client.register_custom_call_handler(
         "CUDA", functools.partial(register_custom_call_target, c_api)

@@ -131,6 +131,11 @@ absl::StatusOr<bool> MpmdInsertReshard::Run(
         HloInstruction* reshard = make_reshard_if_needed(
             *color, operand_devices, devices, operand, parameter);
         if (reshard) {
+          VLOG(5) << "Replacing operand " << index << " of "
+                  << instruction->name() << " with shape "
+                  << instruction->operand(index)->shape().ToString() << " with "
+                  << reshard->name() << " with shape "
+                  << reshard->shape().ToString();
           TF_RETURN_IF_ERROR(instruction->ReplaceOperandWith(index, reshard));
           changed = true;
         }

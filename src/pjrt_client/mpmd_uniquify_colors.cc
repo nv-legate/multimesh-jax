@@ -15,7 +15,6 @@ absl::StatusOr<bool> MpmdUniquifyColors::Run(
     HloModule* module,
     const absl::flat_hash_set<absl::string_view>& execution_threads) {
   // recolor everything to have a unique color per-task
-  int64_t next_color = 0;
   absl::flat_hash_map<std::string, std::string> color_map;
   std::vector<HloComputation*> to_visit = {module->entry_computation()};
 
@@ -37,8 +36,10 @@ absl::StatusOr<bool> MpmdUniquifyColors::Run(
                                        " without color assigned");
         }
         std::string new_color = *color;
-        if (color_map.contains(*color)) {
-          new_color = absl::StrCat(*color, ".", next_color);
+        int64_t next_color = 0;
+        while (color_map.contains(new_color)) {
+          new_color = absl::StrCat(next_color, ".", *color);
+          ++next_color;
         }
         color_map[new_color] = *color;
 
@@ -54,7 +55,6 @@ absl::StatusOr<bool> MpmdUniquifyColors::Run(
             AssignColor(user, new_color);
           }
           AssignColor(instruction, new_color);
-          ++next_color;
         }
       }
     }

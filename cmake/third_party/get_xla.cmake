@@ -55,7 +55,6 @@ function(find_or_configure_xla)
 
   set(test_names
     mpmd_partition_test
-    mm_buffer_action_test
     mm_sharding_test
     loop_scheduler_test
     mm_pjrt_client_test
@@ -85,6 +84,8 @@ function(find_or_configure_xla)
     mpmd_insert_reshard_test
     mpmd_buffer_scheduling_name_test
     mpmd_inplace_collectives_test
+    task_splitter_test
+    critical_path_finder_test
   )
 
   set(target_names
@@ -102,8 +103,15 @@ function(find_or_configure_xla)
    --define open_source_build=true
    --define framework_shared_object=false
    --define tsl_protobuf_header_only=false
-   --config=cuda
  )
+
+ if (CMAKE_BUILD_TYPE STREQUAL "ASAN")
+  # limit parallelism to avoid blowing out memory
+  list(APPEND _bazel_options
+     -c dbg
+     --jobs 32
+     --config=asan)
+ endif()
 
  if (MultiMeshJAX_XLA_LINKER)
    list(APPEND _bazel_options 

@@ -105,23 +105,23 @@ TEST_F(MpmdInstructionDelayRecolorTest, DelayInitInstructions) {
       GetHloModuleFromText(kDelayInitInstructionsHlo, /*num_devices=*/2));
 
   TF_ASSERT_OK_AND_ASSIGN(
-      auto green, partition_->AllocateColor(
-                      "green", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto green,
+      partition_->AllocateColor("green", {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto red, partition_->AllocateColor(
-                    "red", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto red,
+      partition_->AllocateColor("red", {{.start = 0, .num_devices = 2}}, {}));
+  TF_ASSERT_OK_AND_ASSIGN(auto orange,
+                          partition_->AllocateColor(
+                              "orange", {{.start = 0, .num_devices = 2}}, {}));
+  TF_ASSERT_OK_AND_ASSIGN(auto yellow,
+                          partition_->AllocateColor(
+                              "yellow", {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto orange, partition_->AllocateColor(
-                       "orange", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto brown,
+      partition_->AllocateColor("brown", {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto yellow, partition_->AllocateColor(
-                       "yellow", {{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto brown, partition_->AllocateColor(
-                      "brown", {{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto blue, partition_->AllocateColor(
-                     "blue", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto blue,
+      partition_->AllocateColor("blue", {{.start = 0, .num_devices = 2}}, {}));
 
   MpmdInstructionDelayRecolor recolor{partition_.get()};
 
@@ -228,23 +228,23 @@ TEST_F(MpmdInstructionDelayRecolorTest, DelaySharedBroadcastInstructions) {
       auto module, GetHloModuleFromText(kSharedConstantHlo, /*num_devices=*/2));
 
   TF_ASSERT_OK_AND_ASSIGN(
-      auto green, partition_->AllocateColor(
-                      "green", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto green,
+      partition_->AllocateColor("green", {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto red, partition_->AllocateColor(
-                    "red", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto red,
+      partition_->AllocateColor("red", {{.start = 0, .num_devices = 2}}, {}));
+  TF_ASSERT_OK_AND_ASSIGN(auto orange,
+                          partition_->AllocateColor(
+                              "orange", {{.start = 0, .num_devices = 2}}, {}));
+  TF_ASSERT_OK_AND_ASSIGN(auto yellow,
+                          partition_->AllocateColor(
+                              "yellow", {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto orange, partition_->AllocateColor(
-                       "orange", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto brown,
+      partition_->AllocateColor("brown", {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto yellow, partition_->AllocateColor(
-                       "yellow", {{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto brown, partition_->AllocateColor(
-                      "brown", {{.start = 0, .num_devices = 2}}, nullptr));
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto blue, partition_->AllocateColor(
-                     "blue", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto blue,
+      partition_->AllocateColor("blue", {{.start = 0, .num_devices = 2}}, {}));
 
   MpmdInstructionDelayRecolor recolor{partition_.get()};
 

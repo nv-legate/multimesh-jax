@@ -360,23 +360,6 @@ void ZukuExecuteContextImpl::Destroy(StoreHandle& store) {
   }  // the runtime no longer exists, we can't delete
 }
 
-void ZukuExecuteContextImpl::StoreBufferAction(int64_t local_device_id,
-                                               BufferAction* action,
-                                               const StoreHandle& store,
-                                               bool blocking) {
-  zuku::Processor p = LocalProcessor(local_device_id);
-  auto token = on(p).defer(
-      [](int64_t local_device_id, BufferAction* action,
-         zuku::ShardedArray& array) {
-        // ApplyStoreBufferAction(local_device_id, action, array);
-      },
-      local_device_id, action, store.impl->array);
-
-  if (blocking) {
-    token.Wait();
-  }
-}
-
 bool ZukuExecuteContextImpl::HasLocalShard(const StoreHandle& handle) {
   return handle.impl->array->HasTile();
 }
@@ -470,6 +453,10 @@ void ZukuExecuteContextImpl::Reshard(int64_t local_device_id,
 
 bool ZukuExecuteContextImpl::IsGpu() {
   return zuku::Processor::DefaultType() == zuku::Processor::Type::GPU;
+}
+
+void ZukuExecuteContextImpl::MarkProfile(const std::string& name) {
+  zuku::MarkProfile(zuku::Processor::Util(), name, last_execute_events_[0]);
 }
 
 void ZukuExecuteContextImpl::StartTimer(const std::string& name) {

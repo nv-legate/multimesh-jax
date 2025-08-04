@@ -167,11 +167,11 @@ TEST_F(MpmdShardingPropagationTest, NestedWhileLoop) {
       auto module, GetHloModuleFromText(kNestedWhileHlo, /*num_devices=*/4));
 
   TF_ASSERT_OK_AND_ASSIGN(
-      auto f, partition_->AllocateColor(
-                  "task_f", {{.start = 0, .num_devices = 4}}, nullptr));
+      auto f, partition_->AllocateColor("task_f",
+                                        {{.start = 0, .num_devices = 4}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto g, partition_->AllocateColor(
-                  "task_g", {{.start = 0, .num_devices = 4}}, nullptr));
+      auto g, partition_->AllocateColor("task_g",
+                                        {{.start = 0, .num_devices = 4}}, {}));
   MpmdShardingPropagation propagation{
       partition_.get(), MpmdShardingPropagation::PropagationMode::ForwardFull};
   TF_ASSERT_OK(propagation.Run(module.get()).status());
@@ -191,8 +191,8 @@ TEST_F(MpmdShardingPropagationTest, ShardReplicatedIntermediates) {
       auto module, GetHloModuleFromPath("large_replicated_intermediate.txt",
                                         /*num_devices=*/8));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto blue, partition_->AllocateColor(
-                     "blue", {{.start = 0, .num_devices = 8}}, nullptr));
+      auto blue,
+      partition_->AllocateColor("blue", {{.start = 0, .num_devices = 8}}, {}));
   MpmdShardingPropagation propagation{
       partition_.get(),
       MpmdShardingPropagation::PropagationMode::BackwardInputOutput};
@@ -208,10 +208,10 @@ TEST_F(MpmdShardingPropagationTest, LargeParametersNotSharded) {
   zuku::DeviceList devices04{{.start = 0, .num_devices = 4}};
   zuku::DeviceList devices48{{.start = 4, .num_devices = 4}};
   zuku::DeviceList devices08{{.start = 0, .num_devices = 8}};
-  LogicalShardingContext context04{
-      .devices = devices04,
+  multimesh::TaskOptions context04{
+      .devices = devices04.vector(),
       .dims = {1, 1, 4},
-      .device_axes = {"x", "y", "z"},
+      .axes = {"x", "y", "z"},
       .logical_axes =
           {
               {"replica", "x"},
@@ -220,49 +220,34 @@ TEST_F(MpmdShardingPropagationTest, LargeParametersNotSharded) {
           },
   };
   auto context48 = context04;
-  context48.devices = devices48;
-
-  auto context04_ptr =
-      std::make_shared<LogicalShardingContext>(std::move(context04));
-  auto context48_ptr =
-      std::make_shared<LogicalShardingContext>(std::move(context48));
+  context48.devices = devices48.vector();
 
   TF_ASSERT_OK_AND_ASSIGN(
       auto rp,
-      partition_->AllocateColor("replicated-params", devices08, context04_ptr));
+      partition_->AllocateColor("replicated-params", devices08, context04));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto emb, partition_->AllocateColor("emb", devices04, context04_ptr));
+      auto emb, partition_->AllocateColor("emb", devices04, context04));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer0,
-      partition_->AllocateColor("layers_0", devices04, context04_ptr));
+      auto layer0, partition_->AllocateColor("layers_0", devices04, context04));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer2,
-      partition_->AllocateColor("layers_2", devices04, context04_ptr));
+      auto layer2, partition_->AllocateColor("layers_2", devices04, context04));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer4,
-      partition_->AllocateColor("layers_4", devices04, context04_ptr));
+      auto layer4, partition_->AllocateColor("layers_4", devices04, context04));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer6,
-      partition_->AllocateColor("layers_6", devices04, context04_ptr));
+      auto layer6, partition_->AllocateColor("layers_6", devices04, context04));
 
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer1,
-      partition_->AllocateColor("layers_1", devices48, context48_ptr));
+      auto layer1, partition_->AllocateColor("layers_1", devices48, context48));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer3,
-      partition_->AllocateColor("layers_3", devices48, context48_ptr));
+      auto layer3, partition_->AllocateColor("layers_3", devices48, context48));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer5,
-      partition_->AllocateColor("layers_5", devices48, context48_ptr));
+      auto layer5, partition_->AllocateColor("layers_5", devices48, context48));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer7,
-      partition_->AllocateColor("layers_7", devices48, context48_ptr));
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto loss,
-      partition_->AllocateColor("compute_loss", devices48, context48_ptr));
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto final_ln,
-      partition_->AllocateColor("final_ln", devices48, context48_ptr));
+      auto layer7, partition_->AllocateColor("layers_7", devices48, context48));
+  TF_ASSERT_OK_AND_ASSIGN(auto loss, partition_->AllocateColor(
+                                         "compute_loss", devices48, context48));
+  TF_ASSERT_OK_AND_ASSIGN(auto final_ln, partition_->AllocateColor(
+                                             "final_ln", devices48, context48));
 
   MpmdShardingPropagation propagation{
       partition_.get(), MpmdShardingPropagation::PropagationMode::ForwardFull};

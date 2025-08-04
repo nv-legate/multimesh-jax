@@ -238,9 +238,9 @@ StoreHandle MockZukuExecuteContext::CreateStoreImpl(int64_t local_device_id,
           << ", min_cache_size=" << config.min_cache_size.value_or(1);
 
   return {.impl = std::shared_ptr<StoreHandleImpl>{new StoreHandleImpl{
-              .name = config.name.value_or("anonymous"),
               .shape = shape,
-              .has_tile = shape.sharding.devices.Contains(global_device_id)}},
+              .has_tile = shape.sharding.devices.Contains(global_device_id),
+              .name = config.name.value_or("anonymous")}},
           .unique_id = store_id_counter_++};
 }
 
@@ -268,12 +268,9 @@ void MockZukuExecuteContext::Reshard(int64_t local_device_id,
   dst.impl->last_op = LastOp::Reshard;
 }
 
-void MockZukuExecuteContext::StoreBufferAction(int64_t local_device_id,
-                                               BufferAction* actions,
-                                               const StoreHandle& store,
-                                               bool blocking) {}
-
 void MockZukuExecuteContext::Destroy(StoreHandle& store) {}
+
+void MockZukuExecuteContext::MarkProfile(const std::string& name) {}
 
 void MockZukuExecuteContext::StartTimer(const std::string& name) {}
 

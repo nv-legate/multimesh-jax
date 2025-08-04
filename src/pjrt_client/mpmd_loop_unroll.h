@@ -36,8 +36,15 @@ class MpmdLoopUnroll : public HloModulePass {
   absl::string_view name() const override { return "mpmd-loop-unroll"; }
 
  private:
-  absl::Status Unroll(HloComputation* parent, HloComputation* body,
-                      HloInstruction* while_loop, HloInstruction* input_tuple,
+  using ClonedColorMap =
+      absl::flat_hash_map<std::string,
+                          absl::flat_hash_map<zuku::DeviceList, std::string>>;
+
+  bool IsLoopDependent(const HloInstruction* instr);
+  absl::Status ApplyLoopDependentColor(HloInstruction* instr, int iter,
+                                       ClonedColorMap& cloned_colors);
+
+  absl::Status Unroll(HloInstruction* while_loop, ClonedColorMap& cloned_colors,
                       const InstructionProperties& properties,
                       HloPassCleanup& cleanup);
 

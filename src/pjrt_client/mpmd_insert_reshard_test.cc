@@ -82,11 +82,11 @@ TEST_F(MpmdInsertReshardTest, BasicTasks) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
-          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
+          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
-          "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
+          "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, {}));
 
   MpmdInsertReshard inserter{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, inserter.Run(module.get()));
@@ -138,11 +138,11 @@ TEST_F(MpmdInsertReshardTest, CommonReshard) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
-          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
+          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
-          "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
+          "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, {}));
 
   MpmdInsertReshard inserter{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, inserter.Run(module.get()));
@@ -189,11 +189,11 @@ TEST_F(MpmdInsertReshardTest, ShardingChangeSameDevices) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
-          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
+          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
-          "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
+          "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, {}));
 
   MpmdInsertReshard inserter{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, inserter.Run(module.get()));
@@ -244,11 +244,11 @@ TEST_F(MpmdInsertReshardTest, ScalarReshard) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
-          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, nullptr));
+          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 4}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
-          "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, nullptr));
+          "task_g", zuku::DeviceList{{.start = 4, .num_devices = 4}}, {}));
 
   MpmdInsertReshard inserter{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, inserter.Run(module.get()));
@@ -346,26 +346,23 @@ TEST_F(MpmdInsertReshardTest, RootTupleRecolor) {
       GetHloModuleFromText(kRootTupleRecolorHlo, /*num_devices=*/2));
 
   TF_ASSERT_OK_AND_ASSIGN(
-      auto f,
-      partition_->AllocateColor(
-          "f", zuku::DeviceList{{.start = 0, .num_devices = 1}}, nullptr));
+      auto f, partition_->AllocateColor(
+                  "f", zuku::DeviceList{{.start = 0, .num_devices = 1}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto g,
-      partition_->AllocateColor(
-          "g", zuku::DeviceList{{.start = 1, .num_devices = 1}}, nullptr));
+      auto g, partition_->AllocateColor(
+                  "g", zuku::DeviceList{{.start = 1, .num_devices = 1}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto f_bwd,
       partition_->AllocateColor(
-          "f.bwd", zuku::DeviceList{{.start = 0, .num_devices = 1}}, nullptr));
+          "f.bwd", zuku::DeviceList{{.start = 0, .num_devices = 1}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto g_bwd,
       partition_->AllocateColor(
-          "g.bwd", zuku::DeviceList{{.start = 1, .num_devices = 1}}, nullptr));
+          "g.bwd", zuku::DeviceList{{.start = 1, .num_devices = 1}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto global,
       partition_->AllocateColor(
-          "sharding", zuku::DeviceList{{.start = 0, .num_devices = 2}},
-          nullptr));
+          "sharding", zuku::DeviceList{{.start = 0, .num_devices = 2}}, {}));
 
   MpmdInsertReshard inserter{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, inserter.Run(module.get()));

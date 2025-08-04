@@ -11,7 +11,6 @@
 #include <string>
 
 #include "src/zuku/tiled_array.h"
-#include "xla/pjrt/multimesh/mm_buffer_action.h"
 #include "xla/pjrt/multimesh/mm_computation.h"
 #include "xla/pjrt/multimesh/scalar_argument.h"
 #include "xla/pjrt/multimesh/store_handle_fwd.h"
@@ -78,6 +77,8 @@ class ZukuExecuteContext {
   virtual void* SliceLocalShard(int64_t local_device_id,
                                 const StoreHandle& handle) = 0;
 
+  virtual void MarkProfile(const std::string& name) = 0;
+
   virtual void StartTimer(const std::string& name) = 0;
 
   virtual void StopTimer(const std::string& name) = 0;
@@ -111,9 +112,6 @@ class ZukuExecuteContext {
   virtual bool IsGpu() = 0;
 
   virtual bool HasLocalShard(const StoreHandle& handle) = 0;
-
-  virtual void StoreBufferAction(int64_t local_device_id, BufferAction* actions,
-                                 const StoreHandle& store, bool blocking) = 0;
 
   virtual void Rename(StoreHandle& handle, std::string name) = 0;
 

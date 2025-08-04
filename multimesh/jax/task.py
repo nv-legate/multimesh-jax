@@ -3,21 +3,41 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import collections
+import contextlib
+import functools
 import json
+import re
+from dataclasses import dataclass
 from functools import partial
-from typing import Any, Callable, Literal, Optional, Sequence, Tuple, Type
+from typing import (
+    Any,
+    Callable,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Pattern,
+    Sequence,
+    Tuple,
+    Type,
+)
 
 import jax
 import jax.lax
 import jax.numpy as jnp
 import numpy as np
 from jax import core as jax_core
+from jax._src import config as jax_config
 from jax._src.lib import xla_client as xc
+from jax._src.lib.mlir import ir
+from jax._src.lib.mlir.dialects import hlo
+from jax._src.mesh import thread_resources
+from jax.experimental import shard_map as jax_shard_map
 from jax.experimental.pjit import AUTO
 from jax.interpreters import ad, mlir
-from jax.interpreters.mlir import hlo, ir
-from jax.sharding import Mesh, PartitionSpec as P
-from jax.tree_util import tree_map
+from jax.sharding import AbstractMesh, Mesh, PartitionSpec as P
+from jax.tree import map as tree_map
+from numpy.typing import NDArray
 
 from .lib import (
     autoshard,
@@ -25,8 +45,536 @@ from .lib import (
     should_ignore_transforms,
     with_sharding_constraint,
 )
-from .multimesh_jax_impl import _register_task, _register_task_factory
+from .multimesh_jax_impl import (
+    pop_task_context,
+    push_task_context,
+    register_task_factory,
+)
 from .no_op import no_op
+
+jax_custom_partitioning = jax._src.custom_partitioning.custom_partitioning
+jax_shard_map_shard_map = jax_shard_map.shard_map
+
+_context_stack = []
+
+
+class TaskMesh:
+    """TaskMesh representing a submesh within the global mesh
+
+    TaskMesh define the submesh devices, axis names, and axis sizes
+    for a task that runs on a subset or slice of the global mesh
+
+    Args:
+        devices (Sequence[int]): The list of device numbers to include in
+            the task. Device numbers correspond to a [O,N) relative
+            numbering of devices within the executable, not global device
+            numbers.
+        axis_sizes (Optional[Sequence[int]]): The sizes of each
+            task mesh axis. Defaults to None.
+        axis_names (Optional[Sequence[str]]): The names of each
+            task mesh axis. Defaults to None.
+        abstract (Optional[AbstractMesh]): A Jax AbstractMesh
+            defining both axis_sizes and axis_names. Defaults to None.
+    """
+
+    def __init__(
+        self,
+        *,
+        devices: Sequence[int],
+        axis_sizes: Optional[Sequence[int]] = None,
+        axis_names: Optional[Sequence[str]] = None,
+        abstract: Optional[AbstractMesh] = None,
+    ):
+        if abstract is None:
+            self.mesh = AbstractMesh(axis_sizes, axis_names)
+        else:
+            self.mesh = abstract
+        if not isinstance(devices, np.ndarray):
+            devices = np.array(devices, dtype=int).reshape(
+                self.mesh.axis_sizes
+            )
+        self.devices = devices
+
+    def place(self, devices: Sequence[int]) -> Mesh:
+        """Creates an equivalent task mesh placed on new devices
+
+        Args:
+            devices (Sequence[int]): The new devices to use for the mesh
+
+        Returns:
+            TaskMesh: A task mesh with the same axes placed on new devices
+        """
+        return TaskMesh(devices=devices, abstract=self.mesh)
+
+    @property
+    def abstract_mesh(self) -> AbstractMesh:
+        return self.mesh
+
+
+@dataclass
+class Task:
+    """Task dataclass defining all options for a named task context"""
+
+    name: Optional[str] = None
+    """The name of the task. If not given, a default task name based on the
+       matched metadata name will be filled in."""
+    mesh: Optional[TaskMesh] = None
+    """The `TaskMesh` defining the submesh shape and axis names"""
+    logical_axes: Optional[Sequence[Tuple[str, str]]] = None
+    """The mapping of logical axis names in the sharding spec
+       to device axes in the task mesh given as priority-ordered pairs"""
+    mesh_slice: Optional[Mapping[str, int]] = None
+    """A mapping of axis: slice pairs defining the task submesh as
+       a slice of the global mesh along the named axes"""
+    extra_axes: Optional[Sequence[Tuple[str, str]]] = None
+    """Extra logical->device axis mappings to use in addition to those
+       defined by the mesh_slice"""
+    split_backprop: Optional[Tuple[str, str]] = None
+    """Whether to split backprop tasks into activation (critical path)
+       and weight gradients (non-critical path)"""
+    loop_dependent_mesh_slice: Optional[
+        Callable[[int], Mapping[str, int]]
+    ] = None
+    """A callback that defines a different mesh slice for each
+       iteration of the loop"""
+
+
+class Context:
+    def __init__(self):
+        self._registered_task_slices: List[
+            Tuple[Pattern, Callable[[str, bool], Task]]
+        ] = []
+        self.tasks = {}
+
+    def __enter__(self):
+        _context_stack.append(self)
+        push_task_context()
+
+        for regex, cpp_callback in self.tasks.items():
+            register_task_factory(regex, cpp_callback)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _context_stack.pop()
+        pop_task_context()
+
+    def find_matching_slice_in_scope(self) -> Optional[TaskMesh]:
+        name_stack = (
+            jax._src.interpreters.mlir._name_stack
+            or jax._src.source_info_util.current().name_stack
+        )
+
+        scopes = []
+        for x in name_stack.stack:
+            x.wrap(scopes)
+
+        full_scope = "/".join(scopes)
+        for scope in reversed(scopes):
+            for regex, task_callback in self._registered_task_slices:
+                if match := regex.search(scope):
+                    backprop = "transpose(jvp" in full_scope
+                    task = task_callback(match.groups()[0], backprop)
+                    if task.mesh_slice is None:
+                        raise ValueError(
+                            f"task {match.groups()[0]} does not "
+                            f"return a mesh slice: {task}"
+                        )
+                    return task.mesh_slice
+        return None
+
+    def register_task(
+        self,
+        matcher: str,
+        *,
+        callback: Optional[Callable[[str, bool], Task]] = None,
+        task: Optional[Task] = None,
+    ):
+        """Registers a name or regex-based task autosharding context
+
+        Args:
+            matcher: A name or regular expression with match group.
+                This should match the name of a Flax module or a name passed to
+                ``jax.with_named_scope``.
+            callback: optional, a callback taking the match group from ``matcher``
+                    and a bool indicating whether it is backprop. The
+                    callback must return a ``Task`` defining
+                    the mesh and other attributes of the task scope
+            task: optional, a ``Task`` defining the mesh and other attributes
+                    of the task scope
+
+        Returns:
+            None
+
+        Examples:
+            Basic usage with mesh argument is:
+
+            >>> import numpy as np
+            >>> import jax
+            >>> from multimesh.jax import register_task
+            >>> from jax.sharding import PartitionSpec as P, AbstractMesh, Mesh
+            >>>
+            >>> def f(x):
+            ...   with jax.named_scope("subtask"):
+            ...     x = with_sharding_constraint(x, P("batch", "model"))
+            ...     out = x*x
+            ...     return with_sharding_constraint(out, P("batch", "model"))
+            >>>
+            >>> def callback(name: str, backprop: bool):
+            >>>    mesh = TaskMesh(devices=(0,1,2,3), axis_names=("x", "y"), axis_sizes=(2,2))
+            >>>    return Task(mesh=mesh, name=name)
+            >>> register_task("subtask", callback=callback)
+        """  # noqa: E501
+
+        if "(" not in matcher and ")" not in matcher:
+            regex = f"({matcher})"
+        else:
+            regex = matcher
+
+        if callback is None and task is None:
+            raise Exception("must specify callback or task to register_task")
+        else:
+
+            def cpp_callback(matched: str, backprop: bool):
+                mm_task = task or callback(matched, backprop)
+                if not isinstance(mm_task, Task):
+                    raise ValueError(
+                        "MultiMesh task callback must return a Task object"
+                    )
+
+                if mm_task.mesh_slice is not None and mm_task.mesh is not None:
+                    raise ValueError(
+                        "cannot give both a task.mesh and task.mesh_slice"
+                        f" for task matcher {matcher}"
+                    )
+                if mm_task.mesh_slice is not None:
+                    task_mesh = slice_global_mesh(**mm_task.mesh_slice)
+                elif mm_task.mesh is not None:
+                    task_mesh = mm_task.mesh
+                else:
+                    raise ValueError(
+                        "both task.mesh and task.mesh_slice are None"
+                        f" for task matcher {matcher}"
+                    )
+
+                if mm_task.loop_dependent_mesh_slice is not None:
+
+                    def loop_dependent_devices(i):
+                        iter_mesh_slice = mm_task.loop_dependent_mesh_slice(i)
+                        iter_submesh = slice_global_mesh(**iter_mesh_slice)
+                        submesh_devs = iter_submesh.devices.flatten()
+
+                        num_default_devs = task_mesh.devices.size
+                        if submesh_devs.size != num_default_devs:
+                            raise ValueError(
+                                "loop dependent submesh"
+                                f" ({submesh_devs.size} devices)"
+                                " must have same number of devices as default"
+                                f" task mesh ({num_default_devs} devices)"
+                                f" for task matcher {matcher}"
+                            )
+
+                        return submesh_devs
+
+                else:
+                    loop_dependent_devices = None
+
+                dims = list(task_mesh.mesh.shape.values())
+                device_axes = task_mesh.mesh.axis_names
+                logical_axes = mm_task.logical_axes or list(
+                    (dim, dim) for dim in device_axes
+                )
+                if mm_task.extra_axes is not None:
+                    for logical, device in mm_task.extra_axes:
+                        logical_axes.append((logical, device))
+
+                name = mm_task.name or matcher
+                return (
+                    name,
+                    task_mesh.devices.flatten(),
+                    dims,
+                    device_axes,
+                    logical_axes,
+                    mm_task.split_backprop,
+                    loop_dependent_devices,
+                )
+
+            if callback is None:
+
+                def task_callback(x, y):
+                    return task
+
+            else:
+                task_callback = callback
+            self._registered_task_slices.append(
+                (re.compile(regex), task_callback)
+            )
+        self.tasks[regex] = cpp_callback
+
+
+class MultiMesh(Context, contextlib.ContextDecorator):
+    """MultiMesh represents a global mesh with named submeshes
+
+    MultiMesh defines a global mesh with named submeshes. The mesh can
+    can be sliced along certain dimensions to create submeshes with a
+    specific subshape. The MultiMesh can either create a new global
+    mesh or wrap an existing jax.sharding.Mesh.
+
+    Args:
+        axis_sizes (Optional[Sequence[int]]): The sizes of each
+            global mesh axis. Defaults to None. Ignored if `global_mesh`
+            is given.
+        axis_names (Optional[Sequence[str]]): The names of each
+            global mesh axis. Defaults to None. Ignored if `global_mesh`
+            is given.
+        devices (Optional[np.array[xc.Device]]): The shaped array of devices
+            to include in the global mesh. The shape should match
+            `axis_sizes`. Defaults to None. If not specified,
+            the default `jax.devices()` will be used and reshaped to
+            match the `axis_sizes`. Ignored if `global_mesh` is given.
+        global_mesh (Optional[Mesh]): A Jax Mesh
+            defining devices, axis_sizes, and axis_names. Defaults to None.
+            If given, all other parameters will be ignored. If not
+            given, then `axis_sizes` and `axis_names` must be given.
+    """
+
+    def __init__(
+        self,
+        *,
+        axis_sizes: Optional[Sequence[int]] = None,
+        axis_names: Optional[Sequence[str]] = None,
+        devices: Optional[NDArray[xc.Device]] = None,
+        global_mesh: Optional[Mesh] = None,
+    ):
+        super().__init__()
+        if global_mesh:
+            self.global_mesh = global_mesh
+        else:
+            if devices is None:
+                devices = np.array(jax.devices()).reshape(axis_sizes)
+            self.global_mesh = Mesh(devices, axis_names)
+
+    def slice(self, **kwargs: Mapping[str, int]) -> Mesh:
+        """Slice the global mesh along the specified axis.
+
+        Slices a mesh along the given named dimensions as
+        defined by the kwargs map.
+
+        Args:
+            kwargs: (Mapping[str,int]). A mapping defining
+            axis: value pairs that will be sliced out of
+            the global mesh.
+
+        Returns:
+            Mesh: A submesh sliced along the specified dimensions.
+        """
+        slices = tuple(
+            slice(None)
+            if ax not in kwargs
+            else slice(kwargs[ax], kwargs[ax] + 1)
+            for ax in self.axis_names
+        )
+        devices = self.global_mesh.devices[slices]
+        return Mesh(devices, self.global_mesh.axis_names)
+
+    def single_slice_ids(self, **kwargs) -> List[int]:
+        return [
+            dev.id for dev in self.single_slice_devices(**kwargs).flatten()
+        ]
+
+    def single_slice_devices(self, **kwargs) -> np.ndarray:
+        slices = tuple(
+            slice(None)
+            if ax not in kwargs
+            else slice(kwargs[ax], kwargs[ax] + 1)
+            for ax in self.axis_names
+        )
+        return self.global_mesh.devices[slices]
+
+    @property
+    def shape_tuple(self):
+        return tuple(
+            (name, size)
+            for name, size in zip(self.axis_names, self.devices.shape)
+        )
+
+    @property
+    def size(self):
+        return self.global_mesh.size
+
+    @property
+    def axis_types(self):
+        return self.global_mesh.axis_types
+
+    @property
+    def _are_all_axes_manual(self) -> bool:
+        return self.global_mesh._are_all_axes_manual
+
+    @property
+    def _are_all_axes_auto(self) -> bool:
+        return self.global_mesh._are_all_axes_auto
+
+    @property
+    def _are_all_axes_explicit(self) -> bool:
+        return self.global_mesh._are_all_axes_explicit
+
+    @property
+    def _are_all_axes_auto_or_manual(self) -> bool:
+        return self.global_mesh._are_all_axes_auto_or_manual
+
+    @property
+    def _any_axis_manual(self) -> bool:
+        return self.global_mesh._any_axis_manual
+
+    @property
+    def _any_axis_auto(self) -> bool:
+        return self.global_mesh._any_axis_auto
+
+    @property
+    def _any_axis_explicit(self) -> bool:
+        return self.global_mesh._any_axis_explicit
+
+    @property
+    def _any_axis_auto_or_manual(self) -> bool:
+        return self.global_mesh._any_axis_auto_or_manual
+
+    @property
+    def auto_axes(self):
+        return self.global_mesh.auto_axes
+
+    @property
+    def explicit_axes(self):
+        return self.global_mesh.explicit_axes
+
+    @property
+    def manual_axes(self):
+        return self.global_mesh.manual_axes
+
+    @property
+    def _axis_types_dict(self):
+        return self.global_mesh._axis_types_dict
+
+    @functools.cached_property
+    def abstract_mesh(self):
+        return AbstractMesh(
+            self.axis_sizes, self.axis_names, axis_types=self.axis_types
+        )
+
+    @property
+    def is_multi_process(self):
+        return self.global_mesh.is_multi_process
+
+    @property
+    def _flat_devices_tuple(self):
+        return self.global_mesh._flat_devices_tuple
+
+    @property
+    def _flat_devices_set(self):
+        return self.global_mesh._flat_devices_set
+
+    @property
+    def local_devices(self):
+        return self.global_mesh.local_devices
+
+    @property
+    def axis_names(self):
+        return self.global_mesh.axis_names
+
+    @functools.cached_property
+    def _name_to_type(self):
+        return self.global_mesh._name_to_type
+
+    @property
+    def axis_sizes(self) -> tuple[int, ...]:
+        return self.global_mesh.axis_sizes
+
+    @property
+    def devices(self):
+        return self.global_mesh.devices
+
+    @property
+    def shape(self):
+        return self.global_mesh.shape
+
+    @property
+    def _internal_device_list(self):
+        return self.global_mesh._internal_device_list
+
+    @property
+    def empty(self):
+        return self.global_mesh.empty
+
+    def __enter__(self):
+        self.autoshard = autoshard(True)
+        self.autoshard.__enter__()
+        Context.__enter__(self)
+        new_env = thread_resources.stack[-1].with_mesh(self)
+        thread_resources.stack.append(new_env)
+        thread_resources.env = new_env
+        jax_config.mesh_context_manager.set_local(
+            tuple(
+                t.physical_mesh
+                for t in thread_resources.stack
+                if not t.physical_mesh.empty
+            )
+        )
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        Context.__exit__(self, exc_type, exc_value, traceback)
+        self.autoshard.__exit__(exc_type, exc_value, traceback)
+        thread_resources.stack.pop()
+        thread_resources.env = thread_resources.stack[-1]
+        jax_config.mesh_context_manager.set_local(
+            tuple(
+                t.physical_mesh
+                for t in thread_resources.stack
+                if not t.physical_mesh.empty
+            )
+        )
+        return False
+
+    def __repr__(self):
+        return f"MultiMesh({repr(self.global_mesh)})"
+
+    def __str__(self):
+        return f"MultiMesh({str(self.global_mesh)})"
+
+
+class custom_partitioning:
+    def __init__(self, *args, **kwargs):
+        self.partitioner = jax_custom_partitioning(*args, **kwargs)
+
+    def def_partition(self, *args, **kwargs):
+        return self.partitioner.def_partition(*args, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        mesh = jax._src.mesh.thread_resources.env.physical_mesh
+        if not isinstance(mesh, MultiMesh):
+            raise Exception("The global mesh context should a MultiMesh")
+
+        # see if any of the contexts define a matching scope
+        # starting with the innermost scope and working outwards
+        for context in reversed(_context_stack):
+            slices = context.find_matching_slice_in_scope()
+            if slices:
+                with mesh.slice(**slices):
+                    return self.partitioner(
+                        *args,
+                        **kwargs,
+                    )
+        # no slice context found
+        with mesh:
+            return self.partitioner(*args, **kwargs)
+
+
+def shard_map(*args, mesh=None, **kwargs):
+    mesh = mesh or jax._src.mesh.thread_resources.env.physical_mesh
+    for context in reversed(_context_stack):
+        slices = context.find_matching_slice_in_scope() or {}
+        if slices:
+            return jax_shard_map_shard_map(
+                *args, mesh=mesh.slice(**slices), **kwargs
+            )
+    return jax_shard_map_shard_map(*args, mesh=mesh)
 
 
 def parallelize(
@@ -102,11 +650,11 @@ def parallelize(
 
     with autoshard(True):
         param_shapes = jax.eval_shape(init_params)
-        abstract_params = jax.tree_map(
+        abstract_params = tree_map(
             lambda x: jax.core.ShapedArray(x.shape, x.dtype), param_shapes
         )
 
-        param_shardings = jax.tree_map(lambda x: AUTO(mesh), param_shapes)
+        param_shardings = tree_map(lambda x: AUTO(mesh), param_shapes)
         if initial_batch is None:
             if get_input_batch is None:
                 raise ValueError(
@@ -115,18 +663,18 @@ def parallelize(
                 )
 
             batch_shapes = jax.eval_shape(get_input_batch)
-            batch_sharding = jax.tree_map(lambda x: AUTO(mesh), batch_shapes)
-            initial_batch = jax.tree_map(
+            batch_sharding = tree_map(lambda x: AUTO(mesh), batch_shapes)
+            initial_batch = tree_map(
                 lambda x: jax.core.ShapedArray(x.shape, x.dtype), batch_shapes
             )
         else:
-            batch_sharding = jax.tree_map(lambda x: x.sharding, initial_batch)
-            batch_shapes = jax.tree_map(
+            batch_sharding = tree_map(lambda x: x.sharding, initial_batch)
+            batch_shapes = tree_map(
                 lambda x: jax.core.ShapedArray(x.shape, x.dtype), initial_batch
             )
 
         result_shape = jax.eval_shape(fun, param_shapes, batch_shapes)
-        out_shardings = jax.tree_map(lambda x: AUTO(mesh), result_shape)
+        out_shardings = tree_map(lambda x: AUTO(mesh), result_shape)
 
         jit_f = jax.jit(
             fun,
@@ -162,7 +710,7 @@ def _custom_abstract_eval(*args, jaxpr, **unused_kwargs):
     return jaxpr.out_avals
 
 
-mm_task_p = jax_core.Primitive("mm_task")
+mm_task_p = jax.extend.core.Primitive("mm_task")
 mm_task_p.multiple_results = True
 mm_task_p.def_abstract_eval(_custom_abstract_eval)
 mm_task_p.def_impl(__mm_task_lowering_impl)
@@ -250,54 +798,17 @@ def _get_wrapped_task(
     fxn,
     name: str,
     *,
-    devices: np.ndarray | Sequence[xc.Device] | None = None,
-    mesh: Optional[Mesh] = None,
-    device_axes: Optional[Sequence[str]] = None,
+    devices: Sequence[int],
+    axis_sizes: Sequence[int],
+    axis_names: Sequence[str],
     logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
 ):
-    if mesh is not None:
-        if devices is not None or device_axes is not None:
-            raise ValueError(
-                "cannot give both mesh and "
-                "devices/device_axes arguments to MultiMesh task"
-            )
-        dims = mesh.shape
-        devices = mesh.devices
-        device_axes = mesh.axis_names
-        if logical_axes is None:
-            logical_axes = [(ax, ax) for ax in device_axes]
-
-    if devices is None:
-        devices = [d.id for d in jax.devices()]
-        dims = [len(devices)]
-    elif isinstance(devices, np.ndarray):
-        dims = devices.shape
-        devices = [d.id for d in devices.flatten()]
-    else:
-        devices = [d.id for d in devices]
-        dims = [len(devices)]
-
-    if device_axes is not None and len(device_axes) != len(dims):
-        raise ValueError(
-            f"task {name}, device mesh with {len(dims)} dims does not match "
-            f"device axies with {len(device_axes)} dims:  {device_axes}"
-        )
-
-    if logical_axes is not None and device_axes is None:
-        raise ValueError(f"task {name} given logical_axes but no device_axes")
-
-    if device_axes is None:
-        device_axes = []
-
-    if logical_axes is None:
-        logical_axes = []
-
     args = dict(
         name=name,
         devices=devices,
         autosharding=dict(
-            dims=dims,
-            device_axes=device_axes,
+            dims=axis_sizes,
+            device_axes=axis_names,
             logical_axes=logical_axes,
         ),
     )
@@ -326,10 +837,8 @@ def task(
     fun: Callable | Type,
     name: Optional[str] = None,
     *,
-    mesh: Optional[Mesh] = None,
-    devices: np.ndarray | Sequence[xc.Device] | None = None,
-    device_axes: Optional[Sequence[str]] = None,
-    logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
+    task: Optional[Task] = None,
+    **kwargs,
 ):
     """Wraps a function in an auto-sharding task context
 
@@ -337,23 +846,8 @@ def task(
       fun: Function to be encapsulated as a task. ``fun`` should be pure.
         See documentation for `jax.jit`_ for requirements for ``fun``.
       name: optional, a metadata name to assign to the task context
-      mesh: optional, a Mesh context defining the devices and mesh shape
-      devices: optional, a numpy array or list of jax devices
-        specifying the devices to include in the task submesh.
-        One of ``mesh`` or ``devices`` must be given. If ``devices``
-        is a numpy array, the mesh shape is inferred from the shape
-        of the device array.
-      device_axes: optional, a list of names to assign to each device axis.
-        The number of names must match the shape of ``mesh`` or ``devices``.
-        If this and ``mesh`` are not given, logical sharding constraints
-        will be translated to replicated sharding.
-      logical_axes: optional, a list of string pairs ('logical', 'device')
-        giving the translation from logical names to physical device names.
-        The logical names should match those passed to
-        ``with_sharding_constraint`` calls within the task. If None,
-        the device axis names are used directly for autosharding.
-        Raises a ``ValueError`` if ``logical_axes`` are given
-        but no ``mesh`` or ``device_axes`` are specified.
+      task: the `Task` dataclass defining the submesh and sharding
+      kwargs: options passed through to `Task` dataclass constructor
 
     Returns:
       A wrapped version of ``fun`` usable as a submesh task.
@@ -386,12 +880,32 @@ def task(
     if name is None:
         name = fun.__name__
 
+    if task is None:
+        task = Task(**kwargs)
+
+    if task.mesh is None:
+        devices = tuple(range(0, jax.device_count()))
+        axis_names = ("x",)
+        axis_sizes = (len(devices),)
+        logical_axes = (("x", "x"),)
+    else:
+        devices = tuple(x.item() for x in task.mesh.devices.flatten())
+        axis_names = task.mesh.mesh.axis_names
+        axis_sizes = task.mesh.mesh.axis_sizes
+        if task.logical_axes is None:
+            logical_axes = ((ax, ax) for ax in axis_names)
+        else:
+            logical_axes = tuple(task.logical_axes)
+
+        if task.extra_axes is not None:
+            logical_axes = logical_axes + tuple(task.extra_axes)
+
     return _get_wrapped_task(
         fun,
         name,
-        mesh=mesh,
         devices=devices,
-        device_axes=device_axes,
+        axis_sizes=axis_sizes,
+        axis_names=axis_names,
         logical_axes=logical_axes,
     )
 
@@ -403,7 +917,9 @@ def microbatch(
     argnum: int = 0,
     interleave: Optional[int] = None,
     num_stages: Optional[int] = None,
-    schedule: Optional[Literal["1f1b", "gpipe", "wavefront", "custom"]] = None,
+    schedule: Optional[
+        Literal["1f1b", "gpipe", "wavefront", "custom", "zero-bubble-h2"]
+    ] = None,
     unrolling: Optional[int] = None,
     arg_shardings: Optional[Any] = None,
     custom_schedule: Optional[
@@ -525,10 +1041,10 @@ def microbatch(
         if num_microbatches == 1:
             return fun(*args, **kwargs)
 
-        def is_list_of_list_of_strings(l: list[Any]) -> bool:
-            return isinstance(l, list) and all(
+        def is_list_of_list_of_strings(v: list[Any]) -> bool:
+            return isinstance(v, list) and all(
                 isinstance(i, list) and all(isinstance(j, str) for j in i)
-                for i in l
+                for i in v
             )
 
         nonlocal custom_schedule
@@ -578,7 +1094,7 @@ def microbatch(
         )
 
         if arg_shardings is None or isinstance(arg_shardings, P):
-            pre_slice_shardings = jax.tree_map(lambda a: arg_shardings, x)
+            pre_slice_shardings = tree_map(lambda a: arg_shardings, x)
         else:
             pre_slice_shardings = arg_shardings
 
@@ -633,208 +1149,43 @@ def microbatch(
     return wrapped
 
 
+def get_global_mesh() -> Mesh:
+    return jax._src.mesh.thread_resources.env.physical_mesh
+
+
+def get_abstract_global_mesh():
+    return get_global_mesh.abstract_mesh()
+
+
+def slice_global_mesh(**to_slice) -> TaskMesh:
+    mesh = get_global_mesh()
+    shape = list(mesh.shape.values())
+    all_devices = np.arange(mesh.size).reshape(shape)
+    slices = tuple(
+        slice(to_slice[name], to_slice[name] + 1)
+        if name in to_slice
+        else slice(None)
+        for name in mesh.axis_names
+    )
+    devices = all_devices[slices]
+    return TaskMesh(
+        axis_names=mesh.axis_names, axis_sizes=devices.shape, devices=devices
+    )
+
+
+# always have a default context on the stack
+_context_stack.append(Context())
+
+
 def register_task(
-    regex: str,
+    matcher: str,
     *,
-    name: Optional[str] = None,
-    mesh: Optional[Mesh] = None,
-    dims: Optional[Sequence[int]] = None,
-    callback: Optional[Callable[[str, bool], Tuple[Tuple[int, int], str]]] = None,
-    devices: np.ndarray | Sequence[xc.Device] | Sequence[int] | None = None,
-    device_axes: Optional[Sequence[str]] = None,
-    logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
+    callback: Optional[Callable[[str, bool], Task]] = None,
+    task: Optional[Task] = None,
 ):
-    """Registers a name or regex-based task autosharding context
+    _context_stack[-1].register_task(matcher, callback=callback, task=task)
+    if len(_context_stack) == 1:
+        register_task_factory(matcher, _context_stack[-1].tasks[matcher])
 
-    Args:
-      regex: A full name or regular expression with match group.
-        This should match the name of a Flax module or a name passed to
-        ``jax.with_named_scope``.
-      name: optional, a metadata name to assign to the task context
-      mesh: optional, a Mesh context defining the devices and mesh shape
-      callback: optional, a function that takes are arguments the match group from
-        the ``regex`` and a boolean indicating whether the task is
-        a backprop (generated from autograd). The function returns a
-        [start,stop) tuple defining the range devices for the task
-        and a unique color (string) for the task. For the device range
-        [start, stop), stop is exclusive.
-      dims: optional, the submesh dimensions for the task. Only one
-        of ``mesh`` or ``dims`` should be given.
-      devices: optional, a numpy array or list of jax devices
-        specifying the devices to include in the task submesh.
-        One of ``mesh`` or ``devices`` or ``callback`` must be given.
-        If ``devices`` is a numpy array, the mesh shape is inferred from the shape
-        of the device array.  If both ``mesh`` and ``devices`` are given,
-        then ``mesh`` is considered to define a submesh of the ``devices``
-        for task instances within a loop. The function will then infer
-        a ``loop_submesh_size``.  Similarly, ``dims`` can specify
-        a submesh smaller than ``devices``.
-      device_axes: optional, a list of names to assign to each device axis.
-        The number of names must match the shape of ``devices``.
-        User must give only one of ``mesh`` or ``device_axes``.
-        If this and ``mesh`` are not given, logical sharding constraints
-        will be translated to replicated sharding.
-      logical_axes: optional, a list of string pairs ('logical', 'device')
-        giving the translation from logical names to physical device names.
-        The logical names should match those passed to
-        ``with_sharding_constraint`` calls within the task. If None,
-        the device axis names are used directly for autosharding.
-        Raises a ``ValueError`` if ``logical_axes`` are given
-        but no ``device_axes`` or ``mesh`` are specified.
 
-    Returns: None
-
-    Examples:
-      Basic usage with mesh argument is:
-
-      >>> import numpy as np
-      >>> import jax
-      >>> from multimesh.jax import register_task
-      >>> from jax.sharding import PartitionSpec as P, Mesh
-      >>>
-      >>> def f(x):
-      ...   with jax.named_scope("subtask"):
-      ...     x = with_sharding_constraint(x, P("batch", "model"))
-      ...     out = x*x
-      ...     return with_sharding_constraint(out, P("batch", "model"))
-      >>>
-      >>> devices = np.array(jax.devices()).reshape(2,2)
-      >>> mesh = Mesh(devices, ("x", "y"))
-      >>> register_task("subtask",
-      ...               mesh=mesh,
-      ...               logical_axes=(
-      ...                 ("batch", "x"),
-      ...                 ("model", "y"),
-      ...               ))
-
-      A callback function can be used to dynamically compute devices:
-
-      >>> import numpy as np
-      >>> import jax
-      >>> from multimesh.jax import register_task
-      >>> from jax.sharding import PartitionSpec as P, Mesh
-      >>>
-      >>> def callback(match: str, bwd: bool) -> Tuple[Tuple[int,int],str]:
-      ...   layer_num = int(match.split(".")][-1])
-      ...   devices_per_layer = 4
-      ...   start = layer_num * devices_per_layer
-      ...   stop = start + device_per_layer
-      ...   name = ("bwd." if bwd else "fwd.") + f"layer_{layer_num}"
-      ...   return [start, stop], name
-      >>>
-      >>> def f(x):
-      ...   x = with_sharding_constraint(x, P("batch", "model"))
-      ...   out = x*x
-      ...   return with_sharding_constraint(out, P("batch", "model"))
-      >>>
-      >>> def c(x):
-      ...   with jax.named_scope("layer.0"):
-      ...     x = f(x)
-      ...   with jax.named_scope("layer.1"):
-      ...     return f(x)
-      >>>
-      >>> register_task("subtask",
-      ...               callback=callback,
-      ...               dims=(2,2),
-      ...               device_axes=("x","y"),
-      ...               logical_axes=(
-      ...                 ("batch", "x"),
-      ...                 ("model", "y"),
-      ...               ))
-
-      A submesh and global device list can be given to indicate that
-      multiple instances of the task within a loop should be rotated
-      to different submeshes
-
-      >>> import numpy as np
-      >>> import jax
-      >>> from multimesh.jax import register_task
-      >>> from jax.sharding import PartitionSpec as P, Mesh
-      >>>
-      >>> def f(x):
-      ...   with jax.named_scope("subtask"):
-      ...     x = with_sharding_constraint(x, P("batch", "model"))
-      ...     out = x*x
-      ...     return with_sharding_constraint(out, P("batch", "model"))
-      >>>
-      >>> devices = np.array(jax.devices())
-      >>> mesh = Mesh(devices[0:2].reshape(2,1), ("x", "y"))
-      >>> register_task("subtask",
-      ...               mesh=mesh,
-      ...               devices=devices,
-      ...               logical_axes=(
-      ...                 ("batch", "x"),
-      ...                 ("model", "y"),
-      ...               ))
-    """  # noqa: E501
-
-    def _to_device_id(d: int | xc.Device):
-        if isinstance(d, int):
-            return d
-        if isinstance(d, xc.Device):
-            return d.id
-        raise ValueError(
-            f"in register_task({regex}), {d} is not a device ID or xc.Device"
-        )
-
-    if device_axes is not None and mesh is not None:
-        raise ValueError(
-            f"in register_task({regex}), cannot give both device_axes and mesh"
-        )
-
-    if mesh is not None:
-        device_ids = [d.id for d in mesh.devices.flatten()]
-        dims = mesh.devices.shape
-        device_axes = mesh.axis_names
-        if devices is not None:
-            if isinstance(devices, np.ndarray):
-                device_ids = [_to_device_id(d) for d in devices.flatten()]
-            else:
-                device_ids = [_to_device_id(d) for d in devices]
-    elif devices is not None:
-        if isinstance(devices, np.ndarray):
-            device_ids = [_to_device_id(d) for d in devices.flatten()]
-            if dims is None:
-                dims = devices.shape
-        else:
-            if dims is None:
-                dims = (len(devices),)
-            device_ids = [_to_device_id(d) for d in devices]
-    elif callback is not None:
-        if dims is None:
-            raise ValueError(
-                f"in register_task({regex}), when callback is used, you must "
-                "specify mesh, devices, or dims to define mesh shape"
-            )
-    else:
-        raise ValueError(
-            f"in register_task({regex}), must give mesh, devices, or callback"
-        )
-
-    if device_axes is None and mesh is None:
-        raise ValueError(
-            f"in register_task({regex}), must give either device_axes and mesh"
-        )
-
-    if logical_axes is None:
-        logical_axes = [(ax, ax) for ax in device_axes]
-
-    if "(" not in regex and ")" not in regex:
-        regex = f"({regex})"
-    if callback is not None:
-        _register_task_factory(
-            regex,
-            callback,
-            list(dims),
-            list(device_axes),
-            list(logical_axes),
-        )
-    else:
-        _register_task(
-            regex,
-            device_ids,
-            list(dims),
-            list(device_axes),
-            list(logical_axes),
-            name=name,
-        )
+register_task.__doc__ = _context_stack[-1].register_task.__doc__

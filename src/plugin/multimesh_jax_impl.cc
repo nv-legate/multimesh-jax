@@ -2,14 +2,32 @@
  * SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
+#define PYBIND11_DETAILED_ERROR_MESSAGES
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
 
 #include <string>
+#include <tuple>
 
 #include "zuku/init.h"
+#include "pycallback_types.h"
+
+namespace {
+
+template <typename Struct, typename... Args, std::size_t... indices>
+Struct tuple_to_struct(std::tuple<Args...> t, std::index_sequence<indices...>) {
+  return {std::get<indices>(t)...};
+}
+
+template <typename Struct, typename... Args>
+Struct tuple_to_struct(std::tuple<Args...> t) {
+  return tuple_to_struct<Struct, Args...>(t,
+                                          std::index_sequence_for<Args...>{});
+}
+
+}  // namespace
 
 extern "C" void SetStartupConfig(zuku::RealmConfig cfg);
 
@@ -23,21 +41,13 @@ extern "C" void ZukuShutdown();
 
 extern "C" void SetEnableMetadataNameTasks(bool flag);
 
-extern "C" void RegisterMetadataNameTask(
-    std::string matcher,
-    std::function<std::pair<std::pair<int64_t, int64_t>, std::string>(
-        const std::string&, bool)>
-        callback,
-    std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes);
-
 extern "C" void EnableFastPath(bool enable);
 
-extern "C" void EnableOnlyFuseLoopTasks(bool enable);
-
-extern "C" void EnableTaskFusion(bool enable);
-
 extern "C" void ClearMetadataNameTasks();
+
+extern "C" void PushMetadataNameTaskContext();
+
+extern "C" void PopMetadataNameTaskContext();
 
 extern "C" void EnableMultiMeshRecomputation(bool enable);
 
@@ -93,26 +103,6 @@ PYBIND11_MODULE(multimesh_jax_impl, m) {
   m.def("enable_metadata_name_tasks",
         [](bool flag) { SetEnableMetadataNameTasks(flag); });
   m.def(
-      "_register_task",
-      [](std::string task_regex, std::vector<int64_t> py_devices,
-         std::vector<int64_t> py_device_dims,
-         std::vector<std::string> py_device_axes,
-         std::vector<std::pair<std::string, std::string>> py_logical_axes,
-         std::optional<std::string> name) {
-        const int64_t start = py_devices.front();
-        const int64_t stop = py_devices.back() + 1;
-        auto callback = [=](const std::string& match, bool backprop)
-            -> std::pair<std::pair<int64_t, int64_t>, std::string> {
-          return {{start, stop}, name.value_or(match)};
-        };
-
-        RegisterMetadataNameTask(task_regex, callback, py_device_dims,
-                                 py_device_axes, py_logical_axes);
-      },
-      py::arg("task_regex"), py::arg("devices"), py::arg("dims"),
-      py::arg("device_axes"), py::arg("logical_axes"),
-      py::arg("name") = py::none());
-  m.def(
       "set_startup_config",
       [](std::optional<int> cpus, std::optional<int> gpus,
          std::optional<int64_t> fbmem, std::optional<int64_t> sysmem,
@@ -134,19 +124,21 @@ PYBIND11_MODULE(multimesh_jax_impl, m) {
       py::arg("kthreads") = false, py::arg("argv") = std::vector<std::string>{},
       py::arg("profile") = false);
   m.def(
-      "_register_task_factory",
+      "register_task_factory",
       [](std::string task_regex,
-         std::function<std::pair<std::pair<int64_t, int64_t>, std::string>(
-             const std::string&, bool)>
-             device_callback,
-         std::vector<int64_t> py_device_dims,
-         std::vector<std::string> py_device_axes,
-         std::vector<std::pair<std::string, std::string>> py_logical_axes) {
-        RegisterMetadataNameTask(task_regex, device_callback, py_device_dims,
-                                 py_device_axes, py_logical_axes);
+         std::function<multimesh::TaskOptionsTuple(const std::string&, bool)>
+             cpp_callback) {
+        auto wrapped_callback = [=](const std::string& name,
+                                    bool backprop) -> multimesh::TaskOptions {
+          auto tuple = cpp_callback(name, backprop);
+          return tuple_to_struct<multimesh::TaskOptions>(std::move(tuple));
+        };
+        RegisterMetadataNameTask(task_regex, wrapped_callback);
       },
-      py::arg("task_regex"), py::arg("device_callback"), py::arg("dims"),
-      py::arg("device_axes"), py::arg("logical_axes"));
+      py::arg("task_regex"), py::arg("callback"));
+  m.def("pop_task_context", []() { PopMetadataNameTaskContext(); });
+  m.def("push_task_context", []() { PushMetadataNameTaskContext(); });
+  m.def("clear_tasks", []() { ClearMetadataNameTasks(); });
   m.def("clear_tasks", []() { ClearMetadataNameTasks(); });
   m.def(
       "compile_hlo_module",
@@ -167,12 +159,6 @@ PYBIND11_MODULE(multimesh_jax_impl, m) {
       py::arg("device_mem_gb") = 0);
   m.def(
       "enable_fast_path", [](bool enable) { EnableFastPath(enable); },
-      py::arg("enable"));
-  m.def(
-      "enable_only_fuse_loop_tasks",
-      [](bool enable) { EnableOnlyFuseLoopTasks(enable); }, py::arg("enable"));
-  m.def(
-      "enable_task_fusion", [](bool enable) { EnableTaskFusion(enable); },
       py::arg("enable"));
   m.def(
       "replicate_parameters_smaller_than_num_elements",

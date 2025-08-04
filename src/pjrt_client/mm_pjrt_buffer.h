@@ -8,7 +8,6 @@
 
 #include <variant>
 
-#include "xla/pjrt/multimesh/mm_buffer_action.h"
 #include "xla/pjrt/multimesh/mm_computation.h"
 #include "xla/pjrt/multimesh/mm_pjrt_client.h"
 #include "xla/util.h"
@@ -28,8 +27,7 @@ namespace xla {
 
 class MultiMeshPjRtBuffer : public PjRtBuffer {
  public:
-  using data_variant_t = std::variant<StoreHandle, BufferFromHostBufferAction*,
-                                      std::shared_ptr<PjRtBuffer>>;
+  using data_variant_t = std::variant<StoreHandle, std::shared_ptr<PjRtBuffer>>;
   MultiMeshPjRtBuffer(data_variant_t data, std::optional<HloSharding> sharding,
                       Shape global_shape, Shape local_shape,
                       MultiMeshClient* mm_client, PjRtClient* base_client,
@@ -91,16 +89,6 @@ class MultiMeshPjRtBuffer : public PjRtBuffer {
 
   std::string name() const override {
     return name_.has_value() ? *name_ : "unnamed";
-  }
-
-  absl::Status ResolveHostAction();
-
-  bool has_host_action() const {
-    return std::holds_alternative<BufferFromHostBufferAction*>(data_);
-  }
-
-  BufferFromHostBufferAction* host_action() const {
-    return std::get<BufferFromHostBufferAction*>(data_);
   }
 
   bool has_native_buffer() const {

@@ -120,11 +120,11 @@ void MultiMeshXla::CostAnalysis(int vlog) {
 
 absl::StatusOr<std::shared_ptr<HloModule>> MultiMeshXla::GetHloModule() const {
   if (!executable_) {
-    return tsl::errors::InvalidArgument("MultiMesh executable is null");
+    return absl::InvalidArgumentError("MultiMesh executable is null");
   }
   auto* gpu_exe = dynamic_cast<gpu::GpuExecutable*>(executable_.get());
   if (!gpu_exe) {
-    return tsl::errors::InvalidArgument("executable is not a GPU executable");
+    return absl::InvalidArgumentError("executable is not a GPU executable");
   }
   return gpu_exe->shared_module();
 }
@@ -310,8 +310,8 @@ absl::Status MultiMeshXla::Compile(uint64_t run_id,
                       backend_->stream_executor(config.stream_executor_index));
   TF_ASSIGN_OR_RETURN(auto* stream,
                       GetCachedStream(se, config.stream_executor_index));
-  StreamWrapper stream_wrapper(run_id, config.stream_executor_index, stream,
-                               xla::DeviceAssignment{}, backend_,
+  StreamWrapper stream_wrapper(nullptr, run_id, config.stream_executor_index,
+                               stream, xla::DeviceAssignment{}, backend_,
                                config.allocator);
 
   auto global_result_shape = input_module_->result_shape();
@@ -718,8 +718,9 @@ absl::Status RunCpuExecutable(
 }
 
 absl::Status RunGpuExecutable(
-    zuku::Stream* zs, uint64_t run_id, gpu::GpuExecutable* exe,
-    xla::Backend* backend, const std::vector<se::DeviceMemoryBase>& inputs,
+    xla::PjRtClient* client, zuku::Stream* zs, uint64_t run_id,
+    gpu::GpuExecutable* exe, xla::Backend* backend,
+    const std::vector<se::DeviceMemoryBase>& inputs,
     const std::vector<se::DeviceMemoryBase>& outputs,
     TaskMemoryAllocator* allocator,
     const MultiMeshDeviceAssignment& device_assignment, int64_t num_local,
@@ -745,10 +746,12 @@ absl::Status RunGpuExecutable(
 
   TF_ASSIGN_OR_RETURN(DeviceAssignment xla_device_assignment,
                       MultiMeshToXlaDeviceAssignment(device_assignment));
+
   // At this point there should be no more Legion blocking operations so it is
   // safe to allocate a monotonically increasing run_id
   auto stream_wrapper = std::make_unique<StreamWrapper>(
-      run_id, device_assignment.GlobalDeviceId(), stream,
+      dynamic_cast<PjRtStreamExecutorClient*>(client), run_id,
+      device_assignment.GlobalDeviceId(), stream,
       std::move(xla_device_assignment), backend, allocator);
   stream_wrapper->RunOptions()->mutable_run_options()->set_local_device_count(
       num_local);
@@ -783,17 +786,17 @@ absl::Status RunGpuExecutable(
         if (alloc.param_shape_index().size() == 1) {
           input_index = alloc.param_shape_index()[0];
         } else if (alloc.param_shape_index().size() > 1) {
-          return tsl::errors::InvalidArgument(
+          return absl::InvalidArgumentError(
               "Do yet not support arg tuples with nested shapes");
         } else {
           input_index = alloc.parameter_number();
         }
         if (input_index >= inputs.size()) {
-          return tsl::errors::InvalidArgument(
+          return absl::InvalidArgumentError(
               "Too few inputs given to GPU executable");
         }
         if (inputs[input_index].size() != alloc.size() && alloc.size() > 0) {
-          return tsl::errors::InvalidArgument(absl::StrCat(
+          return absl::InvalidArgumentError(absl::StrCat(
               "Mismatched size on input ", input_index, ": XLA expected ",
               alloc.size(), " but MultiMesh has ", inputs[input_index].size(),
               "\n", alloc.ToString()));
@@ -809,19 +812,19 @@ absl::Status RunGpuExecutable(
         // we need to figure out which output this actually corresponds to
         auto iter = output_buffer_reorder.find(alloc.index());
         if (iter == output_buffer_reorder.end()) {
-          return tsl::errors::InvalidArgument(
+          return absl::InvalidArgumentError(
               "Buffer allocation missing from GpuExecutable::OutputInfo");
         }
         int output_index = iter->second;
         if (output_index >= outputs.size()) {
-          return tsl::errors::InvalidArgument(absl::StrCat(
+          return absl::InvalidArgumentError(absl::StrCat(
               "Too few outputs given to GPU executable. Executable has output "
               "index ",
               output_index, " but only ", outputs.size(),
               " outputs were given"));
         }
         if (outputs[output_index].size() != alloc.size() && alloc.size() > 0) {
-          return tsl::errors::InvalidArgument(absl::StrCat(
+          return absl::InvalidArgumentError(absl::StrCat(
               "Mismatched size on output ", output_index, ": XLA expected ",
               alloc.size(), " but MultiMesh has ", outputs[output_index].size(),
               "\n", alloc.ToString()));
@@ -843,7 +846,7 @@ absl::Status RunGpuExecutable(
         buffers.push_back(iter->second);
       }
     } else {
-      return tsl::errors::InvalidArgument(
+      return absl::InvalidArgumentError(
           "Got buffer allocation that is not an input, output, or temp: " +
           alloc.ToString());
     }
@@ -928,12 +931,13 @@ std::optional<std::string> MultiMeshExecutable::Execute(
       return "Executable is not a gpu::GpuExecutable";
     }
 
-    VLOG(1) << "Running GPU executable " << gpu_exe->module().name();
+    VLOG(1) << "Running GPU executable " << gpu_exe->module().name() << " on "
+            << device_assignment.devices();
 
-    auto status =
-        RunGpuExecutable(zs, run_id, gpu_exe, computation_->mutable_backend(),
-                         inputs, outputs, allocator, device_assignment,
-                         num_local, TupledArgs(gpu_exe->module()), blocking);
+    auto status = RunGpuExecutable(
+        computation_->client(), zs, run_id, gpu_exe,
+        computation_->mutable_backend(), inputs, outputs, allocator,
+        device_assignment, num_local, TupledArgs(gpu_exe->module()), blocking);
 
     if (!status.ok()) {
       return absl::StrCat(

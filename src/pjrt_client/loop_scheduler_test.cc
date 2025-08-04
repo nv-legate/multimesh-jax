@@ -8,13 +8,17 @@
 #include "gmock/gmock.h"
 #include "tsl/platform/regexp.h"
 #include "xla/hlo/ir/hlo_module.h"
+#include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/hlo/parser/hlo_parser.h"
 #include "xla/pjrt/multimesh/hlo_partition.h"
 #include "xla/pjrt/multimesh/mpmd_instruction.h"
+#include "xla/pjrt/multimesh/mpmd_test_base.h"
 #include "xla/util.h"
 
 namespace xla {
 namespace {
+
+class LoopSchedulerTest : public MpmdTestBase {};
 
 using ::testing::Each;
 using ::testing::Eq;
@@ -64,7 +68,7 @@ HloComputation* GetDummyComputation(HloModule& module) {
 
 HloInstruction* CreateTask(HloPartition& partition, HloModule& module,
                            std::string name) {
-  Shape shape{PrimitiveType::F32, {}, {}, {}};
+  Shape shape{PrimitiveType::F32, {}, {}};
   HloInstruction* dummy = module.entry_computation()->AddInstruction(
       HloInstruction::CreateCall(shape, {}, GetDummyComputation(module)));
   dummy->SetAndSanitizeName(name);
@@ -106,9 +110,9 @@ TestSetup CreateTest(TestConfig config) {
 
   auto add_task = [&](std::string name, int group) {
     zuku::DeviceList devices{{.start = group, .num_devices = 1}};
-    auto color = partition->FindOrAllocateColor(name, devices, nullptr);
+    auto color = partition->AllocateColor(std::move(name), devices, {});
     for (int64_t iter = 0; iter < config.num_iterations; ++iter) {
-      std::string full_name = absl::StrCat(name, "_iter_", iter);
+      std::string full_name = absl::StrCat(*color, "_iter_", iter);
       tasks[iter].push_back(
           CreateTask(*partition, *module, std::move(full_name)));
       AssignColor(tasks[iter].back(), *color);
@@ -171,7 +175,7 @@ auto GetLayerInfo(absl::string_view name) {
   return std::make_tuple(match, type, number, iter);
 }
 
-TEST(LoopSchedulerTest, FillDrain) {
+TEST_F(LoopSchedulerTest, FillDrain) {
   static constexpr int kNumLayers = 4;
   static constexpr int kNumIters = 8;
 
@@ -332,7 +336,7 @@ void RunCustomScheduleTest(TestConfig config) {
   EXPECT_THAT(num_bwd_tasks_done, Each(Eq(config.num_iterations)));
 }
 
-TEST(LoopSchedulerTest, CustomScheduleSimple) {
+TEST_F(LoopSchedulerTest, CustomScheduleSimple) {
   TestConfig config = {
       .num_layers = 2,
       .num_iterations = 2,
@@ -409,7 +413,7 @@ static const std::vector<std::vector<std::pair<int64_t, std::string>>>
          {6, "bwd-3"},
          {7, "bwd-3"}},
 };
-TEST(LoopSchedulerTest, CustomScheduleGPipe) {
+TEST_F(LoopSchedulerTest, CustomScheduleGPipe) {
   TestConfig config = {.num_layers = 4,
                        .num_iterations = 8,
                        .custom_schedule = kCustomScheduleGPipe};
@@ -481,7 +485,7 @@ static const std::vector<std::vector<std::pair<int64_t, std::string>>>
                             {6, "bwd-3"},
                             {7, "fwd-3"},
                             {7, "bwd-3"}}};
-TEST(LoopSchedulerTest, CustomSchedule1F1B) {
+TEST_F(LoopSchedulerTest, CustomSchedule1F1B) {
   TestConfig config = {.num_layers = 4,
                        .num_iterations = 8,
                        .custom_schedule = kCustomSchedule1F1B};
@@ -518,7 +522,7 @@ static const std::vector<std::vector<std::pair<int64_t, std::string>>>
          {4, "fwd-7"}, {4, "bwd-7"}, {5, "fwd-7"}, {5, "bwd-7"}, {6, "fwd-7"},
          {6, "bwd-7"}, {7, "fwd-7"}, {7, "bwd-7"}, {4, "bwd-3"}, {5, "bwd-3"},
          {6, "bwd-3"}, {7, "bwd-3"}}};
-TEST(LoopSchedulerTest, CustomSchedule1F1BInterleaved) {
+TEST_F(LoopSchedulerTest, CustomSchedule1F1BInterleaved) {
   TestConfig config = {.num_layers = 8,
                        .num_iterations = 8,
                        .interleave = 2,
@@ -526,12 +530,12 @@ TEST(LoopSchedulerTest, CustomSchedule1F1BInterleaved) {
   RunCustomScheduleTest(config);
 }
 
-TEST(LoopSchedulerTest, EvenWavefront) {
+TEST_F(LoopSchedulerTest, EvenWavefront) {
   Run1F1BTest({.num_layers = 4, .num_iterations = 8, .fuse_last_layer = false},
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest, EvenWavefrontEmbeddings) {
+TEST_F(LoopSchedulerTest, EvenWavefrontEmbeddings) {
   Run1F1BTest({.num_layers = 4,
                .num_iterations = 8,
                .fuse_last_layer = false,
@@ -539,7 +543,7 @@ TEST(LoopSchedulerTest, EvenWavefrontEmbeddings) {
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest, EvenWavefrontInterleaved) {
+TEST_F(LoopSchedulerTest, EvenWavefrontInterleaved) {
   Run1F1BTest({.num_layers = 4,
                .num_iterations = 8,
                .fuse_last_layer = false,
@@ -547,27 +551,27 @@ TEST(LoopSchedulerTest, EvenWavefrontInterleaved) {
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest, EvenWavefrontFewIters) {
+TEST_F(LoopSchedulerTest, EvenWavefrontFewIters) {
   Run1F1BTest({.num_layers = 8, .num_iterations = 4, .fuse_last_layer = false},
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest, FusedLastLayerWavefront) {
+TEST_F(LoopSchedulerTest, FusedLastLayerWavefront) {
   Run1F1BTest({.num_layers = 4, .num_iterations = 8, .fuse_last_layer = true},
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest, FusedLastLayerWavefrontMinPipeline) {
+TEST_F(LoopSchedulerTest, FusedLastLayerWavefrontMinPipeline) {
   Run1F1BTest({.num_layers = 4, .num_iterations = 4, .fuse_last_layer = true},
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest, FusedLastLayerWavefrontLarge) {
+TEST_F(LoopSchedulerTest, FusedLastLayerWavefrontLarge) {
   Run1F1BTest({.num_layers = 8, .num_iterations = 24, .fuse_last_layer = true},
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest, FusedLastLayerWavefrontLargeEmbeddings) {
+TEST_F(LoopSchedulerTest, FusedLastLayerWavefrontLargeEmbeddings) {
   Run1F1BTest({.num_layers = 8,
                .num_iterations = 24,
                .fuse_last_layer = true,
@@ -575,7 +579,7 @@ TEST(LoopSchedulerTest, FusedLastLayerWavefrontLargeEmbeddings) {
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved2) {
+TEST_F(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved2) {
   Run1F1BTest({.num_layers = 8,
                .num_iterations = 24,
                .fuse_last_layer = true,
@@ -583,7 +587,7 @@ TEST(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved2) {
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved4) {
+TEST_F(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved4) {
   Run1F1BTest({.num_layers = 8,
                .num_iterations = 24,
                .fuse_last_layer = true,
@@ -591,7 +595,7 @@ TEST(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved4) {
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved2Embeddings) {
+TEST_F(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved2Embeddings) {
   Run1F1BTest({.num_layers = 8,
                .num_iterations = 24,
                .fuse_last_layer = true,
@@ -600,7 +604,7 @@ TEST(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved2Embeddings) {
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved4Embeddings) {
+TEST_F(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved4Embeddings) {
   Run1F1BTest({.num_layers = 8,
                .num_iterations = 24,
                .fuse_last_layer = true,
@@ -609,18 +613,102 @@ TEST(LoopSchedulerTest, FusedLastLayerWavefrontLargeInterleaved4Embeddings) {
               LoopConfig::Schedule::kWavefront);
 }
 
-TEST(LoopSchedulerTest,
-     FusedLastLayerWavefrontLargeInterleaved2EmbeddingsDynamicSlice) {
-  Run1F1BTest({.num_layers = 8,
-               .num_iterations = 24,
-               .fuse_last_layer = true,
-               .interleave = 2,
-               .add_embeddings_and_logits = true,
-               .loop_submesh_embeddings_logits = true},
-              LoopConfig::Schedule::kWavefront);
+absl::StatusOr<std::pair<std::unique_ptr<HloModule>, HloPartition>>
+GetZeroBubbleLoopBody(int64_t num_stages, int64_t interleave) {
+  std::vector<HloInstruction*> fwd_layers(num_stages);
+  std::vector<HloInstruction*> bwd_layers(num_stages);
+  std::vector<HloInstruction*> grad_layers(num_stages);
+  Shape shape{PrimitiveType::F32, {4, 4}, {}};
+  HloComputation::Builder loop_builder{"loop"};
+  TF_ASSIGN_OR_RETURN(HloInstruction * prev,
+                      loop_builder.AddParameter(
+                          HloInstruction::CreateParameter(0, shape, "param")));
+
+  auto module = std::make_unique<HloModule>("test", HloModuleConfig{});
+  std::vector<std::unique_ptr<HloComputation>> computations;
+  auto make_task = [&](std::string prefix, int64_t stage, HloInstruction* prev,
+                       bool critical, HloPartition& partition,
+                       int64_t num_devices) {
+    HloComputation::Builder builder{absl::StrCat(prefix, stage)};
+    HloInstruction* param = *builder.AddParameter(
+        HloInstruction::CreateParameter(0, shape, "param"));
+    auto* copy = builder.AddInstruction(
+        HloInstruction::CreateUnary(shape, HloOpcode::kCopy, param));
+    auto* root = builder.AddInstruction(HloInstruction::CreateTuple({copy}));
+    auto* computation =
+        module->AddComputation(builder.Build(root), /*is_entry=*/false);
+    auto* call = loop_builder.AddInstruction(
+        HloInstruction::CreateCall(root->shape(), {prev}, computation));
+    auto color = partition.AllocateColor(absl::StrCat(prefix, "stage_", stage),
+                                         {{.start = stage % num_devices}}, {});
+    AssignColor(call, *color);
+    if (!critical) {
+      partition.SetColorAsNonCritical(*color);
+    }
+    prev = loop_builder.AddInstruction(
+        HloInstruction::CreateGetTupleElement(call, 0));
+    return prev;
+  };
+
+  const int64_t num_devices = num_stages / interleave;
+  zuku::DeviceList devices{{.start = 0, .num_devices = num_devices}};
+  TF_ASSIGN_OR_RETURN(auto partition,
+                      HloPartition::Create(module.get(), devices));
+  std::vector<HloInstruction*> root_inputs(num_stages);
+  for (int64_t stage = 0; stage < num_stages; ++stage) {
+    prev = make_task("fwd-", stage, prev, true, partition, num_devices);
+  }
+  for (int64_t stage = num_stages - 1; stage >= 0; --stage) {
+    prev = make_task("bwd-", stage, prev, true, partition, num_devices);
+    auto* grad = make_task("grad-", stage, prev, false, partition, num_devices);
+    root_inputs[stage] = grad;
+  }
+
+  auto* root =
+      loop_builder.AddInstruction(HloInstruction::CreateTuple(root_inputs));
+
+  auto* entry =
+      module->AddComputation(loop_builder.Build(root), /*is_entry=*/true);
+
+  return std::make_pair(std::move(module), std::move(partition));
 }
 
-TEST(LoopSchedulerTest, PrefetchWavefrontEmbeddings) {
+void RunZeroBubble(int64_t num_iterations, int64_t num_stages,
+                   int64_t interleave) {
+  auto [module, partition] =
+      *std::move(GetZeroBubbleLoopBody(num_stages, interleave));
+  absl::flat_hash_set<int64_t> critical_tasks;
+  for (int64_t stage = 0; stage < num_stages; ++stage) {
+    critical_tasks.insert(stage);
+    critical_tasks.insert(num_stages + stage);
+  }
+  LoopConfig config{
+      .num_iterations = num_iterations,
+      .schedule = LoopConfig::Schedule::kZeroBubbleH2,
+  };
+  std::vector<std::vector<HloInstruction*>> tasks(num_iterations);
+  for (auto* maybe_call :
+       module->entry_computation()->MakeInstructionPostOrder()) {
+    if (maybe_call->opcode() == HloOpcode::kCall) {
+      for (int64_t iter = 0; iter < config.num_iterations; ++iter) {
+        tasks[iter].push_back(maybe_call);
+      }
+    }
+  }
+  TF_ASSERT_OK_AND_ASSIGN(std::vector<std::vector<HloInstruction*>> schedule,
+                          ScheduleLoops(partition, config, tasks));
+}
+
+TEST_F(LoopSchedulerTest, ZeroBubble4Layers) { RunZeroBubble(8, 4, 1); }
+TEST_F(LoopSchedulerTest, ZeroBubble24LayersInterleaved) {
+  RunZeroBubble(32, 24, 12);
+}
+
+TEST_F(LoopSchedulerTest, ZeroBubble8LayersInterleaved) {
+  RunZeroBubble(16, 8, 2);
+}
+
+TEST_F(LoopSchedulerTest, PrefetchWavefrontEmbeddings) {
   Run1F1BTest({.num_layers = 4,
                .num_iterations = 8,
                .fuse_last_layer = true,

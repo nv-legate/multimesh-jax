@@ -14,6 +14,11 @@
 
 namespace xla {
 
+// Returns a vector of ordering constraints for the `tasks`.
+// The `tasks` are given as a 2D array of iter x stage
+// matching the loop `config`. Stage numbers matching
+// the `tasks` array are identified by belonging to the
+// set `critical_stages`.
 absl::StatusOr<std::vector<std::vector<HloInstruction*>>> ScheduleLoops(
     const HloPartition& partition, const LoopConfig& config,
     const std::vector<std::vector<HloInstruction*>>& tasks);

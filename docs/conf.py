@@ -139,6 +139,7 @@ epub_exclude_files = ["search.html"]
 autodoc_typehints = "description"
 autodoc_typehints_description_target = "all"
 autodoc_type_aliases = {}
+autoclass_content = "class"
 
 # Remove auto-generated API docs from sidebars. They take too long to build.
 remove_from_toctrees = ["_autosummary/*"]

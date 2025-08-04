@@ -1,0 +1,8 @@
+sphinx
+matplotlib
+myst_nb
+sphinx-remove-toctrees
+sphinx-copybutton
+sphinx_design
+sphinxext-rediraffe
+sphinx-book-theme

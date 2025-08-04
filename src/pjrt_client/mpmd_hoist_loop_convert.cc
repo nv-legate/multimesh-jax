@@ -21,11 +21,9 @@ absl::StatusOr<HloComputation*> MpmdHoistLoopConvert::CloneArgTupleComputation(
   HloCloneContext context{module};
 
   auto* old_arg_tuple = computation->parameter_instruction(0);
-  TF_ASSIGN_OR_RETURN(
-      auto* new_arg_tuple,
-      builder.AddParameter(HloInstruction::CreateParameter(
-          0, Shape{PrimitiveType::TUPLE, {}, {}, arg_tuple_shapes},
-          old_arg_tuple->name())));
+  TF_ASSIGN_OR_RETURN(auto* new_arg_tuple,
+                      builder.AddParameter(HloInstruction::CreateParameter(
+                          0, Shape{arg_tuple_shapes}, old_arg_tuple->name())));
   absl::flat_hash_map<const HloInstruction*, HloInstruction*> clone_map;
   clone_map[old_arg_tuple] = new_arg_tuple;
 

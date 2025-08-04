@@ -14,8 +14,8 @@
 #include "xla/pjrt/multimesh/mm_sharding.h"
 #include "xla/pjrt/multimesh/mpmd_instruction.h"
 #include "xla/pjrt/multimesh/mpmd_utils.h"
-#include "xla/service/all_reduce_folder.h"
-#include "xla/service/gpu/transforms/all_reduce_splitter.h"
+#include "xla/hlo/transforms/simplifiers/all_reduce_folder.h"
+#include "xla/service/gpu/transforms/collectives/all_reduce_splitter.h"
 #include "xla/service/gpu/transforms/reduce_scatter_creator.h"
 #include "xla/service/spmd/stateful_rng_spmd_partitioner.h"
 
@@ -35,7 +35,7 @@ bool ShardedOverCxnDims(const HloInstruction* i) {
           HloOpcode::kAdd) {
     auto* reduce = static_cast<const HloReduceInstruction*>(i);
     auto* operand = i->operand(0);
-    if (!IsReplicatedOrNotSharded(operand)) {
+    if (ShardingHasTileAssignment(operand)) {
       for (int64_t dim : reduce->dimensions()) {
         if (operand->sharding().tile_assignment().dim(dim) > 1) {
           return true;
@@ -45,7 +45,7 @@ bool ShardedOverCxnDims(const HloInstruction* i) {
   } else if (i->opcode() == HloOpcode::kDot) {
     auto* dot = static_cast<const HloDotInstruction*>(i);
     auto* lhs = i->operand(0);
-    if (!IsReplicatedOrNotSharded(lhs)) {
+    if (ShardingHasTileAssignment(lhs)) {
       for (int64_t dim :
            dot->dot_dimension_numbers().lhs_contracting_dimensions()) {
         if (lhs->sharding().tile_assignment().dim(dim) > 1) {
@@ -55,7 +55,7 @@ bool ShardedOverCxnDims(const HloInstruction* i) {
     }
 
     auto* rhs = i->operand(1);
-    if (!IsReplicatedOrNotSharded(rhs)) {
+    if (ShardingHasTileAssignment(rhs)) {
       for (int64_t dim :
            dot->dot_dimension_numbers().rhs_contracting_dimensions()) {
         if (rhs->sharding().tile_assignment().dim(dim) > 1) {
@@ -78,8 +78,8 @@ bool ShardedOverCxnDims(const HloInstruction* i) {
       HloInstruction* operand = operands[i];
       HloInstruction* update = updates[i];
 
-      if (!IsReplicatedOrNotSharded(operand) &&
-          !IsReplicatedOrNotSharded(update) &&
+      if (ShardingHasTileAssignment(operand) &&
+          ShardingHasTileAssignment(update) &&
           operand->sharding().ReplicateOnLastTileDim() &&
           !update->sharding().ReplicateOnLastTileDim()) {
         // partial updates are sent to the operand so an
@@ -328,7 +328,9 @@ absl::StatusOr<bool> MpmdShardMapLoopReduce::Run(
         switch (instruction->opcode()) {
           case HloOpcode::kAllReduce:
           case HloOpcode::kAllGather:
-          case HloOpcode::kReduceScatter: {
+          case HloOpcode::kReduceScatter:
+          case HloOpcode::kAllToAll:
+          case HloOpcode::kRaggedAllToAll: {
             auto* channel_instruction =
                 dynamic_cast<HloChannelInstruction*>(instruction);
             if (channel_instruction == nullptr) {

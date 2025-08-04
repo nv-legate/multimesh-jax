@@ -19,7 +19,6 @@ enum Operation {
   kCreateStore,
   kCreateBuffer,
   kReshard,
-  kStoreBufferAction,
   kDestroy,
   kCreateExecuteTask,
   kCreateCompileTask,
@@ -32,7 +31,7 @@ enum MemoryKind { kHOST, kDEVICE };
 
 enum class LastOp { Execute, Reshard, OffloadHtoD, OffloadDtoH, Created };
 
-struct MockZukuExecuteContext;
+class MockZukuExecuteContext;
 
 class MockArrayCache {
  public:
@@ -52,9 +51,6 @@ class MockArrayCache {
   bool Empty() const { return num_available_ == 0; }
 
  private:
-  MemoryKind kind_;
-  int64_t device_;
-  int64_t chunk_size_;
   int64_t num_allocated_;
   int64_t num_available_;
 };
@@ -125,6 +121,8 @@ class MockZukuExecuteContext final : public ZukuExecuteContext {
   void* SliceLocalShard(int64_t local_device_id,
                         const StoreHandle& handle) override;
 
+  void MarkProfile(const std::string& name) override;
+
   void StartTimer(const std::string& name) override;
 
   void StopTimer(const std::string& name) override;
@@ -146,9 +144,6 @@ class MockZukuExecuteContext final : public ZukuExecuteContext {
   bool IsGpu() override;
 
   bool HasLocalShard(const StoreHandle& handle) override;
-
-  void StoreBufferAction(int64_t local_device_id, BufferAction* actions,
-                         const StoreHandle& store, bool blocking) override;
 
   void Rename(StoreHandle& handle, std::string name) override;
 

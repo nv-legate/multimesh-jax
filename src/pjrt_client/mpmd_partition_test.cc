@@ -26,7 +26,6 @@ using ::testing::Each;
 using ::testing::ElementsAre;
 using ::testing::Field;
 using ::testing::FieldsAre;
-using ::testing::Ge;
 using ::testing::IsEmpty;
 using ::testing::IsSupersetOf;
 using ::testing::Not;
@@ -2479,8 +2478,9 @@ TEST_F(MpmdPartitionTest, DecomposeMultipleLayers) {
       }
       return name;
     }();
-    auto devices = std::make_pair(offset, offset + 4);
-    return std::make_pair(devices, std::move(color));
+    std::vector<int64_t> devices(4);
+    std::iota(devices.begin(), devices.end(), offset);
+    return std::make_pair(std::move(devices), std::move(color));
   };
   RegisterMatcherTestTaskWithFactory("(x_layers_\\d+)", device_factory, {2, 2},
                                      {"x", "y"},

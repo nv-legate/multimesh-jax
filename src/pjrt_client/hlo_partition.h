@@ -8,10 +8,12 @@
 
 #include <optional>
 #include <functional>
+#include <string>
 
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_module.h"
-#include "xla/pjrt/multimesh/logical_sharding_context.h"
+#include "xla/pjrt/multimesh/pycallback_types.h"
+#include "src/zuku/mesh.h"
 
 namespace xla {
 
@@ -20,14 +22,12 @@ bool ContainsMultiMeshCustomCall(const HloModuleProto& proto);
 
 class HloPartition {
  public:
-  using name_and_devices_fxn =
-      std::function<std::pair<std::pair<int64_t, int64_t>, std::string>(
-          const std::string&, bool)>;
-
   struct ColorConfig {
     std::string name;
     zuku::DeviceList devices;
-    std::shared_ptr<LogicalShardingContext> logical_sharding_context;
+    bool backprop{};
+    bool noncritical{};
+    multimesh::TaskOptions task_options;
   };
 
   // Public factory function for creating a partition of an HLO module.
@@ -47,16 +47,24 @@ class HloPartition {
 
   bool HasColor(const std::string& color) const;
 
-  absl::StatusOr<std::string> FindOrAllocateColor(
-      zuku::DeviceList devices,
-      std::shared_ptr<LogicalShardingContext> context);
+  bool ColorSplittable(const std::string& color) const;
 
-  absl::StatusOr<std::string> FindOrAllocateColor(
-      std::string name, zuku::DeviceList devices,
-      std::shared_ptr<LogicalShardingContext> context);
+  void SetColorAsNonCritical(const std::string& color);
+
+  bool IsBackprop(const std::string& color) const;
+
+  bool IsBackprop(const HloInstruction* instruction) const;
+
+  bool IsNonCritical(const std::string& color) const;
+
+  bool IsCritical(const HloInstruction* instruction) const;
+
+  bool IsNonCritical(const HloInstruction* instruction) const;
 
   absl::StatusOr<std::string> FindOrAllocateDefaultColor(
-      std::optional<std::string> name = std::nullopt);
+      zuku::DeviceList devices);
+
+  absl::StatusOr<std::string> FindOrAllocateGlobalColor();
 
   absl::StatusOr<std::string> AllocateLoopIncrementColor();
 
@@ -69,17 +77,21 @@ class HloPartition {
 
   int64_t NumDevicesForInstruction(const HloInstruction* instruction) const;
 
-  absl::StatusOr<std::string> FindOrAllocateGlobalColor(std::string name);
-
-  absl::StatusOr<std::string> FindOrAllocateGlobalColor();
+  absl::StatusOr<std::string> CloneColor(
+      const std::string& existing_color, std::string new_color,
+      std::optional<zuku::DeviceList> devices_override = std::nullopt,
+      std::optional<multimesh::TaskOptions> task_options_override =
+          std::nullopt);
 
   // Allocates a new color for the unique `name` corresponding to the given
   // `devices` submesh. Multiple colors with different names can be allocated
   // for a given device mesh. An optional autosharding context can be assigned
   // to the color fo translating logical axis names to physical shardings.
   absl::StatusOr<std::string> AllocateColor(
-      std::string name, zuku::DeviceList devices,
-      std::shared_ptr<LogicalShardingContext> context = nullptr);
+      absl::string_view name, zuku::DeviceList devices,
+      multimesh::TaskOptions task_options);
+
+  absl::StatusOr<std::string> AllocateColor(ColorConfig config);
 
   zuku::DeviceList DefaultPerTaskMesh(const std::string& color) const;
 
@@ -92,12 +104,14 @@ class HloPartition {
 
   const ColorConfig& ConfigForColor(const std::string& color) const;
 
+  const ColorConfig& ConfigForInstruction(
+      const HloInstruction* instruction) const;
+
   std::string OriginalColor(const std::string& color) const;
 
   const zuku::DeviceList& Devices() const { return devices_; }
 
-  std::shared_ptr<LogicalShardingContext> GetLogicalShardingContext(
-      const std::string& color) const;
+  const multimesh::TaskOptions& GetTaskOptions(const std::string& color) const;
 
   absl::Status Recolor(
       const absl::flat_hash_map</*new=*/std::string, /*old*/ std::string>&
@@ -137,9 +151,9 @@ void ValidateModuleMetadata(HloModule* module);
 // e.g. ('batch', 'x') says that the logical batch dimension should be
 // matched to the 'x' physical dimension
 extern "C" void RegisterMetadataNameTask(
-    std::string matcher, xla::HloPartition::name_and_devices_fxn callback,
-    std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes);
+    std::string matcher,
+    std::function<multimesh::TaskOptions(const std::string&, bool)>
+        cpp_callback);
 
 // Turn on/off whether implicit tasks should be matched and created
 extern "C" void SetEnableMetadataNameTasks(bool flag);

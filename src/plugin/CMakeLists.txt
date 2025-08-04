@@ -21,6 +21,7 @@ set_target_properties(multimesh_xla_compiler PROPERTIES
 
 pybind11_add_module(multimesh_jax_impl SHARED multimesh_jax_impl.cc)
 target_link_libraries(multimesh_jax_impl PRIVATE zuku::zuku)
+target_include_directories(multimesh_jax_impl PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/pjrt_client>)
 set_target_properties(multimesh_jax_impl PROPERTIES
          LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/multimesh/jax
          ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/multimesh/jax)

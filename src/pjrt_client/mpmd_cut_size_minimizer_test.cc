@@ -36,11 +36,11 @@ TEST_F(MpmdCutSizeMinimizerTest, LargeDotWithSmallOperands) {
       GetHloModuleFromText(kLargeDotWithSmallOperands, /*num_devices=*/4));
 
   TF_ASSERT_OK_AND_ASSIGN(
-      auto blue, partition_->AllocateColor(
-                     "blue", {{.start = 0, .num_devices = 4}}, nullptr));
+      auto blue,
+      partition_->AllocateColor("blue", {{.start = 0, .num_devices = 4}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto red, partition_->AllocateColor(
-                    "red", {{.start = 0, .num_devices = 4}}, nullptr));
+      auto red,
+      partition_->AllocateColor("red", {{.start = 0, .num_devices = 4}}, {}));
   // before starting, the dots should be red and blue
   EXPECT_THAT(module->entry_computation()->instructions(),
               AllOf(Contains(AllOf(op::Dot(), m::Color("red"))).Times(1)));
@@ -81,11 +81,11 @@ TEST_F(MpmdCutSizeMinimizerTest, UnaryOperandMove) {
               AllOf(Contains(AllOf(op::Dot(), m::Color("red"))).Times(1)));
 
   TF_ASSERT_OK_AND_ASSIGN(
-      auto blue, partition_->AllocateColor(
-                     "blue", {{.start = 0, .num_devices = 4}}, nullptr));
+      auto blue,
+      partition_->AllocateColor("blue", {{.start = 0, .num_devices = 4}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto red, partition_->AllocateColor(
-                    "red", {{.start = 0, .num_devices = 4}}, nullptr));
+      auto red,
+      partition_->AllocateColor("red", {{.start = 0, .num_devices = 4}}, {}));
   MpmdCutSizeMinimizer minimizer{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, minimizer.Run(module.get()));
 

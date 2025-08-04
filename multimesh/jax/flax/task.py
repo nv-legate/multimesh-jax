@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from functools import partial
-from typing import Any, Callable, Optional, Sequence, Tuple, Type
+from typing import Any, Callable, Optional, Type
 
 import jax
 import numpy as np
@@ -11,12 +11,12 @@ import optax
 from flax import linen as nn
 from flax.training.train_state import TrainState
 from jax import random
-from jax._src.lib import xla_client as xc
 from jax.experimental.pjit import AUTO, pjit
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from jax.tree import map as tree_map
 
 from ..lib import autoshard, should_ignore_transforms
-from ..task import task as pure_function_task, with_sharding_constraint
+from ..task import Task, task as pure_function_task, with_sharding_constraint
 
 
 def _put_to_devices(host_array: np.ndarray, devices) -> list[Any]:
@@ -29,10 +29,8 @@ def task(
     model: Type[nn.Module],
     name: Optional[str] = None,
     *,
-    mesh: Optional[Mesh] = None,
-    devices: np.ndarray | Sequence[xc.Device] | None = None,
-    device_axes: Optional[Sequence[str]] = None,
-    logical_axes: Optional[Sequence[Tuple[str, str]]] = None,
+    task: Optional[Task] = None,
+    **kwargs,
 ):
     """Wraps a Flax module in an auto-sharding task context
 
@@ -97,6 +95,9 @@ def task(
     if should_ignore_transforms():
         return model
 
+    if task is None:
+        task = Task(**kwargs)
+
     class ManualTask(model):
         def __init__(self, *args, **kwargs):
             self.mod = model(*args, **kwargs)
@@ -109,14 +110,7 @@ def task(
         def __call__(self, xs):
             init_fn = self.mod.init
             apply_fn = self.mod.apply
-            apply_fn = pure_function_task(
-                apply_fn,
-                name,
-                mesh=mesh,
-                devices=devices,
-                device_axes=device_axes,
-                logical_axes=logical_axes,
-            )
+            apply_fn = pure_function_task(apply_fn, name, task=task)
             mod_params = self.param("mod", init_fn, xs)
             return apply_fn(mod_params, xs)
 
@@ -209,8 +203,8 @@ def parallelize_step(
 
     num_data_loaders = mesh.devices.size // len(mesh.local_devices)
     if global_batch is not None:
-        batch_shardings = jax.tree_map(lambda x: x.sharding, global_batch)
-        batch_avals = jax.tree_map(
+        batch_shardings = tree_map(lambda x: x.sharding, global_batch)
+        batch_avals = tree_map(
             lambda x: jax.ShapeDtypeStruct(x.shape, dtype=x.dtype),
             global_batch,
         )
@@ -225,8 +219,8 @@ def parallelize_step(
             shape = (x.shape[0] * num_data_loaders,) + x.shape[1:]
             return jax.ShapeDtypeStruct(shape, dtype=x.dtype)
 
-        batch_avals = jax.tree_map(get_global_batch, local_batch)
-        batch_shardings = jax.tree_map(
+        batch_avals = tree_map(get_global_batch, local_batch)
+        batch_shardings = tree_map(
             lambda x: NamedSharding(mesh, P(first_axis_name)), local_batch
         )
 
@@ -254,11 +248,11 @@ def parallelize_step(
         variables = variables.apply_gradients(grads=grads)
         return loss, variables
 
-    variable_shardings = jax.tree_map(lambda x: AUTO(mesh), variable_avals)
+    variable_shardings = tree_map(lambda x: AUTO(mesh), variable_avals)
 
     with autoshard(True):
         result_shape = jax.eval_shape(step_fn, variable_avals, batch_avals)
-    out_shardings = jax.tree_map(lambda x: AUTO(mesh), result_shape)
+    out_shardings = tree_map(lambda x: AUTO(mesh), result_shape)
 
     # pjit is required here so we get the global mesh context
     with mesh, autoshard(True):
@@ -285,7 +279,7 @@ def parallelize_step(
             )
 
         def prepare_batch(local_batch_arrays):
-            return jax.tree_map(
+            return tree_map(
                 make_sharded_array, local_batch_arrays, batch_shardings
             )
 

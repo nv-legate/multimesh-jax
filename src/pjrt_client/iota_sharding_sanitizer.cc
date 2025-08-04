@@ -16,6 +16,10 @@ absl::StatusOr<HloSharding> ToIotaSharding(const HloSharding& sharding,
     return HloSharding::Replicate();
   }
 
+  if (sharding.IsManual()) {
+    return HloSharding::Manual();
+  }
+
   if (sharding.IsTuple()) {
     OpSharding op_sharding;
     op_sharding.set_type(OpSharding::TUPLE);

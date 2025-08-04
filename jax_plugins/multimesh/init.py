@@ -116,10 +116,13 @@ def init(
         gc.enable()
 
     import jax
-
     import multimesh.jax
 
     jax.lax.with_sharding_constraint = multimesh.jax.with_sharding_constraint
+    jax._src.custom_partitioning.custom_partitioning = (
+        multimesh.jax.custom_partitioning
+    )
+    jax.experimental.shard_map.shard_map = multimesh.jax.shard_map
 
     if distributed:
         jax.distributed.initialize(

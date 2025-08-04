@@ -10,7 +10,7 @@
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/pjrt/multimesh/mpmd_instruction.h"
 #include "xla/service/call_inliner.h"
-#include "xla/service/tuple_simplifier.h"
+#include "xla/hlo/transforms/simplifiers/tuple_simplifier.h"
 #include "xla/pjrt/multimesh/mpmd_utils.h"
 
 namespace xla {

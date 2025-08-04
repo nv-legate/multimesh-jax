@@ -32,6 +32,7 @@
 #include "xla/pjrt/pjrt_client.h"
 #include "xla/pjrt/pjrt_stream_executor_client.h"
 #include "xla/python/custom_partition_callback.h"
+#include "xla/python/custom_call_batch_partitioner.h"
 #include "xla/service/backend.h"
 #include "xla/service/custom_call_target_registry.h"
 #include "xla/service/platform_util.h"
@@ -100,9 +101,6 @@ absl::StatusOr<std::unique_ptr<PjRtClient>> GetTfrtPluginDeviceClient(
           "underlying client is not a PjRtStreamExecutorClient");
     }
 
-    TF_RETURN_IF_ERROR(InitDistributedRuntimeParams(
-        num_nodes, node_id, gpu_client->addressable_device_count(), kv_store));
-
     return std::unique_ptr<PjRtClient>(std::make_unique<MultiMeshClient>(
         std::move(pjrt_client), gpu_client->client()->mutable_backend(),
         std::move(execute_context)));
@@ -134,9 +132,6 @@ absl::StatusOr<std::unique_ptr<PjRtClient>> GetTfrtPluginDeviceClient(
                               .set_platform(platform)
                               .set_intra_op_parallelism_threads(num_threads)));
 
-  TF_RETURN_IF_ERROR(InitDistributedRuntimeParams(
-      /*num_procs=*/1, /*node_id=*/0, pjrt_client->addressable_device_count(),
-      nullptr));
   return std::unique_ptr<PjRtClient>(std::make_unique<MultiMeshClient>(
       std::move(pjrt_client), backend.release(), std::move(execute_context)));
 }
@@ -158,7 +153,7 @@ PJRT_Error* PJRT_Client_Create(PJRT_Client_Create_Args* args) {
 
 PJRT_Error* PJRT_CpuDeviceTopology_Create(
     PJRT_TopologyDescription_Create_Args* args) {
-  return new PJRT_Error{tsl::errors::Unimplemented(
+  return new PJRT_Error{absl::UnimplementedError(
       "Topology not supported for MultiMesh compilation.")};
 }
 
@@ -240,11 +235,23 @@ PJRT_Error* PJRT_Register_Custom_Partitioner(
   return nullptr;
 }
 
+PJRT_Error* PJRT_Register_Batch_Partitionable(
+    PJRT_Register_Batch_Partitionable_Args* args) {
+  PJRT_RETURN_IF_ERROR(pjrt::ActualStructSizeIsGreaterOrEqual(
+      "PJRT_Register_Batch_Partitionable_Args",
+      PJRT_Register_Batch_Partitionable_Args_STRUCT_SIZE, args->struct_size));
+  std::string name(args->name, args->name_size);
+  RegisterCustomCallPartitioner(
+      name, std::make_unique<xla::CustomCallBatchPartitioner>());
+  return nullptr;
+}
+
 PJRT_Custom_Partitioner_Extension custom_partitioner{
     /*struct_size=*/PJRT_Gpu_Custom_Call_STRUCT_SIZE,
     /*type=*/PJRT_Extension_Type::PJRT_Extension_Type_Custom_Partitioner,
     /*next=*/reinterpret_cast<PJRT_Extension_Base*>(&profiler_extension),
     /*register_custom_partitioner=*/PJRT_Register_Custom_Partitioner,
+    /*register_batch_partitionable=*/PJRT_Register_Batch_Partitionable,
 };
 
 }  // namespace mm_plugin
@@ -259,10 +266,10 @@ extern "C" const PJRT_Api* GetMultiMeshPjRtApi() {
   };
   static PJRT_Layouts_Extension layouts_extension =
       pjrt::CreateLayoutsExtension(
-          reinterpret_cast<PJRT_Extension_Base*>(&custom_call));
+          reinterpret_cast<PJRT_Extension_Base*>(&custom_call.base));
 
   static PJRT_FFI_Extension ffi_extension = pjrt::CreateFfiExtension(
-      reinterpret_cast<PJRT_Extension_Base*>(&layouts_extension));
+      reinterpret_cast<PJRT_Extension_Base*>(&layouts_extension.base));
 
   static const PJRT_Api pjrt_api = pjrt::CreatePjrtApi(
       mm_plugin::PJRT_Client_Create, mm_plugin::PJRT_ExecuteContext_Create,

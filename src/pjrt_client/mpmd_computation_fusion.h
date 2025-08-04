@@ -15,6 +15,21 @@
 
 namespace xla {
 
+absl::Status ClearPredecessors(HloInstruction* instruction);
+
+absl::Status ClearControlDependencies(HloInstruction* instruction);
+
+// Fuse the list of `calls` into a single computation.
+// If `fused_computation` is null, a new computation is generated
+// that is equivalent to the fused calls. If `fused_computation` is
+// non-null, no new computation is generated and `fused_computation`
+// is used directl to create the new call. No error checking is done
+// on `fused_computation` to ensure that it is actually equivalaent
+// to creating a new fusion.
+absl::StatusOr<HloInstruction*> FuseCalls(
+    absl::Span<HloInstruction*> calls,
+    HloComputation* fused_computation = nullptr);
+
 // Finds computations with the same color or same device mesh
 // and fuses them into a single computation, creating a new set
 // of parameter instructions and new set of outputs.

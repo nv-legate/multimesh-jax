@@ -56,8 +56,8 @@ MpmdComputeAssignedColors::CheckForExplicitShardingColor(
 
   auto devices_color = partition_->FindColor(devices);
   if (!devices_color.has_value()) {
-    TF_ASSIGN_OR_RETURN(devices_color, partition_->AllocateColor(
-                                           "sharding", std::move(devices)));
+    TF_ASSIGN_OR_RETURN(devices_color,
+                        partition_->AllocateColor("sharding", devices, {}));
   }
   VLOG(5) << instruction->name() << " assigned from sharding "
           << *explicit_sharding << " to color=" << *devices_color;
@@ -88,17 +88,29 @@ absl::Status MpmdComputeAssignedColors::ComputeAssignedColors(
     }
 
     if (!color.has_value()) {
-      TF_ASSIGN_OR_RETURN(
-          color, CheckForExplicitShardingColor(instruction, properties));
-    }
-
-    if (!color.has_value()) {
       TF_ASSIGN_OR_RETURN(color,
                           partition_->ComputeMetadataNameColor(instruction));
       if (color.has_value()) {
         VLOG(5) << "computed metadata name color for " << instruction->name()
                 << ",color=" << *color
                 << ",metadata=" << instruction->metadata().op_name();
+      }
+    }
+
+    if (!color.has_value()) {
+      TF_ASSIGN_OR_RETURN(
+          color, CheckForExplicitShardingColor(instruction, properties));
+    } else if (ShardingHasTileAssignment(instruction)) {
+      const int64_t num_color_devices =
+          partition_->DevicesForColor(*color).size();
+      const int64_t num_sharding_devices =
+          instruction->sharding().tile_assignment().num_elements();
+      if (num_color_devices != num_sharding_devices) {
+        return InvalidArgumentStrCat(
+            "instruction ", instruction->name(), " was added to color ", *color,
+            " with ", num_color_devices, " devices, but sharding ",
+            instruction->sharding().ToString(), " is sharded over ",
+            num_sharding_devices, "devices");
       }
     }
 

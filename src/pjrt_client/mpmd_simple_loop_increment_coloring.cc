@@ -51,6 +51,7 @@ absl::StatusOr<bool> MpmdSimpleLoopIncrementColoring::VisitLoop(
   bool changed = false;
   auto* computation = instruction->called_computations()[0];
   auto* arg_tuple = computation->parameter_instruction(0);
+  std::optional<std::string> increment_color{};
   for (auto* root : computation->root_instruction()->mutable_operands()) {
     if (root->opcode() != HloOpcode::kGetTupleElement ||
         root->operand(0) != arg_tuple) {
@@ -58,10 +59,12 @@ absl::StatusOr<bool> MpmdSimpleLoopIncrementColoring::VisitLoop(
       if (!tree.empty()) {
         VLOG(5) << "loop output " << root->name() << ":" << root->shape()
                 << " is a simple increment";
-        TF_ASSIGN_OR_RETURN(auto color,
-                            partition_->AllocateLoopIncrementColor());
+        if (!increment_color.has_value()) {
+          TF_ASSIGN_OR_RETURN(increment_color,
+                              partition_->AllocateLoopIncrementColor());
+        }
         for (auto* instruction : tree) {
-          AssignColor(instruction, color);
+          AssignColor(instruction, *increment_color);
         }
         changed = true;
       }

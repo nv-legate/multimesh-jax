@@ -172,7 +172,7 @@ TEST_F(MpmdHoistLoopConvertTest, BasicLoop) {
   MpmdHoistLoopConvert hoister{partition_.get()};
   TF_ASSERT_OK(hoister.Run(module.get()).status());
 
-  Shape bf16_4x4{PrimitiveType::BF16, {4, 4}, {}, {}};
+  Shape bf16_4x4{PrimitiveType::BF16, {4, 4}, {}};
   bf16_4x4.mutable_layout()->add_minor_to_major(1);
   bf16_4x4.mutable_layout()->add_minor_to_major(0);
 

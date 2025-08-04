@@ -10,7 +10,6 @@
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/pjrt/multimesh/json_utils.h"
-#include "xla/pjrt/multimesh/logical_sharding_context.h"
 
 namespace xla {
 namespace {
@@ -183,10 +182,8 @@ std::optional<LogicalShardingAxes> GetAxes(const HloInstruction* instruction) {
   auto iter = src_map.find("axes");
   if (iter != src_map.end()) {
     auto json = GetJsonValue(iter->second.data(), iter->second.size());
-    auto axes = GetTaskValue<InlineVector<InlineVector<std::string>>>(
+    return *GetTaskValue<LogicalShardingAxes>(
         *json, std::string(instruction->name()), "axes");
-
-    return LogicalShardingAxes{.axes = *std::move(axes)};
   }
   return std::nullopt;
 }
@@ -195,7 +192,7 @@ void AssignAxes(HloInstruction* instruction, const LogicalShardingAxes& axes) {
   Json::FastWriter writer;
   Json::Value json_axes;
   // expected to be a field 'axes' in a json dict
-  json_axes["axes"] = ToJson(axes.axes);
+  json_axes["axes"] = ToJson(axes);
   // ugh, can't print without the new line
   auto json_string = writer.write(json_axes);
   json_string = json_string.substr(0, json_string.size() - 1);

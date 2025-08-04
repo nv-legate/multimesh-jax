@@ -79,9 +79,6 @@ WrapperPjRtExecutable::Execute(
     for (auto* buf : handle_vec) {
       auto* mm_buffer = dynamic_cast<MultiMeshPjRtBuffer*>(buf);
       if (mm_buffer) {
-        if (mm_buffer->has_host_action()) {
-          TF_RETURN_IF_ERROR(mm_buffer->ResolveHostAction());
-        }
         if (!mm_buffer->has_native_buffer()) {
           return InvalidArgumentStrCat(
               "WrapperPjRtExecutable::Execute: received multimesh buffer not "
@@ -222,6 +219,7 @@ MultiMeshPjRtExecutable::MultiMeshPjRtExecutable(
     std::optional<std::vector<OpSharding>> parameter_shardings,
     const std::vector<Shape>& output_shapes,
     std::optional<std::vector<OpSharding>> output_shardings,
+    std::string fingerprint,
     std::unique_ptr<WrapperPjRtExecutable> fast_path_exe)
     : mm_client_(mm_client),
       program_shape_(std::move(program_shape)),
@@ -240,6 +238,7 @@ MultiMeshPjRtExecutable::MultiMeshPjRtExecutable(
       output_shapes_(output_shapes),
       output_shardings_(std::move(output_shardings)),
       context_(mm_client->shared_context()),
+      fingerprint_(std::move(fingerprint)),
       fast_path_exe_(std::move(fast_path_exe)) {}
 
 void MultiMeshPjRtExecutable::Delete() { deleted_ = true; }
@@ -362,6 +361,7 @@ MultiMeshPjRtExecutable::Execute(
 
   context_->OpenWindow();
   context_->StartTimer(name_);
+  context_->MarkProfile(absl::StrCat("start ", name_));
 
   // prepare callbacks
   auto compute_callbacks =
@@ -703,6 +703,7 @@ MultiMeshPjRtExecutable::Execute(
 
   context_->StopTimer(name_);
   context_->CloseWindow();
+  context_->MarkProfile(absl::StrCat("finish ", name_));
   return results;
 }
 

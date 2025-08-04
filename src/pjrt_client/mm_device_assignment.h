@@ -46,6 +46,8 @@ class MultiMeshDeviceAssignment {
     return devices_[partition * replica_count_ + replica];
   }
 
+  const zuku::DeviceList& devices() const { return devices_; }
+
  private:
   int64_t local_device_id_;
   int64_t global_device_id_;

@@ -7,7 +7,6 @@
 
 #include "absl/strings/str_cat.h"
 #include "xla/pjrt/distributed/distributed.h"
-#include "xla/pjrt/gpu/nccl_id_store.h"
 #include "xla/service/computation_placer.h"
 #include "xla/service/gpu/gpu_executable_run_options.h"
 #include "xla/util.h"
@@ -40,51 +39,7 @@ struct StreamCacheEntry {
   se::Stream* stream() const { return stream_.get(); }
 };
 
-struct DistributedRuntime {
-  std::unique_ptr<DistributedRuntimeService> runtime_service;
-  std::shared_ptr<DistributedRuntimeClient> runtime_client;
-  gpu::GpuExecutableRunOptions gpu_executable_run_options;
-};
-
-DistributedRuntime* GetDistributedRuntime() {
-  static DistributedRuntime runtime;
-  return &runtime;
-}
-
 }  // namespace
-
-absl::Status InitDistributedRuntimeParams(
-    int num_procs, int node_id, int gpus_per_node,
-    std::shared_ptr<KeyValueStoreInterface> kv_store) {
-  std::map<int, GlobalDeviceId> gpu_device_ids;
-  int local_gpu_start = node_id * gpus_per_node;
-  for (int gpu = 0; gpu < gpus_per_node; ++gpu) {
-    gpu_device_ids[gpu] = local_gpu_start + gpu;
-  }
-  GetDistributedRuntime()->gpu_executable_run_options.set_gpu_global_device_ids(
-      std::move(gpu_device_ids));
-
-  absl::flat_hash_map<GlobalDeviceId, int> device_to_node;
-  for (int node = 0; node < num_procs; ++node) {
-    int gpu_start = node * gpus_per_node;
-    int gpu_stop = gpu_start + gpus_per_node;
-    for (int gpu = gpu_start; gpu < gpu_stop; ++gpu) {
-      GlobalDeviceId global_id(gpu);
-      device_to_node[global_id] = node;
-    }
-  }
-
-  if (num_procs > 1) {
-    auto nccl_id_store =
-        std::make_shared<NcclIdStore>(node_id, device_to_node, kv_store);
-    GetDistributedRuntime()->gpu_executable_run_options.set_clique_id_callback(
-        [nccl_id_store](const CliqueKey& key) {
-          return nccl_id_store->GetNcclUniqueId(key);
-        });
-  }
-
-  return absl::OkStatus();
-}
 
 static constexpr int MAX_LOCAL_GPUS = 32;
 static StreamCacheEntry stream_cache[MAX_LOCAL_GPUS];
@@ -127,7 +82,7 @@ absl::StatusOr<se::OwningDeviceMemory> TaskDeviceMemoryAllocator::Allocate(
     int64_t memory_space) {
   void* buf = allocator_->Allocate(size);
   if (buf == nullptr) {
-    return tsl::errors::InvalidArgument(
+    return absl::InvalidArgumentError(
         absl::StrCat("allocation of size ", size, " failed"));
   }
   se::DeviceMemoryBase mem(buf, size);
@@ -152,8 +107,8 @@ absl::StatusOr<se::Stream*> TaskDeviceMemoryAllocator::GetStream(
   return stream_;
 }
 
-StreamWrapper::StreamWrapper(uint64_t run_id, int device_ordinal,
-                             se::Stream* stream,
+StreamWrapper::StreamWrapper(PjRtStreamExecutorClient* client, uint64_t run_id,
+                             int device_ordinal, se::Stream* stream,
                              xla::DeviceAssignment device_assignment,
                              xla::Backend* backend,
                              TaskMemoryAllocator* allocator)
@@ -173,8 +128,10 @@ StreamWrapper::StreamWrapper(uint64_t run_id, int device_ordinal,
 
   service_run_options_ = ServiceExecutableRunOptions(
       run_options, Backend()->StreamBorrowerWithPriority());
-  service_run_options_.mutable_run_options()->set_gpu_executable_run_options(
-      &GetDistributedRuntime()->gpu_executable_run_options);
+  if (client) {
+    service_run_options_.mutable_run_options()->set_gpu_executable_run_options(
+        client->gpu_run_options());
+  }
 }
 
 se::DeviceMemoryAllocator* StreamWrapper::MemoryAllocator() {
@@ -183,10 +140,6 @@ se::DeviceMemoryAllocator* StreamWrapper::MemoryAllocator() {
   } else {
     return backend_->memory_allocator();
   }
-}
-
-std::shared_ptr<DistributedRuntimeClient> MultiMeshRuntimeClient() {
-  return GetDistributedRuntime()->runtime_client;
 }
 
 }  // namespace xla

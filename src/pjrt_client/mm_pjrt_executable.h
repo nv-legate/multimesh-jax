@@ -35,6 +35,10 @@ class WrapperPjRtExecutable : public PjRtLoadedExecutable {
 
   int num_partitions() const override { return wrapped_->num_partitions(); }
 
+  absl::StatusOr<std::string> FingerprintExecutable() const override {
+    return wrapped_->FingerprintExecutable();
+  }
+
   int64_t SizeOfGeneratedCodeInBytes() const override {
     return wrapped_->SizeOfGeneratedCodeInBytes();
   }
@@ -132,6 +136,7 @@ class MultiMeshPjRtExecutable : public PjRtLoadedExecutable {
       std::optional<std::vector<OpSharding>> parameter_shardings,
       const std::vector<Shape>& output_shapes,
       std::optional<std::vector<OpSharding>> output_shardings,
+      std::string fingerprint,
       std::unique_ptr<WrapperPjRtExecutable> fast_path_exe = nullptr);
 
   ~MultiMeshPjRtExecutable() override = default;
@@ -193,6 +198,10 @@ class MultiMeshPjRtExecutable : public PjRtLoadedExecutable {
     return output_shardings_;
   }
 
+  absl::StatusOr<std::string> FingerprintExecutable() const override {
+    return fingerprint_;
+  }
+
   void Delete() override;
 
   bool IsDeleted() override;
@@ -233,6 +242,7 @@ class MultiMeshPjRtExecutable : public PjRtLoadedExecutable {
   std::vector<std::vector<StoreHandle>> cached_temporary_stores_;
   std::vector<zuku::Future<zuku::ArrayTile>> temp_allocations_;
   std::shared_ptr<ZukuExecuteContext> context_;
+  std::string fingerprint_;
 
   bool deleted_ = false;
 };

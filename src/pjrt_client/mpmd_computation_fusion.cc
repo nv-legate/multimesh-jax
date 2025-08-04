@@ -6,7 +6,6 @@
 #include "xla/pjrt/multimesh/mpmd_computation_fusion.h"
 
 #include <algorithm>
-#include <limits>
 #include <memory>
 
 #include "xla/hlo/analysis/hlo_ordering.h"
@@ -14,16 +13,63 @@
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/hlo/transforms/simplifiers/hlo_dce.h"
-#include "xla/pjrt/multimesh/color_dfs.h"
 #include "xla/pjrt/multimesh/mpmd_instruction.h"
 #include "xla/pjrt/multimesh/mpmd_utils.h"
+#include "xla/pjrt/multimesh/color_dfs.h"
 #include "xla/tsl/platform/errors.h"
 #include "xla/util.h"
 
 namespace xla {
 
-absl::Status MpmdComputationFusion::FuseComputations(
-    HloComputation* parent, absl::Span<HloInstruction*> calls) {
+absl::Status ClearPredecessors(HloInstruction* instruction) {
+  for (auto* predecessor : instruction->control_predecessors()) {
+    TF_RETURN_IF_ERROR(predecessor->RemoveControlDependencyTo(instruction));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status ClearControlDependencies(HloInstruction* instruction) {
+  TF_RETURN_IF_ERROR(ClearPredecessors(instruction));
+  for (auto* successor : instruction->control_successors()) {
+    TF_RETURN_IF_ERROR(instruction->RemoveControlDependencyTo(successor));
+  }
+  return absl::OkStatus();
+}
+
+absl::StatusOr<HloInstruction*> FuseCalls(absl::Span<HloInstruction*> calls,
+                                          HloComputation* fused_computation) {
+  if (calls.empty()) {
+    return InvalidArgumentStrCat("FuseComputations: got empty calls vector");
+  }
+
+  HloComputation* parent = calls.front()->parent();
+  absl::flat_hash_set<HloInstruction*> call_set;
+  for (auto* call : calls) {
+    if (call->parent() != parent) {
+      return InvalidArgumentStrCat(
+          "FuseComputations: cannot fuse calls with different parent "
+          "computations");
+    }
+    call_set.insert(call);
+  }
+
+  std::vector<HloInstruction*> control_predecessors;
+  std::vector<HloInstruction*> control_successors;
+  for (auto* call : calls) {
+    for (auto* predecessor : call->control_predecessors()) {
+      TF_RETURN_IF_ERROR(predecessor->RemoveControlDependencyTo(call));
+      if (!call_set.contains(predecessor)) {
+        control_predecessors.push_back(predecessor);
+      }
+    }
+    for (auto* successor : call->control_successors()) {
+      TF_RETURN_IF_ERROR(call->RemoveControlDependencyTo(successor));
+      if (!call_set.contains(successor)) {
+        control_successors.push_back(successor);
+      }
+    }
+  }
+
   absl::flat_hash_set<HloInstruction*> produced_by_set;
   std::vector<HloInstruction*> parameters_needed;
   std::vector<std::pair<HloInstruction*, HloInstruction*>> roots_needed;
@@ -78,81 +124,86 @@ absl::Status MpmdComputationFusion::FuseComputations(
     }
   }
 
-  HloCloneContext context{parent->parent()};
-  HloComputation::Builder builder{calls[0]->called_computations()[0]->name()};
+  if (fused_computation == nullptr) {
+    HloCloneContext context{parent->parent()};
+    HloComputation::Builder builder{calls[0]->called_computations()[0]->name()};
 
-  int64_t fused_param_number = 0;
-  absl::flat_hash_map<HloInstruction*, HloInstruction*> clone_map;
-  absl::flat_hash_map<HloInstruction*, HloInstruction*> cloned_operand_params;
-  for (auto* operand : parameters_needed) {
-    auto* param = operands_added[operand].front();
-    TF_ASSIGN_OR_RETURN(
-        auto* new_param,
-        builder.AddParameter(HloInstruction::CreateParameter(
-            fused_param_number, param->shape(), param->name())));
-    new_param->set_sharding(param->sharding_ptr());
-    PropagateProperties(param, new_param);
-    for (auto* param : operands_added[operand]) {
-      clone_map[param] = new_param;
-      VLOG(5) << operand->name() << " input maps to clone of " << param->name();
+    int64_t fused_param_number = 0;
+    absl::flat_hash_map<HloInstruction*, HloInstruction*> clone_map;
+    absl::flat_hash_map<HloInstruction*, HloInstruction*> cloned_operand_params;
+    for (auto* operand : parameters_needed) {
+      auto* param = operands_added[operand].front();
+      TF_ASSIGN_OR_RETURN(
+          auto* new_param,
+          builder.AddParameter(HloInstruction::CreateParameter(
+              fused_param_number, param->shape(), param->name())));
+      new_param->set_sharding(param->sharding_ptr());
+      PropagateProperties(param, new_param);
+      for (auto* param : operands_added[operand]) {
+        clone_map[param] = new_param;
+        VLOG(5) << operand->name() << " input maps to clone of "
+                << param->name();
+      }
+      cloned_operand_params[operand] = new_param;
+      ++fused_param_number;
     }
-    cloned_operand_params[operand] = new_param;
-    ++fused_param_number;
-  }
 
-  for (auto* call : calls) {
-    HloComputation* computation = call->called_computations()[0];
-    for (auto* instruction : computation->MakeInstructionPostOrder()) {
-      if (instruction->opcode() == HloOpcode::kParameter) {
-        clone_map[instruction] = cloned_operand_params[call->mutable_operand(
-            instruction->parameter_number())];
-      } else if (instruction != computation->root_instruction()) {
-        absl::InlinedVector<HloInstruction*, 2> cloned_operands;
-        for (auto* operand : instruction->operands()) {
-          if (!clone_map.contains(operand)) {
-            return InvalidArgumentStrCat(
-                operand->name(), " was never added to clone map when fusing ");
+    for (auto* call : calls) {
+      HloComputation* computation = call->called_computations()[0];
+      for (auto* instruction : computation->MakeInstructionPostOrder()) {
+        if (instruction->opcode() == HloOpcode::kParameter) {
+          clone_map[instruction] = cloned_operand_params[call->mutable_operand(
+              instruction->parameter_number())];
+        } else if (instruction != computation->root_instruction()) {
+          absl::InlinedVector<HloInstruction*, 2> cloned_operands;
+          for (auto* operand : instruction->operands()) {
+            if (!clone_map.contains(operand)) {
+              return InvalidArgumentStrCat(
+                  operand->name(),
+                  " was never added to clone map when fusing ");
+            }
+            cloned_operands.push_back(clone_map[operand]);
           }
-          cloned_operands.push_back(clone_map[operand]);
+          auto* new_instruction =
+              builder.AddInstruction(instruction->CloneWithNewOperands(
+                  instruction->shape(), cloned_operands, &context));
+          clone_map[instruction] = new_instruction;
         }
-        auto* new_instruction =
-            builder.AddInstruction(instruction->CloneWithNewOperands(
-                instruction->shape(), cloned_operands, &context));
-        clone_map[instruction] = new_instruction;
+      }
+      for (auto* user : call->users()) {
+        auto* original_root = computation->root_instruction()->mutable_operand(
+            user->tuple_index());
+        auto* new_root = clone_map[original_root];
+        cloned_operand_params[user] = new_root;
+        VLOG(5) << user->name() << " output maps to clone of "
+                << original_root->name();
       }
     }
-    for (auto* user : call->users()) {
-      auto* original_root =
-          computation->root_instruction()->mutable_operand(user->tuple_index());
-      auto* new_root = clone_map[original_root];
-      cloned_operand_params[user] = new_root;
-      VLOG(5) << user->name() << " output maps to clone of "
-              << original_root->name();
-    }
-  }
 
-  std::vector<HloInstruction*> fused_root_operands;
-  for (auto [gte, root] : roots_needed) {
-    auto iter = clone_map.find(root);
-    if (iter == clone_map.end()) {
-      return InvalidArgumentStrCat("fused root ", root->name(),
-                                   " is not in clone map");
+    std::vector<HloInstruction*> fused_root_operands;
+    for (auto [gte, root] : roots_needed) {
+      auto iter = clone_map.find(root);
+      if (iter == clone_map.end()) {
+        return InvalidArgumentStrCat("fused root ", root->name(),
+                                     " is not in clone map");
+      }
+      fused_root_operands.push_back(iter->second);
     }
-    fused_root_operands.push_back(iter->second);
-  }
-  auto* root_tuple =
-      builder.AddInstruction(HloInstruction::CreateTuple(fused_root_operands));
+    auto* root_tuple = builder.AddInstruction(
+        HloInstruction::CreateTuple(fused_root_operands));
 
-  auto* new_comp = parent->parent()->AddComputationAndUnifyNamesAndIds(
-      builder.Build(root_tuple), /*is_entry=*/false);
+    fused_computation = parent->parent()->AddComputationAndUnifyNamesAndIds(
+        builder.Build(root_tuple), /*is_entry=*/false);
+  }
 
   std::vector<HloInstruction*> fused_call_operands;
   fused_call_operands.reserve(parameters_needed.size());
   for (auto* operand : parameters_needed) {
     fused_call_operands.push_back(operand);
   }
-  auto* new_call = parent->AddInstruction(HloInstruction::CreateCall(
-      root_tuple->shape(), fused_call_operands, new_comp));
+  auto* new_call = parent->AddInstruction(
+      HloInstruction::CreateCall(fused_computation->root_instruction()->shape(),
+                                 fused_call_operands, fused_computation));
 
   PropagateColor(calls[0], new_call);
 
@@ -167,6 +218,9 @@ absl::Status MpmdComputationFusion::FuseComputations(
     VLOG(5) << "replacing old output " << gte->name() << " with new output "
             << new_gte->name();
     TF_RETURN_IF_ERROR(gte->ReplaceAllUsesWith(new_gte));
+    if (!gte->metadata().scheduling_name().empty()) {
+      new_gte->set_metadata_scheduling_name(gte->metadata().scheduling_name());
+    }
     if (gte->IsRoot()) {
       VLOG(5) << "replacing root " << gte->name() << " with new output "
               << new_gte->name();
@@ -191,11 +245,19 @@ absl::Status MpmdComputationFusion::FuseComputations(
     }
     auto* computation = call->called_computations()[0];
     TF_RETURN_IF_ERROR(parent->RemoveInstruction(call));
-    TF_RETURN_IF_ERROR(
-        parent->parent()->RemoveEmbeddedComputation(computation));
+    if (computation->caller_computations().empty()) {
+      TF_RETURN_IF_ERROR(
+          parent->parent()->RemoveEmbeddedComputation(computation));
+    }
   }
 
-  return absl::OkStatus();
+  for (auto* predecessor : control_predecessors) {
+    TF_RETURN_IF_ERROR(predecessor->AddControlDependencyTo(new_call));
+  }
+  for (auto* successor : control_successors) {
+    TF_RETURN_IF_ERROR(new_call->AddControlDependencyTo(successor));
+  }
+  return new_call;
 }
 
 bool MpmdComputationFusion::FusionMatch(const HloInstruction* lhs,
@@ -226,7 +288,6 @@ bool MpmdComputationFusion::FusionMatch(const HloInstruction* lhs,
 absl::StatusOr<bool> MpmdComputationFusion::Visit(HloComputation* computation) {
   bool changed = false;
   bool found_match = true;
-  int64_t iter = 0;
   while (found_match) {
     VLOG(5) << "computing HLO ordering for fusion iteration";
     DependencyHloOrdering ordering{computation->parent()};
@@ -395,10 +456,9 @@ absl::StatusOr<bool> MpmdComputationFusion::Visit(HloComputation* computation) {
                 [&](HloInstruction* lhs, HloInstruction* rhs) {
                   return postorder_index[lhs] < postorder_index[rhs];
                 });
-      TF_RETURN_IF_ERROR(FuseComputations(
-          computation, {set->calls.data(), set->calls.size()}));
+      TF_ASSIGN_OR_RETURN(HloInstruction * fused,
+                          FuseCalls({set->calls.data(), set->calls.size()}));
     }
-    ++iter;
   }
 
   return changed;
@@ -435,7 +495,7 @@ absl::StatusOr<bool> MpmdComputationFusion::Run(
 
   if (changed) {
     HloDCE dce{};
-    TF_ASSIGN_OR_RETURN(bool deleted, dce.Run(module));
+    TF_RETURN_IF_ERROR(dce.Run(module).status());
   }
 
   return changed;

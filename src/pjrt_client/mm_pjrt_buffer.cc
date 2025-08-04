@@ -9,8 +9,7 @@
 #include <string>
 
 #include "xla/pjrt/cpu/cpu_client.h"
-#include "xla/pjrt/cpu/tracked_tfrt_cpu_device_buffer.h"
-#include "xla/pjrt/multimesh/mm_buffer_action.h"
+#include "xla/pjrt/cpu/tracked_cpu_device_buffer.h"
 #include "xla/pjrt/multimesh/mm_utils.h"
 #include "xla/pjrt/multimesh/zuku_execute_context.h"
 #include "xla/pjrt/pjrt_client.h"
@@ -35,6 +34,50 @@ class StoreExternalReference : public PjRtBuffer::ExternalReference {
  private:
   StoreHandle store_;
 };
+
+absl::StatusOr<std::pair<const void*, size_t>> GetPjRtBufferData(
+    PjRtBuffer* buffer, se::Stream* stream) {
+  if (buffer->IsOnCpu()) {
+    TF_ASSIGN_OR_RETURN(auto external_ref, buffer->AcquireExternalReference());
+    void* src_buf = external_ref->OpaqueDeviceMemoryDataPointer();
+    TF_ASSIGN_OR_RETURN(auto size, buffer->GetOnDeviceSizeInBytes());
+    return std::make_pair(src_buf, size);
+  }
+  auto* se_device = dynamic_cast<PjRtStreamExecutorDevice*>(buffer->device());
+  if (!se_device) {
+    return InvalidArgument(
+        "GetStreamExecutorBuffer: device is not a stream executor device");
+  }
+
+  auto* se_client_buffer = dynamic_cast<PjRtStreamExecutorBuffer*>(buffer);
+  if (!se_client_buffer) {
+    return InvalidArgument(
+        "GetStreamExecutorBuffer: buffer is not a stream executor buffer");
+  }
+
+  auto hold = se_client_buffer->GetBufferWithUsageHold();
+
+  std::unique_ptr<se::Stream> copy_stream;
+  if (stream) {
+    WaitForBufferDefinitionEventsOnStream(hold.buffer()->definition_events(),
+                                          stream);
+  } else {
+    auto new_stream = se_device->local_device_state()->BorrowStreamFromPool();
+    WaitForBufferDefinitionEventsOnStream(hold.buffer()->definition_events(),
+                                          new_stream.get());
+    // this will cuStreamSynchronize when the new_stream destructor is called
+  }
+
+  const void* ptr = hold.buffer()
+                        ->AsShapedBuffer(buffer->on_device_shape())
+                        .root_buffer()
+                        .opaque();
+  const size_t size = hold.buffer()
+                          ->AsShapedBuffer(buffer->on_device_shape())
+                          .root_buffer()
+                          .size();
+  return std::make_pair(ptr, size);
+}
 
 }  // namespace
 
@@ -61,9 +104,6 @@ MultiMeshPjRtBuffer::CopyToMemorySpace(PjRtMemorySpace* dst_memory_space) {
       TF_ASSIGN_OR_RETURN(auto new_buf,
                           native_buffer()->CopyToMemorySpace(dst_memory_space));
       return std::move(new_buf);
-    }
-    if (has_host_action()) {
-      return host_action();
     }
     return store();
   }();
@@ -105,16 +145,6 @@ MultiMeshPjRtBuffer::AcquireExternalReference() {
       std::make_unique<StoreExternalReference>(data, store()));
 }
 
-absl::Status MultiMeshPjRtBuffer::ResolveHostAction() {
-  VLOG(3) << "MultiMeshPjRtBuffer::ResolveHostAction: " << this << " on "
-          << device_->local_hardware_id();
-  TF_ASSIGN_OR_RETURN(
-      auto native_buf,
-      host_action()->MakeNativeBuffer(device_->local_hardware_id().value()));
-  data_ = std::move(native_buf);
-  return absl::OkStatus();
-}
-
 absl::StatusOr<StoreHandle> MultiMeshPjRtBuffer::ToStore(
     const zuku::ShardedShape& mm_shape,
     const std::shared_ptr<MultiMeshStream>& stream,
@@ -125,24 +155,7 @@ absl::StatusOr<StoreHandle> MultiMeshPjRtBuffer::ToStore(
 
   if (VLOG_IS_ON(3)) {
     VLOG(3) << "converting PjRtBuffer to store: " << global_shape_
-            << ", sharding=" << mm_shape << " host_action=" << std::boolalpha
-            << this->has_host_action();
-  }
-
-  if (this->has_host_action()) {
-    auto store = [&] {
-      if (existing_store.has_value()) {
-        return *std::move(existing_store);
-      }
-      return mm_client_->mutable_context()->CreateStore(
-          device_->local_device_id().value(),
-          device_->global_device_id().value(), mm_shape, {.name = "assembled"});
-    }();
-
-    mm_client_->mutable_context()->StoreBufferAction(
-        device_->local_device_id().value(), this->host_action(), store,
-        /*blocking=*/true);
-    return store;
+            << ", sharding=" << mm_shape;
   }
 
   VLOG(3) << "MultiMeshPjRtBuffer::ToStore: assembling from native "
@@ -190,11 +203,9 @@ absl::StatusOr<std::unique_ptr<PjRtBuffer>> MultiMeshPjRtBuffer::SliceStore()
         device_state->event_pool().ThenAllocateAndRecordEvent(stream));
     base_event->SetSequencingEvent(std::move(event), stream);
 
-    base_event->SetDefinedStatus(absl::OkStatus());
-
-    std::shared_ptr<TrackedDeviceBuffer> buffer(new TrackedDeviceBuffer{
+    std::unique_ptr<TrackedDeviceBuffer> buffer(new TrackedDeviceBuffer{
         device_,
-        {RawSEDeviceMemory::Create(mem, device_, nullptr)},
+        {RawSEDeviceMemory::Create(mem, device_->local_device_id(), nullptr)},
         {std::move(base_event)}});
     native_buf = std::make_unique<PjRtStreamExecutorBuffer>(
         on_device_shape(), std::move(buffer), se_client, device_,
@@ -205,11 +216,10 @@ absl::StatusOr<std::unique_ptr<PjRtBuffer>> MultiMeshPjRtBuffer::SliceStore()
       return InternalStrCat(
           "device for MultiMeshPjRtBuffer is not a CPU device");
     }
-    auto mem =
-        tsl::MakeAvailableAsyncValueRef<MaybeOwningCpuMemory>(sliced_buf, size);
+    auto mem = CpuDeviceMemory::CreateForeignMemory(sliced_buf, size, [] {});
     auto tracked_buf =
-        std::make_unique<TrackedTfrtCpuDeviceBuffer>(TrackedTfrtCpuDeviceBuffer(
-            /*is_tuple=*/false, /*owns_buffers=*/true, {std::move(mem)},
+        std::make_unique<TrackedCpuDeviceBuffer>(TrackedCpuDeviceBuffer(
+            /*owns_buffers=*/true, std::move(mem),
             tsl::MakeAvailableAsyncValueRef<CpuEvent>()));
     native_buf = std::make_unique<TfrtCpuBuffer>(
         on_device_shape(), std::move(tracked_buf), cpu_client, cpu_device,
@@ -244,13 +254,6 @@ absl::StatusOr<std::unique_ptr<PjRtBuffer>>
 MultiMeshPjRtBuffer::SliceLocalShard() const {
   VLOG(3) << "MultiMeshPjRtBuffer::SliceLocalShards for sharding="
           << (sharding_.has_value() ? sharding_->ToString() : "replicated");
-
-  if (has_host_action()) {
-    return Unimplemented(
-        "MultiMeshPjRtBuffer::SliceLocalShards: do not yet support deferred "
-        "host "
-        "actions");
-  }
 
   if (has_native_buffer()) {
     VLOG(3) << "MultiMeshPjRtBuffer::SliceLocalShards: inputs are native PjRt "

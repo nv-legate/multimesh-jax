@@ -48,7 +48,7 @@ absl::StatusOr<bool> MpmdInsertRootTupleShardings::HandleRootTupleShardings(
         }
         zuku::DeviceList devices =
             *CreateDeviceList(sharding.tile_assignment());
-        return *partition_->FindOrAllocateColor(devices, nullptr);
+        return *partition_->FindOrAllocateDefaultColor(devices);
       }();
       recolor->set_sharding(sharding);
       AssignColor(recolor, color);

@@ -22,6 +22,18 @@ Task transformations
    parallelize
    with_sharding_constraint
    register_task
+   MultiMesh
+   Task
+   TaskMesh
+
+Task classes
+------------
+.. autoclass:: MultiMesh
+   :members:
+.. autoclass:: Task
+.. autoclass:: TaskMesh
+   :members:
+
 
 Compiler contexts
 -----------------
@@ -33,7 +45,5 @@ Compiler contexts
    context
    enable_fast_path
    enable_recomputation
-   enable_task_fusion
-   only_fuse_loop_tasks
    ignore_transforms
 

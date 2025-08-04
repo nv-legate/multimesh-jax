@@ -15,6 +15,7 @@
 #include "xla/pjrt/multimesh/mpmd_instruction.h"
 #include "xla/pjrt/multimesh/mpmd_utils.h"
 #include "xla/service/shape_inference.h"
+#include "xla/hlo/utils/hlo_sharding_util.h"
 
 namespace xla {
 
@@ -61,7 +62,11 @@ absl::StatusOr<bool> MpmdReorderShardMapTranspose::VisitLoop(
             "instruction ", tr_instr->name(),
             " is user of `SPMDShardToFullShape` but has no sharding");
       }
-      new_shard_map_instr->set_sharding(tr_instr->sharding());
+
+      // we have to derive the transposed sharding of the original
+      // instruction
+      new_shard_map_instr->set_sharding(hlo_sharding_util::TransposeSharding(
+          instruction->sharding(), tr_instr->dimensions()));
 
       if (tr_color.has_value()) {
         // tr_instruction and instruction have same color

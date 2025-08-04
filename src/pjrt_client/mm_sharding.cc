@@ -302,6 +302,15 @@ absl::StatusOr<zuku::ShardedShape> CanonicalizeSharding(
        ++ta_dim) {
     spanned_dimension *= ta.dim(ta_dim);
     const int64_t iota_group_span = permuted_reshape_dims[iota_dim];
+    // we currently do not support permuting devices within
+    // a single tensor dimension, which happens if, e.g.
+    // a tensor dimension 8 -> iota dims [2,2,2]
+    if (iota_group_span < ta.dim(ta_dim)) {
+      return InvalidArgumentStrCat(
+          "CanonicalizeSharding: ", sharding.ToString(),
+          " has multiple iota dims within a single tensor dimension, which is "
+          "not yet supported");
+    }
     dimension_groups.back().push_back(ta_dim);
     if (spanned_dimension >= iota_group_span) {
       ++iota_dim;
@@ -634,8 +643,10 @@ absl::StatusOr<zuku::ShardedShape> XlaShapeToZukuShape(
       sharding_dims.push_back(
           {.size = dim, .sharding = 1, .permutation = dim_number++});
     }
-    sharding_dims.push_back(
-        {.size = 1, .sharding = devices.size(), .permutation = dim_number});
+    if (devices.size() > 1) {
+      sharding_dims.push_back(
+          {.size = 1, .sharding = devices.size(), .permutation = dim_number});
+    }
     zuku::ShardedShape sharded_shape{
         .type = zuku_type,
         .sharding = {.dims = std::move(sharding_dims), .devices = devices}};

@@ -52,8 +52,6 @@ constexpr int kFastPathInstructionCutoff = 20;
 bool enable_fast_path_exe{true};
 std::optional<int64_t> replicated_parameter_num_elements_cutoff = 0;
 std::optional<int64_t> recompute_from_arguments_if_cost_less_than{1024 * 1024};
-bool only_fuse_loop_tasks{false};
-bool use_task_fusion{true};
 
 struct CompileOutput {
   std::vector<MpmdOperation> schedule;
@@ -65,6 +63,7 @@ struct CompileOutput {
   std::vector<Layout> output_layouts;
   Shape output_shape;
   Shape executable_layout;
+  std::string fingerprint;
 };
 
 bool SmallModuleTask(const MpmdOperation& op) {
@@ -129,10 +128,8 @@ absl::StatusOr<CompileOutput> CreateTasks(
 
   Shape executable_layout(*options.executable_build_options.result_layout());
 
-  config.use_task_fusion = use_task_fusion;
   config.replicated_parameter_num_elements_cutoff =
       replicated_parameter_num_elements_cutoff;
-  config.only_fuse_loop_tasks = only_fuse_loop_tasks;
   config.recompute_from_arguments_if_cost_less_than =
       recompute_from_arguments_if_cost_less_than;
   TF_ASSIGN_OR_RETURN(
@@ -140,7 +137,7 @@ absl::StatusOr<CompileOutput> CreateTasks(
       MpmdPartition(computation.proto(), options, argument_layout_pointers,
                     executable_layout, config));
 
-  auto [ops, modules, temporaries, unused_params] =
+  auto [ops, modules, temporaries, unused_params, global_module] =
       std::move(partition_outputs);
 
   std::vector<OpSharding> root_tuple_shardings(num_roots);
@@ -292,15 +289,19 @@ absl::StatusOr<CompileOutput> CreateTasks(
   VLOG(3) << computation.proto().name() << " has output shape "
           << output_shape.ToString();
 
-  return CompileOutput{.schedule = std::move(ops),
-                       .temporaries = std::move(temporaries),
-                       .parameter_shardings = std::move(parameter_shardings),
-                       .root_shardings = std::move(root_tuple_shardings),
-                       .output_shapes = std::move(output_shapes),
-                       .parameter_layouts = std::move(parameter_layouts),
-                       .output_layouts = std::move(output_layouts),
-                       .output_shape = std::move(output_shape),
-                       .executable_layout = std::move(executable_layout)};
+  tsl::Fprint128 fingerprint128 = tsl::Fingerprint128(
+      global_module->ToString(HloPrintOptions::ModuleFingerprint()));
+  return CompileOutput{
+      .schedule = std::move(ops),
+      .temporaries = std::move(temporaries),
+      .parameter_shardings = std::move(parameter_shardings),
+      .root_shardings = std::move(root_tuple_shardings),
+      .output_shapes = std::move(output_shapes),
+      .parameter_layouts = std::move(parameter_layouts),
+      .output_layouts = std::move(output_layouts),
+      .output_shape = std::move(output_shape),
+      .executable_layout = std::move(executable_layout),
+      .fingerprint = absl::StrCat(fingerprint128.low64, fingerprint128.high64)};
 }
 
 }  // namespace
@@ -405,9 +406,7 @@ MultiMeshClient::MakeCrossHostReceiveBuffers(
                        platform_name());
 }
 
-absl::Status MultiMeshClient::Defragment() { return absl::OkStatus(); }
-
-absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>>
+absl::StatusOr<std::unique_ptr<PjRtExecutable>>
 MultiMeshClient::DeserializeExecutable(absl::string_view serialized,
                                        std::optional<CompileOptions> options) {
   return Unimplemented("DeserializeExecutable not implemented on %s",
@@ -474,8 +473,15 @@ absl::Status AssignExplicitParameterSharding(
   return absl::OkStatus();
 }
 
-absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>> MultiMeshClient::Compile(
+absl::StatusOr<std::unique_ptr<PjRtExecutable>> MultiMeshClient::Compile(
     const XlaComputation& computation, CompileOptions options) {
+  TF_ASSIGN_OR_RETURN(auto exe, CompileAndLoad(computation, options));
+  return std::make_unique<PjRtExecutableForwarder>(std::move(exe));
+}
+
+absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>>
+MultiMeshClient::CompileAndLoad(const XlaComputation& computation,
+                                CompileOptions options) {
   return Compile(computation, options, std::nullopt,
                  /*only_compile_device0=*/false);
 }
@@ -522,9 +528,9 @@ absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>> MultiMeshClient::Compile(
       // the GPU stack to avoid control replication overheads
       TF_ASSIGN_OR_RETURN(auto program_shape, computation.GetProgramShape());
       TF_ASSIGN_OR_RETURN(auto exe,
-                          base_client_->Compile(computation, options));
-      return std::make_unique<WrapperPjRtExecutable>(std::move(exe), this,
-                                                     std::move(program_shape));
+                          base_client_->CompileAndLoad(computation, options));
+      return std::unique_ptr<PjRtLoadedExecutable>(new WrapperPjRtExecutable(
+          std::move(exe), this, std::move(program_shape)));
     }
 
     if (*max_per_process < addressable_device_count() &&
@@ -597,8 +603,8 @@ absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>> MultiMeshClient::Compile(
     sharded_options.executable_build_options
         .set_allow_spmd_sharding_propagation_to_parameters({false});
 
-    TF_ASSIGN_OR_RETURN(
-        auto exe, base_client_->Compile(sharded_computation, sharded_options));
+    TF_ASSIGN_OR_RETURN(auto exe, base_client_->CompileAndLoad(
+                                      sharded_computation, sharded_options));
     TF_ASSIGN_OR_RETURN(auto program_shape, computation.GetProgramShape());
     fast_path_exe = std::make_unique<WrapperPjRtExecutable>(
         std::move(exe), this, std::move(program_shape));
@@ -647,30 +653,35 @@ absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>> MultiMeshClient::Compile(
   context_->FenceCompilation();
 
   // wrap into PjRtLoadedExecutable
-  return std::unique_ptr<PjRtLoadedExecutable>(
-      std::make_unique<MultiMeshPjRtExecutable>(
-          this, base_client_.get(), computation.proto().name(),
-          std::move(program_shape), std::move(compile_result.schedule),
-          std::move(compile_result.temporaries), std::move(device_assignment),
-          std::move(addressable_device_logical_ids),
-          std::move(addressable_devices), compile_result.executable_layout,
-          compile_result.parameter_layouts, compile_result.output_layouts,
-          std::move(compile_result.parameter_shardings),
-          std::vector<Shape>{compile_result.output_shape},
-          std::move(compile_result.root_shardings), std::move(fast_path_exe)));
+  return std::make_unique<MultiMeshPjRtExecutable>(
+      this, base_client_.get(), computation.proto().name(),
+      std::move(program_shape), std::move(compile_result.schedule),
+      std::move(compile_result.temporaries), std::move(device_assignment),
+      std::move(addressable_device_logical_ids), std::move(addressable_devices),
+      compile_result.executable_layout, compile_result.parameter_layouts,
+      compile_result.output_layouts,
+      std::move(compile_result.parameter_shardings),
+      std::vector<Shape>{compile_result.output_shape},
+      std::move(compile_result.root_shardings), compile_result.fingerprint,
+      std::move(fast_path_exe));
 }
 
-absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>> MultiMeshClient::Compile(
-    mlir::ModuleOp module, CompileOptions options) {
-  XlaComputation xla_computation;
-
+absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>>
+MultiMeshClient::CompileAndLoad(mlir::ModuleOp module, CompileOptions options) {
   // NOTE: we cannot allow return tuples as we don't support them yet
+  XlaComputation xla_computation;
   TF_RETURN_IF_ERROR(MlirToXlaComputation(
       module, xla_computation,
       /*use_tuple_args=*/options.parameter_is_tupled_arguments,
       /*return_tuple=*/false, /*use_shardy=*/false));
 
-  return Compile(xla_computation, options);
+  return CompileAndLoad(xla_computation, options);
+}
+
+absl::StatusOr<std::unique_ptr<PjRtExecutable>> MultiMeshClient::Compile(
+    mlir::ModuleOp module, CompileOptions options) {
+  TF_ASSIGN_OR_RETURN(auto exe, CompileAndLoad(module, options));
+  return std::make_unique<PjRtExecutableForwarder>(std::move(exe));
 }
 
 MultiMeshClient::MultiMeshClient(std::unique_ptr<PjRtClient> base_client,
@@ -794,9 +805,3 @@ extern "C" void RecomputeArgumentsIfCostLessThan(int64_t cost) {
     xla::recompute_from_arguments_if_cost_less_than = cost;
   }
 }
-
-extern "C" void EnableOnlyFuseLoopTasks(bool enable) {
-  xla::only_fuse_loop_tasks = enable;
-}
-
-extern "C" void EnableTaskFusion(bool enable) { xla::use_task_fusion = enable; }

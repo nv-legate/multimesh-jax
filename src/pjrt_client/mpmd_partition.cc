@@ -14,6 +14,7 @@
 #include "xla/hlo/ir/hlo_input_output_alias_config.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_opcode.h"
+#include "xla/hlo/pass/hlo_pass_interface.h"
 #include "xla/hlo/pass/hlo_pass_pipeline.h"
 #include "xla/hlo/transforms/simplifiers/hlo_dce.h"
 #include "xla/pjrt/multimesh/hlo_partition.h"
@@ -50,12 +51,13 @@
 #include "xla/pjrt/multimesh/mpmd_unused_loop_output_remover.h"
 #include "xla/pjrt/multimesh/mpmd_unused_param_output_remover.h"
 #include "xla/pjrt/multimesh/mpmd_inplace_collectives.h"
+#include "xla/pjrt/multimesh/mpmd_split_critical_path.h"
 #include "xla/pjrt/multimesh/scalar_argument.h"
 #include "xla/service/call_inliner.h"
 #include "xla/service/dump.h"
 #include "xla/service/hlo_module_util.h"
 #include "xla/service/hlo_proto_util.h"
-#include "xla/service/tuple_simplifier.h"
+#include "xla/hlo/transforms/simplifiers/tuple_simplifier.h"
 #include "xla/shape.h"
 #include "xla/util.h"
 
@@ -69,6 +71,47 @@ overloaded(Ts...) -> overloaded<Ts...>;
 
 namespace xla {
 namespace {
+
+class ValidateCircularDependencies : public HloModulePass {
+ public:
+  // The `partition` object contains the mapping from partition color
+  // to the assigned submesh.
+  ValidateCircularDependencies() = default;
+
+  absl::StatusOr<bool> Run(HloModule* module,
+                           const absl::flat_hash_set<absl::string_view>&
+                               execution_threads) override {
+    std::vector<HloComputation*> to_visit = {module->entry_computation()};
+    while (!to_visit.empty()) {
+      HloComputation* next = to_visit.back();
+      to_visit.pop_back();
+      absl::flat_hash_set<const HloInstruction*> visited;
+      for (auto* instruction : next->MakeInstructionPostOrder()) {
+        for (auto* operand : instruction->operands()) {
+          if (!visited.contains(operand)) {
+            return InvalidArgumentStrCat(
+                "operand ", operand->name(), " of ", instruction->name(),
+                " was not visited, circular dependency");
+          }
+        }
+        visited.insert(instruction);
+        for (auto* comp : instruction->called_computations()) {
+          to_visit.push_back(comp);
+        }
+      }
+    }
+    return false;
+  }
+
+  ~ValidateCircularDependencies() override = default;
+
+  using HloPassInterface::Run;
+  using HloPassInterface::RunOnModuleGroup;
+
+  absl::string_view name() const override {
+    return "validate-circular-depencies";
+  }
+};
 
 constexpr absl::string_view kHoistConvertEnv = "MULTIMESH_HOIST_CONVERT";
 constexpr absl::string_view kZeroArgsEnv = "MULTIMESH_ZERO_ARGUMENTS";
@@ -109,7 +152,7 @@ absl::StatusOr<HloSharding> ToMpmdSharding(
   if (iota_sharding.IsReplicated() && shape.dimensions_size() > 0) {
     // replicated on subset of devices
     proto.set_type(OpSharding::OTHER);
-    for (const auto& dim : shape.dimensions()) {
+    for (int dim = 0; dim < shape.dimensions_size(); ++dim) {
       proto.add_tile_assignment_dimensions(1);
     }
     proto.add_tile_assignment_dimensions(task_devices.size());
@@ -138,8 +181,14 @@ int64_t temp_offload_min_reuse_distance = 0ULL;
 
 int64_t temp_offload_min_size = 1024 * 1024;
 
-static constexpr std::array kSkipComputationNames = {"_threefry", "_normal_",
-                                                     "_where", "silu"};
+// TODO: these computations often get mislabeled with the wrong metadata
+// during lowering from Jax. The cause is not yet known, but for now
+// this list indicates computations that should not have their metadata
+// parsed or used.
+static constexpr std::array kSkipComputationNames = {
+    "_threefry", "_normal_",     "_where",    "silu",
+    "argsort",   "clip",         "cumsum",    "floor_divide",
+    "_take",     "_roll_static", "remainder", "_one_hot"};
 
 absl::StatusOr<HloModuleConfig> GetHloModuleConfig(
     HloComputation* entry_computation,
@@ -570,11 +619,14 @@ absl::Status MpmdScheduler::AddHloModuleTask(
   submodule->mutable_config().set_num_partitions(devices.size());
   submodule->mutable_config().set_use_spmd_partitioning(true);
 
+  HloCostAnalysis analysis;
+  TF_RETURN_IF_ERROR(submodule->entry_computation()->Accept(&analysis));
+
   LOG(INFO) << module_->name() << " partitioned into subtask "
             << submodule->name() << " on devices=[" << devices.start() << "..."
             << devices.stop() << "]"
             << ", module has " << submodule->instruction_count()
-            << " instructions";
+            << " instructions, Gflops=" << analysis.flop_count() / 1e9;
 
   auto spmd_module_ptr = std::make_shared<SpmdModule>(SpmdModule{
       .module = std::move(submodule),
@@ -736,9 +788,9 @@ MpmdPartitionIntoTasks(HloModule* module, const HloPartition& partition,
                          std::move(temporaries), std::move(unused_parameters));
 }
 
-absl::StatusOr<std::tuple<std::vector<MpmdOperation>,
-                          std::vector<std::shared_ptr<SpmdModule>>,
-                          std::vector<Store>, std::vector<Store>>>
+absl::StatusOr<std::tuple<
+    std::vector<MpmdOperation>, std::vector<std::shared_ptr<SpmdModule>>,
+    std::vector<Store>, std::vector<Store>, std::unique_ptr<HloModule>>>
 MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
               const std::vector<const Shape*>& argument_layout_pointers,
               const Shape& executable_layout,
@@ -831,15 +883,23 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
   mpmd_pipeline.AddPass<MpmdLogicalShardingPropagation>();
   if (hoist_convert) {
     mpmd_pipeline.AddPass<MpmdHoistLoopConvert>(&partition, zero_out_arguments);
+    mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   }
   if (config.replicated_parameter_num_elements_cutoff.has_value()) {
     mpmd_pipeline.AddPass<MpmdParameterReplication>(
         &partition, *config.replicated_parameter_num_elements_cutoff);
+    mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   }
   mpmd_pipeline.AddPass<MpmdComputationGrouper>(&partition);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
+  mpmd_pipeline.AddPass<MpmdComputationFusion>(
+      &partition, MpmdComputationFusion::FusionType::kMatchingColor,
+      /*only_fuse_loop_tasks=*/false);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<HloDCE>();
   mpmd_pipeline.AddPass<MpmdCrossTaskBarrierRemover>(
       &partition, /*remove_parameters=*/false);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<MpmdLogicalToGSPMDSharding>(&partition);
   mpmd_pipeline.AddPass<IotaShardingSanitizer>(&partition);
 
@@ -855,46 +915,74 @@ MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
   mpmd_pipeline.AddPass<MpmdShardingPropagation>(
       &partition, MpmdShardingPropagation::PropagationMode::ForwardFull,
       shard_cfg);
-  mpmd_pipeline.AddPass<MpmdComputationFusion>(
-      &partition, MpmdComputationFusion::FusionType::kMatchingColor,
-      /*only_fuse_loop_tasks=*/false);
   mpmd_pipeline.AddPass<HloDCE>();
   mpmd_pipeline.AddPass<MpmdUniquifyColors>(&partition);
   mpmd_pipeline.AddPass<MpmdInstructionDelayRecolor>(&partition);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<MpmdComputationInliner>(&partition);
   if (recompute_arguments &&
       config.recompute_from_arguments_if_cost_less_than.has_value()) {
     mpmd_pipeline.AddPass<MpmdArgumentRecompute>(
         &partition, *config.recompute_from_arguments_if_cost_less_than);
+    mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   }
   if (minimize_cut_size) {
     mpmd_pipeline.AddPass<MpmdCutSizeMinimizer>(&partition);
+    mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   }
   mpmd_pipeline.AddPass<MpmdShardMapLoopReduce>(&partition);
   mpmd_pipeline.AddPass<MpmdHoistShardMapReduce>(&partition,
                                                  remove_hoisted_reduces);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<MpmdReorderShardMapTranspose>();
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<MpmdComputationGrouper>(&partition);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<MpmdCrossTaskBarrierRemover>(
       &partition, /*remove_parameters=*/true);
   mpmd_pipeline.AddPass<MpmdUnusedParamOutputRemover>(&partition);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<MpmdComputationFusion>(
       &partition, MpmdComputationFusion::FusionType::kOriginalColor,
       /*only_fuse_loop_tasks=*/false);
   mpmd_pipeline.AddPass<MpmdComputationFusion>(
       &partition, MpmdComputationFusion::FusionType::kMatchingDevices,
       /*only_fuse_loop_tasks=*/true);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<HloDCE>();
+  mpmd_pipeline.AddPass<MpmdSplitCriticalPath>(&partition);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<MpmdLoopUnroll>(&partition);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<MpmdInsertReshard>(&partition);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<MpmdInPlaceCollectives>(&partition);
+  mpmd_pipeline.AddPass<ValidateCircularDependencies>();
   mpmd_pipeline.AddPass<MpmdAssignBufferSchedulingName>(&partition);
-  TF_ASSIGN_OR_RETURN(bool mpmd_changed, mpmd_pipeline.Run(module.get()));
+
+  TF_RETURN_IF_ERROR(mpmd_pipeline.Run(module.get()).status());
+
+  for (auto* instruction :
+       module->entry_computation()->MakeInstructionPostOrder()) {
+    if (instruction->opcode() == HloOpcode::kCall) {
+      int64_t num_devices = partition.NumDevicesForInstruction(instruction);
+      if (num_devices == 1) {
+        // erase all sharding from inside the computation
+        // XLA has a bug and will choke on this later during fusions
+        for (auto* subinstr :
+             instruction->called_computations()[0]->instructions()) {
+          subinstr->clear_sharding();
+        }
+      }
+    }
+  }
 
   DumpHloModuleIfEnabled(*module, "global_mpmd");
 
-  return MpmdPartitionIntoTasks(module.get(), partition,
-                                options.executable_build_options);
+  TF_ASSIGN_OR_RETURN(auto results,
+                      MpmdPartitionIntoTasks(module.get(), partition,
+                                             options.executable_build_options));
+  return std::tuple_cat(std::move(results), std::make_tuple(std::move(module)));
 }
 
 }  // namespace xla

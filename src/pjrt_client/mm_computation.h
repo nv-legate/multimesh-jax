@@ -113,6 +113,8 @@ class MultiMeshXla {
 
   std::unique_ptr<HloModule> opt_module_;
 
+  Backend* backend_;
+
   PjRtClient* client_;
 
   absl::flat_hash_map<int64_t, int64_t> output_input_alias_;
@@ -121,11 +123,9 @@ class MultiMeshXla {
 
   std::optional<int64_t> temp_required_;
 
-  Backend* backend_;
+  bool concurrent_;
 
   Shape root_shape_;
-
-  bool concurrent_;
 };
 
 class MultiMeshStream {

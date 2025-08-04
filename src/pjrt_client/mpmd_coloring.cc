@@ -6,7 +6,6 @@
 #include "xla/pjrt/multimesh/mpmd_coloring.h"
 
 #include <optional>
-#include "absl/container/btree_map.h"
 
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_instruction.h"
@@ -77,18 +76,6 @@ void ColorBackwards(const std::string& color, HloInstruction* instruction,
   }
 }
 
-absl::flat_hash_map<const HloInstruction*, int64_t> ComputeDepthMap(
-    const HloComputation* computation) {
-  absl::flat_hash_map<const HloInstruction*, int64_t> depth;
-  for (auto* instruction : computation->MakeInstructionPostOrder()) {
-    depth[instruction] = 0;
-    for (auto* operand : instruction->operands()) {
-      depth[instruction] = std::max(depth[instruction], depth[operand] + 1);
-    }
-  }
-  return depth;
-}
-
 absl::btree_map<int64_t, std::string> ComputeColorDepthMap(
     const HloComputation* computation,
     const absl::flat_hash_map<const HloInstruction*, int64_t>& depth) {
@@ -114,21 +101,10 @@ absl::btree_map<int64_t, std::string> ComputeColorDepthMap(
   return depth_to_color;
 }
 
-absl::flat_hash_map<const HloInstruction*, int64_t> CreateTopologicalIndexMap(
-    const HloComputation* computation) {
-  absl::flat_hash_map<const HloInstruction*, int64_t> instruction_to_topo_index;
-  const std::vector<HloInstruction*> topological_order =
-      computation->MakeInstructionPostOrder();
-  for (int64_t i = 0; i < topological_order.size(); ++i) {
-    instruction_to_topo_index[topological_order[i]] = i;
-  }
-  return instruction_to_topo_index;
-}
-
 }  // namespace
 
 bool MpmdColoring::PropagateDirectionally(
-    const std::vector<HloInstruction*> postorder, const std::string color,
+    const std::vector<HloInstruction*>& postorder, const std::string& color,
     const InstructionProperties& properties, FilterVisitFn if_visit,
     const absl::flat_hash_set<HloInstruction*>& fixed_colored_instructions,
     bool propagate_forward) {
@@ -484,7 +460,7 @@ absl::StatusOr<bool> MpmdColoring::Run(
       // a root must always be assigned a color, if all else has failed
       // give a default color
       TF_ASSIGN_OR_RETURN(std::string color,
-                          partition_->FindOrAllocateDefaultColor());
+                          partition_->FindOrAllocateGlobalColor());
       VLOG(5) << "root " << i->name() << " assigned default color=" << color;
       AssignColor(i, color);
       ColorBackwards(color, i, properties);

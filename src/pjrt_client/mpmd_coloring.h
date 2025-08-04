@@ -67,7 +67,7 @@ class MpmdColoring : public HloModulePass {
       FilterVisitFn if_visit);
 
   bool PropagateDirectionally(
-      const std::vector<HloInstruction*> postorder, const std::string color,
+      const std::vector<HloInstruction*>& postorder, const std::string& color,
       const InstructionProperties& properties, FilterVisitFn if_visit,
       const absl::flat_hash_set<HloInstruction*>& fixed_colored_instructions,
       bool propagate_forward);

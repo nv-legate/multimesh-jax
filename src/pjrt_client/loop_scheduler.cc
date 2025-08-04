@@ -4,6 +4,8 @@
  */
 
 #include "xla/pjrt/multimesh/loop_scheduler.h"
+#include <functional>
+#include <queue>
 
 #include "xla/pjrt/multimesh/mpmd_instruction.h"
 #include "xla/pjrt/multimesh/mpmd_loop.h"
@@ -63,6 +65,187 @@ std::vector<std::vector<HloInstruction*>> UnrollLoopIncrementTasks(
 }
 
 }  // namespace
+
+absl::StatusOr<std::vector<std::vector<HloInstruction*>>> ScheduleZeroBubble(
+    const HloPartition& partition, const LoopConfig& loop_config,
+    const std::vector<std::vector<HloInstruction*>>& tasks) {
+  if (tasks.empty()) {
+    return std::vector<std::vector<HloInstruction*>>{};
+  }
+
+  std::vector<std::vector<HloInstruction*>> reordered_tasks(tasks.size());
+  for (int iter = 0; iter < tasks.size(); ++iter) {
+    reordered_tasks[iter].reserve(tasks.size());
+  }
+
+  absl::flat_hash_map<HloInstruction*, int64_t> critical_stage_numbers;
+  int64_t num_pipeline_tasks = 0;
+  for (int64_t stage = 0; stage < tasks[0].size(); ++stage) {
+    if (partition.IsCritical(tasks[0][stage])) {
+      for (int iter = 0; iter < tasks.size(); ++iter) {
+        HloInstruction* task = tasks[iter][stage];
+        critical_stage_numbers[task] = stage;
+        reordered_tasks[iter].push_back(task);
+        VLOG(5) << "critical stage " << task->to_apply()->name()
+                << " pushed back in reordering for iteration " << iter;
+      }
+      ++num_pipeline_tasks;
+    }
+  }
+
+  struct NonCriticalStage {
+    int64_t partner_stage_number;
+    int64_t stage;
+  };
+  struct CompareNonCriticalStage {
+    bool operator()(const NonCriticalStage& lhs,
+                    const NonCriticalStage& rhs) const {
+      return lhs.partner_stage_number < rhs.partner_stage_number;
+    }
+  };
+
+  // we want to reverse order of the non-critical stages
+  // BWD 3, BWD 2, BWD 1, BWD 0, GRAD 0, GRAD 1, GRAD 2, GRAD 3
+  std::priority_queue<NonCriticalStage, std::vector<NonCriticalStage>,
+                      CompareNonCriticalStage>
+      non_critical_stages;
+  // determine criticality based on the LAST microbatch
+  for (int64_t stage = 0; stage < tasks.back().size(); ++stage) {
+    auto* instruction = tasks.back()[stage];
+    if (partition.IsNonCritical(instruction)) {
+      int64_t critical_partner_stage = 0;
+      for (auto* gte_operand : instruction->operands()) {
+        for (auto* call_operand : gte_operand->operands()) {
+          if (critical_stage_numbers.contains(call_operand)) {
+            critical_partner_stage = std::max(
+                critical_partner_stage, critical_stage_numbers[call_operand]);
+          }
+        }
+      }
+      VLOG(5) << "non-critical stage " << stage << " consumes critical stage "
+              << critical_partner_stage;
+      non_critical_stages.emplace(
+          NonCriticalStage{critical_partner_stage, stage});
+    }
+  }
+
+  while (!non_critical_stages.empty()) {
+    NonCriticalStage nc_stage = non_critical_stages.top();
+    non_critical_stages.pop();
+    VLOG(5) << "non-critical stage "
+            << tasks[0][nc_stage.stage]->to_apply()->name()
+            << " pushed back in reordering";
+    for (int64_t iter = 0; iter < tasks.size(); ++iter) {
+      reordered_tasks[iter].push_back(tasks[iter][nc_stage.stage]);
+    }
+  }
+
+  VLOG(5) << "Have loop config num_stages="
+          << loop_config.num_stages.value_or(-1)
+          << ", interleave=" << loop_config.interleave.value_or(-1);
+
+  std::vector<HloInstruction*> order;
+  const int64_t total_num_devices = partition.TotalDevices();
+  const auto num_groups = [&] {
+    absl::flat_hash_map<zuku::DeviceList, int64_t> unique_groups;
+    for (auto&& task : tasks[0]) {
+      auto color = Color(task);
+      auto devices = partition.DevicesForColor(*color);
+      if (devices.size() != total_num_devices) {
+        // don't count tasks over the global set of devices
+        unique_groups[devices] += 1;
+      }
+    }
+    return std::max<int>(1, unique_groups.size());
+  }();
+
+  const int next_minibatch_delay = (num_pipeline_tasks + 1) / 2;
+  const int num_stages = tasks[0].size();
+  const int minibatch_size = num_groups;
+  const int num_minibatches =
+      (loop_config.num_iterations + num_groups - 1) / num_groups;
+  const int num_wavefronts =
+      num_stages + num_minibatches * next_minibatch_delay;
+
+  struct StageGroup {
+    int64_t wf;
+    int64_t microbatch;
+    int64_t stage;
+  };
+
+  // use > to prioritize earlier stages
+  struct CompareStageGroup {
+    bool operator()(const StageGroup& lhs, const StageGroup& rhs) const {
+      if (lhs.wf != rhs.wf) {
+        return lhs.wf > rhs.wf;
+      }
+      if (lhs.microbatch != rhs.microbatch) {
+        return lhs.microbatch > rhs.microbatch;
+      }
+      return lhs.stage > rhs.stage;
+    }
+  };
+
+  std::priority_queue<StageGroup, std::vector<StageGroup>, CompareStageGroup>
+      queue;
+  for (int minibatch = 0; minibatch < num_minibatches; ++minibatch) {
+    const int64_t time_offset = minibatch * next_minibatch_delay;
+    for (int64_t mb = 0; mb < minibatch_size; ++mb) {
+      const int64_t microbatch = minibatch * minibatch_size + mb;
+      for (int64_t stage = 0; stage < tasks[0].size(); ++stage) {
+        const int64_t wf = time_offset + mb + stage;
+        VLOG(5) << "emplacing wf=" << wf << " microbatch=" << microbatch
+                << " stage=" << stage;
+        queue.emplace(StageGroup{wf, microbatch, stage});
+      }
+    }
+  }
+
+  VLOG(3) << "Have num_groups=" << num_groups
+          << ", minibatch_size=" << minibatch_size
+          << ", num_minibatches=" << num_minibatches
+          << ", num_wavefronts=" << num_wavefronts
+          << ", minibatch_delay=" << next_minibatch_delay;
+
+  absl::flat_hash_map<zuku::DeviceList, double> device_timer;
+  absl::flat_hash_map<int64_t, double> microbatch_timer;
+  absl::flat_hash_map<int64_t, zuku::DeviceList> last_devices_for_microbatch;
+  while (!queue.empty()) {
+    StageGroup group = std::move(queue.top());
+    queue.pop();
+    order.push_back(reordered_tasks[group.microbatch][group.stage]);
+    auto devices = partition.DevicesForInstruction(order.back());
+    const auto [time, buffer] = [&] {
+      auto& devices_time = device_timer[devices];
+      if (partition.IsCritical(tasks[0][group.stage])) {
+        auto& microbatch_time = microbatch_timer[group.microbatch];
+        double comm_time = [&] {
+          if (last_devices_for_microbatch.contains(group.microbatch) &&
+              devices != last_devices_for_microbatch[group.microbatch]) {
+            return 0.1;
+          }
+          return 0.0;
+        }();
+        last_devices_for_microbatch[group.microbatch] = devices;
+        auto time = std::max(devices_time, microbatch_time + comm_time);
+        auto buffer = time - microbatch_time;
+        devices_time = time + 1;
+        microbatch_time = time + 1;
+        return std::make_pair(time, buffer);
+      }
+      return std::make_pair(devices_time++, -1.0);
+    }();
+
+    if (VLOG_IS_ON(5)) {
+      std::cerr << "popped wf=" << group.wf
+                << " microbatch=" << group.microbatch
+                << " stage=" << group.stage << " " << devices
+                << " at t=" << time << ", buffer=" << buffer
+                << ", call=" << order.back()->name() << std::endl;
+    }
+  }
+  return std::vector<std::vector<HloInstruction*>>{std::move(order)};
+}
 
 absl::Status ScheduleWavefront(
     const HloPartition& partition,
@@ -341,6 +524,8 @@ absl::StatusOr<std::vector<std::vector<HloInstruction*>>> ScheduleLoops(
       return ScheduleGpipe(config, tasks);
     case LoopConfig::Schedule::kPrefetchWavefront:
       return SchedulePrefetchWavefront(partition, config, tasks);
+    case LoopConfig::Schedule::kZeroBubbleH2:
+      return ScheduleZeroBubble(partition, config, tasks);
     case LoopConfig::Schedule::k1F1B:
     case LoopConfig::Schedule::kWavefront:
       return ScheduleWavefront(partition, config, tasks);

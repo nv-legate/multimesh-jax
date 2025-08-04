@@ -229,7 +229,7 @@ TEST(MultiMeshShardingTest, FullyReplicated) {
 
 TEST(MultiMeshShardingTest, ResizeSharding) {
   auto input = HloSharding::IotaTile({4, 1, 1});
-  Shape shape{PrimitiveType::F32, {8, 8, 8}, {}, {}};
+  Shape shape{PrimitiveType::F32, {8, 8, 8}, {}};
   auto result = ResizeSharding(shape, input, /*num_elements=*/2);
   EXPECT_TRUE(result.has_value());
 
@@ -239,7 +239,7 @@ TEST(MultiMeshShardingTest, ResizeSharding) {
 
 TEST(MultiMeshShardingTest, DoNotOvershardShape) {
   auto input = HloSharding::IotaTile({2, 1, 2});
-  Shape shape{PrimitiveType::F32, {2, 8, 8}, {}, {}};
+  Shape shape{PrimitiveType::F32, {2, 8, 8}, {}};
   auto result = ResizeSharding(shape, input, /*num_elements=*/16);
   ASSERT_TRUE(result.has_value());
 
@@ -714,6 +714,26 @@ TEST(MultiMeshShardingTest, CanonicalizePermutedSharding) {
   };
 
   EXPECT_EQ(zuku_shape, kCorrectZukuShape);
+}
+
+TEST(MultiMeshShardingTest, PermutedIotaInSingleDimSharding) {
+  static constexpr absl::string_view kInputPbtxt = R"(
+    type: OTHER
+    tile_assignment_dimensions: 8
+    tile_assignment_dimensions: 1
+    iota_reshape_dims: 2
+    iota_reshape_dims: 2
+    iota_reshape_dims: 2
+    iota_transpose_perm: 1
+    iota_transpose_perm: 0
+    iota_transpose_perm: 2
+  )";
+
+  TF_ASSERT_OK_AND_ASSIGN(HloSharding input_sharding, GetSharding(kInputPbtxt));
+  Shape shape{PrimitiveType::F32, {8, 8}, {}};
+  // we cannot do an iota permutation with a single tensor dimension
+  auto status_or = CanonicalizeSharding(input_sharding, shape, true);
+  EXPECT_FALSE(status_or.status().ok());
 }
 
 }  // namespace

@@ -10,6 +10,7 @@
 #include "xla/service/call_inliner.h"
 #include "xla/hlo/transforms/simplifiers//tuple_simplifier.h"
 #include "xla/pjrt/multimesh/mpmd_utils.h"
+#include "xla/pjrt/multimesh/mpmd_loop.h"
 
 namespace xla {
 
@@ -84,7 +85,6 @@ absl::StatusOr<bool> MpmdMicrobatchLoopCanonicalizer::Run(
       microbatch_inputs.insert(instruction);
     } else if (instruction->opcode() == HloOpcode::kWhile) {
       auto* body = instruction->called_computations()[0];
-      auto* body_root = body->root_instruction();
       auto* input_tuple = instruction->mutable_operand(0);
       for (int64_t index = 0; index < input_tuple->operand_count(); ++index) {
         auto* input = input_tuple->operand(index);

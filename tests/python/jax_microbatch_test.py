@@ -16,7 +16,8 @@ from jax.experimental.pjit import AUTO
 from jax.sharding import Mesh, PartitionSpec as P
 
 from multimesh.jax import (
-    enable_task_fusion,
+    Task,
+    TaskMesh,
     microbatch,
     register_task,
     task,
@@ -87,24 +88,39 @@ class MicrobatchTest(MultiMeshJaxTestCase):
 
         register_task(
             "layer0",
-            devices=devices,
-            dims=[batch_dim, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            task=Task(
+                name="layer0",
+                mesh=TaskMesh(
+                    axis_sizes=(batch_dim, 1),
+                    axis_names=("x", "y"),
+                    devices=devices,
+                ),
+                logical_axes=logical_axes,
+            ),
         )
         register_task(
             "layer1",
-            devices=devices,
-            dims=[batch_dim, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            task=Task(
+                name="layer1",
+                mesh=TaskMesh(
+                    axis_sizes=(batch_dim, 1),
+                    axis_names=("x", "y"),
+                    devices=devices,
+                ),
+                logical_axes=logical_axes,
+            ),
         )
         register_task(
             "final",
-            devices=devices,
-            dims=[batch_dim, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            task=Task(
+                name="final",
+                mesh=TaskMesh(
+                    axis_sizes=(batch_dim, 1),
+                    axis_names=("x", "y"),
+                    devices=devices,
+                ),
+                logical_axes=logical_axes,
+            ),
         )
 
         def c(params, batch):
@@ -154,7 +170,204 @@ class MicrobatchTest(MultiMeshJaxTestCase):
             batch_sharding,
         )
 
-        with enable_task_fusion(False):
+        self._test_against_reference(
+            c,
+            args_maker,
+            reference_shardings=arg_shardings,
+            arg_shardings=arg_shardings,
+        )
+
+    def test_microbatch_zbh2(self):
+        if jax.device_count() > 2:
+            self.skipTest("need 1 or 2 devices")
+
+        logical_axes = [
+            ("batch", "x"),
+            ("model", "y"),
+        ]
+
+        devices = list(range(jax.device_count()))
+        batch_dim = jax.device_count()
+
+        def callback(name: str, backprop: bool):
+            suffix = "bwd" if backprop else "fwd"
+            return Task(
+                mesh=TaskMesh(
+                    axis_sizes=(batch_dim, 1),
+                    axis_names=("x", "y"),
+                    devices=devices,
+                ),
+                logical_axes=logical_axes,
+                name=f"layer{name}_{suffix}",
+                split_backprop=("_activations", "_gradients")
+                if backprop
+                else None,
+            )
+
+        register_task(
+            r"layer(\d+)",
+            callback=callback,
+        )
+        register_task(
+            "final",
+            task=Task(
+                name="final",
+                mesh=TaskMesh(
+                    axis_sizes=(batch_dim, 1),
+                    axis_names=("x", "y"),
+                    devices=devices,
+                ),
+                logical_axes=logical_axes,
+            ),
+        )
+
+        def c(params, batch):
+            def inner_comp(batch, param):
+                x = jnp.einsum("hd,bd->bh", param, batch)
+                return jnp.einsum("hd,bd->bh", param, x)
+
+            def m(params, batch):
+                x, y = params
+                with jax.named_scope("layer0"):
+                    s = inner_comp(batch, x)
+                with jax.named_scope("layer1"):
+                    s = inner_comp(s, y)
+                return (s * s).sum()
+
+            g = value_and_grad(m)
+            g = microbatch(
+                g, dim=0, size=2, argnum=1, schedule="zero-bubble-h2"
+            )
+            return g(params, batch)
+
+        batch = 4
+        model = 4
+
+        def args_maker():
+            def make_shape(*shape):
+                size = np.prod(shape)
+                return jnp.cos(
+                    jnp.arange(size, dtype=np.float32).reshape(*shape)
+                )
+
+            return (
+                (
+                    make_shape(model, model),
+                    make_shape(model, model),
+                ),
+                make_shape(batch, model),
+            )
+
+        mesh = jax.sharding.Mesh(np.array(jax.devices()), ("x",))
+        param_sharding = jax.sharding.NamedSharding(mesh, P(None, None))
+        batch_sharding = jax.sharding.NamedSharding(mesh, P("x", None))
+
+        arg_shardings = (
+            (
+                param_sharding,
+                param_sharding,
+            ),
+            batch_sharding,
+        )
+
+        self._test_against_reference(
+            c,
+            args_maker,
+            reference_shardings=arg_shardings,
+            arg_shardings=arg_shardings,
+        )
+
+    def test_microbatch_lb(self):
+        if jax.device_count() < 2:
+            self.skipTest("need at least 2 devices")
+
+        logical_axes = [
+            ("batch", "x"),
+            ("model", "y"),
+        ]
+
+        devices = list(range(jax.device_count()))
+        batch_dim = jax.device_count()
+
+        register_task(
+            "emb",
+            task=Task(
+                name="emb",
+                mesh_slice={"x" : 0},
+                logical_axes=logical_axes,
+                loop_dependent_mesh_slice=lambda i: {"x" : i % batch_dim}
+            )
+        )
+
+        register_task(
+            "layer0",
+            task=Task(
+                name="layer0",
+                mesh_slice={"x" : 0},
+                logical_axes=logical_axes,
+            ),
+        )
+        register_task(
+            "layer1",
+            task=Task(
+                name="layer1",
+                mesh_slice={"x" : 1},
+                logical_axes=logical_axes,
+            ),
+        )
+
+        def c(params, batch):
+            def inner_comp(batch, param):
+                x = jnp.einsum("hd,bd->bh", param, batch)
+                return jnp.einsum("hd,bd->bh", param, x)
+
+            def m(params, batch):
+                x, y, z = params
+                with jax.named_scope("emb"):
+                    s = inner_comp(batch, x)
+                with jax.named_scope("layer0"):
+                    s = inner_comp(s, y)
+                with jax.named_scope("layer1"):
+                    s = inner_comp(s, z)
+                return (s * s).sum()
+
+            g = value_and_grad(m)
+            g = microbatch(g, dim=0, size=2, argnum=1, schedule="1f1b")
+            return g(params, batch)
+
+        batch = 8
+        model = 4
+
+        def args_maker():
+            def make_shape(*shape):
+                size = np.prod(shape)
+                return jnp.cos(
+                    jnp.arange(size, dtype=np.float32).reshape(*shape)
+                )
+
+            return (
+                (
+                    make_shape(model, model),
+                    make_shape(model, model),
+                    make_shape(model, model),
+                ),
+                make_shape(batch, model),
+            )
+
+        mesh = jax.sharding.Mesh(np.array(jax.devices()), ("x",))
+        param_sharding = jax.sharding.NamedSharding(mesh, P(None, None))
+        batch_sharding = jax.sharding.NamedSharding(mesh, P("x", None))
+
+        arg_shardings = (
+            (
+                param_sharding,
+                param_sharding,
+                param_sharding,
+            ),
+            batch_sharding,
+        )
+
+        with mesh, enable_task_fusion(False):
             self._test_against_reference(
                 c,
                 args_maker,
@@ -173,17 +386,23 @@ class MicrobatchTest(MultiMeshJaxTestCase):
 
         register_task(
             "layer0",
-            devices=[0],
-            dims=[1, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            task=Task(
+                name="layer0",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"), axis_sizes=(1, 1), devices=(0,)
+                ),
+                logical_axes=logical_axes,
+            ),
         )
         register_task(
             "layer1",
-            devices=[0],
-            dims=[1, 1],
-            device_axes=["x", "y"],
-            logical_axes=logical_axes,
+            task=Task(
+                name="layer1",
+                mesh=TaskMesh(
+                    axis_names=("x", "y"), axis_sizes=(1, 1), devices=(0,)
+                ),
+                logical_axes=logical_axes,
+            ),
         )
 
         def c(args):
@@ -269,7 +488,6 @@ class MicrobatchTest(MultiMeshJaxTestCase):
                     out_shardings=(AUTO(mesh)),
                 )
                 batch, params = args_maker(abstract=True)
-                print(batch, params)
                 lowered = f.lower(batch, params).compile()
                 return lowered
 
@@ -370,12 +588,12 @@ class MicrobatchTest(MultiMeshJaxTestCase):
             def g(x, param):
                 return (x * param).sum()
 
-            g = task(g, devices=jax.devices())
+            g = task(g)
 
             def f(x, param):
                 return x * param
 
-            f = task(f, devices=jax.devices())
+            f = task(f)
 
             def residual(x, param1, param2):
                 x = f(x, param1)
@@ -401,7 +619,7 @@ class MicrobatchTest(MultiMeshJaxTestCase):
             def f(param, x):
                 return (x * param).sum()
 
-            f = value_and_grad(task(f, devices=jax.devices()))
+            f = value_and_grad(task(f))
             f = microbatch(f, argnum=1, dim=0, size=2)
             return f(param, x)
 
@@ -410,8 +628,7 @@ class MicrobatchTest(MultiMeshJaxTestCase):
             x = jnp.arange(16, dtype=np.float32).reshape(4, 4)
             return p, x
 
-        with enable_task_fusion(False):
-            self._test_against_reference(c, args_maker)
+        self._test_against_reference(c, args_maker)
 
     def test_multiple_microbatch_grad(self):
         if jax.device_count() != 1:
@@ -421,12 +638,12 @@ class MicrobatchTest(MultiMeshJaxTestCase):
             def g(x, param):
                 return (x * param).sum()
 
-            g = task(g, devices=jax.devices())
+            g = task(g)
 
             def f(x, param):
                 return x * param
 
-            f = task(f, devices=jax.devices())
+            f = task(f)
 
             def residual(params, x):
                 param1, param2 = params

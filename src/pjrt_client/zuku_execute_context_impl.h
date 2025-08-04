@@ -55,6 +55,8 @@ class ZukuExecuteContextImpl final : public ZukuExecuteContext {
   void* SliceLocalShard(int64_t local_device_id,
                         const StoreHandle& handle) override;
 
+  void MarkProfile(const std::string& name) override;
+
   void StartTimer(const std::string& name) override;
 
   void StopTimer(const std::string& name) override;
@@ -76,9 +78,6 @@ class ZukuExecuteContextImpl final : public ZukuExecuteContext {
   bool IsGpu() override;
 
   bool HasLocalShard(const StoreHandle& handle) override;
-
-  void StoreBufferAction(int64_t local_device_id, BufferAction* actions,
-                         const StoreHandle& store, bool blocking) override;
 
   void Rename(StoreHandle& handle, std::string name) override;
 

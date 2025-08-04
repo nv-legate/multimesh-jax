@@ -74,7 +74,7 @@ class MultiMeshClient : public PjRtClient {
     return base_client_->GetHloCostAnalysis();
   }
 
-  absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>> DeserializeExecutable(
+  absl::StatusOr<std::unique_ptr<PjRtExecutable>> DeserializeExecutable(
       absl::string_view serialized,
       std::optional<CompileOptions> options) override;
 
@@ -85,10 +85,16 @@ class MultiMeshClient : public PjRtClient {
       std::optional<int64_t> max_per_process, bool only_compile_device0,
       MpmdPartitionConfig config = {});
 
-  absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>> Compile(
+  absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>> CompileAndLoad(
       const XlaComputation& computation, CompileOptions options) override;
 
-  absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>> Compile(
+  absl::StatusOr<std::unique_ptr<PjRtExecutable>> Compile(
+      const XlaComputation& computation, CompileOptions options) override;
+
+  absl::StatusOr<std::unique_ptr<PjRtLoadedExecutable>> CompileAndLoad(
+      mlir::ModuleOp module, CompileOptions options) override;
+
+  absl::StatusOr<std::unique_ptr<PjRtExecutable>> Compile(
       mlir::ModuleOp module, CompileOptions options) override;
 
   absl::StatusOr<Layout> GetDefaultLayout(
@@ -126,8 +132,6 @@ class MultiMeshClient : public PjRtClient {
   MakeCrossHostReceiveBuffers(absl::Span<const Shape> shapes,
                               PjRtDevice* device,
                               PjRtCrossHostRecvNotifier notifier) override;
-
-  absl::Status Defragment() override;
 
  private:
   std::unique_ptr<PjRtClient> base_client_;

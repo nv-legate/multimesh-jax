@@ -79,8 +79,7 @@ TEST_F(MpmdLogicalShardingPropagationTest, DotLogicalSharding) {
 
   auto axes = GetAxes(module->entry_computation()->root_instruction());
   ASSERT_TRUE(axes.has_value());
-  EXPECT_THAT(axes->axes,
-              ElementsAre(ElementsAre("mdl"), ElementsAre("hidden")));
+  EXPECT_THAT(*axes, ElementsAre(ElementsAre("mdl"), ElementsAre("hidden")));
 }
 
 constexpr absl::string_view kBatchDimDot = R"(
@@ -99,9 +98,9 @@ TEST_F(MpmdLogicalShardingPropagationTest, BatchDimDotLogicalSharding) {
 
   auto axes = GetAxes(module->entry_computation()->root_instruction());
   ASSERT_TRUE(axes.has_value());
-  EXPECT_THAT(axes->axes, ElementsAre(ElementsAre("data", "fsdp"),
-                                      ElementsAre("tensor", "sequence"),
-                                      ElementsAre(), ElementsAre()));
+  EXPECT_THAT(*axes, ElementsAre(ElementsAre("data", "fsdp"),
+                                 ElementsAre("tensor", "sequence"),
+                                 ElementsAre(), ElementsAre()));
 }
 
 }  // namespace

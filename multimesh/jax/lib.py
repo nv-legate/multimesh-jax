@@ -17,9 +17,7 @@ from .multimesh_jax_impl import (
     clear_tasks,
     enable_fast_path as _enable_fast_path,
     enable_metadata_name_tasks as _enable_metadata_name_tasks,
-    enable_only_fuse_loop_tasks as _enable_only_fuse_loop_tasks,
     enable_recomputation as _enable_recomputation,
-    enable_task_fusion as _enable_task_fusion,
 )
 from .no_op import no_op
 
@@ -97,27 +95,6 @@ def enable_fast_path(enable: Optional[bool] = None, context_value=[True]):
 
 
 @contextmanager
-def enable_task_fusion(enable: Optional[bool] = None, context_value=[True]):
-    """Sets whether tasks should be allowed to fuse.
-
-    Task fusion decreases runtime overhead by decreasing the number of tasks
-    and creates extra opportunities for instruction-level fusion. Task fusion,
-    however, decreases the total number of tasks and may reduce parallelism
-    or increase the critical path length. This indicates whether tasks should
-    be allowed to fuse.
-
-    Args:
-        enable: optional, whether to enable task fusion
-        context_value: optional, a global variable holding the current
-            context value. The user should never pass this value. The program
-            begins in a context with ``enable`` True, which means that all
-            tasks are allowed to fuse.
-    """  # noqa: E501
-    with _set_context_value(enable, _enable_task_fusion, context_value):
-        yield
-
-
-@contextmanager
 def enable_recomputation(enable: Optional[bool] = None, context_value=[True]):
     """(dis|en)ables comm-avoiding recompute of inter-task intermediates.
 
@@ -135,31 +112,6 @@ def enable_recomputation(enable: Optional[bool] = None, context_value=[True]):
             recomputation is enabled.
     """
     with _set_context_value(enable, _enable_recomputation, context_value):
-        yield
-
-
-@contextmanager
-def only_fuse_loop_tasks(enable: Optional[bool] = None, context_value=[False]):
-    """Sets whether tasks outside microbatch loops should be allowed to fuse.
-
-    Task fusion decreases runtime overhead by decreasing the number of tasks
-    and creates extra opportunities for instruction-level fusion. Task fusion,
-    however, decreases the total number of tasks and may reduce parallelism
-    or increase the critical path length. This specifically indicates that
-    tasks inside a loop (which are repeatedly executed) should be fused
-    to minimize overhead and maximize fusions.
-
-    Args:
-        enable: optional, whether only tasks inside a loop should be
-            allowed to fuse
-        context_value: optional, a global variable holding the current context
-            value. The user should never pass this value. The program begins
-            in a context with ``enable`` False, which means that all tasks are
-            allowed to fuse.
-    """
-    with _set_context_value(
-        enable, _enable_only_fuse_loop_tasks, context_value
-    ):
         yield
 
 
@@ -363,20 +315,12 @@ def _context(
     _configurable=None,
     _autoshard: Optional[bool] = None,
     _enable_recomputation: Optional[bool] = None,
-    _only_fuse_loop_tasks=None,
-    _enable_task_fusion=None,
     _enable_fast_path=None,
     _ignore_transforms=None,
 ):
     with tasks(configurable=_configurable) as A, autoshard(
         _autoshard
-    ) as B, only_fuse_loop_tasks(
-        _only_fuse_loop_tasks
-    ) as C, enable_task_fusion(
-        _enable_task_fusion
-    ) as D, enable_fast_path(
-        _enable_fast_path
-    ) as E, ignore_transforms(
+    ) as D, enable_fast_path(_enable_fast_path) as E, ignore_transforms(
         _ignore_transforms
     ) as F, enable_recomputation(
         _enable_recomputation
@@ -388,8 +332,6 @@ def _context(
 def context(
     autoshard: Optional[bool] = None,
     enable_recomputation: Optional[bool] = None,
-    only_fuse_loop_tasks: Optional[bool] = None,
-    enable_task_fusion: Optional[bool] = None,
     enable_fast_path: Optional[bool] = None,
     ignore_transforms: Optional[bool] = None,
 ):
@@ -397,16 +339,12 @@ def context(
 
     Args:
         autoshard: optional, value to configure the :func:`.autoshard` context manager.
-        only_fuse_loop_tasks: optional, value to configure the :func:`.only_fuse_loop_tasks` context manager.
-        enable_task_fusion: optional, value to configure the :func:`.enable_task_fusion` context manager.
         enable_fast_path: optional, value to configure the :func:`.enable_fast_path` context manager.
         ignore_transforms: optional, value to configure the :func:`.ignore_transforms` context manager.
     """  # noqa: E501
     with _context(
         _autoshard=autoshard,
         _enable_recomputation=enable_recomputation,
-        _only_fuse_loop_tasks=only_fuse_loop_tasks,
-        _enable_task_fusion=enable_task_fusion,
         _enable_fast_path=enable_fast_path,
         _ignore_transforms=ignore_transforms,
     ):

@@ -8,7 +8,6 @@
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_instructions.h"
 #include "xla/hlo/ir/hlo_opcode.h"
-#include "xla/pjrt/multimesh/logical_sharding_context.h"
 #include "xla/pjrt/multimesh/mpmd_instruction.h"
 #include "xla/pjrt/multimesh/mpmd_utils.h"
 
@@ -105,7 +104,7 @@ absl::StatusOr<bool> MpmdLogicalShardingPropagation::Run(
           VLOG(5) << "dot " << instruction->name()
                   << " without axes has LHS and RHS with axes assigned";
           LogicalShardingAxes dot_axes;
-          dot_axes.axes.resize(instruction->shape().dimensions_size());
+          dot_axes.resize(instruction->shape().dimensions_size());
           HloDotInstruction* dot = static_cast<HloDotInstruction*>(instruction);
           absl::flat_hash_set<int64_t> rhs_cxn_and_batch_dims;
           absl::flat_hash_set<int64_t> lhs_cxn_and_batch_dims;
@@ -122,11 +121,11 @@ absl::StatusOr<bool> MpmdLogicalShardingPropagation::Run(
           auto maybe_add_axes_at_dim = [&dot_axes, &axes_already_assigned](
                                            int dot_dim, int operand_dim,
                                            const LogicalShardingAxes& axes) {
-            if (dot_axes.axes[dot_dim]
+            if (dot_axes[dot_dim]
                     .empty()) {  // batch dimensions can come from both
-              for (const auto& axis_name : axes.axes[operand_dim]) {
+              for (const auto& axis_name : axes[operand_dim]) {
                 if (!axes_already_assigned.contains(axis_name)) {
-                  dot_axes.axes[dot_dim].push_back(axis_name);
+                  dot_axes[dot_dim].push_back(axis_name);
                   axes_already_assigned.insert(axis_name);
                 }
               }

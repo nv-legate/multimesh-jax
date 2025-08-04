@@ -115,14 +115,16 @@ void PropagateSharding(const HloInstruction* source, HloInstruction* target,
                                            num_devices, std::nullopt);
     if (!resized_sharding.has_value()) {
       resized_sharding = HloSharding::Replicate();
-      LOG(WARNING) << "unable to resize sharding " << source->sharding()
-                   << " on " << source->name() << " to " << num_devices
-                   << " on " << target->name()
-                   << " elements, falling back to replicated";
+      LOG(WARNING) << "unable to resize sharding "
+                   << source->sharding_or_default(HloSharding::Replicate())
+                   << " on " << source->name() << " " << source->shape()
+                   << " to " << num_devices << " on " << target->name() << " "
+                   << target->shape() << ", falling back to replicated";
     }
     VLOG(5) << "resized sharding to " << *resized_sharding << " for "
             << target->name() << " over " << num_devices << " devices from "
-            << source->sharding() << " on " << source->name();
+            << source->sharding_or_default(HloSharding::Replicate()) << " on "
+            << source->name();
 
     target->set_sharding(*std::move(resized_sharding));
   }
@@ -160,19 +162,25 @@ MpmdShardingPropagation::PropagateComputation(
   absl::InlinedVector<bool, 8> allow_sharding_propagation_to_params(
       call->operand_count(), propagate_to_parameters);
   for (int64_t index = 0; index < call->operand_count(); ++index) {
-    auto param_number = properties.ParameterNumber(call->operand(index));
-    if (param_number.has_value()) {
-      if (subconfig.allow_spmd_sharding_propagation_to_parameters().size() >
-          *param_number) {
-        allow_sharding_propagation_to_params[index] =
-            subconfig
-                .allow_spmd_sharding_propagation_to_parameters()[*param_number];
-      } else if (subconfig.allow_spmd_sharding_propagation_to_parameters()
-                     .empty()) {
-        allow_sharding_propagation_to_params[index] = false;
-      } else {
-        allow_sharding_propagation_to_params[index] =
-            subconfig.allow_spmd_sharding_propagation_to_parameters()[0];
+    if (HasAssignedAxes(call->operand(index))) {
+      // this should not be overriden, axes will be used to define
+      // the sharding within this context
+      allow_sharding_propagation_to_params[index] = false;
+    } else {
+      auto param_number = properties.ParameterNumber(call->operand(index));
+      if (param_number.has_value()) {
+        if (subconfig.allow_spmd_sharding_propagation_to_parameters().size() >
+            *param_number) {
+          allow_sharding_propagation_to_params[index] =
+              subconfig.allow_spmd_sharding_propagation_to_parameters()
+                  [*param_number];
+        } else if (subconfig.allow_spmd_sharding_propagation_to_parameters()
+                       .empty()) {
+          allow_sharding_propagation_to_params[index] = false;
+        } else {
+          allow_sharding_propagation_to_params[index] =
+              subconfig.allow_spmd_sharding_propagation_to_parameters()[0];
+        }
       }
     }
   }
@@ -207,7 +215,7 @@ void MpmdShardingPropagation::FixReshapeSharding(HloInstruction* call) {
 
   auto no_op_reshape_with_sharding = [](HloInstruction* i) {
     return i->opcode() == HloOpcode::kReshape &&
-           !IsReplicatedOrNotSharded(i->operand(0)) &&
+           ShardingHasTileAssignment(i->operand(0)) &&
            IsReplicatedOrNotSharded(i) &&
            i->operand(0)->shape().dimensions() == i->shape().dimensions();
   };
@@ -417,11 +425,12 @@ absl::Status MpmdShardingPropagation::ShardForwardCallInstruction(
   for (auto* subcomp : sharded_twin_module->computations()) {
     for (auto* instruction : subcomp->instructions()) {
       if (instruction->has_sharding() && !instruction->sharding().IsTuple() &&
-          !instruction->sharding().IsReplicated()) {
+          !instruction->sharding().IsReplicated() &&
+          !instruction->sharding().IsManual()) {
         if (instruction->sharding().tile_assignment().num_elements() !=
             devices.size()) {
           LOG(FATAL) << instruction->name() << " " << instruction->sharding()
-                     << " " << devices;
+                     << " does not fit " << devices;
         }
       }
     }
@@ -476,7 +485,7 @@ void MpmdShardingPropagation::PropagateParamShardingsBackward(
   for (int64_t index = 0; index < call_instruction->operand_count(); ++index) {
     auto* param = sharded_computation->parameter_instruction(index);
     auto* operand = call_instruction->mutable_operand(index);
-    if (!IsReplicatedOrNotSharded(param)) {
+    if (ShardingHasTileAssignment(param)) {
       properties.ForEachBackwardAliasAndSelf(operand, [&](HloInstruction* i) {
         if (!i->has_sharding()) {
           VLOG(5) << "propagate backward from param " << param->name()
@@ -498,7 +507,7 @@ void MpmdShardingPropagation::PropagateOutputShardingsForward(
   auto* call_root = sharded_computation->root_instruction();
   for (auto* user : call_instruction->users()) {
     auto* alias = call_root->mutable_operand(user->tuple_index());
-    if (!user->has_sharding() && !IsReplicatedOrNotSharded(alias)) {
+    if (!user->has_sharding() && ShardingHasTileAssignment(alias)) {
       VLOG(5) << "propagate forward from root " << alias->name() << " to user "
               << user->name() << " " << user->shape() << ": "
               << alias->sharding();

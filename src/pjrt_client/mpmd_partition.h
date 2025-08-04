@@ -83,9 +83,9 @@ MpmdPartitionIntoTasks(HloModule* module, const HloPartition& partition,
 // options for tuning how the module is partitioned and optimized.
 // Returns a scheduled-order vector operations, the vector of unique
 // SPMD modules, and the vector of unique temporaries.
-absl::StatusOr<std::tuple<std::vector<MpmdOperation>,
-                          std::vector<std::shared_ptr<SpmdModule>>,
-                          std::vector<Store>, std::vector<Store>>>
+absl::StatusOr<std::tuple<
+    std::vector<MpmdOperation>, std::vector<std::shared_ptr<SpmdModule>>,
+    std::vector<Store>, std::vector<Store>, std::unique_ptr<HloModule>>>
 MpmdPartition(const HloModuleProto& proto, const CompileOptions& options,
               const std::vector<const Shape*>& argument_layout_pointers,
               const Shape& executable_layout,

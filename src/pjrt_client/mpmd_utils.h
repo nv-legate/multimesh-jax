@@ -6,6 +6,8 @@
 #define XLA_PJRT_MULTIMESH_MPMD_UTILS_H_
 
 #include "absl/status/status.h"
+#include "absl/container/btree_map.h"
+
 #include "src/zuku/mesh.h"
 #include "xla/hlo/ir/hlo_instruction.h"
 #include "xla/hlo/ir/hlo_module.h"
@@ -52,7 +54,7 @@ HloInstruction* GetComputationRootTuplePartner(HloInstruction* gte,
 
 bool IsReplicatedOrNotSharded(const HloInstruction* instruction);
 
-bool IsNontriviallySharded(const HloInstruction* instruction);
+bool ShardingHasTileAssignment(const HloInstruction* instruction);
 
 absl::StatusOr<zuku::DeviceList> CreateDeviceList(
     const std::vector<int64_t>& devices);
@@ -201,6 +203,21 @@ absl::StatusOr<bool> EnforceBijectiveTasks(HloComputation* computation);
 int64_t OperandWeight(const HloInstruction* instruction);
 
 bool AllowOverride(int64_t index, absl::Span<const bool> override);
+
+// Computes a depth map for a given computation.
+// The depth map is a map from instruction to its depth in the computation.
+// The depth is the number of instructions between the instruction and the
+// arguments. This is used to determine the order of instructions in the
+// computation.
+absl::flat_hash_map<const HloInstruction*, int64_t> ComputeDepthMap(
+    const HloComputation* computation);
+
+// Computes a strict topological index map for a given computation.
+// The topological index map is a map from instruction to its topological
+// index in the computation based on the order given by
+// MakeInstructionPostOrder.
+absl::flat_hash_map<const HloInstruction*, int64_t> CreateTopologicalIndexMap(
+    const HloComputation* computation);
 
 constexpr absl::string_view kCustomCallArgumentRecolor = "ArgumentRecolor";
 constexpr absl::string_view kCustomCallReshard = "Reshard";

@@ -240,11 +240,11 @@ TEST_F(MpmdComputationFusionTest, NestedWhileLoopDeviceFusion) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
-          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
+          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
-          "task_g", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
+          "task_g", zuku::DeviceList{{.start = 0, .num_devices = 2}}, {}));
   const int64_t num_unfused_computations = module->computation_count();
 
   MpmdComputationFusion fusion{
@@ -266,11 +266,11 @@ TEST_F(MpmdComputationFusionTest, NestedWhileLoopMismatchedDeviceNoFusion) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto f,
       partition_->AllocateColor(
-          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
+          "task_f", zuku::DeviceList{{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto g,
       partition_->AllocateColor(
-          "task_g", zuku::DeviceList{{.start = 2, .num_devices = 4}}, nullptr));
+          "task_g", zuku::DeviceList{{.start = 2, .num_devices = 4}}, {}));
   const int64_t num_unfused_computations = module->computation_count();
 
   MpmdComputationFusion fusion{
@@ -326,11 +326,11 @@ TEST_F(MpmdComputationFusionTest, OnlyFuseForward) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto red,
       partition_->AllocateColor(
-          "red", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
+          "red", zuku::DeviceList{{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto blue,
       partition_->AllocateColor(
-          "blue", zuku::DeviceList{{.start = 2, .num_devices = 2}}, nullptr));
+          "blue", zuku::DeviceList{{.start = 2, .num_devices = 2}}, {}));
 
   MpmdComputationFusion fusion{
       partition_.get(), MpmdComputationFusion::FusionType::kMatchingColor,
@@ -387,11 +387,11 @@ TEST_F(MpmdComputationFusionTest, DoNotFuseBackwards) {
   TF_ASSERT_OK_AND_ASSIGN(
       auto red,
       partition_->AllocateColor(
-          "red", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
+          "red", zuku::DeviceList{{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto blue,
       partition_->AllocateColor(
-          "blue", zuku::DeviceList{{.start = 2, .num_devices = 2}}, nullptr));
+          "blue", zuku::DeviceList{{.start = 2, .num_devices = 2}}, {}));
 
   MpmdComputationFusion fusion{
       partition_.get(), MpmdComputationFusion::FusionType::kMatchingColor,
@@ -415,22 +415,20 @@ TEST_F(MpmdComputationFusionTest, FuseSplitBackpropLayers) {
     TF_ASSERT_OK_AND_ASSIGN(
         auto _, partition_->AllocateColor(
                     std::move(color),
-                    zuku::DeviceList{{.start = offset, .num_devices = 2}}));
+                    zuku::DeviceList{{.start = offset, .num_devices = 2}}, {}));
   }
   TF_ASSERT_OK_AND_ASSIGN(
       auto emb,
       partition_->AllocateColor(
-          "emb", zuku::DeviceList{{.start = 0, .num_devices = 2}}, nullptr));
+          "emb", zuku::DeviceList{{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto loss,
-      partition_->AllocateColor(
-          "compute_loss", zuku::DeviceList{{.start = 2, .num_devices = 2}},
-          nullptr));
+      auto loss, partition_->AllocateColor(
+                     "compute_loss",
+                     zuku::DeviceList{{.start = 2, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
       auto final,
       partition_->AllocateColor(
-          "final_ln", zuku::DeviceList{{.start = 2, .num_devices = 2}},
-          nullptr));
+          "final_ln", zuku::DeviceList{{.start = 2, .num_devices = 2}}, {}));
 
   const int64_t initial_computations_count = module->computation_count();
   // the module should start with 5 computations each for 24 layers

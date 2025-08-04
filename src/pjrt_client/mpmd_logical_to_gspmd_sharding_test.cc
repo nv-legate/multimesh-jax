@@ -12,7 +12,6 @@
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/hlo/utils/hlo_matchers.h"
 #include "xla/pjrt/multimesh/hlo_partition.h"
-#include "xla/pjrt/multimesh/logical_sharding_context.h"
 #include "xla/pjrt/multimesh/mpmd_coloring.h"
 #include "xla/pjrt/multimesh/mpmd_computation_grouper.h"
 #include "xla/pjrt/multimesh/mpmd_computation_inliner.h"
@@ -287,7 +286,8 @@ TEST_F(MpmdLogicalShardingTest, GradientAutoShardParam) {
       return task;
     }();
     int offset = task_number * kDevicesPerTask;
-    auto devices = std::make_pair(offset, offset + kDevicesPerTask);
+    std::vector<int64_t> devices(kDevicesPerTask);
+    std::iota(devices.begin(), devices.end(), offset);
     return std::make_pair(devices, std::move(color));
   };
 
@@ -386,10 +386,10 @@ TEST_F(MpmdLogicalShardingTest, LargeParametersNotSharded) {
 
   zuku::DeviceList devices04{{.start = 0, .num_devices = 4}};
   zuku::DeviceList devices48{{.start = 4, .num_devices = 4}};
-  LogicalShardingContext context04{
-      .devices = devices04,
+  multimesh::TaskOptions context04{
+      .devices = devices04.vector(),
       .dims = {1, 1, 4},
-      .device_axes = {"x", "y", "z"},
+      .axes = {"x", "y", "z"},
       .logical_axes =
           {
               {"replica", "x"},
@@ -398,46 +398,31 @@ TEST_F(MpmdLogicalShardingTest, LargeParametersNotSharded) {
           },
   };
   auto context48 = context04;
-  context48.devices = devices48;
-
-  auto context04_ptr =
-      std::make_shared<LogicalShardingContext>(std::move(context04));
-  auto context48_ptr =
-      std::make_shared<LogicalShardingContext>(std::move(context48));
+  context48.devices = devices48.vector();
 
   TF_ASSERT_OK_AND_ASSIGN(
-      auto emb, partition_->AllocateColor("emb", devices04, context04_ptr));
+      auto emb, partition_->AllocateColor("emb", devices04, context04));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer0,
-      partition_->AllocateColor("layers_0", devices04, context04_ptr));
+      auto layer0, partition_->AllocateColor("layers_0", devices04, context04));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer2,
-      partition_->AllocateColor("layers_2", devices04, context04_ptr));
+      auto layer2, partition_->AllocateColor("layers_2", devices04, context04));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer4,
-      partition_->AllocateColor("layers_4", devices04, context04_ptr));
+      auto layer4, partition_->AllocateColor("layers_4", devices04, context04));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer6,
-      partition_->AllocateColor("layers_6", devices04, context04_ptr));
+      auto layer6, partition_->AllocateColor("layers_6", devices04, context04));
 
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer1,
-      partition_->AllocateColor("layers_1", devices48, context48_ptr));
+      auto layer1, partition_->AllocateColor("layers_1", devices48, context48));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer3,
-      partition_->AllocateColor("layers_3", devices48, context48_ptr));
+      auto layer3, partition_->AllocateColor("layers_3", devices48, context48));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer5,
-      partition_->AllocateColor("layers_5", devices48, context48_ptr));
+      auto layer5, partition_->AllocateColor("layers_5", devices48, context48));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto layer7,
-      partition_->AllocateColor("layers_7", devices48, context48_ptr));
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto loss,
-      partition_->AllocateColor("compute_loss", devices48, context48_ptr));
-  TF_ASSERT_OK_AND_ASSIGN(
-      auto final_ln,
-      partition_->AllocateColor("final_ln", devices48, context48_ptr));
+      auto layer7, partition_->AllocateColor("layers_7", devices48, context48));
+  TF_ASSERT_OK_AND_ASSIGN(auto loss, partition_->AllocateColor(
+                                         "compute_loss", devices48, context48));
+  TF_ASSERT_OK_AND_ASSIGN(auto final_ln, partition_->AllocateColor(
+                                             "final_ln", devices48, context48));
 
   MpmdLogicalToGSPMDSharding autoshard{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, autoshard.Run(module.get()));

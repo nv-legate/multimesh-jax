@@ -113,11 +113,11 @@ TEST_F(MpmdColoringTest, NestedWhileColoring) {
   TF_ASSERT_OK_AND_ASSIGN(auto module, GetHloModuleFromText(kNestedWhileHlo,
                                                             /*num_devices=*/4));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto f, partition_->AllocateColor(
-                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto f, partition_->AllocateColor("task_f",
+                                        {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto g, partition_->AllocateColor(
-                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
+      auto g, partition_->AllocateColor("task_g",
+                                        {{.start = 2, .num_devices = 2}}, {}));
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
 
@@ -165,11 +165,11 @@ TEST_F(MpmdColoringTest, NestedWhileCustomScheduleColoring) {
                           GetHloModuleFromText(kNestedWhileCustomScheduleHlo,
                                                /*num_devices=*/4));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto f, partition_->AllocateColor(
-                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto f, partition_->AllocateColor("task_f",
+                                        {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto g, partition_->AllocateColor(
-                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
+      auto g, partition_->AllocateColor("task_g",
+                                        {{.start = 2, .num_devices = 2}}, {}));
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
 
@@ -204,8 +204,9 @@ TEST_F(MpmdColoringTest, TransformerColoring) {
       }
       return name;
     }();
-    auto devices = std::make_pair(offset, offset + 4);
-    return std::make_pair(devices, std::move(color));
+    std::vector<int64_t> devices(4);
+    std::iota(devices.begin(), devices.end(), offset);
+    return std::make_pair(std::move(devices), std::move(color));
   };
   RegisterMatcherTestTaskWithFactory("(layers_\\d+)", device_factory, {2, 2},
                                      {"x", "y"},
@@ -267,11 +268,11 @@ TEST_F(MpmdColoringTest, BackwardsColoringDoesNotOverwrite) {
       auto module, GetHloModuleFromText(kBackwardsColoringDoesNotOverwrite,
                                         /*num_devices=*/4));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto f, partition_->AllocateColor(
-                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto f, partition_->AllocateColor("task_f",
+                                        {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto g, partition_->AllocateColor(
-                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
+      auto g, partition_->AllocateColor("task_g",
+                                        {{.start = 2, .num_devices = 2}}, {}));
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
 
@@ -285,11 +286,11 @@ TEST_F(MpmdColoringTest, FavorMostRecentOperands) {
       auto module, GetHloModuleFromText(kBackwardsColoringDoesNotOverwrite,
                                         /*num_devices=*/4));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto f, partition_->AllocateColor(
-                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto f, partition_->AllocateColor("task_f",
+                                        {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto g, partition_->AllocateColor(
-                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
+      auto g, partition_->AllocateColor("task_g",
+                                        {{.start = 2, .num_devices = 2}}, {}));
   MpmdColoring coloring{partition_.get()};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
 
@@ -397,11 +398,11 @@ TEST_F(MpmdColoringTest, UsersWeightPriorityColoring) {
       GetHloModuleFromText(kTaskWithMultiplePropagationChoicesUsers,
                            /*num_devices=*/2));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto f, partition_->AllocateColor(
-                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto f, partition_->AllocateColor("task_f",
+                                        {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto g, partition_->AllocateColor(
-                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
+      auto g, partition_->AllocateColor("task_g",
+                                        {{.start = 2, .num_devices = 2}}, {}));
   MpmdColoring coloring{partition_.get(),
                         MpmdColoring::ColorPropagationPriority::kWeight};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
@@ -416,11 +417,11 @@ TEST_F(MpmdColoringTest, UsersDepthPriorityColoring) {
       GetHloModuleFromText(kTaskWithMultiplePropagationChoicesUsers,
                            /*num_devices=*/2));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto f, partition_->AllocateColor(
-                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto f, partition_->AllocateColor("task_f",
+                                        {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto g, partition_->AllocateColor(
-                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
+      auto g, partition_->AllocateColor("task_g",
+                                        {{.start = 2, .num_devices = 2}}, {}));
   MpmdColoring coloring{partition_.get(),
                         MpmdColoring::ColorPropagationPriority::kDepth};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
@@ -436,11 +437,11 @@ TEST_F(MpmdColoringTest, UsersTopologicalPriorityColoring) {
                            /*num_devices=*/2));
 
   TF_ASSERT_OK_AND_ASSIGN(
-      auto f, partition_->AllocateColor(
-                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto f, partition_->AllocateColor("task_f",
+                                        {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto g, partition_->AllocateColor(
-                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
+      auto g, partition_->AllocateColor("task_g",
+                                        {{.start = 2, .num_devices = 2}}, {}));
   MpmdColoring coloring{partition_.get(),
                         MpmdColoring::ColorPropagationPriority::kTopological};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
@@ -467,11 +468,11 @@ TEST_F(MpmdColoringTest, OperandsEqualWeightPriorityColoringPreferCloser) {
       GetHloModuleFromText(kTaskWithMultiplePropagationChoicesOperands,
                            /*num_devices=*/2));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto f, partition_->AllocateColor(
-                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto f, partition_->AllocateColor("task_f",
+                                        {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto g, partition_->AllocateColor(
-                  "task_g", {{.start = 2, .num_devices = 2}}, nullptr));
+      auto g, partition_->AllocateColor("task_g",
+                                        {{.start = 2, .num_devices = 2}}, {}));
   MpmdColoring coloring{partition_.get(),
                         MpmdColoring::ColorPropagationPriority::kWeight};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));
@@ -499,14 +500,14 @@ TEST_F(MpmdColoringTest, MixedDepthPriorityColoringPreferOperands) {
       GetHloModuleFromText(kTaskWithMultiplePropagationChoicesMixed,
                            /*num_devices=*/2));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto f, partition_->AllocateColor(
-                  "task_f", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto f, partition_->AllocateColor("task_f",
+                                        {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto g, partition_->AllocateColor(
-                  "task_g", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto g, partition_->AllocateColor("task_g",
+                                        {{.start = 0, .num_devices = 2}}, {}));
   TF_ASSERT_OK_AND_ASSIGN(
-      auto h, partition_->AllocateColor(
-                  "task_h", {{.start = 0, .num_devices = 2}}, nullptr));
+      auto h, partition_->AllocateColor("task_h",
+                                        {{.start = 0, .num_devices = 2}}, {}));
   MpmdColoring coloring{partition_.get(),
                         MpmdColoring::ColorPropagationPriority::kDepth};
   TF_ASSERT_OK_AND_ASSIGN(bool changed, coloring.Run(module.get()));

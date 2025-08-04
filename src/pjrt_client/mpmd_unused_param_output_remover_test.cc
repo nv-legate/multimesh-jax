@@ -60,8 +60,8 @@ TEST_F(MpmdUnusedParamOutputRemoverTest, RootParameter) {
 
   Shape unit_shape =
       module->entry_computation()->parameter_instruction(0)->shape();
-  Shape tuple1_shape{PrimitiveType::TUPLE, {}, {}, {unit_shape}};
-  Shape tuple2_shape{PrimitiveType::TUPLE, {}, {}, {unit_shape, unit_shape}};
+  Shape tuple1_shape{std::vector<Shape>{unit_shape}};
+  Shape tuple2_shape{{unit_shape, unit_shape}};
 
   EXPECT_THAT(
       m::EntryComputationCalls(module.get()),
@@ -123,8 +123,8 @@ TEST_F(MpmdUnusedParamOutputRemoverTest, RootParameterUsedInComputation) {
 
   Shape unit_shape =
       module->entry_computation()->parameter_instruction(0)->shape();
-  Shape tuple1_shape{PrimitiveType::TUPLE, {}, {}, {unit_shape}};
-  Shape tuple2_shape{PrimitiveType::TUPLE, {}, {}, {unit_shape, unit_shape}};
+  Shape tuple1_shape{std::vector<Shape>{unit_shape}};
+  Shape tuple2_shape{{unit_shape, unit_shape}};
 
   EXPECT_THAT(
       m::EntryComputationCalls(module.get()),

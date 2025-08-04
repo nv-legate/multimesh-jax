@@ -56,7 +56,7 @@ absl::Status MpmdTestBase::VerifyHloModule(const HloModule& module,
                                            const HloPartition& partition) {
   for (auto* computation : module.computations()) {
     for (auto* instruction : computation->instructions()) {
-      if (!IsReplicatedOrNotSharded(instruction) &&
+      if (ShardingHasTileAssignment(instruction) &&
           !instruction->sharding().IsTuple()) {
         const int64_t expected_num_devices =
             partition.NumDevicesForInstruction(instruction);
@@ -141,9 +141,6 @@ MpmdTestBase::RunMpmdOnHloModule(std::unique_ptr<HloModule> module,
   HloModuleProto proto = module->ToProto();
 
   auto* root = module->entry_computation()->root_instruction();
-  size_t num_outputs =
-      root->shape().IsTuple() ? root->shape().tuple_shapes_size() : 1;
-
   absl::Span<const bool> allow_output_sharding_propagation =
       module->config().allow_spmd_sharding_propagation_to_output();
   bool allow[] = {true};
@@ -201,10 +198,10 @@ MpmdTestBase::RunMpmdOnHloModule(std::unique_ptr<HloModule> module,
            cfg.replicated_parameter_num_elements_cutoff,
        .recompute_from_arguments_if_cost_less_than =
            cfg.recompute_from_arguments_if_cost_less_than,
-       .run_simplification_passes = cfg.run_simplification_passes,
-       .only_fuse_loop_tasks = cfg.only_fuse_loop_tasks});
+       .run_simplification_passes = cfg.run_simplification_passes});
 
-  auto [schedule, modules, temporaries, unused_params] = *std::move(result);
+  auto [schedule, modules, temporaries, unused_params, global_module] =
+      *std::move(result);
 
   std::vector<SpmdHloModuleTask> tasks;
   for (auto& op : schedule) {
@@ -362,6 +359,9 @@ std::vector<HloComputation*> WhileBodies(HloModule* module) {
       absl::StrCat("instruction has shape larger than ", elements, " elements"),
       [=](const HloInstruction* instruction,
           ::testing::MatchResultListener* listener) {
+        if (instruction->shape().IsTuple()) {
+          return false;
+        }
         return ShapeUtil::ElementsIn(instruction->shape()) > elements;
       }));
 }
@@ -504,38 +504,72 @@ std::vector<HloComputation*> WhileBodies(HloModule* module) {
 }  // namespace mpmd_matchers
 
 void RegisterMatcherTestTask(
-    std::string matcher, std::pair<int64_t, int64_t> devices,
+    std::string matcher, std::pair<int64_t, int64_t> device_bounds,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes) {
+    std::vector<std::pair<std::string, std::string>> logical_axes,
+    std::optional<std::pair<std::string, std::string>> split_backprop_suffixes,
+    std::function<std::vector<int64_t>(int64_t iteration)>
+        loop_dependent_devices) {
+  std::vector<int64_t> devices;
+  devices.reserve(device_bounds.second - device_bounds.first);
+  for (int64_t dev = device_bounds.first; dev < device_bounds.second; ++dev) {
+    devices.push_back(dev);
+  }
+
   auto callback = [=](const std::string& matched, bool backprop) {
     std::string name = matched;
     if (backprop) {
       name = absl::StrCat("bwd.", name);
     }
-    return std::make_pair(devices, name);
+    return multimesh::TaskOptions{
+        .name = name,
+        .devices = devices,
+        .dims = dims,
+        .axes = axes,
+        .logical_axes = logical_axes,
+        .split_backprop = backprop ? split_backprop_suffixes : std::nullopt,
+        .loop_dependent_devices = loop_dependent_devices,
+    };
   };
-  RegisterMetadataNameTask(matcher, callback, std::move(dims), std::move(axes),
-                           std::move(logical_axes));
+  RegisterMetadataNameTask(matcher, callback);
 }
 
 void RegisterNamedTestTask(
-    std::string name, std::pair<int64_t, int64_t> devices,
+    std::string name, std::pair<int64_t, int64_t> device_bounds,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes) {
-  RegisterMatcherTestTask(absl::StrCat("(", name, ")"), devices,
-                          std::move(dims), std::move(axes),
-                          std::move(logical_axes));
+    std::vector<std::pair<std::string, std::string>> logical_axes,
+    std::optional<std::pair<std::string, std::string>> split_backprop_suffixes,
+    std::function<std::vector<int64_t>(int64_t iteration)>
+        loop_dependent_devices) {
+  RegisterMatcherTestTask(
+      absl::StrCat("(", name, ")"), device_bounds, std::move(dims),
+      std::move(axes), std::move(logical_axes),
+      std::move(split_backprop_suffixes), std::move(loop_dependent_devices));
 }
 
 void RegisterMatcherTestTaskWithFactory(
     std::string matcher,
-    std::function<std::pair<std::pair<int64_t, int64_t>, std::string>(
-        const std::string&, bool)>
+    std::function<
+        std::pair<std::vector<int64_t>, std::string>(const std::string&, bool)>
         device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes) {
-  RegisterMetadataNameTask(matcher, std::move(device_factory), std::move(dims),
-                           std::move(axes), std::move(logical_axes));
+    std::vector<std::pair<std::string, std::string>> logical_axes,
+    std::optional<std::pair<std::string, std::string>> split_backprop_suffixes,
+    std::function<std::vector<int64_t>(int64_t iteration)>
+        loop_dependent_devices) {
+  auto callback = [=](const std::string& name, bool backprop) {
+    auto [devices, matched_name] = device_factory(name, backprop);
+    return multimesh::TaskOptions{
+        .name = std::move(matched_name),
+        .devices = std::move(devices),
+        .dims = std::move(dims),
+        .axes = std::move(axes),
+        .logical_axes = std::move(logical_axes),
+        .split_backprop = backprop ? split_backprop_suffixes : std::nullopt,
+        .loop_dependent_devices = loop_dependent_devices};
+  };
+
+  RegisterMetadataNameTask(matcher, callback);
 }
 
 }  // namespace xla

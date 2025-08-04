@@ -27,6 +27,17 @@ constexpr int64_t kCrossMeshCommComputeRatio = 1000;
 // flop and the cost to communicate a byte from global memory.
 constexpr int64_t kGlobalMemToComputeRatio = 100;
 
+int64_t ElementsIn(const Shape& shape) {
+  if (shape.IsTuple()) {
+    int64_t total = 0;
+    for (const auto& shape : shape.tuple_shapes()) {
+      total += ElementsIn(shape);
+    }
+    return total;
+  }
+  return ShapeUtil::ElementsIn(shape);
+}
+
 }  // namespace
 
 MpmdArgumentRecompute::MpmdArgumentRecompute(
@@ -118,12 +129,15 @@ absl::StatusOr<bool> MpmdArgumentRecompute::MaybeRecomputeOperandFromArguments(
     // if anything in the operand tree is sharded over a different number of
     // devices return false and quit
     // TODO: enable argument recompute across a tree with different meshes
-    if (IsNontriviallySharded(next) && IsNontriviallySharded(instruction)) {
+    if (ShardingHasTileAssignment(next) &&
+        ShardingHasTileAssignment(instruction)) {
       if (next->sharding().tile_assignment().num_elements() !=
           instruction->sharding().tile_assignment().num_elements()) {
-        VLOG(5) << "found misimatched sharding in operand tree for "
+        VLOG(5) << "found mismatched sharding in operand tree for "
                 << operand->name() << ":" << operand->shape()
-                << " abandoning replication";
+                << " abandoning replication since " << instruction->name()
+                << " " << instruction->sharding() << " does not match "
+                << next->name() << ":" << next->sharding();
         return false;
       }
     }
@@ -173,18 +187,12 @@ absl::StatusOr<bool> MpmdArgumentRecompute::MaybeRecomputeOperandFromArguments(
         // assume we can do this efficiently and it adds little extra cost
         break;
       case HloOpcode::kReduce:
-        if (!next->shape().IsTuple()) {
-          // TODO: for now, just ignore the cost for tuple reductions
-          // since XLA no longer provides a way to automatically count
-          // the number of elements recursively in a tuple
-          total_recompute_cost +=
-              ShapeUtil::ElementsIn(GetSpmdShape(next->operand(0)));
-        }
+        total_recompute_cost += ElementsIn(GetSpmdShape(next->operand(0)));
         break;
       default:
         // only add costs for non-tuples
         if (!next->shape().IsTuple()) {
-          total_recompute_cost += ShapeUtil::ElementsIn(GetSpmdShape(next));
+          total_recompute_cost += ElementsIn(GetSpmdShape(next));
         }
         break;
     }
@@ -235,7 +243,7 @@ absl::StatusOr<bool> MpmdArgumentRecompute::MaybeRecomputeOperandFromArguments(
     auto* clone = computation->AddInstruction(
         to_clone->CloneWithNewOperands(to_clone->shape(), new_operands));
 
-    if (!IsReplicatedOrNotSharded(clone) &&
+    if (ShardingHasTileAssignment(clone) &&
         clone->sharding().tile_assignment().num_elements() != num_devices) {
       clone->clear_sharding();
     }

@@ -9,7 +9,7 @@ from typing import Callable, Optional
 import jax
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import mhlo
-from jax.core import Primitive
+from jax.extend.core import Primitive
 from jax.interpreters import ad, mlir
 
 

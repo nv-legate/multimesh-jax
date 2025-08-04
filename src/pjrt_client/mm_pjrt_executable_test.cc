@@ -83,7 +83,7 @@ std::ostream& operator<<(std::ostream& os, const ReplicaGroup& group) {
   return os;
 }
 
-std::pair<std::pair<int64_t, int64_t>, std::string> TaskCallback(
+std::pair<std::vector<int64_t>, std::string> TaskCallback(
     const std::string& name, bool backprop, int64_t devices_per_stage,
     int64_t layers_per_stage, int64_t total_devices) {
   int layer_num;
@@ -97,16 +97,18 @@ std::pair<std::pair<int64_t, int64_t>, std::string> TaskCallback(
   const int64_t num_device_groups = total_devices / devices_per_stage;
   const int64_t offset =
       ((layer_num / layers_per_stage) % num_device_groups) * devices_per_stage;
-  auto devices = std::make_pair(offset, offset + devices_per_stage);
+
+  std::vector<int64_t> devices(devices_per_stage);
+  std::iota(devices.begin(), devices.end(), offset);
 
   std::string color =
       absl::StrCat("stage_", pipeline_stage, "_", backprop ? "bwd" : "fwd");
 
-  return std::make_pair(devices, std::move(color));
+  return std::make_pair(std::move(devices), std::move(color));
 };
 
-std::function<std::pair<std::pair<int64_t, int64_t>, std::string>(
-    const std::string&, bool)>
+std::function<std::pair<std::vector<int64_t>, std::string>(const std::string&,
+                                                           bool)>
 TaskCallback(int64_t devices_per_stage, int64_t layers_per_stage,
              int64_t total_devices) {
   return [=](const std::string& name, bool backprop) {
@@ -492,6 +494,29 @@ TEST_F(MultiMeshExecutableTest, Pipeline2x8Stages) {
   ExecutePath("pipeline_16gpus.txt", /*num_devices=*/kTotalDevices);
 }
 
+TEST_F(MultiMeshExecutableTest, Pipeline2x8StagesZeroBubble) {
+  static constexpr int kLayersPerStage = 6;
+  static constexpr int kDevicesPerStage = 4;
+  static constexpr int kTotalDevices = 16;
+  static constexpr int kNumDeviceGroups = 4;
+  static constexpr int64_t kMaxBytesAllocated = 29800000000;
+
+  std::vector<std::pair<std::string, std::string>> transformer_axes = {
+      {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
+      {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
+  };
+
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices),
+      {1, 1, kDevicesPerStage}, {"x", "y", "z"}, transformer_axes,
+      std::make_pair("activations", "weights"));
+
+  ReplicateParametersSmallerThanNumElements(1024 * 2048);
+
+  ExecutePath("zero_bubble_24layers.txt", /*num_devices=*/kTotalDevices);
+}
+
 TEST_F(MultiMeshExecutableTest, Pipeline2x8StagesReplicateSmallParams) {
   static constexpr int kLayersPerStage = 1;
   static constexpr int kDevicesPerStage = 8;
@@ -529,6 +554,40 @@ TEST_F(MultiMeshExecutableTest, Pipeline2x8StagesReplicateSmallParams) {
   ExecutePath("pipeline_16gpus.txt", /*num_devices=*/kTotalDevices);
 
   EXPECT_LT(DeviceBytesHighWatermark(0), kMaxBytesAllocated);
+}
+
+TEST_F(MultiMeshExecutableTest, Pipeline2x8StagesLoadBalanceEmb) {
+  static constexpr int kLayersPerStage = 1;
+  static constexpr int kDevicesPerStage = 8;
+  static constexpr int kTotalDevices = 16;
+
+  std::vector<std::pair<std::string, std::string>> embeddings_axes = {
+      {"replica", "x"}, {"seq", "y"},     {"seq", "z"},
+      {"mdl", "z"},     {"replica", "y"}, {"replica", "z"},
+  };
+
+  std::vector<std::pair<std::string, std::string>> transformer_axes = {
+      {"replica", "x"}, {"data", "y"}, {"mdl", "z"},
+      {"seq", "y"},     {"seq", "z"},  {"mdl", "x"},
+  };
+
+  RegisterMatcherTestTaskWithFactory(
+      "(layers_\\d+)",
+      TaskCallback(kDevicesPerStage, kLayersPerStage, kTotalDevices), {1, 1, 8},
+      {"x", "y", "z"}, transformer_axes);
+
+  auto emb_iter_devs = [&](int64_t i) -> std::vector<int64_t> {
+    std::vector<int64_t> devs(kDevicesPerStage);
+    int64_t start = (kDevicesPerStage * i) % kTotalDevices;
+    std::iota(devs.begin(), devs.end(), start);
+    return devs;
+  };
+
+  RegisterMatcherTestTask("(emb).*", {0, kDevicesPerStage}, {1, 1, 8},
+                          {"x", "y", "z"}, embeddings_axes, std::nullopt,
+                          emb_iter_devs);
+
+  ExecutePath("pipeline_16gpus.txt", /*num_devices=*/kTotalDevices);
 }
 
 TEST_F(MultiMeshExecutableTest, Pipeline2x8Stages24LayersReplicateSmallParams) {

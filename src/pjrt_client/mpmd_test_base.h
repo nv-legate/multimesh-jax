@@ -167,6 +167,13 @@ inline auto TrivialOp() {
 inline auto NontrivialOp() { return ::testing::Not(TrivialOp()); }
 
 template <class Matcher>
+auto ToApplyInstructions(const Matcher& matcher) {
+  using ::testing::Property;
+  return Property(&HloInstruction::to_apply,
+                  Property(&HloComputation::MakeInstructionPostOrder, matcher));
+}
+
+template <class Matcher>
 auto TaskInstructions(const Matcher& matcher) {
   using ::testing::Field;
   using ::testing::Property;
@@ -288,22 +295,34 @@ struct MpmdStoreMatcherConfig {
 }  // namespace mpmd_matchers
 
 void RegisterNamedTestTask(
-    std::string name, std::pair<int64_t, int64_t> devices,
+    std::string name, std::pair<int64_t, int64_t> device_bounds,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes);
+    std::vector<std::pair<std::string, std::string>> logical_axes,
+    std::optional<std::pair<std::string, std::string>> split_backprop_suffixes =
+        std::nullopt,
+    std::function<std::vector<int64_t>(int64_t iteration)>
+        loop_dependent_devices = nullptr);
 
 void RegisterMatcherTestTask(
-    std::string matcher, std::pair<int64_t, int64_t> devices,
+    std::string matcher, std::pair<int64_t, int64_t> device_bounds,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes);
+    std::vector<std::pair<std::string, std::string>> logical_axes,
+    std::optional<std::pair<std::string, std::string>> split_backprop_suffixes =
+        std::nullopt,
+    std::function<std::vector<int64_t>(int64_t iteration)>
+        loop_dependent_devices = nullptr);
 
 void RegisterMatcherTestTaskWithFactory(
     std::string matcher,
-    std::function<std::pair<std::pair<int64_t, int64_t>, std::string>(
+    std::function<std::pair<std::vector<int64_t>, std::string>(
         const std::string& task, bool backprop)>
         device_factory,
     std::vector<int64_t> dims, std::vector<std::string> axes,
-    std::vector<std::pair<std::string, std::string>> logical_axes);
+    std::vector<std::pair<std::string, std::string>> logical_axes,
+    std::optional<std::pair<std::string, std::string>> split_backprop_suffixes =
+        std::nullopt,
+    std::function<std::vector<int64_t>(int64_t iteration)>
+        loop_dependent_devices = nullptr);
 
 }  // namespace xla
 

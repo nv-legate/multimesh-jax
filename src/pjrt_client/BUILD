@@ -7,14 +7,19 @@ load("//xla/tsl:tsl.bzl", "tsl_pybind_extension_opensource")
 
 load("@local_config_cuda//cuda:build_defs.bzl", "if_cuda", "cuda_default_copts", "cuda_library")
 
-load(
-    "//xla:xla.bzl",
-    "xla_cc_test",
-)
+load("//xla:xla.default.bzl", "xla_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
+)
+
+cc_library(
+    name = "pycallback_types",
+    hdrs = ["pycallback_types.h"],
+    deps = [
+    ],
+    alwayslink = True
 )
 
 cc_library(
@@ -27,7 +32,7 @@ cc_library(
         "//xla/stream_executor:stream_executor_h",
         "//xla/service:backend",
         "//xla/pjrt/distributed:distributed",
-        "//xla/pjrt/gpu:nccl_id_store",
+        "//xla/pjrt:pjrt_stream_executor_client",
         "//xla/service/gpu:gpu_executable_run_options",
         "@zuku",
         ":json_utils",
@@ -140,9 +145,9 @@ cc_library(
     deps = [
         "@com_google_absl//absl/status",
         "@zuku",
+        "//xla/hlo/transforms/simplifiers:all_reduce_folder",
         "//xla/service/gpu/transforms:reduce_scatter_creator",
-        "//xla/service:all_reduce_folder",
-        "//xla/service/gpu/transforms:all_reduce_splitter",
+        "//xla/service/gpu/transforms/collectives:all_reduce_splitter",
         ":hlo_partition",
     ],
 )
@@ -185,7 +190,6 @@ cc_library(
         "//xla/hlo/pass:hlo_pass_pipeline",
         ":mpmd_instruction",
         ":mpmd_utils",
-        ":logical_sharding_context",
     ],
 )
 
@@ -197,7 +201,7 @@ cc_library(
         "@com_google_absl//absl/status",
         "@zuku",
         "//xla/hlo/pass:hlo_pass_pipeline",
-        "//xla/service:tuple_simplifier",
+        "//xla/hlo/transforms/simplifiers:tuple_simplifier",
         "//xla/service:call_inliner",
         ":hlo_partition",
         ":mpmd_instruction",
@@ -240,7 +244,6 @@ cc_library(
         "//xla:xla_proto_cc",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass_pipeline",
-        "//xla/service:hlo_pass_pipeline",
         "@tsl//tsl/platform:errors",
         "@tsl//tsl/platform:logging",
         "@tsl//tsl/platform:path",
@@ -365,7 +368,7 @@ cc_library(
         "@com_google_absl//absl/status",
         ":hlo_partition",
         "//xla/hlo/ir:hlo",
-        "//xla/service:hlo_pass_pipeline",
+        "//xla/hlo/pass:hlo_pass_pipeline",
         "@jsoncpp_git//:jsoncpp",
         "@zuku",
     ],
@@ -382,7 +385,6 @@ cc_library(
         "@zuku",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass_pipeline",
-        "//xla/service:hlo_pass_pipeline",
         ":color_dfs",
         ":mpmd_instruction",
         ":hlo_partition",
@@ -399,10 +401,54 @@ cc_library(
         "@zuku",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass_pipeline",
-        "//xla/service:hlo_pass_pipeline",
         ":mpmd_instruction",
         ":hlo_partition",
         ":color_dfs",
+    ],
+)
+
+cc_library(
+    name = "task_splitter",
+    srcs = ["task_splitter.cc"],
+    hdrs = ["task_splitter.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@zuku",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/pass:hlo_pass_pipeline",
+        "//xla/hlo/analysis:hlo_ordering",
+        ":hlo_partition",
+        ":mpmd_instruction",
+        ":mpmd_utils",
+    ],
+)
+
+cc_library(
+    name = "critical_path_finder",
+    srcs = ["critical_path_finder.cc"],
+    hdrs = ["critical_path_finder.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@zuku",
+        "//xla/hlo/ir:hlo",
+    ],
+)
+
+cc_library(
+    name = "mpmd_split_critical_path",
+    srcs = ["mpmd_split_critical_path.cc"],
+    hdrs = ["mpmd_split_critical_path.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@zuku",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/pass:hlo_pass_pipeline",
+        "//xla/hlo/analysis:hlo_ordering",
+        ":hlo_partition",
+        ":mpmd_instruction",
+        ":mpmd_utils",
+        ":task_splitter",
+        ":critical_path_finder",
     ],
 )
 
@@ -456,6 +502,7 @@ cc_library(
         "//xla/hlo/pass:hlo_pass_pipeline",
         ":mpmd_instruction",
         ":hlo_partition",
+        ":pycallback_types",
     ],
 )
 
@@ -479,7 +526,7 @@ cc_library(
     deps = [
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass_pipeline",
-        "//xla/service:tuple_simplifier",
+        "//xla/hlo/transforms/simplifiers:tuple_simplifier",
         "//xla/service:call_inliner",
         "@com_google_absl//absl/status",
         "@zuku",
@@ -498,11 +545,11 @@ cc_library(
         "@zuku",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass_pipeline",
-        "//xla/service:hlo_pass_pipeline",
-        "//xla/service:tuple_simplifier",
+        "//xla/hlo/transforms/simplifiers:tuple_simplifier",
         "//xla/service:call_inliner",
         ":mpmd_instruction",
         ":hlo_partition",
+        ":pycallback_types",
     ],
 )
 
@@ -515,7 +562,6 @@ cc_library(
         "@zuku",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass_pipeline",
-        "//xla/service:hlo_pass_pipeline",
         ":mpmd_instruction",
         ":hlo_partition",
     ],
@@ -530,7 +576,6 @@ cc_library(
         "@zuku",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass_pipeline",
-        "//xla/service:hlo_pass_pipeline",
         ":mpmd_instruction",
         ":hlo_partition",
     ],
@@ -545,7 +590,6 @@ cc_library(
         "@zuku",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass_pipeline",
-        "//xla/service:hlo_pass_pipeline",
         ":mpmd_instruction",
         ":hlo_partition",
     ],
@@ -560,7 +604,6 @@ cc_library(
         "@zuku",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass_pipeline",
-        "//xla/service:hlo_pass_pipeline",
         ":mpmd_instruction",
         ":hlo_partition",
         ":mpmd_utils",
@@ -689,21 +732,6 @@ cc_library(
 )
 
 cc_library(
-    name = "logical_sharding_context",
-    hdrs = [":logical_sharding_context.h"],
-    srcs = [":logical_sharding_context.cc"],
-    deps = [
-        "@com_google_absl//absl/base:core_headers",
-        "@tsl//tsl/platform:status",
-        "@zuku",
-        ":json_utils",
-        ":mpmd_loop",
-        ":mpmd_utils",
-    ],
-    alwayslink = True,
-)
-
-cc_library(
     name = "mpmd_instruction",
     hdrs = ["mpmd_instruction.h"],
     srcs = ["mpmd_instruction.cc"],
@@ -713,7 +741,6 @@ cc_library(
         "@zuku",
         ":json_utils",
         ":mpmd_loop",
-        ":logical_sharding_context",
     ],
     alwayslink = True,
 )
@@ -726,9 +753,9 @@ cc_library(
         "@com_google_absl//absl/status",
         ":json_utils",
         ":mm_sharding",
-        ":logical_sharding_context",
         ":mpmd_instruction",
         ":mpmd_utils",
+        ":pycallback_types",
         "//xla/hlo/ir:hlo",
         "@tsl//tsl/platform:regexp",
         "@jsoncpp_git//:jsoncpp",
@@ -749,7 +776,7 @@ cc_library(
         "//xla/service:hlo_module_util",
         "//xla/tools:hlo_module_loader",
         "//xla/pjrt:compile_options_proto_cc",
-        "//xla/pjrt:execute_options_proto_cc",
+        "//xla/pjrt/proto:execute_options_proto_cc",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/transforms/simplifiers:hlo_dce",
         ":mm_sharding",
@@ -783,6 +810,7 @@ cc_library(
         ":mpmd_insert_reshard",
         ":mpmd_buffer_scheduling_name",
         ":mpmd_inplace_collectives",
+        ":mpmd_split_critical_path",
         ":iota_sharding_sanitizer",
         ":scalar_argument",
     ],
@@ -795,7 +823,7 @@ cc_library(
     hdrs = ["mpmd_input_output_buffer_alias.h"],
     deps = [
         "@com_google_absl//absl/status",
-        "//xla/service:hlo_pass",
+        "//xla/hlo/pass:hlo_pass",
         "//xla:shape_util",
         "//xla/hlo/ir:hlo",
         "@com_google_absl//absl/algorithm:container",
@@ -836,23 +864,9 @@ cc_library(
         "//xla/pjrt/cpu:tracked_tfrt_cpu_device_buffer",
         "//xla/pjrt:tfrt_cpu_pjrt_client",
         "//xla/service/cpu:cpu_event",
-        ":mm_buffer_action",
         ":mm_utils",
         ":zuku_execute_context",
         "@zuku",
-    ],
-    alwayslink = True,
-)
-
-cc_library(
-    name = "mm_buffer_action",
-    srcs = ["mm_buffer_action.cc"],
-    hdrs = ["mm_buffer_action.h"],
-    deps = [
-        "//xla/pjrt:pjrt_client",
-        "//xla/pjrt:pjrt_stream_executor_client",
-        ":cuda_utils",
-        ":json_utils",
     ],
     alwayslink = True,
 )
@@ -947,7 +961,6 @@ cc_library(
         "@zuku",
         "@realm",
         ":scalar_argument",
-        ":mm_buffer_action",
         ":allocator",
         ":store_handle_fwd",
     ],
@@ -977,7 +990,6 @@ cc_library(
         "//xla/pjrt:pjrt_client",
         "//xla/pjrt:pjrt_stream_executor_client",
         "//xla/client:local_client",
-        ":mm_buffer_action",
         ":mm_utils",
         ":mm_computation",
         ":zuku_execute_context",
@@ -1005,6 +1017,7 @@ cc_library(
         "//xla/backends/cpu/collectives:gloo_collectives",
         "//xla/backends/cpu/collectives:gloo_kv_store",
         "//xla/python:custom_partition_callback",
+        "//xla/python:custom_call_batch_partitioner",
         "//xla/backends/profiler/plugin:plugin_tracer_impl",
         "//xla/pjrt/c:pjrt_c_api_custom_partitioner_extension_hdrs",
         "//xla/pjrt/c:pjrt_c_api_gpu_extension_hdrs",
@@ -1035,6 +1048,10 @@ cuda_library(
         "//xla/stream_executor/gpu:gpu_stream",
         "@local_config_cuda//cuda:cuda_headers",
         "@zuku",
+    ],
+    tags = [
+        "cuda-only",
+        "gpu",
     ],
     alwayslink = True
 )
@@ -1090,9 +1107,9 @@ tsl_pybind_extension_opensource(
         "ZukuShutdown",
         "ClearMetadataNameTasks",
         "SetEnableMetadataNameTasks",
+        "PushMetadataNameTaskContext",
+        "PopMetadataNameTaskContext",
         "EnableFastPath",
-        "EnableTaskFusion",
-        "EnableOnlyFuseLoopTasks",
         "EnableMultiMeshRecomputation",
         "RegisterMetadataNameTask",
         "ReplicateParametersSmallerThanNumElements",
@@ -1124,7 +1141,7 @@ tsl_pybind_extension_opensource(
         "//xla/service/gpu:gpu_executable",
         "//xla/service/gpu/model:gpu_hlo_cost_analysis",
         "//xla/service:gpu_plugin",
-        "//xla/pjrt/gpu:nccl_id_store",
+        "//xla/stream_executor:cuda_platform",
         "//xla/stream_executor/cuda:cublas_plugin",
         "//xla/stream_executor/cuda:cuda_platform",
         "//xla/stream_executor/cuda:cudnn_plugin",
@@ -1203,6 +1220,7 @@ cc_library(
         "//xla/hlo/ir:hlo",
         "//xla/hlo/parser:hlo_parser",
         "//xla/tests:hlo_test_base",
+        "//xla/stream_executor/cuda:cuda_executor",
     ],
     testonly = True,
 )
@@ -1223,6 +1241,7 @@ cc_library(
         ":mpmd_store",
         ":json_utils",
         "@zuku",
+        "//xla/stream_executor/cuda:cuda_executor",
     ],
     testonly = True
 )
@@ -1242,6 +1261,7 @@ xla_cc_test(
         "@tsl//tsl/platform:test_main",
         "//xla/service:cpu_plugin",
         "//xla/service:gpu_plugin",
+        "//xla/stream_executor/cuda:cuda_platform",
     ],
 )
 
@@ -1259,6 +1279,7 @@ xla_cc_test(
         "@tsl//tsl/platform:test_main",
         "//xla/service:cpu_plugin",
         "//xla/service:gpu_plugin",
+        "//xla/stream_executor/cuda:cuda_platform",
     ],
 )
 
@@ -1345,6 +1366,36 @@ xla_cc_test(
         "@tsl//tsl/platform:test_main",
     ],
 )
+
+xla_cc_test(
+    name = "critical_path_finder_test",
+    srcs = ["critical_path_finder_test.cc"],
+    deps = [
+        ":critical_path_finder",
+        ":mpmd_instruction",
+        ":mpmd_utils",
+        ":hlo_partition",
+        ":mpmd_test_base",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/utils:hlo_matchers",
+        "@tsl//tsl/platform:test_main",
+    ],
+)
+
+xla_cc_test(
+    name = "task_splitter_test",
+    srcs = ["task_splitter_test.cc"],
+    deps = [
+        ":task_splitter",
+        ":mpmd_instruction",
+        ":hlo_partition",
+        ":mpmd_test_base",
+        "//xla/hlo/ir:hlo",
+        "//xla/hlo/utils:hlo_matchers",
+        "@tsl//tsl/platform:test_main",
+    ],
+)
+
 
 xla_cc_test(
     name = "mpmd_hoist_loop_convert_test",
@@ -1642,22 +1693,11 @@ xla_cc_test(
     deps = [
         ":loop_scheduler",
         ":mm_mock_mm_xla",
+        ":mpmd_test_base",
         "//xla/hlo/parser:hlo_parser",
         "//xla/tests:hlo_test_base",
         "@tsl//tsl/platform:test_main",
+        "//xla/stream_executor/cuda:cuda_executor",
     ],
 )
 
-xla_cc_test(
-    name = "mm_buffer_action_test",
-    srcs = ["mm_buffer_action_test.cc"],
-    deps = [
-        ":mm_buffer_action",
-        "//xla/pjrt/gpu:se_gpu_pjrt_client",
-        "@xla//xla/tsl/platform:test",
-        "@tsl//tsl/platform:test_main",
-        "//xla/tsl/cuda",  # buildcleaner: keep
-        "//xla/tsl/cuda:cudart",  # buildcleaner: keep
-        "//xla/service:gpu_plugin",
-    ],
-)
