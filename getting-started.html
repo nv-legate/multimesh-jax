@@ -345,7 +345,10 @@ document.write(`
             </div>
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#docker-images">Docker Images</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#docker-images">Docker Images</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#requirements">Requirements</a></li>
+</ul>
+</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#running-jupyter-tutorials-with-docker">Running Jupyter tutorials with Docker</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#building-images">Building Images</a></li>
 </ul>
@@ -370,7 +373,15 @@ rebuilding each component.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>pull<span class="w"> </span>ghcr.io/nv-legate/multimesh-jax:v0.2
 </pre></div>
 </div>
-<p>Containers can also be built using <a class="reference external" href="https://github.com/nv-legate/multimesh-jax-workflows">MultiMesh for Jax workflows</a>.</p>
+<p>Images can also be built using <a class="reference external" href="https://github.com/nv-legate/multimesh-jax-workflows">MultiMesh for Jax workflows</a>.</p>
+<section id="requirements">
+<h3>Requirements<a class="headerlink" href="#requirements" title="Link to this heading">#</a></h3>
+<p>The prebuilt container is built from a CUDA 12.8
+<a class="reference external" href="https://hub.docker.com/layers/nvidia/cuda/12.8.1-cudnn-devel-ubuntu22.04/images/sha256-61f6c08f2b59036cb935e56d1e31a6b64e3ae2c7ddb86d33fa0b044c7917b719">base image</a>
+on Ubuntu 22.
+For system compatibility, refer to the
+<a class="reference external" href="https://docs.nvidia.com/cuda/archive/12.8.0/cuda-toolkit-release-notes/index.html#cuda-toolkit-major-component-versions">CUDA toolkit documentation</a>.</p>
+</section>
 </section>
 <section id="running-jupyter-tutorials-with-docker">
 <h2>Running Jupyter tutorials with Docker<a class="headerlink" href="#running-jupyter-tutorials-with-docker" title="Link to this heading">#</a></h2>
@@ -385,7 +396,8 @@ that can be loaded in a local browser:</p>
 <span class="w">  </span>jupyter<span class="w"> </span>notebook<span class="w"> </span>--allow-root<span class="w"> </span>--ip<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="o">=</span><span class="m">8675</span>
 </pre></div>
 </div>
-<p>The notebook will then be available at the link shown.<br />
+<p>The notebook will then be available at the URL shown,
+which is usually <code class="docutils literal notranslate"><span class="pre">http://127.0.0.1:8675/...</span></code> or <code class="docutils literal notranslate"><span class="pre">http://localhost:8675/...</span></code>.
 If GPUs are available, then docker can be launched as:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-w<span class="w"> </span>/opt/workspace/multimesh-jax/docs/notebooks<span class="w"> </span><span class="se">\</span>
@@ -449,7 +461,10 @@ that handles all of the components required for building the plugin.</p>
   </div>
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#docker-images">Docker Images</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#docker-images">Docker Images</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#requirements">Requirements</a></li>
+</ul>
+</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#running-jupyter-tutorials-with-docker">Running Jupyter tutorials with Docker</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#building-images">Building Images</a></li>
 </ul>

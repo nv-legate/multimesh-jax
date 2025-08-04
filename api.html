@@ -404,13 +404,13 @@ document.write(`
 <tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.register_task.html#multimesh.jax.register_task" title="multimesh.jax.register_task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_task</span></code></a>(matcher, *[, callback, task])</p></td>
 <td><p>Registers a name or regex-based task autosharding context</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.MultiMesh.html#multimesh.jax.MultiMesh" title="multimesh.jax.MultiMesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiMesh</span></code></a>(*[, axis_sizes, axis_names, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#multimesh.jax.MultiMesh" title="multimesh.jax.MultiMesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">MultiMesh</span></code></a>(*[, axis_sizes, axis_names, ...])</p></td>
 <td><p>MultiMesh represents a global mesh with named submeshes</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.Task.html#multimesh.jax.Task" title="multimesh.jax.Task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Task</span></code></a>([name, mesh, logical_axes, mesh_slice, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#multimesh.jax.Task" title="multimesh.jax.Task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Task</span></code></a>([name, mesh, logical_axes, mesh_slice, ...])</p></td>
 <td><p>Task dataclass defining all options for a named task context</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/multimesh.jax.TaskMesh.html#multimesh.jax.TaskMesh" title="multimesh.jax.TaskMesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TaskMesh</span></code></a>(*, devices[, axis_sizes, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#multimesh.jax.TaskMesh" title="multimesh.jax.TaskMesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TaskMesh</span></code></a>(*, devices[, axis_sizes, ...])</p></td>
 <td><p>TaskMesh representing a submesh within the global mesh</p></td>
 </tr>
 </tbody>
@@ -481,7 +481,7 @@ defined by the kwargs map.</p>
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em> | </em><em>None</em>)</p></li>
-<li><p><strong>mesh</strong> (<a class="reference internal" href="_autosummary/multimesh.jax.TaskMesh.html#multimesh.jax.TaskMesh" title="multimesh.jax.task.TaskMesh"><em>TaskMesh</em></a><em> | </em><em>None</em>)</p></li>
+<li><p><strong>mesh</strong> (<a class="reference internal" href="#multimesh.jax.TaskMesh" title="multimesh.jax.task.TaskMesh"><em>TaskMesh</em></a><em> | </em><em>None</em>)</p></li>
 <li><p><strong>logical_axes</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>] </em><em>| </em><em>None</em>)</p></li>
 <li><p><strong>mesh_slice</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Mapping" title="(in Python v3.13)"><em>Mapping</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
 <li><p><strong>extra_axes</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.13)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><em>Tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>]</em><em>] </em><em>| </em><em>None</em>)</p></li>
@@ -526,7 +526,7 @@ defining both axis_sizes and axis_names. Defaults to None.</p></li>
 <dd class="field-even"><p>A task mesh with the same axes placed on new devices</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference internal" href="_autosummary/multimesh.jax.TaskMesh.html#multimesh.jax.TaskMesh" title="multimesh.jax.TaskMesh">TaskMesh</a></p>
+<dd class="field-odd"><p><a class="reference internal" href="#multimesh.jax.TaskMesh" title="multimesh.jax.TaskMesh">TaskMesh</a></p>
 </dd>
 </dl>
 </dd></dl>

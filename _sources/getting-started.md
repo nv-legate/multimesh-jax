@@ -12,7 +12,15 @@ The easiest way to get started is by using the prebuilt container images:
 docker pull ghcr.io/nv-legate/multimesh-jax:v0.2
 ```
 
-Containers can also be built using [MultiMesh for Jax workflows](https://github.com/nv-legate/multimesh-jax-workflows).
+Images can also be built using [MultiMesh for Jax workflows](https://github.com/nv-legate/multimesh-jax-workflows).
+
+### Requirements
+
+The prebuilt container is built from a CUDA 12.8
+[base image](https://hub.docker.com/layers/nvidia/cuda/12.8.1-cudnn-devel-ubuntu22.04/images/sha256-61f6c08f2b59036cb935e56d1e31a6b64e3ae2c7ddb86d33fa0b044c7917b719)
+on Ubuntu 22.
+For system compatibility, refer to the
+[CUDA toolkit documentation](https://docs.nvidia.com/cuda/archive/12.8.0/cuda-toolkit-release-notes/index.html#cuda-toolkit-major-component-versions).
 
 
 ## Running Jupyter tutorials with Docker
@@ -29,7 +37,8 @@ docker run \
   ghcr.io/nv-legate/multimesh-jax:v0.2 \
   jupyter notebook --allow-root --ip 0.0.0.0 --port=8675
 ```
-The notebook will then be available at the link shown.  
+The notebook will then be available at the URL shown,
+which is usually `http://127.0.0.1:8675/...` or `http://localhost:8675/...`.
 If GPUs are available, then docker can be launched as:
 
 ```bash
